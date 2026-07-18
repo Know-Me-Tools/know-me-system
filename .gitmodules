@@ -1,0 +1,3 @@
+[submodule "rust/vendor/librefang"]
+	path = rust/vendor/librefang
+	url = git@github.com:GQAdonis/librefang.git
