@@ -1,0 +1,44 @@
+[package]
+name = "knowme-poc"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.96"
+
+[lib]
+name = "knowme_poc"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["devtools"] }
+tauri-plugin-shell = "2"
+tauri-plugin-store = "2"
+tauri-plugin-os = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-gen-ui = { path = "../../rust/crates/tauri-plugin-gen-ui" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+directories = "6"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-log = "0.2"
+
+# ─────────────────────── Transitive dependency patches ──────────────────────
+# MUST mirror rust/Cargo.toml's [patch] — this is a SEPARATE workspace with its own
+# Cargo.lock, so patches declared there do not reach here. It pulls the inference lane
+# in transitively via tauri-plugin-gen-ui (path dep), which means it inherits mistral.rs
+# but NOT the patch that makes mistral.rs compile. Without this the desktop app — the
+# actual shipping binary — fails to build even while `cargo check` in rust/ is green.
+#
+# WHY (verified 2026-07-16): mistral.rs @ b7746a85 declares `safetensors = "0.7.0"`, but
+# GQAdonis/candle#main has moved to `"0.8.0"`. Semver-incompatible, so Cargo keeps both
+# and candle-core's `Dtype` stops unifying with mistralrs-quant's (E0308 on
+# `UnsupportedSafeTensorDtype`). The fix is the fallback the fork's own Cargo.toml
+# documents: upstream huggingface/candle rev 5404348, which declares 0.7.0.
+#
+# Keep the rev in lockstep with rust/Cargo.toml. Two locks, one truth.
+[patch."https://github.com/GQAdonis/candle.git"]
+candle-core = { git = "https://github.com/huggingface/candle.git", rev = "5404348" }
+candle-nn = { git = "https://github.com/huggingface/candle.git", rev = "5404348" }

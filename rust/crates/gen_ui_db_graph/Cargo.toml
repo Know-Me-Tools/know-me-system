@@ -1,0 +1,47 @@
+[package]
+name = "gen_ui_db_graph"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+gen_ui_types   = { path = "../gen_ui_types" }
+gen_ui_runtime = { path = "../gen_ui_runtime" }
+workspace-hack = { path = "../workspace-hack" }
+async-trait.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+futures.workspace = true
+# `sync` only (OnceCell for the singleton open) — wasm32-safe, no runtime pulled in.
+tokio = { workspace = true, features = ["sync"] }
+
+# SurrealDB engine is target-split so the native build gets RocksDB (persistent,
+# incl. iOS/Android) and wasm gets IndexedDB — the only embedded KV that links on
+# wasm32. Both share the same SurrealQL surface, so store.rs is target-agnostic.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+surrealdb = { workspace = true, features = ["kv-rocksdb", "kv-mem"] }
+# fastembed pulls ONNX Runtime — native only. On wasm the embedder is supplied by
+# the host (JS transformers.js) through the Embedder trait, so fastembed is absent.
+fastembed = { workspace = true, optional = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+surrealdb = { workspace = true, features = ["kv-indxdb"] }
+
+[features]
+# `embed-native` wires the on-device fastembed model. Off by default so the crate
+# (and its boundary tests) build without downloading an ONNX model; leaves that
+# ship inference enable it. wasm never gets it.
+default = []
+embed-native = ["dep:fastembed"]
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt", "macros"] }
+
+# One integration-test binary (tests/it/main.rs) — every extra tests/*.rs is a
+# separately linked binary and linking dominates the SurrealDB compile cycle.
+[[test]]
+name = "it"
+path = "tests/it/main.rs"

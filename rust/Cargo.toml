@@ -1,0 +1,237 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/gen_ui_types",
+    "crates/gen_ui_runtime",
+    "crates/gen_ui_protocol",
+    "crates/gen_ui_client",
+    "crates/gen_ui_mcp",
+    "crates/gen_ui_db",
+    "crates/gen_ui_db_graph",
+    "crates/gen_ui_inference",
+    "crates/gen_ui_audio",
+    "crates/gen_ui_agent",
+    "crates/gen_ui_host",
+    "crates/gen_ui_ffi",
+    "crates/tauri-plugin-gen-ui",
+    "crates/gen_ui_wasm",
+    "crates/gen_ui_server_axum",
+    "crates/knowme-web-server",
+    "crates/knowme_hands",
+    "crates/knowme_ofp",
+    "crates/knowme_plugin_host",
+    "crates/workspace-hack",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+# MSRV floor. 1.80 (the original TJ-ARCH-MOB-001 minimum) can no longer resolve the
+# current dependency graph — transitive crates (e.g. chacha20 ≥0.10) now require the
+# edition2024 Cargo feature, unparseable before Cargo 1.85. 1.93 is the realistic
+# mid-2026 floor. 1.93 can no longer build the SurrealDB 3.2 graph crate (C-004):
+# its transitive fastnum ≥0.7.5 requires rustc 1.94+, and the wasm target only
+# compiled cleanly on 1.96. Keep in sync with rust-toolchain.toml
+# and CLAUDE.md tool versions.
+rust-version = "1.96"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+# --- shared, workspace-wide (each crate opts in via `.workspace = true`) ---
+serde             = { version = "1.0",  features = ["derive"] }
+serde_json        = "1.0"
+thiserror         = "1.0"
+anyhow            = "1.0"
+futures           = "0.3"
+async-trait       = "0.1"
+tracing           = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+uuid              = { version = "1.10", features = ["v4", "fast-rng", "serde"] }
+chrono            = { version = "0.4",  features = ["serde"] }
+# --- native-heavy (feature/target gated inside crates) ---
+tokio             = { version = "1.40", default-features = false }
+tokio-stream      = { version = "0.1",  features = ["sync"] }
+axum              = { version = "0.8", features = ["json", "tokio", "http1"] }
+tower-http        = { version = "0.6", features = ["trace"] }
+async-stream      = "0.3"
+rust-embed        = { version = "8.7", features = ["interpolate-folder-path"] }
+mime_guess        = "2.0"
+reqwest           = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+sha2              = "0.10"
+encoding_rs       = "0.8"
+llama-cpp-2       = { version = "0.1.151", default-features = false }
+reqwest-eventsource = "0.6"
+# --- Flint platform SDK (FRF realtime spine). Nothing is published to crates.io —
+#     all FRF inter-crate deps are PATH deps in-repo, and the repo is private, so a
+#     fresh scaffold cannot resolve them. They are therefore left COMMENTED here (as
+#     C-001 leaves `tauri` commented for C-007): the default gate+forge build has NO
+#     FRF dependency and stays wasm-safe + offline-resolvable. To enable the `frf` /
+#     `peer-crdt` features, UNCOMMENT below and point at your vendored checkout —
+#     a `git`+`rev` pin (reproducible) or a `path` to a local clone:
+#       frf-sdk-rust = { git = "ssh://git@github.com/Prometheus-AGS/flint-realtime-fabric", rev = "9ba04ae6ce41be796ae149609414b17a0d0d376b" }
+#     ── VERIFIED HEAD (2026-07-15, re-confirmed 2026-07-16): 9ba04ae6ce41be796ae149609414b17a0d0d376b ──
+#
+#     C-106 (2026-07-16) VERIFIED the enable path end-to-end, then reverted it. Findings:
+#       * The git+rev dep RESOLVES fine — cargo clones the whole repo, so FRF's internal
+#         `path` deps (frf-domain = { path = "../frf-domain" }) are satisfied. The older
+#         note claiming a fresh scaffold "cannot resolve them" was wrong on that point.
+#       * The org casing is `Prometheus-AGS`, NOT `prometheusags` (verified: git ls-remote).
+#       * Cargo's libgit2 SSH transport CANNOT auth against this private repo
+#         ("no usernames succeeded") though the git CLI can. Requires, in .cargo/config.toml:
+#             [net]
+#             git-fetch-with-cli = true
+#       * THE REAL BLOCKER — why this stays commented: **FRF lives in a DIFFERENT GitHub org
+#         (Prometheus-AGS) than this repo (Know-Me-Tools), so CI's GITHUB_TOKEN can never
+#         reach it.** Uncommenting puts an `ssh://git@github.com/...` source in Cargo.lock,
+#         and CI then fails at fetch — `git@github.com: Permission denied (publickey)` — even
+#         though the `frf` feature is OFF by default, because the LOCK forces resolution.
+#         Enabling FRF in CI therefore needs a cross-org deploy key / PAT secret + an
+#         ssh-agent step in the workflow. That is a repo-admin action, not a code change.
+#       * Locally, uncomment + set git-fetch-with-cli and it builds clean:
+#         `cargo check -p gen_ui_client --features frf` passes, clippy -D warnings passes,
+#         and wasm32 stays FRF-free (verified via cargo tree).
+# frf-sdk-rust      = { git = "ssh://git@github.com/Prometheus-AGS/flint-realtime-fabric", rev = "9ba04ae6ce41be796ae149609414b17a0d0d376b", default-features = false }
+# frf-crdt          = { git = "ssh://git@github.com/Prometheus-AGS/flint-realtime-fabric", rev = "9ba04ae6ce41be796ae149609414b17a0d0d376b", default-features = false }
+# frf-store-redb    = { git = "ssh://git@github.com/Prometheus-AGS/flint-realtime-fabric", rev = "9ba04ae6ce41be796ae149609414b17a0d0d376b", default-features = false }
+# JWT decode (inspect exp/role/tenant_id from gate-minted tokens; no local verify —
+# gate/forge own verification via JWKS). validation disabled for pure claim reads.
+jsonwebtoken      = { version = "9", default-features = false }
+surrealdb         = { version = "3.2",  default-features = false }
+sqlx              = { version = "0.8",  default-features = false, features = ["runtime-tokio-rustls", "macros", "migrate"] }
+pglite-oxide       = { version = "0.5.1", default-features = false }
+refinery           = { version = "0.8", default-features = false }
+virtual-net        = "=0.702.0-alpha.3"
+candle-core       = "0.7"
+candle-nn         = "0.7"
+candle-transformers = "0.7"
+fastembed         = { version = "5", default-features = false, features = ["hf-hub-rustls-tls", "ort-download-binaries-rustls-tls", "image-models"] }
+flutter_rust_bridge = { version = "2.12", features = ["anyhow"] }
+dashmap           = "6.1"
+parking_lot       = "0.12"
+once_cell         = "1.20"
+# Cross-platform OS credential store (macOS Keychain, Windows Credential Manager,
+# Linux Secret Service, iOS Keychain). NO Android Keystore support yet (tracked
+# upstream: open-source-cooperative/keyring-rs#127) — Android secret storage is
+# deferred to C-109 alongside the Settings/keychain-admin UI.
+# `apple-native-keyring-store`'s `protected` feature is a hard compile-time
+# requirement on iOS (its `keychain` backend, enabled by keyring's default `v1`
+# feature, is macOS-only). keyring 4.1 doesn't re-export a standalone `protected`
+# feature (only bundled inside its heavyweight `cli` feature), so the store crate
+# is declared directly here purely to enable that one feature — Cargo unifies it
+# into the same dependency edge keyring itself pulls in. Additive on macOS/desktop,
+# which keeps using `keychain` from `v1` unless the app opts into Protected Data.
+keyring           = "4.1"
+apple-native-keyring-store = { version = "1", default-features = false, features = ["protected"] }
+# Universal LLM gateway (142+ providers) — user's fork, pinned by SHA (Rule 22/23).
+# native-http (reqwest/tokio) for desktop+mobile; wasm-http (reqwest/fetch, no
+# tokio multithread) for the wasm32 web target — same crate, feature-gated.
+#     ── VERIFIED HEAD (2026-07-16): 78b7496ca7b09a1aa6c3c666af0a149bbdf5249f ──
+liter-llm         = { git = "https://github.com/GQAdonis/liter-llm.git", rev = "78b7496ca7b09a1aa6c3c666af0a149bbdf5249f", default-features = false }
+# Optional mistral.rs desktop experiment; the reference app defaults to the
+# pinned llama.cpp/Qwen lane so first-run local chat stays reproducible.
+# User's fork, pinned by SHA (Rule 22/23). Workspace v0.8.3, its own MSRV is 1.88 —
+# clears our 1.96 floor. Metal + accelerate are the macOS acceleration features.
+# Consumed ONLY by gen_ui_inference, target-gated to desktop: mistral.rs/candle have
+# no documented mobile deployment path (gen_ui_types::inference §rationale), and the
+# crate cannot build for wasm32 — mobile uses llama-cpp-2, web uses WebLLM.
+#     ── VERIFIED HEAD (2026-07-16): b7746a85cb2e78fb2cf11cfb6ea9abd0a167d1f3 ──
+# CAVEAT (Rule 22): this fork tracks two of its own git deps by BRANCH, not rev —
+# GQAdonis/candle#main (resolved 2026-07-16: 8430d50bf15959e1759c5dc24ea1bc2a0fc90d95)
+# and GQAdonis/turboquant-rs#main (b485a88fd1688124d6f641e88367e498cc9365f1). Both are
+# public and reachable. Cargo.lock is therefore the ONLY pin holding those transitives
+# still; treat any `cargo update` touching candle/turboquant as deliberate + re-verified,
+# never routine. See the C-105 design doc for the full risk note and upstream fallback.
+mistralrs         = { git = "https://github.com/GQAdonis/mistral.rs.git", rev = "b7746a85cb2e78fb2cf11cfb6ea9abd0a167d1f3", default-features = false }
+
+# Feature-unification pin (cargo-hakari): all real crates depend on this so a
+# switch between desktop/mobile/wasm invocations doesn't churn shared deps.
+# Regenerate with: cargo hakari generate
+[workspace.dependencies.workspace-hack]
+path = "crates/workspace-hack"
+
+# ─────────────────────── Transitive dependency patches ──────────────────────
+# mistral.rs's candle dependency, redirected off the fork's floating `main`.
+#
+# WHY (verified 2026-07-16, C-105): mistral.rs @ b7746a85 declares
+# `safetensors = "0.7.0"` in its workspace, but GQAdonis/candle#main has moved on to
+# `safetensors = "0.8.0"`. Those are semver-incompatible, so Cargo keeps BOTH in the
+# graph and candle-core's `Dtype` (0.7) no longer unifies with mistralrs-quant's
+# `Dtype` (0.8) — mistralrs-quant fails to compile with E0308 on
+# `UnsupportedSafeTensorDtype`. This is the fork's own crates disagreeing; nothing in
+# our code triggers it. (Our fastembed pulls safetensors 0.8, which is what Cargo
+# unifies into mistralrs-quant — but the mismatch exists regardless of us.)
+#
+# THE FIX is the one the fork's maintainer documented in its own Cargo.toml: fall back
+# to the upstream huggingface/candle rev it was actually built against. Verified that
+# rev declares `safetensors = "0.7.0"`, matching mistral.rs — so the graph unifies.
+#
+# This is a [patch], not a dep bump, because candle is a *transitive* dep of mistralrs;
+# we have no other way to pin it. Revisit if the fork re-syncs its candle to 0.8.
+#
+# BONUS (Rule 22): this also removes the fork's floating `branch = "main"` candle
+# reference from our graph entirely, replacing it with a SHA. Only turboquant-rs#main
+# still floats, held by Cargo.lock alone.
+#
+# Only candle-core/-nn are patched: the metal-kernels/flash-attn crates aren't in our
+# normal resolved graph (Metal kernels are disabled until the fork's Candle versions
+# agree; flash-attn is CUDA-only). Revisit the Metal lane with an upstream-compatible pin.
+#     ── upstream candle rev per mistral.rs's own fallback comment: 5404348 ──
+[patch."https://github.com/GQAdonis/candle.git"]
+candle-core = { git = "https://github.com/huggingface/candle.git", rev = "5404348" }
+candle-nn = { git = "https://github.com/huggingface/candle.git", rev = "5404348" }
+
+# llama-cpp-2 0.1.151 declares `common` as optional, but its dependency on
+# llama-cpp-sys-2 still enables the sys crate's default `common` feature. On iOS
+# that compiles llama.cpp's HTTP tooling and leaves unresolved `httplib::Client`
+# symbols in the final app. This source-preserving local patch changes only those
+# dependency edges to `default-features = false`; see vendor/llama-cpp-2/PATCH.md.
+[patch.crates-io]
+llama-cpp-2 = { path = "vendor/llama-cpp-2" }
+
+# ─────────────────────────── Compile profiles ───────────────────────────────
+# Development: fast iteration on host. Deps compiled well once (opt-2) then cached;
+# app code iterates at opt-0. line-tables-only + unpacked debuginfo = big macOS win.
+[profile.dev]
+opt-level = 0
+debug = "line-tables-only"
+split-debuginfo = "unpacked"
+incremental = true
+
+[profile.dev.package."*"]
+opt-level = 2
+debug = false
+
+# Build scripts + proc-macros (serde_derive, frb support, sqlx macros) run at
+# compile time — optimizing them speeds every downstream compile.
+[profile.dev.build-override]
+opt-level = 3
+
+# Release: shipped desktop/mobile binaries.
+# panic = "unwind" is REQUIRED: flutter_rust_bridge wraps handlers in catch_unwind
+# to convert Rust panics into a catchable Dart PanicException. panic="abort" would
+# hard-kill the entire mobile app process on any panic. (Do NOT change to abort.)
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+panic = "unwind"
+incremental = false
+
+# WASM: size-optimized. panic=abort is safe & standard on wasm32.
+[profile.wasm-release]
+inherits = "release"
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = "debuginfo"
+
+# Optional nightly host-only fast codegen. Enable per-invocation:
+#   cargo +nightly build --profile dev-fast -Zcodegen-backend
+# Cranelift works on aarch64-macOS host dev ONLY — never iOS/Android/wasm.
+# (Left commented so stable builds are unaffected; uncomment cargo-features to use.)
+# cargo-features = ["codegen-backend"]
+# [profile.dev-fast]
+# inherits = "dev"
+# codegen-backend = "cranelift"

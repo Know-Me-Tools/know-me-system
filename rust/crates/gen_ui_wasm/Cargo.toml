@@ -1,0 +1,29 @@
+[package]
+name = "gen_ui_wasm"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+gen_ui_types    = { path = "../gen_ui_types" }
+gen_ui_runtime  = { path = "../gen_ui_runtime" }
+gen_ui_protocol = { path = "../gen_ui_protocol" }
+# wasm-http (not native-http): liter-llm's fetch-based client — no tokio
+# multithread runtime, matches the browser's single-threaded execution model.
+gen_ui_client   = { path = "../gen_ui_client", default-features = false, features = ["wasm-http"] }
+wasm-bindgen = "0.2"
+serde.workspace = true
+serde_json.workspace = true
+serde-wasm-bindgen = "0.6"
+console_error_panic_hook = "0.1"
+# liter-llm's ahash dependency pulls in getrandom 0.3, which refuses to build for
+# wasm32-unknown-unknown without the wasm_js backend explicitly enabled (it no
+# longer auto-detects JS availability). Declaring it directly (even unused) turns
+# the feature on workspace-wide via Cargo's feature unification. Requires the
+# matching --cfg in .cargo/config.toml (see getrandom 0.3 docs).
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.3", features = ["wasm_js"] }

@@ -1,0 +1,50 @@
+[package]
+name = "gen_ui_db"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+gen_ui_types   = { path = "../gen_ui_types" }
+gen_ui_runtime = { path = "../gen_ui_runtime" }
+async-trait.workspace = true
+anyhow.workspace      = true
+serde.workspace       = true
+serde_json.workspace  = true
+thiserror.workspace   = true
+futures.workspace     = true
+tracing.workspace     = true
+sqlx.workspace        = true
+refinery.workspace    = true
+reqwest.workspace     = true
+pglite-oxide = { workspace = true, optional = true }
+virtual-net = { workspace = true, optional = true }
+
+[features]
+# Desktop (Tauri) uses pglite-oxide; web drives PGlite from the TS side against
+# the same Postgres-dialect schema. Mobile does NOT use this crate's relational
+# store — it uses the embedded SurrealDB instance in gen_ui_db_graph. No sqlite
+# backend: one embedded-DB story per platform (pglite-oxide desktop / PGlite web
+# / SurrealDB mobile), not three.
+default = []
+pg = ["sqlx/postgres"]
+# C-106: the FRF spine read lane. OFF by default — the SDK is a private cross-org git
+# dep that CI cannot fetch (see the workspace Cargo.toml). With it off, the write queue
+# still runs and still persists; only the read lane is inert. Decode/apply logic is
+# feature-independent and always compiled + tested.
+frf = []
+pglite = ["pg", "dep:pglite-oxide", "dep:virtual-net", "pglite-oxide/bundled"]
+sqlite = ["sqlx/sqlite"]
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio        = { workspace = true, features = ["rt", "sync", "time", "macros"] }
+tokio-stream = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"
+# test-util: #[tokio::test(start_paused = true)] auto-advances time, so the write
+# queue's retry backoff (200ms, 400ms, 800ms…) costs zero wall-clock in tests. Without
+# it the replay tests would really sleep — slow tests get skipped, and skipped tests
+# stop protecting anything.
+tokio = { workspace = true, features = ["macros", "rt", "test-util"] }

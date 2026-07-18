@@ -1,0 +1,14 @@
+[package]
+name = "knowme_hands"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Hands system — autonomous, scheduled, Cedar-governed agents (FUNC-SPEC §06). Skeleton crate: domain types are real, execution is stubbed pending UAR scheduler wiring."
+
+[dependencies]
+# gen_ui_types / gen_ui_agent become dependencies when the UAR scheduler is wired (roadmap M1).
+workspace-hack = { path = "../workspace-hack" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true

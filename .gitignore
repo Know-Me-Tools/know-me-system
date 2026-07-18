@@ -1,0 +1,52 @@
+# Rust
+target/
+
+# Build-tool scratch locks (Gradle daemon, build_runner) — machine-local, never
+# shared. Formerly a blanket `*.lock`, which also swallowed the dependency
+# lockfiles below; those MUST be committed (see C-105 design doc).
+*.gradle/**/*.lock
+**/.dart_tool/build/lock/*.lock
+
+# Dependency lockfiles ARE committed — this is an application workspace, not a
+# library, so builds must be reproducible across machines and CI. This matters
+# concretely here: native llama.cpp dependencies and optional Mistral/Liter-LLM
+# providers must remain on reviewed revisions. Without these committed, CI can
+# silently re-resolve and the build can break.
+!rust/Cargo.lock
+!desktop/src-tauri/Cargo.lock
+!mobile/pubspec.lock
+!mobile/ios/Podfile.lock
+!flutter_packages/*/pubspec.lock
+
+# Local application data and browser-verification output
+.knowme-data/
+.playwright-mcp/
+**/__pycache__/
+
+# Flutter
+mobile/.dart_tool/
+mobile/build/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/android/app/src/main/jniLibs/
+mobile/ios/Frameworks/
+
+# Tauri/Node
+desktop/node_modules/
+desktop/src-tauri/target/
+desktop/dist/
+
+# Publishable packages (C-007)
+packages/*/node_modules/
+packages/*/dist/
+packages/gen-ui-wasm/pkg/
+rust/crates/tauri-plugin-gen-ui/guest-js/node_modules/
+rust/crates/tauri-plugin-gen-ui/guest-js/dist/
+flutter_packages/*/.dart_tool/
+flutter_packages/*/build/
+
+# Environment
+.env
+.env.*
+!.env.example
+_to_delete/

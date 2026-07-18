@@ -1,0 +1,19 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - "lib/bridge/generated_api.dart"
+    - "lib/bridge/frb_generated*.dart"
+    - "lib/bridge/api/*.dart"
+    - "lib/bridge/third_party/*.dart"
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+  errors:
+    invalid_annotation_target: ignore
+
+linter:
+  rules:
+    prefer_single_quotes: true
+    avoid_print: true
+    require_trailing_commas: true
+    sort_pub_dependencies: false

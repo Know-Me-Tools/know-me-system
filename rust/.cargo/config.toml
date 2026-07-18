@@ -1,0 +1,39 @@
+# TJ-ARCH-MOB-001 — compile-speed configuration.
+# See references/rust/compile-speed.md for the per-target rationale.
+
+[build]
+# rust-lld is the default linker on Linux x86_64 since Rust 1.90. macOS uses the
+# fast default Xcode "ld-prime" linker; the biggest macOS link win is debuginfo
+# tuning (set in the dev profile), not a third-party linker (mold/sold are dead
+# on macOS). To try lld on macOS: brew install llvm, then uncomment below.
+
+# [target.aarch64-apple-darwin]
+# rustflags = ["-C", "link-arg=-fuse-ld=/opt/homebrew/opt/llvm/bin/ld64.lld"]
+
+[env]
+# Native inference/audio dependencies use std::filesystem (macOS 10.15+).
+MACOSX_DEPLOYMENT_TARGET = { value = "10.15", force = true }
+
+[target.x86_64-unknown-linux-gnu]
+# mold is the fastest production linker on Linux (install: apt/brew install mold)
+# linker = "clang"
+# rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+
+# sccache: CI + branch-switching only (cannot cache incremental crates, so it is
+# NOT an inner-loop tool). Enable in ~/.cargo/config.toml, not here:
+#   [build] rustc-wrapper = "sccache"
+
+[target.wasm32-unknown-unknown]
+# getrandom 0.3 (pulled in transitively via liter-llm -> ahash) requires this cfg
+# alongside the `wasm_js` feature (enabled in gen_ui_wasm/Cargo.toml) to build for
+# the browser target — it no longer auto-detects JS availability. See:
+# https://docs.rs/getrandom/latest/getrandom/#webassembly-support
+rustflags = ["--cfg", "getrandom_backend=\"wasm_js\""]
+
+[net]
+# C-106: the FRF crates are a private git dep (ssh://git@github.com/...). Cargo's
+# built-in libgit2 SSH transport fails against it ("attempted ssh-agent authentication,
+# but no usernames succeeded") while the git CLI authenticates fine, so delegate fetching
+# to the CLI — it honours ~/.ssh/config, agent forwarding, and keychain/1Password agents.
+# This is Cargo's own documented remedy for private SSH deps.
+git-fetch-with-cli = true

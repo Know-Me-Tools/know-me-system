@@ -1,0 +1,42 @@
+[package]
+name = "gen_ui_inference"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[features]
+# Desktop local-inference lane (mistral.rs, Metal). OFF by default so surfaces that
+# don't want a 17-crate inference workspace in their graph stay cheap to compile —
+# tauri-plugin-gen-ui opts in explicitly. Named `local-mistral` rather than a bare
+# `mistral` to leave room for the sibling lanes in versions.toml [inference]:
+# llama-cpp-2 on mobile, WebLLM on web.
+default = []
+local-mistral = ["dep:mistralrs"]
+local-llama = ["dep:llama-cpp-2", "dep:reqwest", "dep:sha2", "dep:encoding_rs"]
+
+[dependencies]
+gen_ui_types   = { path = "../gen_ui_types" }
+gen_ui_runtime = { path = "../gen_ui_runtime" }
+async-trait.workspace = true
+anyhow.workspace = true
+futures.workspace = true
+tracing.workspace = true
+# `sync` for the RwLock guarding the loaded model + the mpsc channel that carries
+# generated tokens out of the spawned generation task.
+tokio = { workspace = true, features = ["sync", "fs", "io-util"] }
+# UnboundedReceiverStream — adapts that channel's receiver into the futures::Stream
+# the InferenceProvider trait returns.
+tokio-stream.workspace = true
+llama-cpp-2 = { workspace = true, optional = true }
+reqwest = { workspace = true, optional = true }
+sha2 = { workspace = true, optional = true }
+encoding_rs = { workspace = true, optional = true }
+
+# mistral.rs is desktop-only: no documented mobile deployment path
+# (gen_ui_types::inference §rationale) and it does not build for wasm32.
+# Target-gating here — rather than relying on the feature alone — means an
+# accidental `--features local-mistral` on an iOS/Android/wasm build resolves to
+# nothing instead of dragging in (or failing on) the whole candle/Metal graph.
+[target.'cfg(not(any(target_os = "ios", target_os = "android", target_arch = "wasm32")))'.dependencies]
+mistralrs = { workspace = true, optional = true }

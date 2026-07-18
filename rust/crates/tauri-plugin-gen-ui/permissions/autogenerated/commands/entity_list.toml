@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-entity-list"
+description = "Enables the entity_list command without any pre-configured scope."
+commands.allow = ["entity_list"]
+
+[[permission]]
+identifier = "deny-entity-list"
+description = "Denies the entity_list command without any pre-configured scope."
+commands.deny = ["entity_list"]

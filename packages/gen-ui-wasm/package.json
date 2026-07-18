@@ -1,0 +1,27 @@
+{
+  "name": "@prometheus-ags/gen-ui-wasm",
+  "version": "0.1.0",
+  "description": "Web/WASM surface of gen_ui_core — shared protocol adapters (A2UI ContentBlock folding) compiled to WebAssembly.",
+  "license": "MIT OR Apache-2.0",
+  "type": "module",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js"
+    }
+  },
+  "files": ["src", "pkg"],
+  "sideEffects": ["./pkg/*"],
+  "scripts": {
+    "build:wasm": "bash ../../rust/crates/gen_ui_wasm/build-wasm.sh ../../packages/gen-ui-wasm/pkg",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

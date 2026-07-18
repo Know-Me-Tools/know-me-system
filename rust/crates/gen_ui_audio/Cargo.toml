@@ -1,0 +1,42 @@
+[package]
+name = "gen_ui_audio"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+gen_ui_types    = { path = "../gen_ui_types" }
+gen_ui_runtime  = { path = "../gen_ui_runtime" }
+workspace-hack  = { path = "../workspace-hack" }
+thiserror.workspace = true
+tracing.workspace = true
+serde.workspace = true
+reqwest.workspace = true
+
+# Native-only crate (LEAF, like gen_ui_inference): whisper-rs links whisper.cpp
+# (C++ via cc/cmake) and cpal binds platform audio APIs (CoreAudio/WASAPI/ALSA/
+# AAudio) — neither compiles for wasm32. Scribe therefore stays a documented
+# mobile+desktop feature (see gen_ui_audio::lib.rs doc comment) until a browser
+# adapter (MediaRecorder + a wasm STT model) is designed, mirroring the C-105
+# WebLLM precedent for "web gets its own adapter, not this crate".
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+# whisper.cpp bindings. `download-binaries` (default OFF here) would fetch a
+# librewhisper release from GitHub; we instead vendor the C++ build. `-tiny` is
+# selected at the model-file level (see model.rs), not a crate feature — the
+# encoder/decoder graph is the same across all ggml sizes.
+whisper-rs = { version = "0.16", default-features = false }
+# Cross-platform audio input (CoreAudio/WASAPI/ALSA/AAudio/AVAudioEngine). Runs
+# the mic on its own OS callback thread; frames are handed to Rust via a bounded
+# channel, never blocking the Tokio runtime (Rule: CPU/IO-bound work off async).
+cpal = "0.18"
+# WAV container read for any pre-recorded/imported audio path (tests, desktop
+# "attach a clip" flow). Recording itself resamples straight to the in-memory
+# PCM whisper-rs wants, so this is a secondary/import path, not the hot path.
+hound = "3.5"
+# Per-OS cache dir for the downloaded whisper-tiny.bin (see model.rs — bundle vs
+# download-on-first-run tradeoff called out in the crate doc comment).
+dirs = "6.0"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt", "macros"] }

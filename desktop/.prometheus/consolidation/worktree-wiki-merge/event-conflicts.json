@@ -1,0 +1,1280 @@
+[
+  {
+    "id": "0ee78726-fbc8-4f04-95fa-244f6c237cc1",
+    "variants": [
+      {
+        "original_sha256": "45b8187dcd5c97a0627028f78761940970bfb3639dd063a2cc66bc31c7cb4586",
+        "record": "{\"id\":\"0ee78726-fbc8-4f04-95fa-244f6c237cc1\",\"kind\":\"compiled\",\"session_id\":\"9d2e1aff-ff5d-4df5-9d62-56b7b2bd14f0\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/desktop\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T01:20:12.952264Z\",\"payload\":{\"entry_id\":\"executor-completion-marker-for-codegen-and-ci-verification-phase\",\"tags\":[\"phase-status\",\"codegen\",\"ci-verification\",\"executor-session\",\"hybrid-mobile\"],\"title\":\"Executor Completion Marker for Codegen and CI Verification Phase\",\"ts\":\"2026-07-16T01:20:12.952264Z\",\"type\":\"compiled\"},\"affects\":[\"executor-completion-marker-for-codegen-and-ci-verification-phase\"]}",
+        "redactions": [],
+        "sources": [
+          {
+            "branch": "main-pre-consolidation",
+            "line": 9,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "primary"
+          },
+          {
+            "branch": "codex/consolidate-main",
+            "line": 9,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "integration"
+          },
+          {
+            "branch": "claude/compassionate-babbage-7cd4bc",
+            "line": 9,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "compassionate-babbage-7cd4bc"
+          },
+          {
+            "branch": "claude/cross-platform-app-theming-4a272e",
+            "line": 9,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "cross-platform-app-theming-4a272e"
+          },
+          {
+            "branch": "claude/funny-wozniak-06a4cc",
+            "line": 9,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "funny-wozniak-06a4cc"
+          },
+          {
+            "branch": "claude/goofy-gould-d872b8",
+            "line": 9,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "goofy-gould-d872b8"
+          },
+          {
+            "branch": "claude/optimistic-volhard-233482",
+            "line": 9,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "optimistic-volhard-233482"
+          },
+          {
+            "branch": "claude/pensive-greider-2e206c",
+            "line": 9,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "pensive-greider-2e206c"
+          },
+          {
+            "branch": "claude/practical-bose-6b609c",
+            "line": 9,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "practical-bose-6b609c"
+          },
+          {
+            "branch": "claude/sweet-mendeleev-401c40",
+            "line": 9,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "sweet-mendeleev-401c40"
+          },
+          {
+            "branch": "claude/xenodochial-sammet-a67a35",
+            "line": 9,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "xenodochial-sammet-a67a35"
+          }
+        ]
+      },
+      {
+        "original_sha256": "389bb8fb0edc5673b751a7433c5fb7b14d2dfc52dac51e0a8caa5245e1153483",
+        "record": "{\"id\":\"0ee78726-fbc8-4f04-95fa-244f6c237cc1\",\"kind\":\"compiled\",\"session_id\":\"9d2e1aff-ff5d-4df5-9d62-56b7b2bd14f0\",\"project_root\":\"$REPO_ROOT/apps/knowme-poc/desktop\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T01:20:12.952264Z\",\"payload\":{\"entry_id\":\"executor-completion-marker-for-codegen-and-ci-verification-phase\",\"tags\":[\"phase-status\",\"codegen\",\"ci-verification\",\"executor-session\",\"hybrid-mobile\"],\"title\":\"Executor Completion Marker for Codegen and CI Verification Phase\",\"ts\":\"2026-07-16T01:20:12.952264Z\",\"type\":\"compiled\"},\"affects\":[\"executor-completion-marker-for-codegen-and-ci-verification-phase\"]}",
+        "redactions": [
+          {
+            "kind": "repository-worktree-path",
+            "occurrences": 1
+          }
+        ],
+        "sources": [
+          {
+            "branch": "worktree-agent-a6bf13877ab890979",
+            "line": 9,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "agent-a6bf13877ab890979"
+          },
+          {
+            "branch": "worktree-agent-ad0c09b67356676bb",
+            "line": 9,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "agent-ad0c09b67356676bb"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "0fd0ef5e-61d1-4038-af6a-56815526b116",
+    "variants": [
+      {
+        "original_sha256": "06f111f7fdc0111ab38646c55d81073665b94b8490ed052a67c3eb08f2ab047d",
+        "record": "{\"id\":\"0fd0ef5e-61d1-4038-af6a-56815526b116\",\"kind\":\"compiled\",\"session_id\":\"e7ab889d-80cb-43aa-bae2-b9d823b187bc\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/desktop\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T11:57:08.487459Z\",\"payload\":{\"entry_id\":\"codegen-and-ci-verification-phase-for-knowme-poc\",\"tags\":[\"hybrid-mobile\",\"phase-codegen\",\"ci-verification\",\"proof-of-concept\",\"flutter\",\"rust-ffi\",\"tauri\",\"session-state\"],\"title\":\"Codegen and CI verification phase for KnowMe PoC\",\"ts\":\"2026-07-16T11:57:08.487459Z\",\"type\":\"compiled\"},\"affects\":[\"codegen-and-ci-verification-phase-for-knowme-poc\"]}",
+        "redactions": [],
+        "sources": [
+          {
+            "branch": "main-pre-consolidation",
+            "line": 13,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "primary"
+          },
+          {
+            "branch": "codex/consolidate-main",
+            "line": 13,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "integration"
+          },
+          {
+            "branch": "claude/cross-platform-app-theming-4a272e",
+            "line": 13,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "cross-platform-app-theming-4a272e"
+          },
+          {
+            "branch": "claude/funny-wozniak-06a4cc",
+            "line": 13,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "funny-wozniak-06a4cc"
+          },
+          {
+            "branch": "claude/goofy-gould-d872b8",
+            "line": 13,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "goofy-gould-d872b8"
+          },
+          {
+            "branch": "claude/optimistic-volhard-233482",
+            "line": 13,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "optimistic-volhard-233482"
+          },
+          {
+            "branch": "claude/practical-bose-6b609c",
+            "line": 13,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "practical-bose-6b609c"
+          },
+          {
+            "branch": "claude/xenodochial-sammet-a67a35",
+            "line": 13,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "xenodochial-sammet-a67a35"
+          }
+        ]
+      },
+      {
+        "original_sha256": "ed1ba4925944117665549f8ac29eb46de9c86e34954d353906fe569b1329a51f",
+        "record": "{\"id\":\"0fd0ef5e-61d1-4038-af6a-56815526b116\",\"kind\":\"compiled\",\"session_id\":\"e7ab889d-80cb-43aa-bae2-b9d823b187bc\",\"project_root\":\"$REPO_ROOT/apps/knowme-poc/desktop\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T11:57:08.487459Z\",\"payload\":{\"entry_id\":\"codegen-and-ci-verification-phase-for-knowme-poc\",\"tags\":[\"hybrid-mobile\",\"phase-codegen\",\"ci-verification\",\"proof-of-concept\",\"flutter\",\"rust-ffi\",\"tauri\",\"session-state\"],\"title\":\"Codegen and CI verification phase for KnowMe PoC\",\"ts\":\"2026-07-16T11:57:08.487459Z\",\"type\":\"compiled\"},\"affects\":[\"codegen-and-ci-verification-phase-for-knowme-poc\"]}",
+        "redactions": [
+          {
+            "kind": "repository-worktree-path",
+            "occurrences": 1
+          }
+        ],
+        "sources": [
+          {
+            "branch": "claude/compassionate-babbage-7cd4bc",
+            "line": 13,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "compassionate-babbage-7cd4bc"
+          },
+          {
+            "branch": "claude/pensive-greider-2e206c",
+            "line": 13,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "pensive-greider-2e206c"
+          },
+          {
+            "branch": "claude/sweet-mendeleev-401c40",
+            "line": 13,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "sweet-mendeleev-401c40"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "278120ac-7f2e-4062-bc6f-075a8ee574c0",
+    "variants": [
+      {
+        "original_sha256": "dba9d839258d3ffc08d75edd089dc158a5b9700121557dd1793a23c4161bb024",
+        "record": "{\"id\":\"278120ac-7f2e-4062-bc6f-075a8ee574c0\",\"kind\":\"compiled\",\"session_id\":\"e48bcd85-7bd8-40b3-8719-7361960e6b52\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/desktop\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T00:45:50.090481Z\",\"payload\":{\"entry_id\":\"knowme-poc-codegen-and-tauri-verification-c-102\",\"tags\":[\"hybrid-mobile\",\"knowme-poc\",\"codegen\",\"tauri\",\"flutter\",\"rust-workspace\",\"ci-verification\"],\"title\":\"KnowMe PoC Codegen and Tauri Verification C-102\",\"ts\":\"2026-07-16T00:45:50.090481Z\",\"type\":\"compiled\"},\"affects\":[\"knowme-poc-codegen-and-tauri-verification-c-102\"]}",
+        "redactions": [],
+        "sources": [
+          {
+            "branch": "main-pre-consolidation",
+            "line": 2,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "primary"
+          },
+          {
+            "branch": "codex/consolidate-main",
+            "line": 2,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "integration"
+          },
+          {
+            "branch": "claude/compassionate-babbage-7cd4bc",
+            "line": 2,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "compassionate-babbage-7cd4bc"
+          },
+          {
+            "branch": "claude/cross-platform-app-theming-4a272e",
+            "line": 2,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "cross-platform-app-theming-4a272e"
+          },
+          {
+            "branch": "claude/funny-wozniak-06a4cc",
+            "line": 2,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "funny-wozniak-06a4cc"
+          },
+          {
+            "branch": "claude/goofy-gould-d872b8",
+            "line": 2,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "goofy-gould-d872b8"
+          },
+          {
+            "branch": "claude/optimistic-volhard-233482",
+            "line": 2,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "optimistic-volhard-233482"
+          },
+          {
+            "branch": "claude/pensive-greider-2e206c",
+            "line": 2,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "pensive-greider-2e206c"
+          },
+          {
+            "branch": "claude/practical-bose-6b609c",
+            "line": 2,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "practical-bose-6b609c"
+          },
+          {
+            "branch": "claude/sweet-mendeleev-401c40",
+            "line": 2,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "sweet-mendeleev-401c40"
+          },
+          {
+            "branch": "claude/xenodochial-sammet-a67a35",
+            "line": 2,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "xenodochial-sammet-a67a35"
+          }
+        ]
+      },
+      {
+        "original_sha256": "0a5bb035ee9422ca2095289603321d1e90cdeae3deb360a90fbd7cbf001e8ad6",
+        "record": "{\"id\":\"278120ac-7f2e-4062-bc6f-075a8ee574c0\",\"kind\":\"compiled\",\"session_id\":\"e48bcd85-7bd8-40b3-8719-7361960e6b52\",\"project_root\":\"$REPO_ROOT/apps/knowme-poc/desktop\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T00:45:50.090481Z\",\"payload\":{\"entry_id\":\"knowme-poc-codegen-and-tauri-verification-c-102\",\"tags\":[\"hybrid-mobile\",\"knowme-poc\",\"codegen\",\"tauri\",\"flutter\",\"rust-workspace\",\"ci-verification\"],\"title\":\"KnowMe PoC Codegen and Tauri Verification C-102\",\"ts\":\"2026-07-16T00:45:50.090481Z\",\"type\":\"compiled\"},\"affects\":[\"knowme-poc-codegen-and-tauri-verification-c-102\"]}",
+        "redactions": [
+          {
+            "kind": "repository-worktree-path",
+            "occurrences": 1
+          }
+        ],
+        "sources": [
+          {
+            "branch": "worktree-agent-a6bf13877ab890979",
+            "line": 2,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "agent-a6bf13877ab890979"
+          },
+          {
+            "branch": "worktree-agent-ad0c09b67356676bb",
+            "line": 2,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "agent-ad0c09b67356676bb"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "7a5f728f-025d-489f-a6e5-ba6b8928abda",
+    "variants": [
+      {
+        "original_sha256": "9fb2564d4da1f75b923463c2af944b8b0a30ea376702cfb26e8f066b572d0b89",
+        "record": "{\"id\":\"7a5f728f-025d-489f-a6e5-ba6b8928abda\",\"kind\":\"compiled\",\"session_id\":\"63ae1b98-bc17-499b-8508-ac20f919fdb1\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/desktop\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T11:57:33.757103Z\",\"payload\":{\"entry_id\":\"codegen-and-ci-verification-phase-completion-marker\",\"tags\":[\"phase-status\",\"codegen\",\"ci-verification\",\"executor-session\",\"hybrid-mobile\"],\"title\":\"Codegen and CI Verification Phase Completion Marker\",\"ts\":\"2026-07-16T11:57:33.757103Z\",\"type\":\"compiled\"},\"affects\":[\"codegen-and-ci-verification-phase-completion-marker\"]}",
+        "redactions": [],
+        "sources": [
+          {
+            "branch": "main-pre-consolidation",
+            "line": 15,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "primary"
+          },
+          {
+            "branch": "codex/consolidate-main",
+            "line": 15,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "integration"
+          },
+          {
+            "branch": "claude/cross-platform-app-theming-4a272e",
+            "line": 15,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "cross-platform-app-theming-4a272e"
+          },
+          {
+            "branch": "claude/funny-wozniak-06a4cc",
+            "line": 15,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "funny-wozniak-06a4cc"
+          },
+          {
+            "branch": "claude/goofy-gould-d872b8",
+            "line": 15,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "goofy-gould-d872b8"
+          },
+          {
+            "branch": "claude/optimistic-volhard-233482",
+            "line": 15,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "optimistic-volhard-233482"
+          },
+          {
+            "branch": "claude/practical-bose-6b609c",
+            "line": 15,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "practical-bose-6b609c"
+          },
+          {
+            "branch": "claude/xenodochial-sammet-a67a35",
+            "line": 15,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "xenodochial-sammet-a67a35"
+          }
+        ]
+      },
+      {
+        "original_sha256": "d83fc80a77bd00b5c705b8cc026a65f2587fa8ff5bccd9ee965ba3c6ad72ceaa",
+        "record": "{\"id\":\"7a5f728f-025d-489f-a6e5-ba6b8928abda\",\"kind\":\"compiled\",\"session_id\":\"63ae1b98-bc17-499b-8508-ac20f919fdb1\",\"project_root\":\"$REPO_ROOT/apps/knowme-poc/desktop\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T11:57:33.757103Z\",\"payload\":{\"entry_id\":\"codegen-and-ci-verification-phase-completion-marker\",\"tags\":[\"phase-status\",\"codegen\",\"ci-verification\",\"executor-session\",\"hybrid-mobile\"],\"title\":\"Codegen and CI Verification Phase Completion Marker\",\"ts\":\"2026-07-16T11:57:33.757103Z\",\"type\":\"compiled\"},\"affects\":[\"codegen-and-ci-verification-phase-completion-marker\"]}",
+        "redactions": [
+          {
+            "kind": "repository-worktree-path",
+            "occurrences": 1
+          }
+        ],
+        "sources": [
+          {
+            "branch": "claude/compassionate-babbage-7cd4bc",
+            "line": 15,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "compassionate-babbage-7cd4bc"
+          },
+          {
+            "branch": "claude/pensive-greider-2e206c",
+            "line": 15,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "pensive-greider-2e206c"
+          },
+          {
+            "branch": "claude/sweet-mendeleev-401c40",
+            "line": 15,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "sweet-mendeleev-401c40"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "84513a27-563a-49f2-bcaa-71383d634c7e",
+    "variants": [
+      {
+        "original_sha256": "2751a7e22e37a0d57c77492f510ecaf3f3712d8f1d1e0e04ab92a93e119702b7",
+        "record": "{\"id\":\"84513a27-563a-49f2-bcaa-71383d634c7e\",\"kind\":\"compiled\",\"session_id\":\"1833c47f-f8a9-469b-b26f-8742f932e761\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/desktop\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T01:20:03.480903Z\",\"payload\":{\"entry_id\":\"knowme-tauri-dev-build-clean-after-branding-and-startup-fixes\",\"tags\":[\"hybrid-mobile\",\"knowme-poc\",\"tauri\",\"branding\",\"startup-commands\",\"ci-verification\",\"phase-status\"],\"title\":\"KnowMe Tauri Dev Build Clean After Branding and Startup Fixes\",\"ts\":\"2026-07-16T01:20:03.480903Z\",\"type\":\"compiled\"},\"affects\":[\"knowme-tauri-dev-build-clean-after-branding-and-startup-fixes\"]}",
+        "redactions": [],
+        "sources": [
+          {
+            "branch": "main-pre-consolidation",
+            "line": 8,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "primary"
+          },
+          {
+            "branch": "codex/consolidate-main",
+            "line": 8,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "integration"
+          },
+          {
+            "branch": "claude/compassionate-babbage-7cd4bc",
+            "line": 8,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "compassionate-babbage-7cd4bc"
+          },
+          {
+            "branch": "claude/cross-platform-app-theming-4a272e",
+            "line": 8,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "cross-platform-app-theming-4a272e"
+          },
+          {
+            "branch": "claude/funny-wozniak-06a4cc",
+            "line": 8,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "funny-wozniak-06a4cc"
+          },
+          {
+            "branch": "claude/goofy-gould-d872b8",
+            "line": 8,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "goofy-gould-d872b8"
+          },
+          {
+            "branch": "claude/optimistic-volhard-233482",
+            "line": 8,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "optimistic-volhard-233482"
+          },
+          {
+            "branch": "claude/pensive-greider-2e206c",
+            "line": 8,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "pensive-greider-2e206c"
+          },
+          {
+            "branch": "claude/practical-bose-6b609c",
+            "line": 8,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "practical-bose-6b609c"
+          },
+          {
+            "branch": "claude/sweet-mendeleev-401c40",
+            "line": 8,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "sweet-mendeleev-401c40"
+          },
+          {
+            "branch": "claude/xenodochial-sammet-a67a35",
+            "line": 8,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "xenodochial-sammet-a67a35"
+          }
+        ]
+      },
+      {
+        "original_sha256": "352faf8cd8abaedff2fb154420cbdfe244ff0a82f310d98af69ca3f46461e738",
+        "record": "{\"id\":\"84513a27-563a-49f2-bcaa-71383d634c7e\",\"kind\":\"compiled\",\"session_id\":\"1833c47f-f8a9-469b-b26f-8742f932e761\",\"project_root\":\"$REPO_ROOT/apps/knowme-poc/desktop\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T01:20:03.480903Z\",\"payload\":{\"entry_id\":\"knowme-tauri-dev-build-clean-after-branding-and-startup-fixes\",\"tags\":[\"hybrid-mobile\",\"knowme-poc\",\"tauri\",\"branding\",\"startup-commands\",\"ci-verification\",\"phase-status\"],\"title\":\"KnowMe Tauri Dev Build Clean After Branding and Startup Fixes\",\"ts\":\"2026-07-16T01:20:03.480903Z\",\"type\":\"compiled\"},\"affects\":[\"knowme-tauri-dev-build-clean-after-branding-and-startup-fixes\"]}",
+        "redactions": [
+          {
+            "kind": "repository-worktree-path",
+            "occurrences": 1
+          }
+        ],
+        "sources": [
+          {
+            "branch": "worktree-agent-a6bf13877ab890979",
+            "line": 8,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "agent-a6bf13877ab890979"
+          },
+          {
+            "branch": "worktree-agent-ad0c09b67356676bb",
+            "line": 8,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "agent-ad0c09b67356676bb"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "a9c6787b-a91f-46c3-8195-26e75989b4f6",
+    "variants": [
+      {
+        "original_sha256": "0786a27279bc3a54bb0861eef19a126fd8e2519e732297457d2e84811fc459b6",
+        "record": "{\"id\":\"a9c6787b-a91f-46c3-8195-26e75989b4f6\",\"kind\":\"compiled\",\"session_id\":\"a05dc1ee-5d0a-4a40-9e1b-6ec1b5229726\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/desktop\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T01:14:35.580602Z\",\"payload\":{\"entry_id\":\"knowme-poc-branding-tauri-menu-and-startup-command-fixes\",\"tags\":[\"hybrid-mobile\",\"knowme-poc\",\"tauri\",\"branding\",\"startup-commands\",\"web-compatibility\",\"phase-status\"],\"title\":\"KnowMe PoC Branding, Tauri Menu, and Startup Command Fixes\",\"ts\":\"2026-07-16T01:14:35.580602Z\",\"type\":\"compiled\"},\"affects\":[\"knowme-poc-branding-tauri-menu-and-startup-command-fixes\"]}",
+        "redactions": [],
+        "sources": [
+          {
+            "branch": "main-pre-consolidation",
+            "line": 5,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "primary"
+          },
+          {
+            "branch": "codex/consolidate-main",
+            "line": 5,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "integration"
+          },
+          {
+            "branch": "claude/compassionate-babbage-7cd4bc",
+            "line": 5,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "compassionate-babbage-7cd4bc"
+          },
+          {
+            "branch": "claude/cross-platform-app-theming-4a272e",
+            "line": 5,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "cross-platform-app-theming-4a272e"
+          },
+          {
+            "branch": "claude/funny-wozniak-06a4cc",
+            "line": 5,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "funny-wozniak-06a4cc"
+          },
+          {
+            "branch": "claude/goofy-gould-d872b8",
+            "line": 5,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "goofy-gould-d872b8"
+          },
+          {
+            "branch": "claude/optimistic-volhard-233482",
+            "line": 5,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "optimistic-volhard-233482"
+          },
+          {
+            "branch": "claude/pensive-greider-2e206c",
+            "line": 5,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "pensive-greider-2e206c"
+          },
+          {
+            "branch": "claude/practical-bose-6b609c",
+            "line": 5,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "practical-bose-6b609c"
+          },
+          {
+            "branch": "claude/sweet-mendeleev-401c40",
+            "line": 5,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "sweet-mendeleev-401c40"
+          },
+          {
+            "branch": "claude/xenodochial-sammet-a67a35",
+            "line": 5,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "xenodochial-sammet-a67a35"
+          }
+        ]
+      },
+      {
+        "original_sha256": "0c05946ecbb807f42f42c5c601571f2bd26b075b5467c94571eec264cc7dfec8",
+        "record": "{\"id\":\"a9c6787b-a91f-46c3-8195-26e75989b4f6\",\"kind\":\"compiled\",\"session_id\":\"a05dc1ee-5d0a-4a40-9e1b-6ec1b5229726\",\"project_root\":\"$REPO_ROOT/apps/knowme-poc/desktop\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T01:14:35.580602Z\",\"payload\":{\"entry_id\":\"knowme-poc-branding-tauri-menu-and-startup-command-fixes\",\"tags\":[\"hybrid-mobile\",\"knowme-poc\",\"tauri\",\"branding\",\"startup-commands\",\"web-compatibility\",\"phase-status\"],\"title\":\"KnowMe PoC Branding, Tauri Menu, and Startup Command Fixes\",\"ts\":\"2026-07-16T01:14:35.580602Z\",\"type\":\"compiled\"},\"affects\":[\"knowme-poc-branding-tauri-menu-and-startup-command-fixes\"]}",
+        "redactions": [
+          {
+            "kind": "repository-worktree-path",
+            "occurrences": 1
+          }
+        ],
+        "sources": [
+          {
+            "branch": "worktree-agent-a6bf13877ab890979",
+            "line": 5,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "agent-a6bf13877ab890979"
+          },
+          {
+            "branch": "worktree-agent-ad0c09b67356676bb",
+            "line": 5,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "agent-ad0c09b67356676bb"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "ab812a34-cdce-4ae9-a757-1db578055fb6",
+    "variants": [
+      {
+        "original_sha256": "38875df14be84755c0dc1e6cce46c18eaa56657b814b8cabcad98444767faa2e",
+        "record": "{\"id\":\"ab812a34-cdce-4ae9-a757-1db578055fb6\",\"kind\":\"compiled\",\"session_id\":\"77d4e95e-b1e5-4efd-ba87-6b60ca8fa973\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/desktop\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T13:49:42.086007Z\",\"payload\":{\"entry_id\":\"hybrid-mobile-architecture-phase-codegen-and-ci-verification-status\",\"tags\":[\"hybrid-mobile\",\"phase-codegen-and-ci-verification\",\"proof-of-concept\",\"flutter-rust-bridge\",\"ci-verification\",\"rust-ffi\",\"tauri\",\"session-state\"],\"title\":\"Hybrid Mobile Architecture phase codegen and CI verification status\",\"ts\":\"2026-07-16T13:49:42.086007Z\",\"type\":\"compiled\"},\"affects\":[\"hybrid-mobile-architecture-phase-codegen-and-ci-verification-status\"]}",
+        "redactions": [],
+        "sources": [
+          {
+            "branch": "main-pre-consolidation",
+            "line": 16,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "primary"
+          },
+          {
+            "branch": "codex/consolidate-main",
+            "line": 16,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "integration"
+          },
+          {
+            "branch": "claude/cross-platform-app-theming-4a272e",
+            "line": 16,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "cross-platform-app-theming-4a272e"
+          },
+          {
+            "branch": "claude/funny-wozniak-06a4cc",
+            "line": 16,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "funny-wozniak-06a4cc"
+          },
+          {
+            "branch": "claude/goofy-gould-d872b8",
+            "line": 16,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "goofy-gould-d872b8"
+          },
+          {
+            "branch": "claude/optimistic-volhard-233482",
+            "line": 16,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "optimistic-volhard-233482"
+          },
+          {
+            "branch": "claude/practical-bose-6b609c",
+            "line": 16,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "practical-bose-6b609c"
+          },
+          {
+            "branch": "claude/xenodochial-sammet-a67a35",
+            "line": 16,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "xenodochial-sammet-a67a35"
+          }
+        ]
+      },
+      {
+        "original_sha256": "6a5fa4b5e4e71be3cf30f9f95a59ace6a714010492684821aadef950475fe336",
+        "record": "{\"id\":\"ab812a34-cdce-4ae9-a757-1db578055fb6\",\"kind\":\"compiled\",\"session_id\":\"77d4e95e-b1e5-4efd-ba87-6b60ca8fa973\",\"project_root\":\"$REPO_ROOT/apps/knowme-poc/desktop\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T13:49:42.086007Z\",\"payload\":{\"entry_id\":\"hybrid-mobile-architecture-phase-codegen-and-ci-verification-status\",\"tags\":[\"hybrid-mobile\",\"phase-codegen-and-ci-verification\",\"proof-of-concept\",\"flutter-rust-bridge\",\"ci-verification\",\"rust-ffi\",\"tauri\",\"session-state\"],\"title\":\"Hybrid Mobile Architecture phase codegen and CI verification status\",\"ts\":\"2026-07-16T13:49:42.086007Z\",\"type\":\"compiled\"},\"affects\":[\"hybrid-mobile-architecture-phase-codegen-and-ci-verification-status\"]}",
+        "redactions": [
+          {
+            "kind": "repository-worktree-path",
+            "occurrences": 1
+          }
+        ],
+        "sources": [
+          {
+            "branch": "claude/compassionate-babbage-7cd4bc",
+            "line": 16,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "compassionate-babbage-7cd4bc"
+          },
+          {
+            "branch": "claude/pensive-greider-2e206c",
+            "line": 16,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "pensive-greider-2e206c"
+          },
+          {
+            "branch": "claude/sweet-mendeleev-401c40",
+            "line": 16,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "sweet-mendeleev-401c40"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "c6dbcb08-5f67-444b-af5a-ccbedbf28533",
+    "variants": [
+      {
+        "original_sha256": "b3b8c3cf1f456e0fd9ea3fa87a7b3a65c8fb7765cf65aedafca1a9aef3e4bf86",
+        "record": "{\"id\":\"c6dbcb08-5f67-444b-af5a-ccbedbf28533\",\"kind\":\"compiled\",\"session_id\":\"57d3997b-1438-42cf-9443-7351fbc0d8da\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/desktop\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T01:14:44.635615Z\",\"payload\":{\"entry_id\":\"executor-completion-marker-for-codegen-and-ci-verification-phase\",\"tags\":[\"phase-status\",\"codegen\",\"ci-verification\",\"executor-session\",\"hybrid-mobile\"],\"title\":\"Executor Completion Marker for Codegen and CI Verification Phase\",\"ts\":\"2026-07-16T01:14:44.635615Z\",\"type\":\"compiled\"},\"affects\":[\"executor-completion-marker-for-codegen-and-ci-verification-phase\"]}",
+        "redactions": [],
+        "sources": [
+          {
+            "branch": "main-pre-consolidation",
+            "line": 6,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "primary"
+          },
+          {
+            "branch": "codex/consolidate-main",
+            "line": 6,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "integration"
+          },
+          {
+            "branch": "claude/compassionate-babbage-7cd4bc",
+            "line": 6,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "compassionate-babbage-7cd4bc"
+          },
+          {
+            "branch": "claude/cross-platform-app-theming-4a272e",
+            "line": 6,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "cross-platform-app-theming-4a272e"
+          },
+          {
+            "branch": "claude/funny-wozniak-06a4cc",
+            "line": 6,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "funny-wozniak-06a4cc"
+          },
+          {
+            "branch": "claude/goofy-gould-d872b8",
+            "line": 6,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "goofy-gould-d872b8"
+          },
+          {
+            "branch": "claude/optimistic-volhard-233482",
+            "line": 6,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "optimistic-volhard-233482"
+          },
+          {
+            "branch": "claude/pensive-greider-2e206c",
+            "line": 6,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "pensive-greider-2e206c"
+          },
+          {
+            "branch": "claude/practical-bose-6b609c",
+            "line": 6,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "practical-bose-6b609c"
+          },
+          {
+            "branch": "claude/sweet-mendeleev-401c40",
+            "line": 6,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "sweet-mendeleev-401c40"
+          },
+          {
+            "branch": "claude/xenodochial-sammet-a67a35",
+            "line": 6,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "xenodochial-sammet-a67a35"
+          }
+        ]
+      },
+      {
+        "original_sha256": "ab54c02cebe77862ccfac8f18e0d9c354c207bb2031d7fad48d5675451819269",
+        "record": "{\"id\":\"c6dbcb08-5f67-444b-af5a-ccbedbf28533\",\"kind\":\"compiled\",\"session_id\":\"57d3997b-1438-42cf-9443-7351fbc0d8da\",\"project_root\":\"$REPO_ROOT/apps/knowme-poc/desktop\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T01:14:44.635615Z\",\"payload\":{\"entry_id\":\"executor-completion-marker-for-codegen-and-ci-verification-phase\",\"tags\":[\"phase-status\",\"codegen\",\"ci-verification\",\"executor-session\",\"hybrid-mobile\"],\"title\":\"Executor Completion Marker for Codegen and CI Verification Phase\",\"ts\":\"2026-07-16T01:14:44.635615Z\",\"type\":\"compiled\"},\"affects\":[\"executor-completion-marker-for-codegen-and-ci-verification-phase\"]}",
+        "redactions": [
+          {
+            "kind": "repository-worktree-path",
+            "occurrences": 1
+          }
+        ],
+        "sources": [
+          {
+            "branch": "worktree-agent-a6bf13877ab890979",
+            "line": 6,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "agent-a6bf13877ab890979"
+          },
+          {
+            "branch": "worktree-agent-ad0c09b67356676bb",
+            "line": 6,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "agent-ad0c09b67356676bb"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "d2a53052-68c1-43e3-b8d0-20b7971e0486",
+    "variants": [
+      {
+        "original_sha256": "ee27a7e230a4321e826779c5925808d3efadd83a75351cae893403823a11f1b9",
+        "record": "{\"id\":\"d2a53052-68c1-43e3-b8d0-20b7971e0486\",\"kind\":\"compiled\",\"session_id\":\"fb43477a-2918-41cf-9d40-d53c92a7fa66\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/desktop\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T11:57:21.020788Z\",\"payload\":{\"entry_id\":\"knowme-poc-session-logs-committed-but-public-repo-push-blocked\",\"tags\":[\"hybrid-mobile\",\"knowme-poc\",\"phase-status\",\"session-logs\",\"permission-classifier\",\"public-repo\",\"pull-request\",\"ci-verification\"],\"title\":\"KnowMe PoC Session Logs Committed but Public Repo Push Blocked\",\"ts\":\"2026-07-16T11:57:21.020788Z\",\"type\":\"compiled\"},\"affects\":[\"knowme-poc-session-logs-committed-but-public-repo-push-blocked\"]}",
+        "redactions": [],
+        "sources": [
+          {
+            "branch": "main-pre-consolidation",
+            "line": 14,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "primary"
+          },
+          {
+            "branch": "codex/consolidate-main",
+            "line": 14,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "integration"
+          },
+          {
+            "branch": "claude/cross-platform-app-theming-4a272e",
+            "line": 14,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "cross-platform-app-theming-4a272e"
+          },
+          {
+            "branch": "claude/funny-wozniak-06a4cc",
+            "line": 14,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "funny-wozniak-06a4cc"
+          },
+          {
+            "branch": "claude/goofy-gould-d872b8",
+            "line": 14,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "goofy-gould-d872b8"
+          },
+          {
+            "branch": "claude/optimistic-volhard-233482",
+            "line": 14,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "optimistic-volhard-233482"
+          },
+          {
+            "branch": "claude/practical-bose-6b609c",
+            "line": 14,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "practical-bose-6b609c"
+          },
+          {
+            "branch": "claude/xenodochial-sammet-a67a35",
+            "line": 14,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "xenodochial-sammet-a67a35"
+          }
+        ]
+      },
+      {
+        "original_sha256": "9834145d062f9ab63b986b7d5e677c7dabc8fb9ff14002db41f3cc6cf80dab50",
+        "record": "{\"id\":\"d2a53052-68c1-43e3-b8d0-20b7971e0486\",\"kind\":\"compiled\",\"session_id\":\"fb43477a-2918-41cf-9d40-d53c92a7fa66\",\"project_root\":\"$REPO_ROOT/apps/knowme-poc/desktop\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T11:57:21.020788Z\",\"payload\":{\"entry_id\":\"knowme-poc-session-logs-committed-but-public-repo-push-blocked\",\"tags\":[\"hybrid-mobile\",\"knowme-poc\",\"phase-status\",\"session-logs\",\"permission-classifier\",\"public-repo\",\"pull-request\",\"ci-verification\"],\"title\":\"KnowMe PoC Session Logs Committed but Public Repo Push Blocked\",\"ts\":\"2026-07-16T11:57:21.020788Z\",\"type\":\"compiled\"},\"affects\":[\"knowme-poc-session-logs-committed-but-public-repo-push-blocked\"]}",
+        "redactions": [
+          {
+            "kind": "repository-worktree-path",
+            "occurrences": 1
+          }
+        ],
+        "sources": [
+          {
+            "branch": "claude/compassionate-babbage-7cd4bc",
+            "line": 14,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "compassionate-babbage-7cd4bc"
+          },
+          {
+            "branch": "claude/pensive-greider-2e206c",
+            "line": 14,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "pensive-greider-2e206c"
+          },
+          {
+            "branch": "claude/sweet-mendeleev-401c40",
+            "line": 14,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "sweet-mendeleev-401c40"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "f65a9fba-63d2-4663-b554-b5d6171310d8",
+    "variants": [
+      {
+        "original_sha256": "66fa43a41ebfff859c8131bf47d63037254db0926e02e7844ab79ac7e6411831",
+        "record": "{\"id\":\"f65a9fba-63d2-4663-b554-b5d6171310d8\",\"kind\":\"compiled\",\"session_id\":\"74fa1b2a-8c02-4e10-bf11-bd0aae706a7e\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/desktop\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T01:14:19.320805Z\",\"payload\":{\"entry_id\":\"knowme-poc-phase-codegen-ci-and-live-tauri-verification\",\"tags\":[\"hybrid-mobile\",\"phase-codegen\",\"ci-verification\",\"proof-of-concept\",\"flutter\",\"rust-ffi\",\"tauri\",\"session-state\"],\"title\":\"KnowMe PoC phase: codegen, CI, and live Tauri verification\",\"ts\":\"2026-07-16T01:14:19.320805Z\",\"type\":\"compiled\"},\"affects\":[\"knowme-poc-phase-codegen-ci-and-live-tauri-verification\"]}",
+        "redactions": [],
+        "sources": [
+          {
+            "branch": "main-pre-consolidation",
+            "line": 4,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "primary"
+          },
+          {
+            "branch": "codex/consolidate-main",
+            "line": 4,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "integration"
+          },
+          {
+            "branch": "claude/compassionate-babbage-7cd4bc",
+            "line": 4,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "compassionate-babbage-7cd4bc"
+          },
+          {
+            "branch": "claude/cross-platform-app-theming-4a272e",
+            "line": 4,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "cross-platform-app-theming-4a272e"
+          },
+          {
+            "branch": "claude/funny-wozniak-06a4cc",
+            "line": 4,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "funny-wozniak-06a4cc"
+          },
+          {
+            "branch": "claude/goofy-gould-d872b8",
+            "line": 4,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "goofy-gould-d872b8"
+          },
+          {
+            "branch": "claude/optimistic-volhard-233482",
+            "line": 4,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "optimistic-volhard-233482"
+          },
+          {
+            "branch": "claude/pensive-greider-2e206c",
+            "line": 4,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "pensive-greider-2e206c"
+          },
+          {
+            "branch": "claude/practical-bose-6b609c",
+            "line": 4,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "practical-bose-6b609c"
+          },
+          {
+            "branch": "claude/sweet-mendeleev-401c40",
+            "line": 4,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "sweet-mendeleev-401c40"
+          },
+          {
+            "branch": "claude/xenodochial-sammet-a67a35",
+            "line": 4,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "xenodochial-sammet-a67a35"
+          }
+        ]
+      },
+      {
+        "original_sha256": "5f88b509d17f956e84136028fec5226453d620c5d06e82abf768e2452ce41c38",
+        "record": "{\"id\":\"f65a9fba-63d2-4663-b554-b5d6171310d8\",\"kind\":\"compiled\",\"session_id\":\"74fa1b2a-8c02-4e10-bf11-bd0aae706a7e\",\"project_root\":\"$REPO_ROOT/apps/knowme-poc/desktop\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T01:14:19.320805Z\",\"payload\":{\"entry_id\":\"knowme-poc-phase-codegen-ci-and-live-tauri-verification\",\"tags\":[\"hybrid-mobile\",\"phase-codegen\",\"ci-verification\",\"proof-of-concept\",\"flutter\",\"rust-ffi\",\"tauri\",\"session-state\"],\"title\":\"KnowMe PoC phase: codegen, CI, and live Tauri verification\",\"ts\":\"2026-07-16T01:14:19.320805Z\",\"type\":\"compiled\"},\"affects\":[\"knowme-poc-phase-codegen-ci-and-live-tauri-verification\"]}",
+        "redactions": [
+          {
+            "kind": "repository-worktree-path",
+            "occurrences": 1
+          }
+        ],
+        "sources": [
+          {
+            "branch": "worktree-agent-a6bf13877ab890979",
+            "line": 4,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "agent-a6bf13877ab890979"
+          },
+          {
+            "branch": "worktree-agent-ad0c09b67356676bb",
+            "line": 4,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "agent-ad0c09b67356676bb"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "f8bb5f4a-6d7d-4979-a3bf-6f092456d3a3",
+    "variants": [
+      {
+        "original_sha256": "b3f2b936ff8f5b5b082742097a852ca4b6f28e0655099be398d81e51ec00466f",
+        "record": "{\"id\":\"f8bb5f4a-6d7d-4979-a3bf-6f092456d3a3\",\"kind\":\"compiled\",\"session_id\":\"aab42fe5-a503-486a-a275-5c3bb23049ac\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/desktop\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T00:45:37.675947Z\",\"payload\":{\"entry_id\":\"phase-codegen-and-ci-verification-goals-for-knowme-poc\",\"tags\":[\"hybrid-mobile\",\"phase-codegen\",\"ci-verification\",\"proof-of-concept\",\"flutter\",\"rust-ffi\",\"tauri\",\"session-state\"],\"title\":\"Phase codegen and CI verification goals for KnowMe PoC\",\"ts\":\"2026-07-16T00:45:37.675947Z\",\"type\":\"compiled\"},\"affects\":[\"phase-codegen-and-ci-verification-goals-for-knowme-poc\"]}",
+        "redactions": [],
+        "sources": [
+          {
+            "branch": "main-pre-consolidation",
+            "line": 1,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "primary"
+          },
+          {
+            "branch": "codex/consolidate-main",
+            "line": 1,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "integration"
+          },
+          {
+            "branch": "claude/compassionate-babbage-7cd4bc",
+            "line": 1,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "compassionate-babbage-7cd4bc"
+          },
+          {
+            "branch": "claude/cross-platform-app-theming-4a272e",
+            "line": 1,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "cross-platform-app-theming-4a272e"
+          },
+          {
+            "branch": "claude/funny-wozniak-06a4cc",
+            "line": 1,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "funny-wozniak-06a4cc"
+          },
+          {
+            "branch": "claude/goofy-gould-d872b8",
+            "line": 1,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "goofy-gould-d872b8"
+          },
+          {
+            "branch": "claude/optimistic-volhard-233482",
+            "line": 1,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "optimistic-volhard-233482"
+          },
+          {
+            "branch": "claude/pensive-greider-2e206c",
+            "line": 1,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "pensive-greider-2e206c"
+          },
+          {
+            "branch": "claude/practical-bose-6b609c",
+            "line": 1,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "practical-bose-6b609c"
+          },
+          {
+            "branch": "claude/sweet-mendeleev-401c40",
+            "line": 1,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "sweet-mendeleev-401c40"
+          },
+          {
+            "branch": "claude/xenodochial-sammet-a67a35",
+            "line": 1,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "xenodochial-sammet-a67a35"
+          }
+        ]
+      },
+      {
+        "original_sha256": "62e3cbaba2dd9bf3656b38fd5fc7daacc7aa98d35242cd1c4a1eedc1ba32aa68",
+        "record": "{\"id\":\"f8bb5f4a-6d7d-4979-a3bf-6f092456d3a3\",\"kind\":\"compiled\",\"session_id\":\"aab42fe5-a503-486a-a275-5c3bb23049ac\",\"project_root\":\"$REPO_ROOT/apps/knowme-poc/desktop\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T00:45:37.675947Z\",\"payload\":{\"entry_id\":\"phase-codegen-and-ci-verification-goals-for-knowme-poc\",\"tags\":[\"hybrid-mobile\",\"phase-codegen\",\"ci-verification\",\"proof-of-concept\",\"flutter\",\"rust-ffi\",\"tauri\",\"session-state\"],\"title\":\"Phase codegen and CI verification goals for KnowMe PoC\",\"ts\":\"2026-07-16T00:45:37.675947Z\",\"type\":\"compiled\"},\"affects\":[\"phase-codegen-and-ci-verification-goals-for-knowme-poc\"]}",
+        "redactions": [
+          {
+            "kind": "repository-worktree-path",
+            "occurrences": 1
+          }
+        ],
+        "sources": [
+          {
+            "branch": "worktree-agent-a6bf13877ab890979",
+            "line": 1,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "agent-a6bf13877ab890979"
+          },
+          {
+            "branch": "worktree-agent-ad0c09b67356676bb",
+            "line": 1,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "agent-ad0c09b67356676bb"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "fd099523-bfc6-4332-8644-96b4495790a1",
+    "variants": [
+      {
+        "original_sha256": "4af803b68202d541a18f852c8849a0e3d85327159cb6fc832ca52628b680661d",
+        "record": "{\"id\":\"fd099523-bfc6-4332-8644-96b4495790a1\",\"kind\":\"compiled\",\"session_id\":\"f64498b1-5729-45b7-939f-ea21e7b6e8d4\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/desktop\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T01:20:00.335117Z\",\"payload\":{\"entry_id\":\"knowme-poc-phase-codegen-ci-and-tauri-icon-verification\",\"tags\":[\"hybrid-mobile\",\"phase-codegen\",\"ci-verification\",\"proof-of-concept\",\"tauri\",\"flutter\",\"rust-ffi\",\"macos\"],\"title\":\"KnowMe PoC phase: codegen, CI, and Tauri icon verification\",\"ts\":\"2026-07-16T01:20:00.335117Z\",\"type\":\"compiled\"},\"affects\":[\"knowme-poc-phase-codegen-ci-and-tauri-icon-verification\"]}",
+        "redactions": [],
+        "sources": [
+          {
+            "branch": "main-pre-consolidation",
+            "line": 7,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "primary"
+          },
+          {
+            "branch": "codex/consolidate-main",
+            "line": 7,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "integration"
+          },
+          {
+            "branch": "claude/compassionate-babbage-7cd4bc",
+            "line": 7,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "compassionate-babbage-7cd4bc"
+          },
+          {
+            "branch": "claude/cross-platform-app-theming-4a272e",
+            "line": 7,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "cross-platform-app-theming-4a272e"
+          },
+          {
+            "branch": "claude/funny-wozniak-06a4cc",
+            "line": 7,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "funny-wozniak-06a4cc"
+          },
+          {
+            "branch": "claude/goofy-gould-d872b8",
+            "line": 7,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "goofy-gould-d872b8"
+          },
+          {
+            "branch": "claude/optimistic-volhard-233482",
+            "line": 7,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "optimistic-volhard-233482"
+          },
+          {
+            "branch": "claude/pensive-greider-2e206c",
+            "line": 7,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "pensive-greider-2e206c"
+          },
+          {
+            "branch": "claude/practical-bose-6b609c",
+            "line": 7,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "practical-bose-6b609c"
+          },
+          {
+            "branch": "claude/sweet-mendeleev-401c40",
+            "line": 7,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "sweet-mendeleev-401c40"
+          },
+          {
+            "branch": "claude/xenodochial-sammet-a67a35",
+            "line": 7,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "xenodochial-sammet-a67a35"
+          }
+        ]
+      },
+      {
+        "original_sha256": "0e743baf79d0283f2e49e14fa31b3f3ee6633217b9056679613fc77cadb04b22",
+        "record": "{\"id\":\"fd099523-bfc6-4332-8644-96b4495790a1\",\"kind\":\"compiled\",\"session_id\":\"f64498b1-5729-45b7-939f-ea21e7b6e8d4\",\"project_root\":\"$REPO_ROOT/apps/knowme-poc/desktop\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T01:20:00.335117Z\",\"payload\":{\"entry_id\":\"knowme-poc-phase-codegen-ci-and-tauri-icon-verification\",\"tags\":[\"hybrid-mobile\",\"phase-codegen\",\"ci-verification\",\"proof-of-concept\",\"tauri\",\"flutter\",\"rust-ffi\",\"macos\"],\"title\":\"KnowMe PoC phase: codegen, CI, and Tauri icon verification\",\"ts\":\"2026-07-16T01:20:00.335117Z\",\"type\":\"compiled\"},\"affects\":[\"knowme-poc-phase-codegen-ci-and-tauri-icon-verification\"]}",
+        "redactions": [
+          {
+            "kind": "repository-worktree-path",
+            "occurrences": 1
+          }
+        ],
+        "sources": [
+          {
+            "branch": "worktree-agent-a6bf13877ab890979",
+            "line": 7,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "agent-a6bf13877ab890979"
+          },
+          {
+            "branch": "worktree-agent-ad0c09b67356676bb",
+            "line": 7,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "agent-ad0c09b67356676bb"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "fecdc271-c16e-48ff-9801-c371cf3f13f1",
+    "variants": [
+      {
+        "original_sha256": "cb70df0584265eed1233f64cd7a8c1bf86e8ffdbb98e5c5a9e9bcf4fb66491fc",
+        "record": "{\"id\":\"fecdc271-c16e-48ff-9801-c371cf3f13f1\",\"kind\":\"compiled\",\"session_id\":\"2f0ce58c-42b3-4dba-8fab-6a2566a25f43\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/desktop\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T00:46:06.218577Z\",\"payload\":{\"entry_id\":\"phase-codegen-and-ci-verification-session-status\",\"tags\":[\"hybrid-mobile\",\"phase-status\",\"knowme-poc\",\"codegen\",\"ci-verification\",\"tauri\",\"rust-workspace\"],\"title\":\"Phase Codegen and CI Verification Session Status\",\"ts\":\"2026-07-16T00:46:06.218577Z\",\"type\":\"compiled\"},\"affects\":[\"phase-codegen-and-ci-verification-session-status\"]}",
+        "redactions": [],
+        "sources": [
+          {
+            "branch": "main-pre-consolidation",
+            "line": 3,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "primary"
+          },
+          {
+            "branch": "codex/consolidate-main",
+            "line": 3,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "integration"
+          },
+          {
+            "branch": "claude/compassionate-babbage-7cd4bc",
+            "line": 3,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "compassionate-babbage-7cd4bc"
+          },
+          {
+            "branch": "claude/cross-platform-app-theming-4a272e",
+            "line": 3,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "cross-platform-app-theming-4a272e"
+          },
+          {
+            "branch": "claude/funny-wozniak-06a4cc",
+            "line": 3,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "funny-wozniak-06a4cc"
+          },
+          {
+            "branch": "claude/goofy-gould-d872b8",
+            "line": 3,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "goofy-gould-d872b8"
+          },
+          {
+            "branch": "claude/optimistic-volhard-233482",
+            "line": 3,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "optimistic-volhard-233482"
+          },
+          {
+            "branch": "claude/pensive-greider-2e206c",
+            "line": 3,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "pensive-greider-2e206c"
+          },
+          {
+            "branch": "claude/practical-bose-6b609c",
+            "line": 3,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "practical-bose-6b609c"
+          },
+          {
+            "branch": "claude/sweet-mendeleev-401c40",
+            "line": 3,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "sweet-mendeleev-401c40"
+          },
+          {
+            "branch": "claude/xenodochial-sammet-a67a35",
+            "line": 3,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "xenodochial-sammet-a67a35"
+          }
+        ]
+      },
+      {
+        "original_sha256": "35082628d82bc97056b150d0c1607f2f773e9ad9ac1a329827b17a91549d4c3f",
+        "record": "{\"id\":\"fecdc271-c16e-48ff-9801-c371cf3f13f1\",\"kind\":\"compiled\",\"session_id\":\"2f0ce58c-42b3-4dba-8fab-6a2566a25f43\",\"project_root\":\"$REPO_ROOT/apps/knowme-poc/desktop\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T00:46:06.218577Z\",\"payload\":{\"entry_id\":\"phase-codegen-and-ci-verification-session-status\",\"tags\":[\"hybrid-mobile\",\"phase-status\",\"knowme-poc\",\"codegen\",\"ci-verification\",\"tauri\",\"rust-workspace\"],\"title\":\"Phase Codegen and CI Verification Session Status\",\"ts\":\"2026-07-16T00:46:06.218577Z\",\"type\":\"compiled\"},\"affects\":[\"phase-codegen-and-ci-verification-session-status\"]}",
+        "redactions": [
+          {
+            "kind": "repository-worktree-path",
+            "occurrences": 1
+          }
+        ],
+        "sources": [
+          {
+            "branch": "worktree-agent-a6bf13877ab890979",
+            "line": 3,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "agent-a6bf13877ab890979"
+          },
+          {
+            "branch": "worktree-agent-ad0c09b67356676bb",
+            "line": 3,
+            "path": "apps/knowme-poc/desktop/.prometheus/events.jsonl",
+            "source": "agent-ad0c09b67356676bb"
+          }
+        ]
+      }
+    ]
+  }
+]

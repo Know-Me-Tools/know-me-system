@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-entity-update"
+description = "Enables the entity_update command without any pre-configured scope."
+commands.allow = ["entity_update"]
+
+[[permission]]
+identifier = "deny-entity-update"
+description = "Denies the entity_update command without any pre-configured scope."
+commands.deny = ["entity_update"]

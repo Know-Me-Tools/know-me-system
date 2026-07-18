@@ -1,0 +1,99 @@
+[
+  {
+    "original_sha256": "064ff553a938a0e96e084ea6fd51348c607beb20f5a68e3f05b0bbfa64a88bcd",
+    "record": "{\"id\":\"bb0708ac-7694-435e-beab-4a172d8c1e9f\",\"kind\":\"compiled\",\"session_id\":\"3175b765-b5fd-4141-8abd-3832e6110a81\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/desktop/src-tauri\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T00:36:01.376458Z\",\"payload\":{\"entry_id\":\"executor-session-codegen-and-ci-verification-completed\",\"tags\":[\"executor-session\",\"codegen\",\"ci-verification\",\"session-metadata\"],\"title\":\"Executor Session Codegen and CI Verification Completed\",\"ts\":\"2026-07-16T00:36:01.376458Z\",\"type\":\"compiled\"},\"affects\":[\"executor-session-codegen-and-ci-verification-completed\"]}",
+    "redactions": [],
+    "sources": [
+      {
+        "branch": "main-pre-consolidation",
+        "line": 1,
+        "path": "apps/knowme-poc/desktop/src-tauri/.prometheus/events.jsonl",
+        "source": "primary"
+      },
+      {
+        "branch": "codex/consolidate-main",
+        "line": 1,
+        "path": "apps/knowme-poc/desktop/src-tauri/.prometheus/events.jsonl",
+        "source": "integration"
+      },
+      {
+        "branch": "claude/cross-platform-app-theming-4a272e",
+        "line": 1,
+        "path": "apps/knowme-poc/desktop/src-tauri/.prometheus/events.jsonl",
+        "source": "cross-platform-app-theming-4a272e"
+      },
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 1,
+        "path": "apps/knowme-poc/desktop/src-tauri/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      },
+      {
+        "branch": "claude/goofy-gould-d872b8",
+        "line": 1,
+        "path": "apps/knowme-poc/desktop/src-tauri/.prometheus/events.jsonl",
+        "source": "goofy-gould-d872b8"
+      },
+      {
+        "branch": "claude/optimistic-volhard-233482",
+        "line": 1,
+        "path": "apps/knowme-poc/desktop/src-tauri/.prometheus/events.jsonl",
+        "source": "optimistic-volhard-233482"
+      },
+      {
+        "branch": "claude/practical-bose-6b609c",
+        "line": 1,
+        "path": "apps/knowme-poc/desktop/src-tauri/.prometheus/events.jsonl",
+        "source": "practical-bose-6b609c"
+      },
+      {
+        "branch": "claude/xenodochial-sammet-a67a35",
+        "line": 1,
+        "path": "apps/knowme-poc/desktop/src-tauri/.prometheus/events.jsonl",
+        "source": "xenodochial-sammet-a67a35"
+      }
+    ]
+  },
+  {
+    "original_sha256": "e354f050b883d4a708d7102b5168dacef547281eb8f632f098c2107e7375724e",
+    "record": "{\"id\":\"bb0708ac-7694-435e-beab-4a172d8c1e9f\",\"kind\":\"compiled\",\"session_id\":\"3175b765-b5fd-4141-8abd-3832e6110a81\",\"project_root\":\"$REPO_ROOT/apps/knowme-poc/desktop/src-tauri\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T00:36:01.376458Z\",\"payload\":{\"entry_id\":\"executor-session-codegen-and-ci-verification-completed\",\"tags\":[\"executor-session\",\"codegen\",\"ci-verification\",\"session-metadata\"],\"title\":\"Executor Session Codegen and CI Verification Completed\",\"ts\":\"2026-07-16T00:36:01.376458Z\",\"type\":\"compiled\"},\"affects\":[\"executor-session-codegen-and-ci-verification-completed\"]}",
+    "redactions": [
+      {
+        "kind": "repository-worktree-path",
+        "occurrences": 1
+      }
+    ],
+    "sources": [
+      {
+        "branch": "worktree-agent-a6bf13877ab890979",
+        "line": 1,
+        "path": "apps/knowme-poc/desktop/src-tauri/.prometheus/events.jsonl",
+        "source": "agent-a6bf13877ab890979"
+      },
+      {
+        "branch": "worktree-agent-ad0c09b67356676bb",
+        "line": 1,
+        "path": "apps/knowme-poc/desktop/src-tauri/.prometheus/events.jsonl",
+        "source": "agent-ad0c09b67356676bb"
+      },
+      {
+        "branch": "claude/compassionate-babbage-7cd4bc",
+        "line": 1,
+        "path": "apps/knowme-poc/desktop/src-tauri/.prometheus/events.jsonl",
+        "source": "compassionate-babbage-7cd4bc"
+      },
+      {
+        "branch": "claude/pensive-greider-2e206c",
+        "line": 1,
+        "path": "apps/knowme-poc/desktop/src-tauri/.prometheus/events.jsonl",
+        "source": "pensive-greider-2e206c"
+      },
+      {
+        "branch": "claude/sweet-mendeleev-401c40",
+        "line": 1,
+        "path": "apps/knowme-poc/desktop/src-tauri/.prometheus/events.jsonl",
+        "source": "sweet-mendeleev-401c40"
+      }
+    ]
+  }
+]

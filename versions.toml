@@ -1,0 +1,43 @@
+# versions.toml — SINGLE SOURCE OF TRUTH for tool/stack versions and engine
+# selections across this skill pack's authority documents (SKILL.md, CLAUDE.md,
+# AGENTS.md, README.md, references/*.md).
+#
+# Rules:
+#   - Versions live HERE and only here. Authority docs must state these same
+#     values; `bash scripts/audit.sh doc-consistency` fails CI on drift.
+#   - When bumping a version: update this file first, then every authority doc,
+#     then re-run the audit. (A generated-docs pipeline can replace the manual
+#     step later; the audit gate is what prevents rot either way.)
+#   - Rationale for non-obvious pins lives next to the value.
+
+[toolchain]
+# SurrealDB 3.2's `fastnum` transitive dep needs rustc >=1.94; the wasm32 lane
+# only compiled cleanly on 1.96 (references/rust/wasm-targets.md).
+rust = "1.96+"
+node = "24+"            # Active LTS — pin, do not use `--lts`
+flutter = "beta"        # beta channel, latest (ships the Dart MCP server)
+typescript = "7.x"      # Go-native compiler — no version pin
+bun = "latest"
+pnpm = "latest"
+
+[frameworks]
+tauri_cli = "2.10+"
+flutter_rust_bridge = "2.12+"   # must match the workspace's frb crate version
+riverpod = "3.3"                # flutter_riverpod ^3.3, riverpod_annotation 4.x
+vite = "8"
+react = "19"
+zustand = "5"
+openspec = "1.6.0+"             # @fission-ai/openspec — never the squatted bare package
+
+[data]
+surrealdb = "3.2"               # embedded graph/vector/FTS, kv-rocksdb native / kv-indxdb wasm
+pglite_oxide = "0.5.1"          # desktop config-DB only (macOS arm64 / Win x64 / Linux x64+arm64)
+
+# Inference engines are per-lane decisions, not one global choice
+# (assessment 2026-07-16 §3.3: no documented mobile path for mistral.rs/candle;
+# the shipped mobile-LLM ecosystem runs on llama.cpp).
+[inference]
+desktop = "llama-cpp-2"         # pinned/checksummed Qwen GGUF; zero-config reference default
+mobile = "llama-cpp-2"          # same engine and catalog model behind InferenceProvider
+web = "WebLLM"                  # MLC WebGPU lane; zero-key browser default
+mistral_optional = "mistral.rs" # experimental desktop alternative behind InferenceProvider

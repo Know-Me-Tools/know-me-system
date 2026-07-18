@@ -1,0 +1,36 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/skill-activation.py",
+            "description": "TJ-ARCH-MOB-001: activate project-local UI/UX and runtime-verification skills by prompt-word match"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/skill-activation.py",
+            "description": "TJ-ARCH-MOB-001: activate project-local UI/UX skills by prompt-word match"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/a11y-reminder.py",
+            "description": "TJ-ARCH-MOB-001: remind to run the a11y-gate after UI edits"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,31 @@
+# TJ-ARCH-MOB-001 inner loop. `cargo clippy` is the single loop driver — never
+# alternate with bare `cargo check` (they don't share fingerprint caches, so
+# alternating recompiles everything twice). Cross-target jobs catch cfg errors
+# in seconds without full mobile/wasm builds.
+default_job = "clippy"
+
+[jobs.clippy]
+# NOT --all-features: gen_ui_ffi's `frb-streams` feature references the
+# codegen-emitted StreamSink<T> and only compiles after
+# `flutter_rust_bridge_codegen generate` has run. Enabling it before codegen
+# would break the inner loop. Run `bacon clippy-frb` after codegen to include it.
+command = ["cargo", "clippy", "--all-targets", "--", "-D", "warnings"]
+need_stdout = false
+
+[jobs.clippy-frb]
+# Post-codegen: lint the full FFI surface including the generated stream sinks.
+command = ["cargo", "clippy", "--all-targets", "--features", "gen_ui_ffi/frb-streams", "--", "-D", "warnings"]
+need_stdout = false
+
+[jobs.check-wasm]
+command = ["cargo", "check", "--target", "wasm32-unknown-unknown", "-p", "gen_ui_wasm"]
+need_stdout = false
+
+[jobs.check-ios]
+command = ["cargo", "check", "--target", "aarch64-apple-ios", "-p", "gen_ui_ffi"]
+need_stdout = false
+
+[keybindings]
+c = "job:clippy"
+w = "job:check-wasm"
+i = "job:check-ios"

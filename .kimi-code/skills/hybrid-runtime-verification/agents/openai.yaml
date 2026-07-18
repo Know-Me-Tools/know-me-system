@@ -1,0 +1,4 @@
+interface:
+  display_name: "Hybrid Runtime Verification"
+  short_description: "Prove hybrid apps work from clean checkout"
+  default_prompt: "Use $hybrid-runtime-verification to verify this hybrid application from a clean checkout through a real launch and public workflow."

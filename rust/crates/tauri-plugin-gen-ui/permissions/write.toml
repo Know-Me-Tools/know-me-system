@@ -1,0 +1,7 @@
+# TJ-ARCH-MOB-001 compliant
+"$schema" = "schemas/schema.json"
+
+[[permission]]
+identifier = "allow-write"
+description = "Allow entity create/update/delete. Grant only to capabilities that own writes."
+commands.allow = ["entity_create", "entity_update", "entity_delete"]

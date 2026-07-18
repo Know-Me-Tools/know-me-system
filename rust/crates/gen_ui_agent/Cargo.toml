@@ -1,0 +1,75 @@
+[package]
+name = "gen_ui_agent"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+gen_ui_types    = { path = "../gen_ui_types" }
+gen_ui_runtime  = { path = "../gen_ui_runtime" }
+gen_ui_protocol = { path = "../gen_ui_protocol" }
+# gen_ui_agent is native-only (consumed by gen_ui_ffi mobile + tauri-plugin-gen-ui
+# desktop, never gen_ui_wasm), so native-http is unconditional here.
+gen_ui_client   = { path = "../gen_ui_client", default-features = false, features = ["native-http"] }
+gen_ui_db_graph = { path = "../gen_ui_db_graph", features = ["embed-native"] }
+gen_ui_mcp      = { path = "../gen_ui_mcp" }
+# The library NEVER names a concrete engine: it drives local inference purely
+# through the `gen_ui_types::inference::InferenceProvider` trait object handed to
+# `state::init_with_inference`, and the platform leaf picks the engine
+# (tauri-plugin-gen-ui enables `local-mistral`). That keeps the mobile llama-cpp-2
+# lane from ever touching this crate.
+#
+# This optional dep exists ONLY for the `test-local-mistral` feature, which the
+# C-105 T12 live test uses to drive a real model through the public chat::send
+# path. Off in every normal build — including mobile's, which must not resolve
+# mistral.rs at all.
+gen_ui_inference = { path = "../gen_ui_inference", features = ["local-mistral"], optional = true }
+liter-llm.workspace = true
+async-trait.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio = { workspace = true, features = ["sync", "rt"] }
+once_cell.workspace = true
+tracing.workspace = true
+keyring.workspace = true
+uuid.workspace = true
+futures.workspace = true
+# C-106: assembling the forge/Quarry WriteSink here keeps the platform leaves thin —
+# they would otherwise each need these two just to construct a client. Both are already
+# in gen_ui_client's graph, so this adds no new third-party code to the build.
+reqwest = { workspace = true, default-features = false, features = ["rustls-tls", "json"] }
+parking_lot.workspace = true
+
+[target.'cfg(target_os = "ios")'.dependencies]
+# Cargo feature-unifies this into the same apple-native-keyring-store instance
+# keyring pulls in transitively — see the workspace Cargo.toml comment on keyring
+# for why the `protected` feature can't be enabled through keyring's own table.
+apple-native-keyring-store.workspace = true
+
+# pglite-oxide (desktop's embedded PostgreSQL) is structurally unsupported on
+# iOS/Android (no child processes, no JIT — see docs/pglite-oxide-tauri-hybrid.md).
+# Mobile's relational store is the embedded SurrealDB instance in
+# gen_ui_db_graph instead. Enabling pglite here also pulls in wasmer
+# transitively, which fails to cross-compile for i686-linux-android (E0425
+# UNWIND_DATA_REG, unsupported on 32-bit x86) — the actual trigger for this
+# gate. gen_ui_agent is shared with tauri-plugin-gen-ui desktop, which needs
+# pglite; mobile and desktop are always separate `cargo build` invocations
+# (different manifest-path/target-dir), so this target-gate never unifies
+# features across them.
+[target.'cfg(not(any(target_os = "ios", target_os = "android")))'.dependencies]
+gen_ui_db = { path = "../gen_ui_db", features = ["pglite"] }
+[target.'cfg(any(target_os = "ios", target_os = "android"))'.dependencies]
+gen_ui_db = { path = "../gen_ui_db" }
+
+[features]
+# Pulls the concrete desktop engine in as a DEV dependency so the C-105 T12 live
+# test can drive chat::send's local lane end-to-end. Not a library feature: the
+# crate itself never names an engine (see the note on the dependencies above), and
+# nothing in a normal build turns this on.
+test-local-mistral = ["dep:gen_ui_inference"]
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }

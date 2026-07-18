@@ -1,0 +1,20 @@
+# TJ-ARCH-MOB-001 compliant
+name: gen_ui_flutter
+description: Dart-only wrapper types for the gen_ui_core FFI surface. The actual
+  frb-generated bindings and native Rust linking live directly in mobile/ (see
+  mobile/lib/bridge/ and mobile/rust_builder/) — this package is not an ffiPlugin
+  and is not imported by the app yet; kept as a place for shared, publishable
+  Dart-side types if/when this is extracted into its own package.
+version: 0.1.0
+publish_to: none # set to https://pub.dev when ready to publish
+environment:
+  sdk: ">=3.8.0 <4.0.0"
+  flutter: ">=3.29.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_rust_bridge: ^2.12.0
+
+dev_dependencies:
+  flutter_lints: ^5.0.0

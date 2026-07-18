@@ -1,0 +1,4 @@
+interface:
+  display_name: "Record Karpathy Progress"
+  short_description: "Capture verified work and lessons in project and private wikis"
+  default_prompt: "Use $karpathy-progress-memory to record this verified phase boundary and its reusable lessons."

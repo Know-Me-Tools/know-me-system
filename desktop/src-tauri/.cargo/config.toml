@@ -1,0 +1,7 @@
+# TJ-ARCH-MOB-001 compliant
+
+[env]
+# whisper.cpp uses std::filesystem, which is unavailable before macOS 10.15.
+# Cargo owns native dependency compilation, so this must live here rather than
+# solely in tauri.conf.json's bundle metadata.
+MACOSX_DEPLOYMENT_TARGET = { value = "10.15", force = true }

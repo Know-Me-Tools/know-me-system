@@ -1,0 +1,2781 @@
+[
+  {
+    "original_sha256": "84a244354f0d1960d840e1fa3f17e2f178464f00c9a88d25a0fa7dfd31359e71",
+    "record": "{\"id\":\"5c357a8c-8938-4e2f-9cda-1181c8bb2096\",\"kind\":\"compiled\",\"session_id\":\"ae007df6-afae-4c84-846f-5e707b68a0e1\",\"project_root\":\"$REPO_ROOT/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T01:12:51.965540Z\",\"payload\":{\"entry_id\":\"knowme-poc-phase-codegen-ci-verification-branding-and-startup-fixes\",\"tags\":[\"hybrid-mobile\",\"phase-codegen\",\"ci-verification\",\"proof-of-concept\",\"flutter\",\"rust-ffi\",\"tauri\",\"branding\"],\"title\":\"KnowMe PoC phase: codegen, CI verification, branding, and startup fixes\",\"ts\":\"2026-07-16T01:12:51.965540Z\",\"type\":\"compiled\"},\"affects\":[\"knowme-poc-phase-codegen-ci-verification-branding-and-startup-fixes\"]}",
+    "redactions": [
+      {
+        "kind": "repository-worktree-path",
+        "occurrences": 1
+      }
+    ],
+    "sources": [
+      {
+        "branch": "worktree-agent-a6bf13877ab890979",
+        "line": 1,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "agent-a6bf13877ab890979"
+      },
+      {
+        "branch": "worktree-agent-ad0c09b67356676bb",
+        "line": 1,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "agent-ad0c09b67356676bb"
+      }
+    ]
+  },
+  {
+    "original_sha256": "c194f4b06000c2304a63a273bbf45535e0b4c886f2979424a723a42b984c6230",
+    "record": "{\"id\":\"5c357a8c-8938-4e2f-9cda-1181c8bb2096\",\"kind\":\"compiled\",\"session_id\":\"ae007df6-afae-4c84-846f-5e707b68a0e1\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T01:12:51.965540Z\",\"payload\":{\"entry_id\":\"knowme-poc-phase-codegen-ci-verification-branding-and-startup-fixes\",\"tags\":[\"hybrid-mobile\",\"phase-codegen\",\"ci-verification\",\"proof-of-concept\",\"flutter\",\"rust-ffi\",\"tauri\",\"branding\"],\"title\":\"KnowMe PoC phase: codegen, CI verification, branding, and startup fixes\",\"ts\":\"2026-07-16T01:12:51.965540Z\",\"type\":\"compiled\"},\"affects\":[\"knowme-poc-phase-codegen-ci-verification-branding-and-startup-fixes\"]}",
+    "redactions": [],
+    "sources": [
+      {
+        "branch": "main-pre-consolidation",
+        "line": 1,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "primary"
+      },
+      {
+        "branch": "codex/consolidate-main",
+        "line": 1,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "integration"
+      },
+      {
+        "branch": "claude/compassionate-babbage-7cd4bc",
+        "line": 1,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "compassionate-babbage-7cd4bc"
+      },
+      {
+        "branch": "claude/cross-platform-app-theming-4a272e",
+        "line": 1,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "cross-platform-app-theming-4a272e"
+      },
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 1,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      },
+      {
+        "branch": "claude/goofy-gould-d872b8",
+        "line": 1,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "goofy-gould-d872b8"
+      },
+      {
+        "branch": "claude/optimistic-volhard-233482",
+        "line": 1,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "optimistic-volhard-233482"
+      },
+      {
+        "branch": "claude/pensive-greider-2e206c",
+        "line": 1,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "pensive-greider-2e206c"
+      },
+      {
+        "branch": "claude/practical-bose-6b609c",
+        "line": 1,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "practical-bose-6b609c"
+      },
+      {
+        "branch": "claude/sweet-mendeleev-401c40",
+        "line": 1,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "sweet-mendeleev-401c40"
+      },
+      {
+        "branch": "claude/xenodochial-sammet-a67a35",
+        "line": 1,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "xenodochial-sammet-a67a35"
+      }
+    ]
+  },
+  {
+    "original_sha256": "4ae912f84f2c6ca14b44a0c7b55aec4c4b14698bd4a796bc9ebb883e44b09db0",
+    "record": "{\"id\":\"f898bcd4-5b97-4002-bce1-4a4d15a5a8cd\",\"kind\":\"compiled\",\"session_id\":\"94db0f88-8d21-430c-a0fc-5deb668cfdc3\",\"project_root\":\"$REPO_ROOT/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T01:12:52.209582Z\",\"payload\":{\"entry_id\":\"hybrid-mobile-architecture-poc-phase-goals-and-current-status\",\"tags\":[\"hybrid-mobile\",\"proof-of-concept\",\"codegen\",\"ci-verification\",\"tauri\",\"flutter\",\"surrealdb\",\"pem\"],\"title\":\"Hybrid Mobile Architecture PoC Phase Goals and Current Status\",\"ts\":\"2026-07-16T01:12:52.209582Z\",\"type\":\"compiled\"},\"affects\":[\"hybrid-mobile-architecture-poc-phase-goals-and-current-status\"]}",
+    "redactions": [
+      {
+        "kind": "repository-worktree-path",
+        "occurrences": 1
+      }
+    ],
+    "sources": [
+      {
+        "branch": "worktree-agent-a6bf13877ab890979",
+        "line": 2,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "agent-a6bf13877ab890979"
+      },
+      {
+        "branch": "worktree-agent-ad0c09b67356676bb",
+        "line": 2,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "agent-ad0c09b67356676bb"
+      }
+    ]
+  },
+  {
+    "original_sha256": "58fb12254e3d218bd0e032322c5375d40108169f325e4853112a0ba7dd423727",
+    "record": "{\"id\":\"f898bcd4-5b97-4002-bce1-4a4d15a5a8cd\",\"kind\":\"compiled\",\"session_id\":\"94db0f88-8d21-430c-a0fc-5deb668cfdc3\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T01:12:52.209582Z\",\"payload\":{\"entry_id\":\"hybrid-mobile-architecture-poc-phase-goals-and-current-status\",\"tags\":[\"hybrid-mobile\",\"proof-of-concept\",\"codegen\",\"ci-verification\",\"tauri\",\"flutter\",\"surrealdb\",\"pem\"],\"title\":\"Hybrid Mobile Architecture PoC Phase Goals and Current Status\",\"ts\":\"2026-07-16T01:12:52.209582Z\",\"type\":\"compiled\"},\"affects\":[\"hybrid-mobile-architecture-poc-phase-goals-and-current-status\"]}",
+    "redactions": [],
+    "sources": [
+      {
+        "branch": "main-pre-consolidation",
+        "line": 2,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "primary"
+      },
+      {
+        "branch": "codex/consolidate-main",
+        "line": 2,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "integration"
+      },
+      {
+        "branch": "claude/compassionate-babbage-7cd4bc",
+        "line": 2,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "compassionate-babbage-7cd4bc"
+      },
+      {
+        "branch": "claude/cross-platform-app-theming-4a272e",
+        "line": 2,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "cross-platform-app-theming-4a272e"
+      },
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 2,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      },
+      {
+        "branch": "claude/goofy-gould-d872b8",
+        "line": 2,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "goofy-gould-d872b8"
+      },
+      {
+        "branch": "claude/optimistic-volhard-233482",
+        "line": 2,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "optimistic-volhard-233482"
+      },
+      {
+        "branch": "claude/pensive-greider-2e206c",
+        "line": 2,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "pensive-greider-2e206c"
+      },
+      {
+        "branch": "claude/practical-bose-6b609c",
+        "line": 2,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "practical-bose-6b609c"
+      },
+      {
+        "branch": "claude/sweet-mendeleev-401c40",
+        "line": 2,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "sweet-mendeleev-401c40"
+      },
+      {
+        "branch": "claude/xenodochial-sammet-a67a35",
+        "line": 2,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "xenodochial-sammet-a67a35"
+      }
+    ]
+  },
+  {
+    "original_sha256": "3177af4119eb6e611be56d086def8a485dc6f61d821d848ba007c43613387bb7",
+    "record": "{\"id\":\"d9257631-481f-43b7-b567-6f45c01ac15c\",\"kind\":\"compiled\",\"session_id\":\"486514cc-072c-489a-bff8-6dbe068ced9e\",\"project_root\":\"$REPO_ROOT/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T03:16:44.196314Z\",\"payload\":{\"entry_id\":\"hybrid-mobile-poc-codegen-and-ci-verification-session\",\"tags\":[\"hybrid-mobile\",\"proof-of-concept\",\"codegen\",\"ci-verification\",\"tauri\",\"surrealdb\",\"local-first\"],\"title\":\"Hybrid Mobile PoC Codegen and CI Verification Session\",\"ts\":\"2026-07-16T03:16:44.196314Z\",\"type\":\"compiled\"},\"affects\":[\"hybrid-mobile-poc-codegen-and-ci-verification-session\"]}",
+    "redactions": [
+      {
+        "kind": "repository-worktree-path",
+        "occurrences": 1
+      }
+    ],
+    "sources": [
+      {
+        "branch": "worktree-agent-a6bf13877ab890979",
+        "line": 3,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "agent-a6bf13877ab890979"
+      },
+      {
+        "branch": "worktree-agent-ad0c09b67356676bb",
+        "line": 3,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "agent-ad0c09b67356676bb"
+      }
+    ]
+  },
+  {
+    "original_sha256": "abd4df4e70aa420b0e00d9956e47d03cc7561e5a1f8ea29c5c8a22d16c02b589",
+    "record": "{\"id\":\"d9257631-481f-43b7-b567-6f45c01ac15c\",\"kind\":\"compiled\",\"session_id\":\"486514cc-072c-489a-bff8-6dbe068ced9e\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T03:16:44.196314Z\",\"payload\":{\"entry_id\":\"hybrid-mobile-poc-codegen-and-ci-verification-session\",\"tags\":[\"hybrid-mobile\",\"proof-of-concept\",\"codegen\",\"ci-verification\",\"tauri\",\"surrealdb\",\"local-first\"],\"title\":\"Hybrid Mobile PoC Codegen and CI Verification Session\",\"ts\":\"2026-07-16T03:16:44.196314Z\",\"type\":\"compiled\"},\"affects\":[\"hybrid-mobile-poc-codegen-and-ci-verification-session\"]}",
+    "redactions": [],
+    "sources": [
+      {
+        "branch": "main-pre-consolidation",
+        "line": 3,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "primary"
+      },
+      {
+        "branch": "codex/consolidate-main",
+        "line": 3,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "integration"
+      },
+      {
+        "branch": "claude/compassionate-babbage-7cd4bc",
+        "line": 3,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "compassionate-babbage-7cd4bc"
+      },
+      {
+        "branch": "claude/cross-platform-app-theming-4a272e",
+        "line": 3,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "cross-platform-app-theming-4a272e"
+      },
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 3,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      },
+      {
+        "branch": "claude/goofy-gould-d872b8",
+        "line": 3,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "goofy-gould-d872b8"
+      },
+      {
+        "branch": "claude/optimistic-volhard-233482",
+        "line": 3,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "optimistic-volhard-233482"
+      },
+      {
+        "branch": "claude/pensive-greider-2e206c",
+        "line": 3,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "pensive-greider-2e206c"
+      },
+      {
+        "branch": "claude/practical-bose-6b609c",
+        "line": 3,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "practical-bose-6b609c"
+      },
+      {
+        "branch": "claude/sweet-mendeleev-401c40",
+        "line": 3,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "sweet-mendeleev-401c40"
+      },
+      {
+        "branch": "claude/xenodochial-sammet-a67a35",
+        "line": 3,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "xenodochial-sammet-a67a35"
+      }
+    ]
+  },
+  {
+    "original_sha256": "3e69a9d8126a43710a2ef770d17a933beab7fb8d2107ebf10131a269b9114b9c",
+    "record": "{\"id\":\"420a9466-c62e-4926-a337-330a90562d18\",\"kind\":\"compiled\",\"session_id\":\"673155b9-9247-4c1d-abfa-2ff6d3d6ce37\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T03:54:45.733690Z\",\"payload\":{\"entry_id\":\"hybrid-mobile-poc-executor-session-completion\",\"tags\":[\"hybrid-mobile\",\"proof-of-concept\",\"codegen\",\"ci-verification\",\"tauri\",\"surrealdb\",\"local-first\"],\"title\":\"Hybrid Mobile PoC Executor Session Completion\",\"ts\":\"2026-07-16T03:54:45.733690Z\",\"type\":\"compiled\"},\"affects\":[\"hybrid-mobile-poc-executor-session-completion\"]}",
+    "redactions": [],
+    "sources": [
+      {
+        "branch": "main-pre-consolidation",
+        "line": 4,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "primary"
+      },
+      {
+        "branch": "codex/consolidate-main",
+        "line": 4,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "integration"
+      },
+      {
+        "branch": "claude/compassionate-babbage-7cd4bc",
+        "line": 4,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "compassionate-babbage-7cd4bc"
+      },
+      {
+        "branch": "claude/cross-platform-app-theming-4a272e",
+        "line": 4,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "cross-platform-app-theming-4a272e"
+      },
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 4,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      },
+      {
+        "branch": "claude/goofy-gould-d872b8",
+        "line": 4,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "goofy-gould-d872b8"
+      },
+      {
+        "branch": "claude/optimistic-volhard-233482",
+        "line": 4,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "optimistic-volhard-233482"
+      },
+      {
+        "branch": "claude/pensive-greider-2e206c",
+        "line": 4,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "pensive-greider-2e206c"
+      },
+      {
+        "branch": "claude/practical-bose-6b609c",
+        "line": 4,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "practical-bose-6b609c"
+      },
+      {
+        "branch": "claude/sweet-mendeleev-401c40",
+        "line": 4,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "sweet-mendeleev-401c40"
+      },
+      {
+        "branch": "claude/xenodochial-sammet-a67a35",
+        "line": 4,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "xenodochial-sammet-a67a35"
+      }
+    ]
+  },
+  {
+    "original_sha256": "f6ad8d53c660aad47efdf222b72feb095229182d776a364060ebebd6a1c04960",
+    "record": "{\"id\":\"61004d06-95b5-4467-b3fc-1b5a17ee1aad\",\"kind\":\"compiled\",\"session_id\":\"f7c48127-6e41-46e1-b535-d85bfdf92701\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T08:35:06.457736Z\",\"payload\":{\"entry_id\":\"hybrid-mobile-poc-phase-codegen-and-ci-execution-context\",\"tags\":[\"hybrid-mobile\",\"proof-of-concept\",\"codegen\",\"ci-verification\",\"tauri\",\"flutter\",\"surrealdb\",\"pem\"],\"title\":\"Hybrid Mobile PoC Phase Codegen and CI Execution Context\",\"ts\":\"2026-07-16T08:35:06.457736Z\",\"type\":\"compiled\"},\"affects\":[\"hybrid-mobile-poc-phase-codegen-and-ci-execution-context\"]}",
+    "redactions": [],
+    "sources": [
+      {
+        "branch": "main-pre-consolidation",
+        "line": 5,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "primary"
+      },
+      {
+        "branch": "codex/consolidate-main",
+        "line": 5,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "integration"
+      },
+      {
+        "branch": "claude/compassionate-babbage-7cd4bc",
+        "line": 5,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "compassionate-babbage-7cd4bc"
+      },
+      {
+        "branch": "claude/cross-platform-app-theming-4a272e",
+        "line": 5,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "cross-platform-app-theming-4a272e"
+      },
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 5,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      },
+      {
+        "branch": "claude/goofy-gould-d872b8",
+        "line": 5,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "goofy-gould-d872b8"
+      },
+      {
+        "branch": "claude/optimistic-volhard-233482",
+        "line": 5,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "optimistic-volhard-233482"
+      },
+      {
+        "branch": "claude/pensive-greider-2e206c",
+        "line": 5,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "pensive-greider-2e206c"
+      },
+      {
+        "branch": "claude/practical-bose-6b609c",
+        "line": 5,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "practical-bose-6b609c"
+      },
+      {
+        "branch": "claude/sweet-mendeleev-401c40",
+        "line": 5,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "sweet-mendeleev-401c40"
+      },
+      {
+        "branch": "claude/xenodochial-sammet-a67a35",
+        "line": 5,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "xenodochial-sammet-a67a35"
+      }
+    ]
+  },
+  {
+    "original_sha256": "ce36d74bd8caf3acbcfc1d4998a4823e2160d8db3eea25311061ea644cf4fd07",
+    "record": "{\"id\":\"a37f1969-a156-4f95-b74f-77957a81372c\",\"kind\":\"compiled\",\"session_id\":\"9cb6985b-ce70-4aae-aec6-699572029769\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T08:35:14.096234Z\",\"payload\":{\"entry_id\":\"codegen-and-ci-verification-phase-for-knowme-poc\",\"tags\":[\"hybrid-mobile\",\"phase-codegen\",\"ci-verification\",\"proof-of-concept\",\"flutter\",\"rust-ffi\",\"tauri\",\"session-state\"],\"title\":\"Codegen and CI verification phase for KnowMe PoC\",\"ts\":\"2026-07-16T08:35:14.096234Z\",\"type\":\"compiled\"},\"affects\":[\"codegen-and-ci-verification-phase-for-knowme-poc\"]}",
+    "redactions": [],
+    "sources": [
+      {
+        "branch": "main-pre-consolidation",
+        "line": 6,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "primary"
+      },
+      {
+        "branch": "codex/consolidate-main",
+        "line": 6,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "integration"
+      },
+      {
+        "branch": "claude/compassionate-babbage-7cd4bc",
+        "line": 6,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "compassionate-babbage-7cd4bc"
+      },
+      {
+        "branch": "claude/cross-platform-app-theming-4a272e",
+        "line": 6,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "cross-platform-app-theming-4a272e"
+      },
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 6,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      },
+      {
+        "branch": "claude/goofy-gould-d872b8",
+        "line": 6,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "goofy-gould-d872b8"
+      },
+      {
+        "branch": "claude/optimistic-volhard-233482",
+        "line": 6,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "optimistic-volhard-233482"
+      },
+      {
+        "branch": "claude/pensive-greider-2e206c",
+        "line": 6,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "pensive-greider-2e206c"
+      },
+      {
+        "branch": "claude/practical-bose-6b609c",
+        "line": 6,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "practical-bose-6b609c"
+      },
+      {
+        "branch": "claude/sweet-mendeleev-401c40",
+        "line": 6,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "sweet-mendeleev-401c40"
+      },
+      {
+        "branch": "claude/xenodochial-sammet-a67a35",
+        "line": 6,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "xenodochial-sammet-a67a35"
+      }
+    ]
+  },
+  {
+    "original_sha256": "5c7f0a9629d65019e54c0c9faff4912783e7f6c2d2a0ec0207f09cd6e803ad73",
+    "record": "{\"id\":\"8a116df7-61c7-42a0-ba81-f26732472c88\",\"kind\":\"compiled\",\"session_id\":\"00eff38e-f9ee-4da9-be58-1991393f24b5\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T09:47:28.537394Z\",\"payload\":{\"entry_id\":\"knowme-poc-phase-codegen-ci-verification-and-singleton-fix\",\"tags\":[\"hybrid-mobile\",\"codegen\",\"ci-verification\",\"proof-of-concept\",\"tauri\",\"flutter\",\"rust-ffi\",\"singleton\"],\"title\":\"KnowMe PoC phase: codegen, CI verification, and singleton fix\",\"ts\":\"2026-07-16T09:47:28.537394Z\",\"type\":\"compiled\"},\"affects\":[\"knowme-poc-phase-codegen-ci-verification-and-singleton-fix\"]}",
+    "redactions": [],
+    "sources": [
+      {
+        "branch": "main-pre-consolidation",
+        "line": 7,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "primary"
+      },
+      {
+        "branch": "codex/consolidate-main",
+        "line": 7,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "integration"
+      },
+      {
+        "branch": "claude/compassionate-babbage-7cd4bc",
+        "line": 7,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "compassionate-babbage-7cd4bc"
+      },
+      {
+        "branch": "claude/cross-platform-app-theming-4a272e",
+        "line": 7,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "cross-platform-app-theming-4a272e"
+      },
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 7,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      },
+      {
+        "branch": "claude/goofy-gould-d872b8",
+        "line": 7,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "goofy-gould-d872b8"
+      },
+      {
+        "branch": "claude/optimistic-volhard-233482",
+        "line": 7,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "optimistic-volhard-233482"
+      },
+      {
+        "branch": "claude/pensive-greider-2e206c",
+        "line": 7,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "pensive-greider-2e206c"
+      },
+      {
+        "branch": "claude/practical-bose-6b609c",
+        "line": 7,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "practical-bose-6b609c"
+      },
+      {
+        "branch": "claude/sweet-mendeleev-401c40",
+        "line": 7,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "sweet-mendeleev-401c40"
+      },
+      {
+        "branch": "claude/xenodochial-sammet-a67a35",
+        "line": 7,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "xenodochial-sammet-a67a35"
+      }
+    ]
+  },
+  {
+    "original_sha256": "4b248375ce652222477f1c217ff4831842f7d3cb70bf2374f9d564f1e572eb7c",
+    "record": "{\"id\":\"3f07d717-ea74-4a7a-8944-03ad7bbf0790\",\"kind\":\"compiled\",\"session_id\":\"cece1e2f-3996-4201-a118-025eaef7a6b5\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T09:47:47.196101Z\",\"payload\":{\"entry_id\":\"knowme-poc-phase-codegen-and-ci-verification-goals\",\"tags\":[\"hybrid-mobile\",\"phase-codegen\",\"ci-verification\",\"proof-of-concept\",\"flutter\",\"rust-ffi\",\"tauri\",\"session-state\"],\"title\":\"KnowMe PoC phase: codegen and CI verification goals\",\"ts\":\"2026-07-16T09:47:47.196101Z\",\"type\":\"compiled\"},\"affects\":[\"knowme-poc-phase-codegen-and-ci-verification-goals\"]}",
+    "redactions": [],
+    "sources": [
+      {
+        "branch": "main-pre-consolidation",
+        "line": 8,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "primary"
+      },
+      {
+        "branch": "codex/consolidate-main",
+        "line": 8,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "integration"
+      },
+      {
+        "branch": "claude/compassionate-babbage-7cd4bc",
+        "line": 8,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "compassionate-babbage-7cd4bc"
+      },
+      {
+        "branch": "claude/cross-platform-app-theming-4a272e",
+        "line": 8,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "cross-platform-app-theming-4a272e"
+      },
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 8,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      },
+      {
+        "branch": "claude/goofy-gould-d872b8",
+        "line": 8,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "goofy-gould-d872b8"
+      },
+      {
+        "branch": "claude/optimistic-volhard-233482",
+        "line": 8,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "optimistic-volhard-233482"
+      },
+      {
+        "branch": "claude/pensive-greider-2e206c",
+        "line": 8,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "pensive-greider-2e206c"
+      },
+      {
+        "branch": "claude/practical-bose-6b609c",
+        "line": 8,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "practical-bose-6b609c"
+      },
+      {
+        "branch": "claude/sweet-mendeleev-401c40",
+        "line": 8,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "sweet-mendeleev-401c40"
+      },
+      {
+        "branch": "claude/xenodochial-sammet-a67a35",
+        "line": 8,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "xenodochial-sammet-a67a35"
+      }
+    ]
+  },
+  {
+    "original_sha256": "3c05deea8ce09bda1aee88746cd28dea3d654e0feca9b372bdf8e0728074d76e",
+    "record": "{\"id\":\"549ea2d1-46f6-4b23-beb9-a9cea94adf32\",\"kind\":\"compiled\",\"session_id\":\"a37b06bb-0f7e-4815-a0a4-2e886665bdd6\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T10:04:32.849291Z\",\"payload\":{\"entry_id\":\"knowme-poc-codegen-and-ci-verification-phase\",\"tags\":[\"hybrid-mobile\",\"phase-codegen\",\"ci-verification\",\"proof-of-concept\",\"flutter\",\"rust-ffi\",\"tauri\",\"session-state\"],\"title\":\"KnowMe PoC codegen and CI verification phase\",\"ts\":\"2026-07-16T10:04:32.849291Z\",\"type\":\"compiled\"},\"affects\":[\"knowme-poc-codegen-and-ci-verification-phase\"]}",
+    "redactions": [],
+    "sources": [
+      {
+        "branch": "main-pre-consolidation",
+        "line": 9,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "primary"
+      },
+      {
+        "branch": "codex/consolidate-main",
+        "line": 9,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "integration"
+      },
+      {
+        "branch": "claude/compassionate-babbage-7cd4bc",
+        "line": 9,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "compassionate-babbage-7cd4bc"
+      },
+      {
+        "branch": "claude/cross-platform-app-theming-4a272e",
+        "line": 9,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "cross-platform-app-theming-4a272e"
+      },
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 9,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      },
+      {
+        "branch": "claude/goofy-gould-d872b8",
+        "line": 9,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "goofy-gould-d872b8"
+      },
+      {
+        "branch": "claude/optimistic-volhard-233482",
+        "line": 9,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "optimistic-volhard-233482"
+      },
+      {
+        "branch": "claude/pensive-greider-2e206c",
+        "line": 9,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "pensive-greider-2e206c"
+      },
+      {
+        "branch": "claude/practical-bose-6b609c",
+        "line": 9,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "practical-bose-6b609c"
+      },
+      {
+        "branch": "claude/sweet-mendeleev-401c40",
+        "line": 9,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "sweet-mendeleev-401c40"
+      },
+      {
+        "branch": "claude/xenodochial-sammet-a67a35",
+        "line": 9,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "xenodochial-sammet-a67a35"
+      }
+    ]
+  },
+  {
+    "original_sha256": "c97540f5b471e05f529b253b34d13311cfab7a887e6979ca85091f4a5ed38475",
+    "record": "{\"id\":\"0eb41714-f849-4097-a8c7-5de32d4a042d\",\"kind\":\"compiled\",\"session_id\":\"44f05d91-f617-4b5d-a7ef-ad3760ec7a96\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T10:04:40.732844Z\",\"payload\":{\"entry_id\":\"hybrid-mobile-poc-phase-goals-for-codegen-and-ci-verification\",\"tags\":[\"hybrid-mobile\",\"proof-of-concept\",\"codegen\",\"ci-verification\",\"flutter\",\"tauri\",\"pem\",\"surrealdb\"],\"title\":\"Hybrid Mobile PoC phase goals for codegen and CI verification\",\"ts\":\"2026-07-16T10:04:40.732844Z\",\"type\":\"compiled\"},\"affects\":[\"hybrid-mobile-poc-phase-goals-for-codegen-and-ci-verification\"]}",
+    "redactions": [],
+    "sources": [
+      {
+        "branch": "main-pre-consolidation",
+        "line": 10,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "primary"
+      },
+      {
+        "branch": "codex/consolidate-main",
+        "line": 10,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "integration"
+      },
+      {
+        "branch": "claude/compassionate-babbage-7cd4bc",
+        "line": 10,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "compassionate-babbage-7cd4bc"
+      },
+      {
+        "branch": "claude/cross-platform-app-theming-4a272e",
+        "line": 10,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "cross-platform-app-theming-4a272e"
+      },
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 10,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      },
+      {
+        "branch": "claude/goofy-gould-d872b8",
+        "line": 10,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "goofy-gould-d872b8"
+      },
+      {
+        "branch": "claude/optimistic-volhard-233482",
+        "line": 10,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "optimistic-volhard-233482"
+      },
+      {
+        "branch": "claude/pensive-greider-2e206c",
+        "line": 10,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "pensive-greider-2e206c"
+      },
+      {
+        "branch": "claude/practical-bose-6b609c",
+        "line": 10,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "practical-bose-6b609c"
+      },
+      {
+        "branch": "claude/sweet-mendeleev-401c40",
+        "line": 10,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "sweet-mendeleev-401c40"
+      },
+      {
+        "branch": "claude/xenodochial-sammet-a67a35",
+        "line": 10,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "xenodochial-sammet-a67a35"
+      }
+    ]
+  },
+  {
+    "original_sha256": "1a52838e8ce48c6f6b5e7ed533b30ca25c3a9ab770cfbf8d4b0d0a5733b651a1",
+    "record": "{\"id\":\"64376d6b-c5b3-423f-b0ab-ab5cd660e2c1\",\"kind\":\"compiled\",\"session_id\":\"a00b5018-ddbc-4023-942a-7d622f48820d\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T10:08:34.132916Z\",\"payload\":{\"entry_id\":\"knowme-poc-codegen-and-ci-verification-phase-goals\",\"tags\":[\"hybrid-mobile\",\"phase-codegen\",\"ci-verification\",\"proof-of-concept\",\"flutter\",\"rust-ffi\",\"tauri\",\"session-state\"],\"title\":\"KnowMe PoC codegen and CI verification phase goals\",\"ts\":\"2026-07-16T10:08:34.132916Z\",\"type\":\"compiled\"},\"affects\":[\"knowme-poc-codegen-and-ci-verification-phase-goals\"]}",
+    "redactions": [],
+    "sources": [
+      {
+        "branch": "main-pre-consolidation",
+        "line": 11,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "primary"
+      },
+      {
+        "branch": "codex/consolidate-main",
+        "line": 11,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "integration"
+      },
+      {
+        "branch": "claude/compassionate-babbage-7cd4bc",
+        "line": 11,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "compassionate-babbage-7cd4bc"
+      },
+      {
+        "branch": "claude/cross-platform-app-theming-4a272e",
+        "line": 11,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "cross-platform-app-theming-4a272e"
+      },
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 11,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      },
+      {
+        "branch": "claude/goofy-gould-d872b8",
+        "line": 11,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "goofy-gould-d872b8"
+      },
+      {
+        "branch": "claude/optimistic-volhard-233482",
+        "line": 11,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "optimistic-volhard-233482"
+      },
+      {
+        "branch": "claude/pensive-greider-2e206c",
+        "line": 11,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "pensive-greider-2e206c"
+      },
+      {
+        "branch": "claude/practical-bose-6b609c",
+        "line": 11,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "practical-bose-6b609c"
+      },
+      {
+        "branch": "claude/sweet-mendeleev-401c40",
+        "line": 11,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "sweet-mendeleev-401c40"
+      },
+      {
+        "branch": "claude/xenodochial-sammet-a67a35",
+        "line": 11,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "xenodochial-sammet-a67a35"
+      }
+    ]
+  },
+  {
+    "original_sha256": "c4b319b990a1344622ad1ebba245b3555068b907b8287e289c8ac04219e8265a",
+    "record": "{\"id\":\"a9025a7b-4375-460e-95a3-9a04bbef0a83\",\"kind\":\"compiled\",\"session_id\":\"98a1abc8-dd3e-4e89-aeff-8d967f00c9a3\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T10:08:43.792665Z\",\"payload\":{\"entry_id\":\"knowme-poc-scribe-feature-and-ci-workflow-verification-status\",\"tags\":[\"hybrid-mobile\",\"knowme-poc\",\"ci-verification\",\"codegen\",\"tauri\",\"flutter\",\"scribe\",\"ios-simulator\"],\"title\":\"KnowMe PoC Scribe feature and CI workflow verification status\",\"ts\":\"2026-07-16T10:08:43.792665Z\",\"type\":\"compiled\"},\"affects\":[\"knowme-poc-scribe-feature-and-ci-workflow-verification-status\"]}",
+    "redactions": [],
+    "sources": [
+      {
+        "branch": "main-pre-consolidation",
+        "line": 12,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "primary"
+      },
+      {
+        "branch": "codex/consolidate-main",
+        "line": 12,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "integration"
+      },
+      {
+        "branch": "claude/compassionate-babbage-7cd4bc",
+        "line": 12,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "compassionate-babbage-7cd4bc"
+      },
+      {
+        "branch": "claude/cross-platform-app-theming-4a272e",
+        "line": 12,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "cross-platform-app-theming-4a272e"
+      },
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 12,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      },
+      {
+        "branch": "claude/goofy-gould-d872b8",
+        "line": 12,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "goofy-gould-d872b8"
+      },
+      {
+        "branch": "claude/optimistic-volhard-233482",
+        "line": 12,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "optimistic-volhard-233482"
+      },
+      {
+        "branch": "claude/pensive-greider-2e206c",
+        "line": 12,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "pensive-greider-2e206c"
+      },
+      {
+        "branch": "claude/practical-bose-6b609c",
+        "line": 12,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "practical-bose-6b609c"
+      },
+      {
+        "branch": "claude/sweet-mendeleev-401c40",
+        "line": 12,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "sweet-mendeleev-401c40"
+      },
+      {
+        "branch": "claude/xenodochial-sammet-a67a35",
+        "line": 12,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "xenodochial-sammet-a67a35"
+      }
+    ]
+  },
+  {
+    "original_sha256": "54f895df4af0057ba539fc9a5565f1b181c2e14856d417033330945d315596d8",
+    "record": "{\"id\":\"945404be-23a2-4289-a72c-51ee1a6f3334\",\"kind\":\"compiled\",\"session_id\":\"63f87611-c3a9-40a6-86af-0ad3ff89d344\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T11:17:16.015712Z\",\"payload\":{\"entry_id\":\"knowme-poc-phase-codegen-ci-verification-and-app-delivery\",\"tags\":[\"hybrid-mobile\",\"phase-codegen\",\"ci-verification\",\"proof-of-concept\",\"flutter\",\"rust-ffi\",\"tauri\",\"session-state\"],\"title\":\"KnowMe PoC phase: codegen, CI verification, and app delivery\",\"ts\":\"2026-07-16T11:17:16.015712Z\",\"type\":\"compiled\"},\"affects\":[\"knowme-poc-phase-codegen-ci-verification-and-app-delivery\"]}",
+    "redactions": [],
+    "sources": [
+      {
+        "branch": "main-pre-consolidation",
+        "line": 13,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "primary"
+      },
+      {
+        "branch": "codex/consolidate-main",
+        "line": 13,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "integration"
+      },
+      {
+        "branch": "claude/compassionate-babbage-7cd4bc",
+        "line": 13,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "compassionate-babbage-7cd4bc"
+      },
+      {
+        "branch": "claude/cross-platform-app-theming-4a272e",
+        "line": 13,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "cross-platform-app-theming-4a272e"
+      },
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 13,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      },
+      {
+        "branch": "claude/goofy-gould-d872b8",
+        "line": 13,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "goofy-gould-d872b8"
+      },
+      {
+        "branch": "claude/optimistic-volhard-233482",
+        "line": 13,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "optimistic-volhard-233482"
+      },
+      {
+        "branch": "claude/pensive-greider-2e206c",
+        "line": 13,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "pensive-greider-2e206c"
+      },
+      {
+        "branch": "claude/practical-bose-6b609c",
+        "line": 13,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "practical-bose-6b609c"
+      },
+      {
+        "branch": "claude/sweet-mendeleev-401c40",
+        "line": 13,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "sweet-mendeleev-401c40"
+      },
+      {
+        "branch": "claude/xenodochial-sammet-a67a35",
+        "line": 13,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "xenodochial-sammet-a67a35"
+      }
+    ]
+  },
+  {
+    "original_sha256": "a8fd500b1a43c19bdc8e55dfe728b40aacbf1f107209d1e37275855c384df7ce",
+    "record": "{\"id\":\"3f2c2679-cc8d-4759-9b32-56b4852bd866\",\"kind\":\"compiled\",\"session_id\":\"fa2ccea1-a00d-40bb-a151-d4378830766f\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T11:17:18.652995Z\",\"payload\":{\"entry_id\":\"hybrid-mobile-poc-phase-goals-and-verification-scope\",\"tags\":[\"hybrid-mobile\",\"proof-of-concept\",\"codegen\",\"ci-verification\",\"flutter\",\"tauri\",\"pem\",\"surrealdb\"],\"title\":\"Hybrid Mobile PoC phase goals and verification scope\",\"ts\":\"2026-07-16T11:17:18.652995Z\",\"type\":\"compiled\"},\"affects\":[\"hybrid-mobile-poc-phase-goals-and-verification-scope\"]}",
+    "redactions": [],
+    "sources": [
+      {
+        "branch": "main-pre-consolidation",
+        "line": 14,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "primary"
+      },
+      {
+        "branch": "codex/consolidate-main",
+        "line": 14,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "integration"
+      },
+      {
+        "branch": "claude/compassionate-babbage-7cd4bc",
+        "line": 14,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "compassionate-babbage-7cd4bc"
+      },
+      {
+        "branch": "claude/cross-platform-app-theming-4a272e",
+        "line": 14,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "cross-platform-app-theming-4a272e"
+      },
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 14,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      },
+      {
+        "branch": "claude/goofy-gould-d872b8",
+        "line": 14,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "goofy-gould-d872b8"
+      },
+      {
+        "branch": "claude/optimistic-volhard-233482",
+        "line": 14,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "optimistic-volhard-233482"
+      },
+      {
+        "branch": "claude/pensive-greider-2e206c",
+        "line": 14,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "pensive-greider-2e206c"
+      },
+      {
+        "branch": "claude/practical-bose-6b609c",
+        "line": 14,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "practical-bose-6b609c"
+      },
+      {
+        "branch": "claude/sweet-mendeleev-401c40",
+        "line": 14,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "sweet-mendeleev-401c40"
+      },
+      {
+        "branch": "claude/xenodochial-sammet-a67a35",
+        "line": 14,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "xenodochial-sammet-a67a35"
+      }
+    ]
+  },
+  {
+    "original_sha256": "3a105505df6dab3d0581b30a17263b60c21606e6a9f44058edd93fbc80a4ae73",
+    "record": "{\"id\":\"08baa491-5739-42d2-b433-0a95b8192343\",\"kind\":\"compiled\",\"session_id\":\"4893ab78-e402-48bf-a9b5-48609759d717\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T11:17:28.670401Z\",\"payload\":{\"entry_id\":\"executor-completion-marker-for-codegen-and-ci-phase\",\"tags\":[\"hybrid-mobile\",\"codegen\",\"ci-verification\",\"executor-session\",\"phase-tracking\"],\"title\":\"Executor Completion Marker for Codegen and CI Phase\",\"ts\":\"2026-07-16T11:17:28.670401Z\",\"type\":\"compiled\"},\"affects\":[\"executor-completion-marker-for-codegen-and-ci-phase\"]}",
+    "redactions": [],
+    "sources": [
+      {
+        "branch": "main-pre-consolidation",
+        "line": 15,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "primary"
+      },
+      {
+        "branch": "codex/consolidate-main",
+        "line": 15,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "integration"
+      },
+      {
+        "branch": "claude/compassionate-babbage-7cd4bc",
+        "line": 15,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "compassionate-babbage-7cd4bc"
+      },
+      {
+        "branch": "claude/cross-platform-app-theming-4a272e",
+        "line": 15,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "cross-platform-app-theming-4a272e"
+      },
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 15,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      },
+      {
+        "branch": "claude/goofy-gould-d872b8",
+        "line": 15,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "goofy-gould-d872b8"
+      },
+      {
+        "branch": "claude/optimistic-volhard-233482",
+        "line": 15,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "optimistic-volhard-233482"
+      },
+      {
+        "branch": "claude/pensive-greider-2e206c",
+        "line": 15,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "pensive-greider-2e206c"
+      },
+      {
+        "branch": "claude/practical-bose-6b609c",
+        "line": 15,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "practical-bose-6b609c"
+      },
+      {
+        "branch": "claude/sweet-mendeleev-401c40",
+        "line": 15,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "sweet-mendeleev-401c40"
+      },
+      {
+        "branch": "claude/xenodochial-sammet-a67a35",
+        "line": 15,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "xenodochial-sammet-a67a35"
+      }
+    ]
+  },
+  {
+    "original_sha256": "57e8387b0bc46b3cae7d61bb010981fb340e2255dca2164c07ef7551b7274b28",
+    "record": "{\"id\":\"2ef8e970-b7af-4e64-87eb-4ed472c87c7d\",\"kind\":\"compiled\",\"session_id\":\"1168fc40-77f3-4866-9761-6915bba13978\",\"project_root\":\"$REPO_ROOT/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T12:07:27.742401Z\",\"payload\":{\"entry_id\":\"knowme-poc-phase-requirements-and-codegen-ci-validation-scope\",\"tags\":[\"hybrid-mobile\",\"phase-codegen\",\"ci-verification\",\"proof-of-concept\",\"flutter\",\"rust-ffi\",\"tauri\",\"session-state\"],\"title\":\"KnowMe PoC phase requirements and codegen/CI validation scope\",\"ts\":\"2026-07-16T12:07:27.742401Z\",\"type\":\"compiled\"},\"affects\":[\"knowme-poc-phase-requirements-and-codegen-ci-validation-scope\"]}",
+    "redactions": [
+      {
+        "kind": "repository-worktree-path",
+        "occurrences": 1
+      }
+    ],
+    "sources": [
+      {
+        "branch": "claude/compassionate-babbage-7cd4bc",
+        "line": 16,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "compassionate-babbage-7cd4bc"
+      },
+      {
+        "branch": "claude/pensive-greider-2e206c",
+        "line": 16,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "pensive-greider-2e206c"
+      },
+      {
+        "branch": "claude/sweet-mendeleev-401c40",
+        "line": 16,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "sweet-mendeleev-401c40"
+      }
+    ]
+  },
+  {
+    "original_sha256": "5a7b0f7d58f216677985deb94a688c742d640b0cd59a63b984cdf276087f751f",
+    "record": "{\"id\":\"2ef8e970-b7af-4e64-87eb-4ed472c87c7d\",\"kind\":\"compiled\",\"session_id\":\"1168fc40-77f3-4866-9761-6915bba13978\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T12:07:27.742401Z\",\"payload\":{\"entry_id\":\"knowme-poc-phase-requirements-and-codegen-ci-validation-scope\",\"tags\":[\"hybrid-mobile\",\"phase-codegen\",\"ci-verification\",\"proof-of-concept\",\"flutter\",\"rust-ffi\",\"tauri\",\"session-state\"],\"title\":\"KnowMe PoC phase requirements and codegen/CI validation scope\",\"ts\":\"2026-07-16T12:07:27.742401Z\",\"type\":\"compiled\"},\"affects\":[\"knowme-poc-phase-requirements-and-codegen-ci-validation-scope\"]}",
+    "redactions": [],
+    "sources": [
+      {
+        "branch": "main-pre-consolidation",
+        "line": 16,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "primary"
+      },
+      {
+        "branch": "codex/consolidate-main",
+        "line": 16,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "integration"
+      },
+      {
+        "branch": "claude/cross-platform-app-theming-4a272e",
+        "line": 16,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "cross-platform-app-theming-4a272e"
+      },
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 16,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      },
+      {
+        "branch": "claude/goofy-gould-d872b8",
+        "line": 16,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "goofy-gould-d872b8"
+      },
+      {
+        "branch": "claude/optimistic-volhard-233482",
+        "line": 16,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "optimistic-volhard-233482"
+      },
+      {
+        "branch": "claude/practical-bose-6b609c",
+        "line": 16,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "practical-bose-6b609c"
+      },
+      {
+        "branch": "claude/xenodochial-sammet-a67a35",
+        "line": 16,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "xenodochial-sammet-a67a35"
+      }
+    ]
+  },
+  {
+    "original_sha256": "0ff0e7ccc15e1b286b11f8cd2ed2d1157d5c5dba513f0619059e956679208ef2",
+    "record": "{\"id\":\"09e76732-90ad-4ea2-878a-d1d4bda68ad7\",\"kind\":\"compiled\",\"session_id\":\"a0f066a8-f68e-4af0-aa16-3b46f52ab2a4\",\"project_root\":\"$REPO_ROOT/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T12:07:38.536081Z\",\"payload\":{\"entry_id\":\"knowme-poc-chat-routing-restored-after-aborted-stale-pr-merge\",\"tags\":[\"hybrid-mobile\",\"knowme-poc\",\"tauri\",\"chat-routing\",\"ci-verification\",\"codegen\",\"pem\",\"surrealdb\"],\"title\":\"KnowMe PoC chat routing restored after aborted stale PR merge\",\"ts\":\"2026-07-16T12:07:38.536081Z\",\"type\":\"compiled\"},\"affects\":[\"knowme-poc-chat-routing-restored-after-aborted-stale-pr-merge\"]}",
+    "redactions": [
+      {
+        "kind": "repository-worktree-path",
+        "occurrences": 1
+      }
+    ],
+    "sources": [
+      {
+        "branch": "claude/compassionate-babbage-7cd4bc",
+        "line": 17,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "compassionate-babbage-7cd4bc"
+      },
+      {
+        "branch": "claude/pensive-greider-2e206c",
+        "line": 17,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "pensive-greider-2e206c"
+      },
+      {
+        "branch": "claude/sweet-mendeleev-401c40",
+        "line": 17,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "sweet-mendeleev-401c40"
+      }
+    ]
+  },
+  {
+    "original_sha256": "df4a35728ae5c3507be45150bbb01ebda7d33cd111de5dd2c4d99516923cab6c",
+    "record": "{\"id\":\"09e76732-90ad-4ea2-878a-d1d4bda68ad7\",\"kind\":\"compiled\",\"session_id\":\"a0f066a8-f68e-4af0-aa16-3b46f52ab2a4\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T12:07:38.536081Z\",\"payload\":{\"entry_id\":\"knowme-poc-chat-routing-restored-after-aborted-stale-pr-merge\",\"tags\":[\"hybrid-mobile\",\"knowme-poc\",\"tauri\",\"chat-routing\",\"ci-verification\",\"codegen\",\"pem\",\"surrealdb\"],\"title\":\"KnowMe PoC chat routing restored after aborted stale PR merge\",\"ts\":\"2026-07-16T12:07:38.536081Z\",\"type\":\"compiled\"},\"affects\":[\"knowme-poc-chat-routing-restored-after-aborted-stale-pr-merge\"]}",
+    "redactions": [],
+    "sources": [
+      {
+        "branch": "main-pre-consolidation",
+        "line": 17,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "primary"
+      },
+      {
+        "branch": "codex/consolidate-main",
+        "line": 17,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "integration"
+      },
+      {
+        "branch": "claude/cross-platform-app-theming-4a272e",
+        "line": 17,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "cross-platform-app-theming-4a272e"
+      },
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 17,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      },
+      {
+        "branch": "claude/goofy-gould-d872b8",
+        "line": 17,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "goofy-gould-d872b8"
+      },
+      {
+        "branch": "claude/optimistic-volhard-233482",
+        "line": 17,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "optimistic-volhard-233482"
+      },
+      {
+        "branch": "claude/practical-bose-6b609c",
+        "line": 17,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "practical-bose-6b609c"
+      },
+      {
+        "branch": "claude/xenodochial-sammet-a67a35",
+        "line": 17,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "xenodochial-sammet-a67a35"
+      }
+    ]
+  },
+  {
+    "original_sha256": "6f6a6affc4a3f1674314873be772cb83e6b277e6555ee05f4857c165e2d95d77",
+    "record": "{\"id\":\"0af754d2-b089-4d3c-a3fd-9289bf76c07a\",\"kind\":\"compiled\",\"session_id\":\"a0b615c5-27b9-4070-828c-82426ef3701a\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T12:07:55.165753Z\",\"payload\":{\"entry_id\":\"codegen-and-ci-verification-executor-completion-marker\",\"tags\":[\"hybrid-mobile\",\"codegen\",\"ci-verification\",\"executor-session\",\"phase-tracking\"],\"title\":\"Codegen and CI Verification Executor Completion Marker\",\"ts\":\"2026-07-16T12:07:55.165753Z\",\"type\":\"compiled\"},\"affects\":[\"codegen-and-ci-verification-executor-completion-marker\"]}",
+    "redactions": [],
+    "sources": [
+      {
+        "branch": "main-pre-consolidation",
+        "line": 18,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "primary"
+      },
+      {
+        "branch": "codex/consolidate-main",
+        "line": 18,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "integration"
+      },
+      {
+        "branch": "claude/cross-platform-app-theming-4a272e",
+        "line": 18,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "cross-platform-app-theming-4a272e"
+      },
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 18,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      },
+      {
+        "branch": "claude/goofy-gould-d872b8",
+        "line": 18,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "goofy-gould-d872b8"
+      },
+      {
+        "branch": "claude/optimistic-volhard-233482",
+        "line": 18,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "optimistic-volhard-233482"
+      },
+      {
+        "branch": "claude/practical-bose-6b609c",
+        "line": 18,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "practical-bose-6b609c"
+      },
+      {
+        "branch": "claude/xenodochial-sammet-a67a35",
+        "line": 18,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "xenodochial-sammet-a67a35"
+      }
+    ]
+  },
+  {
+    "original_sha256": "e542bb504ad87318d7fe424bb22882b472a8a77f5ca7e8d58aab604a4257879d",
+    "record": "{\"id\":\"0af754d2-b089-4d3c-a3fd-9289bf76c07a\",\"kind\":\"compiled\",\"session_id\":\"a0b615c5-27b9-4070-828c-82426ef3701a\",\"project_root\":\"$REPO_ROOT/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T12:07:55.165753Z\",\"payload\":{\"entry_id\":\"codegen-and-ci-verification-executor-completion-marker\",\"tags\":[\"hybrid-mobile\",\"codegen\",\"ci-verification\",\"executor-session\",\"phase-tracking\"],\"title\":\"Codegen and CI Verification Executor Completion Marker\",\"ts\":\"2026-07-16T12:07:55.165753Z\",\"type\":\"compiled\"},\"affects\":[\"codegen-and-ci-verification-executor-completion-marker\"]}",
+    "redactions": [
+      {
+        "kind": "repository-worktree-path",
+        "occurrences": 1
+      }
+    ],
+    "sources": [
+      {
+        "branch": "claude/compassionate-babbage-7cd4bc",
+        "line": 18,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "compassionate-babbage-7cd4bc"
+      },
+      {
+        "branch": "claude/pensive-greider-2e206c",
+        "line": 18,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "pensive-greider-2e206c"
+      },
+      {
+        "branch": "claude/sweet-mendeleev-401c40",
+        "line": 18,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "sweet-mendeleev-401c40"
+      }
+    ]
+  },
+  {
+    "original_sha256": "10a9b548df6f26c181df4f4caea272c3936db52fe56b3c408253b0252d70108e",
+    "record": "{\"id\":\"19b4b035-2b06-4f4b-b13c-20a27dd16f42\",\"kind\":\"compiled\",\"session_id\":\"cc31ac57-2e72-4f24-a68d-976f4e016396\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T12:39:26.269559Z\",\"payload\":{\"entry_id\":\"frb-transparent-types-fix-for-codegen-in-phase-codegen-and-ci-verification\",\"tags\":[\"flutter-rust-bridge\",\"codegen\",\"ci-verification\",\"proof-of-concept\",\"hybrid-mobile\",\"transparent-types\",\"rust-ffi\",\"session-state\"],\"title\":\"FRB transparent types fix for codegen in phase-codegen-and-ci-verification\",\"ts\":\"2026-07-16T12:39:26.269559Z\",\"type\":\"compiled\"},\"affects\":[\"frb-transparent-types-fix-for-codegen-in-phase-codegen-and-ci-verification\"]}",
+    "redactions": [],
+    "sources": [
+      {
+        "branch": "main-pre-consolidation",
+        "line": 19,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "primary"
+      },
+      {
+        "branch": "codex/consolidate-main",
+        "line": 19,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "integration"
+      },
+      {
+        "branch": "claude/cross-platform-app-theming-4a272e",
+        "line": 19,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "cross-platform-app-theming-4a272e"
+      },
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 19,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      },
+      {
+        "branch": "claude/goofy-gould-d872b8",
+        "line": 19,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "goofy-gould-d872b8"
+      },
+      {
+        "branch": "claude/optimistic-volhard-233482",
+        "line": 19,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "optimistic-volhard-233482"
+      },
+      {
+        "branch": "claude/practical-bose-6b609c",
+        "line": 19,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "practical-bose-6b609c"
+      },
+      {
+        "branch": "claude/xenodochial-sammet-a67a35",
+        "line": 19,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "xenodochial-sammet-a67a35"
+      }
+    ]
+  },
+  {
+    "original_sha256": "6d4bccf60d2ee777ad187e6cb9c73c93e2aa7283cbc38c5f2689ee7b3d96a0bf",
+    "record": "{\"id\":\"19b4b035-2b06-4f4b-b13c-20a27dd16f42\",\"kind\":\"compiled\",\"session_id\":\"cc31ac57-2e72-4f24-a68d-976f4e016396\",\"project_root\":\"$REPO_ROOT/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T12:39:26.269559Z\",\"payload\":{\"entry_id\":\"frb-transparent-types-fix-for-codegen-in-phase-codegen-and-ci-verification\",\"tags\":[\"flutter-rust-bridge\",\"codegen\",\"ci-verification\",\"proof-of-concept\",\"hybrid-mobile\",\"transparent-types\",\"rust-ffi\",\"session-state\"],\"title\":\"FRB transparent types fix for codegen in phase-codegen-and-ci-verification\",\"ts\":\"2026-07-16T12:39:26.269559Z\",\"type\":\"compiled\"},\"affects\":[\"frb-transparent-types-fix-for-codegen-in-phase-codegen-and-ci-verification\"]}",
+    "redactions": [
+      {
+        "kind": "repository-worktree-path",
+        "occurrences": 1
+      }
+    ],
+    "sources": [
+      {
+        "branch": "claude/compassionate-babbage-7cd4bc",
+        "line": 19,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "compassionate-babbage-7cd4bc"
+      },
+      {
+        "branch": "claude/pensive-greider-2e206c",
+        "line": 19,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "pensive-greider-2e206c"
+      },
+      {
+        "branch": "claude/sweet-mendeleev-401c40",
+        "line": 19,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "sweet-mendeleev-401c40"
+      }
+    ]
+  },
+  {
+    "original_sha256": "ae8a486105532349dc301d813e6b28455088d9d98a69d45231a4dcbc6e9b1f0c",
+    "record": "{\"id\":\"04b9470a-7da6-4319-b726-657e50db09f6\",\"kind\":\"compiled\",\"session_id\":\"7a135b2b-8a4a-4ca8-8908-ea3cf8477e41\",\"project_root\":\"$REPO_ROOT/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T12:39:34.656281Z\",\"payload\":{\"entry_id\":\"android-rust-cross-compile-progress-for-hybrid-mobile-poc\",\"tags\":[\"hybrid-mobile\",\"knowme-poc\",\"android\",\"rust-cross-compile\",\"flutter\",\"cargokit\",\"ci-verification\"],\"title\":\"Android Rust cross-compile progress for Hybrid Mobile PoC\",\"ts\":\"2026-07-16T12:39:34.656281Z\",\"type\":\"compiled\"},\"affects\":[\"android-rust-cross-compile-progress-for-hybrid-mobile-poc\"]}",
+    "redactions": [
+      {
+        "kind": "repository-worktree-path",
+        "occurrences": 1
+      }
+    ],
+    "sources": [
+      {
+        "branch": "claude/compassionate-babbage-7cd4bc",
+        "line": 20,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "compassionate-babbage-7cd4bc"
+      },
+      {
+        "branch": "claude/pensive-greider-2e206c",
+        "line": 20,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "pensive-greider-2e206c"
+      },
+      {
+        "branch": "claude/sweet-mendeleev-401c40",
+        "line": 20,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "sweet-mendeleev-401c40"
+      }
+    ]
+  },
+  {
+    "original_sha256": "b80fb5cd898fe310a4497da754ec3341576bb9482f497c2fd1762021d2f9c7b8",
+    "record": "{\"id\":\"04b9470a-7da6-4319-b726-657e50db09f6\",\"kind\":\"compiled\",\"session_id\":\"7a135b2b-8a4a-4ca8-8908-ea3cf8477e41\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T12:39:34.656281Z\",\"payload\":{\"entry_id\":\"android-rust-cross-compile-progress-for-hybrid-mobile-poc\",\"tags\":[\"hybrid-mobile\",\"knowme-poc\",\"android\",\"rust-cross-compile\",\"flutter\",\"cargokit\",\"ci-verification\"],\"title\":\"Android Rust cross-compile progress for Hybrid Mobile PoC\",\"ts\":\"2026-07-16T12:39:34.656281Z\",\"type\":\"compiled\"},\"affects\":[\"android-rust-cross-compile-progress-for-hybrid-mobile-poc\"]}",
+    "redactions": [],
+    "sources": [
+      {
+        "branch": "main-pre-consolidation",
+        "line": 20,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "primary"
+      },
+      {
+        "branch": "codex/consolidate-main",
+        "line": 20,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "integration"
+      },
+      {
+        "branch": "claude/cross-platform-app-theming-4a272e",
+        "line": 20,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "cross-platform-app-theming-4a272e"
+      },
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 20,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      },
+      {
+        "branch": "claude/goofy-gould-d872b8",
+        "line": 20,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "goofy-gould-d872b8"
+      },
+      {
+        "branch": "claude/optimistic-volhard-233482",
+        "line": 20,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "optimistic-volhard-233482"
+      },
+      {
+        "branch": "claude/practical-bose-6b609c",
+        "line": 20,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "practical-bose-6b609c"
+      },
+      {
+        "branch": "claude/xenodochial-sammet-a67a35",
+        "line": 20,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "xenodochial-sammet-a67a35"
+      }
+    ]
+  },
+  {
+    "original_sha256": "2c21fd5cf70cd120206cb559a2382a016e76be336f8fa4a1c174b6cc49e76496",
+    "record": "{\"id\":\"e36fa297-8ab2-42fd-96a6-40b122d7c6d8\",\"kind\":\"compiled\",\"session_id\":\"ac33e639-3d3f-4873-8063-e875901888b0\",\"project_root\":\"$REPO_ROOT/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T12:39:45.166563Z\",\"payload\":{\"entry_id\":\"codegen-and-ci-verification-executor-session-completion\",\"tags\":[\"hybrid-mobile\",\"codegen\",\"ci-verification\",\"executor-session\",\"phase-tracking\"],\"title\":\"Codegen and CI Verification Executor Session Completion\",\"ts\":\"2026-07-16T12:39:45.166563Z\",\"type\":\"compiled\"},\"affects\":[\"codegen-and-ci-verification-executor-session-completion\"]}",
+    "redactions": [
+      {
+        "kind": "repository-worktree-path",
+        "occurrences": 1
+      }
+    ],
+    "sources": [
+      {
+        "branch": "claude/compassionate-babbage-7cd4bc",
+        "line": 21,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "compassionate-babbage-7cd4bc"
+      },
+      {
+        "branch": "claude/pensive-greider-2e206c",
+        "line": 21,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "pensive-greider-2e206c"
+      },
+      {
+        "branch": "claude/sweet-mendeleev-401c40",
+        "line": 21,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "sweet-mendeleev-401c40"
+      }
+    ]
+  },
+  {
+    "original_sha256": "b1b1d2ae20fab39c81c4d7acf8693cb862901743c4b86c650d349a70bdc69c39",
+    "record": "{\"id\":\"e36fa297-8ab2-42fd-96a6-40b122d7c6d8\",\"kind\":\"compiled\",\"session_id\":\"ac33e639-3d3f-4873-8063-e875901888b0\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T12:39:45.166563Z\",\"payload\":{\"entry_id\":\"codegen-and-ci-verification-executor-session-completion\",\"tags\":[\"hybrid-mobile\",\"codegen\",\"ci-verification\",\"executor-session\",\"phase-tracking\"],\"title\":\"Codegen and CI Verification Executor Session Completion\",\"ts\":\"2026-07-16T12:39:45.166563Z\",\"type\":\"compiled\"},\"affects\":[\"codegen-and-ci-verification-executor-session-completion\"]}",
+    "redactions": [],
+    "sources": [
+      {
+        "branch": "main-pre-consolidation",
+        "line": 21,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "primary"
+      },
+      {
+        "branch": "codex/consolidate-main",
+        "line": 21,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "integration"
+      },
+      {
+        "branch": "claude/cross-platform-app-theming-4a272e",
+        "line": 21,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "cross-platform-app-theming-4a272e"
+      },
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 21,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      },
+      {
+        "branch": "claude/goofy-gould-d872b8",
+        "line": 21,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "goofy-gould-d872b8"
+      },
+      {
+        "branch": "claude/optimistic-volhard-233482",
+        "line": 21,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "optimistic-volhard-233482"
+      },
+      {
+        "branch": "claude/practical-bose-6b609c",
+        "line": 21,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "practical-bose-6b609c"
+      },
+      {
+        "branch": "claude/xenodochial-sammet-a67a35",
+        "line": 21,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "xenodochial-sammet-a67a35"
+      }
+    ]
+  },
+  {
+    "original_sha256": "46027f0239e6e6c273645bfc14728a744e8da4122a7560c02d3adcfa9097f747",
+    "record": "{\"id\":\"8a4a7d81-25f3-448e-80c8-4f771c08019d\",\"kind\":\"compiled\",\"session_id\":\"3e99edfb-0543-4fff-ba17-4333f1c2377e\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T12:40:32.191900Z\",\"payload\":{\"entry_id\":\"android-cross-compile-fix-for-knowme-poc-using-fastembed-rustls\",\"tags\":[\"hybrid-mobile\",\"phase-codegen\",\"android-cross-compile\",\"fastembed\",\"rustls\",\"openssl\",\"proof-of-concept\",\"ci-verification\"],\"title\":\"Android cross-compile fix for KnowMe PoC using fastembed rustls\",\"ts\":\"2026-07-16T12:40:32.191900Z\",\"type\":\"compiled\"},\"affects\":[\"android-cross-compile-fix-for-knowme-poc-using-fastembed-rustls\"]}",
+    "redactions": [],
+    "sources": [
+      {
+        "branch": "main-pre-consolidation",
+        "line": 22,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "primary"
+      },
+      {
+        "branch": "codex/consolidate-main",
+        "line": 22,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "integration"
+      },
+      {
+        "branch": "claude/cross-platform-app-theming-4a272e",
+        "line": 22,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "cross-platform-app-theming-4a272e"
+      },
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 22,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      },
+      {
+        "branch": "claude/goofy-gould-d872b8",
+        "line": 22,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "goofy-gould-d872b8"
+      },
+      {
+        "branch": "claude/optimistic-volhard-233482",
+        "line": 22,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "optimistic-volhard-233482"
+      },
+      {
+        "branch": "claude/practical-bose-6b609c",
+        "line": 22,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "practical-bose-6b609c"
+      },
+      {
+        "branch": "claude/xenodochial-sammet-a67a35",
+        "line": 22,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "xenodochial-sammet-a67a35"
+      }
+    ]
+  },
+  {
+    "original_sha256": "a76f0dd60a6707dcf694979f09817e010bf3f8268b6e169f374fb74830a9d6dc",
+    "record": "{\"id\":\"8a4a7d81-25f3-448e-80c8-4f771c08019d\",\"kind\":\"compiled\",\"session_id\":\"3e99edfb-0543-4fff-ba17-4333f1c2377e\",\"project_root\":\"$REPO_ROOT/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T12:40:32.191900Z\",\"payload\":{\"entry_id\":\"android-cross-compile-fix-for-knowme-poc-using-fastembed-rustls\",\"tags\":[\"hybrid-mobile\",\"phase-codegen\",\"android-cross-compile\",\"fastembed\",\"rustls\",\"openssl\",\"proof-of-concept\",\"ci-verification\"],\"title\":\"Android cross-compile fix for KnowMe PoC using fastembed rustls\",\"ts\":\"2026-07-16T12:40:32.191900Z\",\"type\":\"compiled\"},\"affects\":[\"android-cross-compile-fix-for-knowme-poc-using-fastembed-rustls\"]}",
+    "redactions": [
+      {
+        "kind": "repository-worktree-path",
+        "occurrences": 1
+      }
+    ],
+    "sources": [
+      {
+        "branch": "claude/compassionate-babbage-7cd4bc",
+        "line": 22,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "compassionate-babbage-7cd4bc"
+      },
+      {
+        "branch": "claude/pensive-greider-2e206c",
+        "line": 22,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "pensive-greider-2e206c"
+      },
+      {
+        "branch": "claude/sweet-mendeleev-401c40",
+        "line": 22,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "sweet-mendeleev-401c40"
+      }
+    ]
+  },
+  {
+    "original_sha256": "2ad1d2c2ed3508c6efa544f8c4eac79213e759045809c3fb136decc0f5213373",
+    "record": "{\"id\":\"2cc6a7e3-3548-41a3-8018-48c73c96c1f7\",\"kind\":\"compiled\",\"session_id\":\"9e341a5e-9077-4dbd-ae0b-c5c05560c7a4\",\"project_root\":\"$REPO_ROOT/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T12:40:51.363281Z\",\"payload\":{\"entry_id\":\"frb-rust-input-fix-for-transparent-poc-bridge-types\",\"tags\":[\"hybrid-mobile\",\"flutter-rust-bridge\",\"codegen\",\"proof-of-concept\",\"flutter\",\"tauri\",\"pem\",\"ci-verification\"],\"title\":\"FRB rust_input fix for transparent PoC bridge types\",\"ts\":\"2026-07-16T12:40:51.363281Z\",\"type\":\"compiled\"},\"affects\":[\"frb-rust-input-fix-for-transparent-poc-bridge-types\"]}",
+    "redactions": [
+      {
+        "kind": "repository-worktree-path",
+        "occurrences": 1
+      }
+    ],
+    "sources": [
+      {
+        "branch": "claude/compassionate-babbage-7cd4bc",
+        "line": 23,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "compassionate-babbage-7cd4bc"
+      },
+      {
+        "branch": "claude/pensive-greider-2e206c",
+        "line": 23,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "pensive-greider-2e206c"
+      },
+      {
+        "branch": "claude/sweet-mendeleev-401c40",
+        "line": 23,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "sweet-mendeleev-401c40"
+      }
+    ]
+  },
+  {
+    "original_sha256": "d3895901188825158acea06914f5f199b18b7d6e78fa868e2cefd223bfd522dd",
+    "record": "{\"id\":\"2cc6a7e3-3548-41a3-8018-48c73c96c1f7\",\"kind\":\"compiled\",\"session_id\":\"9e341a5e-9077-4dbd-ae0b-c5c05560c7a4\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T12:40:51.363281Z\",\"payload\":{\"entry_id\":\"frb-rust-input-fix-for-transparent-poc-bridge-types\",\"tags\":[\"hybrid-mobile\",\"flutter-rust-bridge\",\"codegen\",\"proof-of-concept\",\"flutter\",\"tauri\",\"pem\",\"ci-verification\"],\"title\":\"FRB rust_input fix for transparent PoC bridge types\",\"ts\":\"2026-07-16T12:40:51.363281Z\",\"type\":\"compiled\"},\"affects\":[\"frb-rust-input-fix-for-transparent-poc-bridge-types\"]}",
+    "redactions": [],
+    "sources": [
+      {
+        "branch": "main-pre-consolidation",
+        "line": 23,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "primary"
+      },
+      {
+        "branch": "codex/consolidate-main",
+        "line": 23,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "integration"
+      },
+      {
+        "branch": "claude/cross-platform-app-theming-4a272e",
+        "line": 23,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "cross-platform-app-theming-4a272e"
+      },
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 23,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      },
+      {
+        "branch": "claude/goofy-gould-d872b8",
+        "line": 23,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "goofy-gould-d872b8"
+      },
+      {
+        "branch": "claude/optimistic-volhard-233482",
+        "line": 23,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "optimistic-volhard-233482"
+      },
+      {
+        "branch": "claude/practical-bose-6b609c",
+        "line": 23,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "practical-bose-6b609c"
+      },
+      {
+        "branch": "claude/xenodochial-sammet-a67a35",
+        "line": 23,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "xenodochial-sammet-a67a35"
+      }
+    ]
+  },
+  {
+    "original_sha256": "241471ff9bd397b1de9f9b39175ee9810665a276cf5759b4a4b54ab4a0414025",
+    "record": "{\"id\":\"2bd6b2b9-a40f-4c9b-a63e-a6428c4a9be5\",\"kind\":\"compiled\",\"session_id\":\"c6519936-b74d-48f2-b0af-8fd3dc67a786\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T13:45:54.319896Z\",\"payload\":{\"entry_id\":\"hybrid-mobile-architecture-phase-codegen-and-ci-verification\",\"tags\":[\"hybrid-mobile\",\"phase-codegen-and-ci-verification\",\"proof-of-concept\",\"flutter-rust-bridge\",\"ci-verification\",\"rust-ffi\",\"tauri\",\"session-state\"],\"title\":\"Hybrid Mobile Architecture phase codegen and CI verification\",\"ts\":\"2026-07-16T13:45:54.319896Z\",\"type\":\"compiled\"},\"affects\":[\"hybrid-mobile-architecture-phase-codegen-and-ci-verification\"]}",
+    "redactions": [],
+    "sources": [
+      {
+        "branch": "main-pre-consolidation",
+        "line": 24,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "primary"
+      },
+      {
+        "branch": "codex/consolidate-main",
+        "line": 24,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "integration"
+      },
+      {
+        "branch": "claude/cross-platform-app-theming-4a272e",
+        "line": 24,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "cross-platform-app-theming-4a272e"
+      },
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 24,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      },
+      {
+        "branch": "claude/goofy-gould-d872b8",
+        "line": 24,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "goofy-gould-d872b8"
+      },
+      {
+        "branch": "claude/optimistic-volhard-233482",
+        "line": 24,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "optimistic-volhard-233482"
+      },
+      {
+        "branch": "claude/practical-bose-6b609c",
+        "line": 24,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "practical-bose-6b609c"
+      },
+      {
+        "branch": "claude/xenodochial-sammet-a67a35",
+        "line": 24,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "xenodochial-sammet-a67a35"
+      }
+    ]
+  },
+  {
+    "original_sha256": "97aa4f42e68057e2c35b469d0b06939ec9c876ffbcc364b85883b91b7d6938c9",
+    "record": "{\"id\":\"2bd6b2b9-a40f-4c9b-a63e-a6428c4a9be5\",\"kind\":\"compiled\",\"session_id\":\"c6519936-b74d-48f2-b0af-8fd3dc67a786\",\"project_root\":\"$REPO_ROOT/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T13:45:54.319896Z\",\"payload\":{\"entry_id\":\"hybrid-mobile-architecture-phase-codegen-and-ci-verification\",\"tags\":[\"hybrid-mobile\",\"phase-codegen-and-ci-verification\",\"proof-of-concept\",\"flutter-rust-bridge\",\"ci-verification\",\"rust-ffi\",\"tauri\",\"session-state\"],\"title\":\"Hybrid Mobile Architecture phase codegen and CI verification\",\"ts\":\"2026-07-16T13:45:54.319896Z\",\"type\":\"compiled\"},\"affects\":[\"hybrid-mobile-architecture-phase-codegen-and-ci-verification\"]}",
+    "redactions": [
+      {
+        "kind": "repository-worktree-path",
+        "occurrences": 1
+      }
+    ],
+    "sources": [
+      {
+        "branch": "claude/compassionate-babbage-7cd4bc",
+        "line": 24,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "compassionate-babbage-7cd4bc"
+      },
+      {
+        "branch": "claude/pensive-greider-2e206c",
+        "line": 24,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "pensive-greider-2e206c"
+      },
+      {
+        "branch": "claude/sweet-mendeleev-401c40",
+        "line": 24,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "sweet-mendeleev-401c40"
+      }
+    ]
+  },
+  {
+    "original_sha256": "5ee3a7449e01e2ff6e790ae1f614de810950cd47a0672b8edcc5a4ed66c2df97",
+    "record": "{\"id\":\"d15d963b-c724-4706-8f17-73fa03f3307f\",\"kind\":\"compiled\",\"session_id\":\"ccc6e936-5daf-4297-8dcc-5ec67f6986d3\",\"project_root\":\"$REPO_ROOT/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T13:46:00.466960Z\",\"payload\":{\"entry_id\":\"hybrid-mobile-poc-android-build-reached-gradle-assembledebug\",\"tags\":[\"hybrid-mobile\",\"knowme-poc\",\"android\",\"flutter\",\"gradle\",\"rust-cross-compile\",\"ci-verification\"],\"title\":\"Hybrid Mobile PoC Android build reached Gradle assembleDebug\",\"ts\":\"2026-07-16T13:46:00.466960Z\",\"type\":\"compiled\"},\"affects\":[\"hybrid-mobile-poc-android-build-reached-gradle-assembledebug\"]}",
+    "redactions": [
+      {
+        "kind": "repository-worktree-path",
+        "occurrences": 1
+      }
+    ],
+    "sources": [
+      {
+        "branch": "claude/compassionate-babbage-7cd4bc",
+        "line": 25,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "compassionate-babbage-7cd4bc"
+      },
+      {
+        "branch": "claude/pensive-greider-2e206c",
+        "line": 25,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "pensive-greider-2e206c"
+      },
+      {
+        "branch": "claude/sweet-mendeleev-401c40",
+        "line": 25,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "sweet-mendeleev-401c40"
+      }
+    ]
+  },
+  {
+    "original_sha256": "c77ede4fc9a7669ca30d98f8662a2bcc0bd1ddc8c826b004458158d16eafdd57",
+    "record": "{\"id\":\"d15d963b-c724-4706-8f17-73fa03f3307f\",\"kind\":\"compiled\",\"session_id\":\"ccc6e936-5daf-4297-8dcc-5ec67f6986d3\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T13:46:00.466960Z\",\"payload\":{\"entry_id\":\"hybrid-mobile-poc-android-build-reached-gradle-assembledebug\",\"tags\":[\"hybrid-mobile\",\"knowme-poc\",\"android\",\"flutter\",\"gradle\",\"rust-cross-compile\",\"ci-verification\"],\"title\":\"Hybrid Mobile PoC Android build reached Gradle assembleDebug\",\"ts\":\"2026-07-16T13:46:00.466960Z\",\"type\":\"compiled\"},\"affects\":[\"hybrid-mobile-poc-android-build-reached-gradle-assembledebug\"]}",
+    "redactions": [],
+    "sources": [
+      {
+        "branch": "main-pre-consolidation",
+        "line": 25,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "primary"
+      },
+      {
+        "branch": "codex/consolidate-main",
+        "line": 25,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "integration"
+      },
+      {
+        "branch": "claude/cross-platform-app-theming-4a272e",
+        "line": 25,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "cross-platform-app-theming-4a272e"
+      },
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 25,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      },
+      {
+        "branch": "claude/goofy-gould-d872b8",
+        "line": 25,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "goofy-gould-d872b8"
+      },
+      {
+        "branch": "claude/optimistic-volhard-233482",
+        "line": 25,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "optimistic-volhard-233482"
+      },
+      {
+        "branch": "claude/practical-bose-6b609c",
+        "line": 25,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "practical-bose-6b609c"
+      },
+      {
+        "branch": "claude/xenodochial-sammet-a67a35",
+        "line": 25,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "xenodochial-sammet-a67a35"
+      }
+    ]
+  },
+  {
+    "original_sha256": "eb02b8db589d4e9f741491a02aa3a8f42841b49d282ce5eaf4daf153208b1f5a",
+    "record": "{\"id\":\"7472b350-ec25-4a57-ab8a-fd724c7d5834\",\"kind\":\"compiled\",\"session_id\":\"e33334dc-d184-42e7-90ac-528ebbcdd7a9\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T14:03:11.996353Z\",\"payload\":{\"entry_id\":\"hybrid-mobile-architecture-phase-codegen-and-ci-verification-status\",\"tags\":[\"hybrid-mobile\",\"phase-codegen-and-ci-verification\",\"proof-of-concept\",\"flutter-rust-bridge\",\"ci-verification\",\"rust-ffi\",\"tauri\",\"session-state\"],\"title\":\"Hybrid Mobile Architecture phase codegen and CI verification status\",\"ts\":\"2026-07-16T14:03:11.996353Z\",\"type\":\"compiled\"},\"affects\":[\"hybrid-mobile-architecture-phase-codegen-and-ci-verification-status\"]}",
+    "redactions": [],
+    "sources": [
+      {
+        "branch": "main-pre-consolidation",
+        "line": 26,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "primary"
+      },
+      {
+        "branch": "codex/consolidate-main",
+        "line": 26,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "integration"
+      },
+      {
+        "branch": "claude/cross-platform-app-theming-4a272e",
+        "line": 26,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "cross-platform-app-theming-4a272e"
+      },
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 26,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      },
+      {
+        "branch": "claude/goofy-gould-d872b8",
+        "line": 26,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "goofy-gould-d872b8"
+      },
+      {
+        "branch": "claude/optimistic-volhard-233482",
+        "line": 26,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "optimistic-volhard-233482"
+      },
+      {
+        "branch": "claude/practical-bose-6b609c",
+        "line": 26,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "practical-bose-6b609c"
+      },
+      {
+        "branch": "claude/xenodochial-sammet-a67a35",
+        "line": 26,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "xenodochial-sammet-a67a35"
+      }
+    ]
+  },
+  {
+    "original_sha256": "f1b57f2dfde6727b4617d4218567f03e74c30c099052c0980bb24f278526217c",
+    "record": "{\"id\":\"7472b350-ec25-4a57-ab8a-fd724c7d5834\",\"kind\":\"compiled\",\"session_id\":\"e33334dc-d184-42e7-90ac-528ebbcdd7a9\",\"project_root\":\"$REPO_ROOT/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T14:03:11.996353Z\",\"payload\":{\"entry_id\":\"hybrid-mobile-architecture-phase-codegen-and-ci-verification-status\",\"tags\":[\"hybrid-mobile\",\"phase-codegen-and-ci-verification\",\"proof-of-concept\",\"flutter-rust-bridge\",\"ci-verification\",\"rust-ffi\",\"tauri\",\"session-state\"],\"title\":\"Hybrid Mobile Architecture phase codegen and CI verification status\",\"ts\":\"2026-07-16T14:03:11.996353Z\",\"type\":\"compiled\"},\"affects\":[\"hybrid-mobile-architecture-phase-codegen-and-ci-verification-status\"]}",
+    "redactions": [
+      {
+        "kind": "repository-worktree-path",
+        "occurrences": 1
+      }
+    ],
+    "sources": [
+      {
+        "branch": "claude/compassionate-babbage-7cd4bc",
+        "line": 26,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "compassionate-babbage-7cd4bc"
+      },
+      {
+        "branch": "claude/pensive-greider-2e206c",
+        "line": 26,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "pensive-greider-2e206c"
+      },
+      {
+        "branch": "claude/sweet-mendeleev-401c40",
+        "line": 26,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "sweet-mendeleev-401c40"
+      }
+    ]
+  },
+  {
+    "original_sha256": "525f7d1f8433d0359700706cf31874cb0468a79d73b06425a18b4709aab9d6a4",
+    "record": "{\"id\":\"8507f46f-071b-4109-b47c-e16cf0da025b\",\"kind\":\"compiled\",\"session_id\":\"69139765-06f2-4157-b845-1f21be7d715e\",\"project_root\":\"$REPO_ROOT/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T14:03:36.003640Z\",\"payload\":{\"entry_id\":\"hybrid-mobile-codegen-and-ci-verification-completion-marker\",\"tags\":[\"hybrid-mobile\",\"codegen\",\"ci-verification\",\"executor-session\",\"phase-tracking\"],\"title\":\"Hybrid Mobile Codegen and CI Verification Completion Marker\",\"ts\":\"2026-07-16T14:03:36.003640Z\",\"type\":\"compiled\"},\"affects\":[\"hybrid-mobile-codegen-and-ci-verification-completion-marker\"]}",
+    "redactions": [
+      {
+        "kind": "repository-worktree-path",
+        "occurrences": 1
+      }
+    ],
+    "sources": [
+      {
+        "branch": "claude/compassionate-babbage-7cd4bc",
+        "line": 27,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "compassionate-babbage-7cd4bc"
+      },
+      {
+        "branch": "claude/pensive-greider-2e206c",
+        "line": 27,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "pensive-greider-2e206c"
+      },
+      {
+        "branch": "claude/sweet-mendeleev-401c40",
+        "line": 27,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "sweet-mendeleev-401c40"
+      }
+    ]
+  },
+  {
+    "original_sha256": "9e1c5cbe6f829a2948a0aef79c11e9329cb3d2de27cc6291050e57619aa21028",
+    "record": "{\"id\":\"8507f46f-071b-4109-b47c-e16cf0da025b\",\"kind\":\"compiled\",\"session_id\":\"69139765-06f2-4157-b845-1f21be7d715e\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T14:03:36.003640Z\",\"payload\":{\"entry_id\":\"hybrid-mobile-codegen-and-ci-verification-completion-marker\",\"tags\":[\"hybrid-mobile\",\"codegen\",\"ci-verification\",\"executor-session\",\"phase-tracking\"],\"title\":\"Hybrid Mobile Codegen and CI Verification Completion Marker\",\"ts\":\"2026-07-16T14:03:36.003640Z\",\"type\":\"compiled\"},\"affects\":[\"hybrid-mobile-codegen-and-ci-verification-completion-marker\"]}",
+    "redactions": [],
+    "sources": [
+      {
+        "branch": "main-pre-consolidation",
+        "line": 27,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "primary"
+      },
+      {
+        "branch": "codex/consolidate-main",
+        "line": 27,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "integration"
+      },
+      {
+        "branch": "claude/cross-platform-app-theming-4a272e",
+        "line": 27,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "cross-platform-app-theming-4a272e"
+      },
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 27,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      },
+      {
+        "branch": "claude/goofy-gould-d872b8",
+        "line": 27,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "goofy-gould-d872b8"
+      },
+      {
+        "branch": "claude/optimistic-volhard-233482",
+        "line": 27,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "optimistic-volhard-233482"
+      },
+      {
+        "branch": "claude/practical-bose-6b609c",
+        "line": 27,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "practical-bose-6b609c"
+      },
+      {
+        "branch": "claude/xenodochial-sammet-a67a35",
+        "line": 27,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "xenodochial-sammet-a67a35"
+      }
+    ]
+  },
+  {
+    "original_sha256": "2f2d1b5a12f0d1411aa3e757e9f31833c77b4fdbedad75a2d04ffd0044b1e5d4",
+    "record": "{\"id\":\"787bada1-43b1-4d0f-b63e-d703af64645f\",\"kind\":\"compiled\",\"session_id\":\"9176a7ba-2f82-4766-bf20-8904c6ad0c61\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T14:16:44.845980Z\",\"payload\":{\"entry_id\":\"android-build-workaround-skip-whisper-rs-sys-for-gen-ui-audio\",\"tags\":[\"hybrid-mobile\",\"android-build\",\"flutter-rust-bridge\",\"rust-ffi\",\"whisper-rs\",\"codegen\",\"ci-verification\",\"proof-of-concept\"],\"title\":\"Android build workaround: skip whisper-rs-sys for gen_ui_audio\",\"ts\":\"2026-07-16T14:16:44.845980Z\",\"type\":\"compiled\"},\"affects\":[\"android-build-workaround-skip-whisper-rs-sys-for-gen-ui-audio\"]}",
+    "redactions": [],
+    "sources": [
+      {
+        "branch": "main-pre-consolidation",
+        "line": 28,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "primary"
+      },
+      {
+        "branch": "codex/consolidate-main",
+        "line": 28,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "integration"
+      },
+      {
+        "branch": "claude/cross-platform-app-theming-4a272e",
+        "line": 28,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "cross-platform-app-theming-4a272e"
+      },
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 28,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      },
+      {
+        "branch": "claude/goofy-gould-d872b8",
+        "line": 28,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "goofy-gould-d872b8"
+      },
+      {
+        "branch": "claude/optimistic-volhard-233482",
+        "line": 28,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "optimistic-volhard-233482"
+      },
+      {
+        "branch": "claude/practical-bose-6b609c",
+        "line": 28,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "practical-bose-6b609c"
+      },
+      {
+        "branch": "claude/xenodochial-sammet-a67a35",
+        "line": 28,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "xenodochial-sammet-a67a35"
+      }
+    ]
+  },
+  {
+    "original_sha256": "a9e851c4357dbabee7c5b82c26c978403dbe88d0c5cebe64ea1f4dcd7c776446",
+    "record": "{\"id\":\"787bada1-43b1-4d0f-b63e-d703af64645f\",\"kind\":\"compiled\",\"session_id\":\"9176a7ba-2f82-4766-bf20-8904c6ad0c61\",\"project_root\":\"$REPO_ROOT/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T14:16:44.845980Z\",\"payload\":{\"entry_id\":\"android-build-workaround-skip-whisper-rs-sys-for-gen-ui-audio\",\"tags\":[\"hybrid-mobile\",\"android-build\",\"flutter-rust-bridge\",\"rust-ffi\",\"whisper-rs\",\"codegen\",\"ci-verification\",\"proof-of-concept\"],\"title\":\"Android build workaround: skip whisper-rs-sys for gen_ui_audio\",\"ts\":\"2026-07-16T14:16:44.845980Z\",\"type\":\"compiled\"},\"affects\":[\"android-build-workaround-skip-whisper-rs-sys-for-gen-ui-audio\"]}",
+    "redactions": [
+      {
+        "kind": "repository-worktree-path",
+        "occurrences": 1
+      }
+    ],
+    "sources": [
+      {
+        "branch": "claude/compassionate-babbage-7cd4bc",
+        "line": 28,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "compassionate-babbage-7cd4bc"
+      },
+      {
+        "branch": "claude/pensive-greider-2e206c",
+        "line": 28,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "pensive-greider-2e206c"
+      },
+      {
+        "branch": "claude/sweet-mendeleev-401c40",
+        "line": 28,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "sweet-mendeleev-401c40"
+      }
+    ]
+  },
+  {
+    "original_sha256": "74b4da983c426b9626affa6e4514c19dc77c868ca61d0af7114c410ba5450e60",
+    "record": "{\"id\":\"987e831f-8ef1-425e-9963-c386556e7418\",\"kind\":\"compiled\",\"session_id\":\"7ccddfa8-f5c0-4b55-ac2b-c3e3fcf204f3\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T14:16:54.819494Z\",\"payload\":{\"entry_id\":\"surrealdb-core-rebuild-delayed-hybrid-mobile-poc-verification\",\"tags\":[\"hybrid-mobile\",\"knowme-poc\",\"surrealdb\",\"ci-verification\",\"codegen\",\"flutter-rust-bridge\",\"tauri\"],\"title\":\"SurrealDB core rebuild delayed Hybrid Mobile PoC verification\",\"ts\":\"2026-07-16T14:16:54.819494Z\",\"type\":\"compiled\"},\"affects\":[\"surrealdb-core-rebuild-delayed-hybrid-mobile-poc-verification\"]}",
+    "redactions": [],
+    "sources": [
+      {
+        "branch": "main-pre-consolidation",
+        "line": 29,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "primary"
+      },
+      {
+        "branch": "codex/consolidate-main",
+        "line": 29,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "integration"
+      },
+      {
+        "branch": "claude/cross-platform-app-theming-4a272e",
+        "line": 29,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "cross-platform-app-theming-4a272e"
+      },
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 29,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      },
+      {
+        "branch": "claude/goofy-gould-d872b8",
+        "line": 29,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "goofy-gould-d872b8"
+      },
+      {
+        "branch": "claude/optimistic-volhard-233482",
+        "line": 29,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "optimistic-volhard-233482"
+      },
+      {
+        "branch": "claude/practical-bose-6b609c",
+        "line": 29,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "practical-bose-6b609c"
+      },
+      {
+        "branch": "claude/xenodochial-sammet-a67a35",
+        "line": 29,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "xenodochial-sammet-a67a35"
+      }
+    ]
+  },
+  {
+    "original_sha256": "c7a7ee625825aec40b08365fb0ba7b10603ca2c2fbeedc48de461e88a5c2411a",
+    "record": "{\"id\":\"987e831f-8ef1-425e-9963-c386556e7418\",\"kind\":\"compiled\",\"session_id\":\"7ccddfa8-f5c0-4b55-ac2b-c3e3fcf204f3\",\"project_root\":\"$REPO_ROOT/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T14:16:54.819494Z\",\"payload\":{\"entry_id\":\"surrealdb-core-rebuild-delayed-hybrid-mobile-poc-verification\",\"tags\":[\"hybrid-mobile\",\"knowme-poc\",\"surrealdb\",\"ci-verification\",\"codegen\",\"flutter-rust-bridge\",\"tauri\"],\"title\":\"SurrealDB core rebuild delayed Hybrid Mobile PoC verification\",\"ts\":\"2026-07-16T14:16:54.819494Z\",\"type\":\"compiled\"},\"affects\":[\"surrealdb-core-rebuild-delayed-hybrid-mobile-poc-verification\"]}",
+    "redactions": [
+      {
+        "kind": "repository-worktree-path",
+        "occurrences": 1
+      }
+    ],
+    "sources": [
+      {
+        "branch": "claude/compassionate-babbage-7cd4bc",
+        "line": 29,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "compassionate-babbage-7cd4bc"
+      },
+      {
+        "branch": "claude/pensive-greider-2e206c",
+        "line": 29,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "pensive-greider-2e206c"
+      },
+      {
+        "branch": "claude/sweet-mendeleev-401c40",
+        "line": 29,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "sweet-mendeleev-401c40"
+      }
+    ]
+  },
+  {
+    "original_sha256": "0bf49d23b990ce279035d05a7cb9604191d20a8d662d094573a956081dedf8c6",
+    "record": "{\"id\":\"d8a246d9-7911-4a80-8688-6211afa37f3d\",\"kind\":\"compiled\",\"session_id\":\"ae30f8ba-1a09-4853-81ae-666de4793c9c\",\"project_root\":\"$REPO_ROOT/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T14:35:57.523521Z\",\"payload\":{\"entry_id\":\"hybrid-mobile-architecture-android-pglite-feature-gate-fix\",\"tags\":[\"hybrid-mobile\",\"android-build\",\"feature-gating\",\"cargo-tree\",\"rust-ffi\",\"pglite\",\"wasmer\",\"codegen\"],\"title\":\"Hybrid Mobile Architecture: Android pglite feature gate fix\",\"ts\":\"2026-07-16T14:35:57.523521Z\",\"type\":\"compiled\"},\"affects\":[\"hybrid-mobile-architecture-android-pglite-feature-gate-fix\"]}",
+    "redactions": [
+      {
+        "kind": "repository-worktree-path",
+        "occurrences": 1
+      }
+    ],
+    "sources": [
+      {
+        "branch": "claude/compassionate-babbage-7cd4bc",
+        "line": 30,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "compassionate-babbage-7cd4bc"
+      },
+      {
+        "branch": "claude/pensive-greider-2e206c",
+        "line": 30,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "pensive-greider-2e206c"
+      },
+      {
+        "branch": "claude/sweet-mendeleev-401c40",
+        "line": 30,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "sweet-mendeleev-401c40"
+      }
+    ]
+  },
+  {
+    "original_sha256": "cf9b5849fd6fee698c8cd3b03bab60577692c08f0e65996cfbc0ee293793d936",
+    "record": "{\"id\":\"d8a246d9-7911-4a80-8688-6211afa37f3d\",\"kind\":\"compiled\",\"session_id\":\"ae30f8ba-1a09-4853-81ae-666de4793c9c\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T14:35:57.523521Z\",\"payload\":{\"entry_id\":\"hybrid-mobile-architecture-android-pglite-feature-gate-fix\",\"tags\":[\"hybrid-mobile\",\"android-build\",\"feature-gating\",\"cargo-tree\",\"rust-ffi\",\"pglite\",\"wasmer\",\"codegen\"],\"title\":\"Hybrid Mobile Architecture: Android pglite feature gate fix\",\"ts\":\"2026-07-16T14:35:57.523521Z\",\"type\":\"compiled\"},\"affects\":[\"hybrid-mobile-architecture-android-pglite-feature-gate-fix\"]}",
+    "redactions": [],
+    "sources": [
+      {
+        "branch": "main-pre-consolidation",
+        "line": 30,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "primary"
+      },
+      {
+        "branch": "codex/consolidate-main",
+        "line": 30,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "integration"
+      },
+      {
+        "branch": "claude/cross-platform-app-theming-4a272e",
+        "line": 30,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "cross-platform-app-theming-4a272e"
+      },
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 30,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      },
+      {
+        "branch": "claude/goofy-gould-d872b8",
+        "line": 30,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "goofy-gould-d872b8"
+      },
+      {
+        "branch": "claude/optimistic-volhard-233482",
+        "line": 30,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "optimistic-volhard-233482"
+      },
+      {
+        "branch": "claude/practical-bose-6b609c",
+        "line": 30,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "practical-bose-6b609c"
+      },
+      {
+        "branch": "claude/xenodochial-sammet-a67a35",
+        "line": 30,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "xenodochial-sammet-a67a35"
+      }
+    ]
+  },
+  {
+    "original_sha256": "94a4f2af1aa890a317fddc3fb656cfca3f961912230ecad9840f06af60002a38",
+    "record": "{\"id\":\"45f473c2-d9ec-48a7-9f6c-7b411d9bc5b0\",\"kind\":\"compiled\",\"session_id\":\"53540129-74d9-41f7-b2ac-3ea73d9c5aef\",\"project_root\":\"~/Projects/hybrid-mobile-architecture-src/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T14:36:05.758765Z\",\"payload\":{\"entry_id\":\"android-rust-target-install-during-hybrid-mobile-poc-verification\",\"tags\":[\"hybrid-mobile\",\"knowme-poc\",\"android\",\"rust-cross-compile\",\"flutter\",\"ci-verification\",\"codegen\"],\"title\":\"Android Rust target install during Hybrid Mobile PoC verification\",\"ts\":\"2026-07-16T14:36:05.758765Z\",\"type\":\"compiled\"},\"affects\":[\"android-rust-target-install-during-hybrid-mobile-poc-verification\"]}",
+    "redactions": [],
+    "sources": [
+      {
+        "branch": "main-pre-consolidation",
+        "line": 31,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "primary"
+      },
+      {
+        "branch": "codex/consolidate-main",
+        "line": 31,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "integration"
+      },
+      {
+        "branch": "claude/cross-platform-app-theming-4a272e",
+        "line": 31,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "cross-platform-app-theming-4a272e"
+      },
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 31,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      },
+      {
+        "branch": "claude/goofy-gould-d872b8",
+        "line": 31,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "goofy-gould-d872b8"
+      },
+      {
+        "branch": "claude/optimistic-volhard-233482",
+        "line": 31,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "optimistic-volhard-233482"
+      },
+      {
+        "branch": "claude/practical-bose-6b609c",
+        "line": 31,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "practical-bose-6b609c"
+      },
+      {
+        "branch": "claude/xenodochial-sammet-a67a35",
+        "line": 31,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "xenodochial-sammet-a67a35"
+      }
+    ]
+  },
+  {
+    "original_sha256": "b4a36196ad19a84b61af106f52225f22f4a9766def76c1ceabaa4db9ca00a6c2",
+    "record": "{\"id\":\"45f473c2-d9ec-48a7-9f6c-7b411d9bc5b0\",\"kind\":\"compiled\",\"session_id\":\"53540129-74d9-41f7-b2ac-3ea73d9c5aef\",\"project_root\":\"$REPO_ROOT/apps/knowme-poc/rust\",\"scope\":\"project\",\"timestamp\":\"2026-07-16T14:36:05.758765Z\",\"payload\":{\"entry_id\":\"android-rust-target-install-during-hybrid-mobile-poc-verification\",\"tags\":[\"hybrid-mobile\",\"knowme-poc\",\"android\",\"rust-cross-compile\",\"flutter\",\"ci-verification\",\"codegen\"],\"title\":\"Android Rust target install during Hybrid Mobile PoC verification\",\"ts\":\"2026-07-16T14:36:05.758765Z\",\"type\":\"compiled\"},\"affects\":[\"android-rust-target-install-during-hybrid-mobile-poc-verification\"]}",
+    "redactions": [
+      {
+        "kind": "repository-worktree-path",
+        "occurrences": 1
+      }
+    ],
+    "sources": [
+      {
+        "branch": "claude/compassionate-babbage-7cd4bc",
+        "line": 31,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "compassionate-babbage-7cd4bc"
+      },
+      {
+        "branch": "claude/pensive-greider-2e206c",
+        "line": 31,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "pensive-greider-2e206c"
+      },
+      {
+        "branch": "claude/sweet-mendeleev-401c40",
+        "line": 31,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "sweet-mendeleev-401c40"
+      }
+    ]
+  },
+  {
+    "original_sha256": "4ee539eea84c6785e026ef772b254a64756a26c9102cd44a8d8ee6548da229e4",
+    "record": "{\"id\":\"b2e263e3-15fc-4381-92ec-d599fda79ddd\",\"kind\":\"compiled\",\"session_id\":\"3f9749f6-11b6-4872-a587-8d775f847ad0\",\"project_root\":\"$REPO_ROOT\",\"scope\":\"project\",\"timestamp\":\"2026-07-17T01:37:09.229418Z\",\"payload\":{\"entry_id\":\"phase-codegen-and-ci-verification-scope-and-live-relate-bug-note\",\"tags\":[\"hybrid-mobile\",\"phase-status\",\"proof-of-concept\",\"codegen\",\"ci-verification\",\"flutter-rust-bridge\",\"android-build\",\"session-state\"],\"title\":\"phase-codegen-and-ci-verification scope and live RELATE bug note\",\"ts\":\"2026-07-17T01:37:09.229418Z\",\"type\":\"compiled\"},\"affects\":[\"phase-codegen-and-ci-verification-scope-and-live-relate-bug-note\"]}",
+    "redactions": [
+      {
+        "kind": "repository-worktree-path",
+        "occurrences": 1
+      }
+    ],
+    "sources": [
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 32,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      }
+    ]
+  },
+  {
+    "original_sha256": "26cabf55023611c6964ba11033083a2927e0e59715e8385a78c64a0a31c121ae",
+    "record": "{\"id\":\"c2c9e274-9e54-4b42-89df-c925113b9f4a\",\"kind\":\"compiled\",\"session_id\":\"c7b464a5-4259-478d-8f81-f33dda0279a8\",\"project_root\":\"$REPO_ROOT\",\"scope\":\"project\",\"timestamp\":\"2026-07-17T01:37:10.864658Z\",\"payload\":{\"entry_id\":\"hybrid-mobile-poc-ios-skia-verification-status\",\"tags\":[\"hybrid-mobile\",\"proof-of-concept\",\"ios-verification\",\"flutter\",\"impeller\",\"skia\",\"codegen\",\"ci-verification\"],\"title\":\"Hybrid Mobile PoC iOS Skia Verification Status\",\"ts\":\"2026-07-17T01:37:10.864658Z\",\"type\":\"compiled\"},\"affects\":[\"hybrid-mobile-poc-ios-skia-verification-status\"]}",
+    "redactions": [
+      {
+        "kind": "repository-worktree-path",
+        "occurrences": 1
+      }
+    ],
+    "sources": [
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 33,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      }
+    ]
+  },
+  {
+    "original_sha256": "0757a13804c7361be305ae7a80ed2cf6985a2cfcadf8c1fdcf4f6215b6eeea57",
+    "record": "{\"id\":\"6d3e89e3-a24d-42ea-adfc-f7d306dfd75a\",\"kind\":\"compiled\",\"session_id\":\"07115d2d-a0a6-465f-a0be-05f5e93a81f6\",\"project_root\":\"$REPO_ROOT\",\"scope\":\"project\",\"timestamp\":\"2026-07-17T01:38:05.045790Z\",\"payload\":{\"entry_id\":\"phase-codegen-and-ci-verification-status-with-surrealdb-relate-fix-plan\",\"tags\":[\"hybrid-mobile\",\"phase-status\",\"proof-of-concept\",\"surrealdb\",\"codegen\",\"ci-verification\",\"rust-testing\"],\"title\":\"Phase codegen and CI verification status with SurrealDB relate() fix plan\",\"ts\":\"2026-07-17T01:38:05.045790Z\",\"type\":\"compiled\"},\"affects\":[\"phase-codegen-and-ci-verification-status-with-surrealdb-relate-fix-plan\"]}",
+    "redactions": [
+      {
+        "kind": "repository-worktree-path",
+        "occurrences": 1
+      }
+    ],
+    "sources": [
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 34,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      }
+    ]
+  },
+  {
+    "original_sha256": "66b53f4dbd5d46d952a1076c46c7ab5cd5de1d7a10de495887e52fd1ea3620b0",
+    "record": "{\"id\":\"561a54f1-c23f-4f5e-a39e-c13c3f2e1b73\",\"kind\":\"compiled\",\"session_id\":\"325cccea-73d4-42e7-8b48-ddffe6b76b13\",\"project_root\":\"$REPO_ROOT\",\"scope\":\"project\",\"timestamp\":\"2026-07-17T01:38:15.178082Z\",\"payload\":{\"entry_id\":\"knowme-poc-surrealdb-relate-error-handling-and-endpoint-fix\",\"tags\":[\"hybrid-mobile\",\"knowme-poc\",\"surrealdb\",\"graph-rag\",\"relate-query\",\"ci-verification\",\"rust\"],\"title\":\"KnowMe PoC SurrealDB RELATE error handling and endpoint fix\",\"ts\":\"2026-07-17T01:38:15.178082Z\",\"type\":\"compiled\"},\"affects\":[\"knowme-poc-surrealdb-relate-error-handling-and-endpoint-fix\"]}",
+    "redactions": [
+      {
+        "kind": "repository-worktree-path",
+        "occurrences": 1
+      }
+    ],
+    "sources": [
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 35,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      }
+    ]
+  },
+  {
+    "original_sha256": "2d740ea9d4bd4820519544052a9ef7bbc536e1634fbaeee4808ca8219eb1fc18",
+    "record": "{\"id\":\"313e7ebd-d317-4fa5-9d5d-7171399abd5a\",\"kind\":\"compiled\",\"session_id\":\"0e078067-262b-407e-8491-cf802772b8da\",\"project_root\":\"$REPO_ROOT\",\"scope\":\"project\",\"timestamp\":\"2026-07-17T01:45:57.372314Z\",\"payload\":{\"entry_id\":\"phase-codegen-and-ci-verification-session-update-for-hybrid-mobile-architecture\",\"tags\":[\"hybrid-mobile\",\"phase-status\",\"proof-of-concept\",\"codegen\",\"ci-verification\",\"surrealdb\",\"flutter-rust-bridge\"],\"title\":\"Phase codegen and CI verification session update for Hybrid Mobile Architecture\",\"ts\":\"2026-07-17T01:45:57.372314Z\",\"type\":\"compiled\"},\"affects\":[\"phase-codegen-and-ci-verification-session-update-for-hybrid-mobile-architecture\"]}",
+    "redactions": [
+      {
+        "kind": "repository-worktree-path",
+        "occurrences": 1
+      }
+    ],
+    "sources": [
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 36,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      }
+    ]
+  },
+  {
+    "original_sha256": "fb1811845a5da4be2689956c94925adf14af55a9efa20d3028fd7730fbdb378f",
+    "record": "{\"id\":\"b056e0e7-554b-421f-8a50-533faa86170c\",\"kind\":\"compiled\",\"session_id\":\"a9e94905-e2bb-4878-b866-7b7e4419522d\",\"project_root\":\"$REPO_ROOT\",\"scope\":\"project\",\"timestamp\":\"2026-07-17T01:46:05.918910Z\",\"payload\":{\"entry_id\":\"surrealdb-relate-parameter-fix-for-graph-expand-c-111\",\"tags\":[\"surrealdb\",\"graph-rag\",\"graph-expand\",\"rust\",\"hybrid-mobile\",\"proof-of-concept\",\"ci-verification\"],\"title\":\"SurrealDB RELATE parameter fix for graph_expand C-111\",\"ts\":\"2026-07-17T01:46:05.918910Z\",\"type\":\"compiled\"},\"affects\":[\"surrealdb-relate-parameter-fix-for-graph-expand-c-111\"]}",
+    "redactions": [
+      {
+        "kind": "repository-worktree-path",
+        "occurrences": 1
+      }
+    ],
+    "sources": [
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 37,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      }
+    ]
+  },
+  {
+    "original_sha256": "9901479ce448a4aed1caf670f9a049bc7f1b8da88a4798e0cf3c48141d48969d",
+    "record": "{\"id\":\"d91e6a7f-67c7-4675-8c07-ee2a68207c9e\",\"kind\":\"compiled\",\"session_id\":\"381543dc-dbaf-40e5-9279-56cce6143b31\",\"project_root\":\"$REPO_ROOT\",\"scope\":\"project\",\"timestamp\":\"2026-07-17T01:48:48.127674Z\",\"payload\":{\"entry_id\":\"codegen-and-ci-verification-phase-falsification-run-clippy-fix-and-test-result\",\"tags\":[\"hybrid-mobile\",\"codegen\",\"ci-verification\",\"proof-of-concept\",\"clippy\",\"surrealdb\",\"falsification\"],\"title\":\"Codegen and CI verification phase: falsification run, clippy fix, and test result\",\"ts\":\"2026-07-17T01:48:48.127674Z\",\"type\":\"compiled\"},\"affects\":[\"codegen-and-ci-verification-phase-falsification-run-clippy-fix-and-test-result\"]}",
+    "redactions": [
+      {
+        "kind": "repository-worktree-path",
+        "occurrences": 1
+      }
+    ],
+    "sources": [
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 38,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      }
+    ]
+  },
+  {
+    "original_sha256": "a9030a624a1b3b381350c9b5bf76420cbfba9255644014b0637c6784cf73444d",
+    "record": "{\"id\":\"df42f5d4-e0dc-4175-a232-548e80660be4\",\"kind\":\"compiled\",\"session_id\":\"3fed9334-45f6-4798-a1f7-ad2e120b8515\",\"project_root\":\"$REPO_ROOT\",\"scope\":\"project\",\"timestamp\":\"2026-07-17T01:48:55.879096Z\",\"payload\":{\"entry_id\":\"hybrid-mobile-poc-ios-reboot-verification-next-steps\",\"tags\":[\"hybrid-mobile\",\"proof-of-concept\",\"ios-verification\",\"flutter\",\"codegen\",\"ci-verification\",\"pasteboard-daemon\"],\"title\":\"Hybrid Mobile PoC iOS Reboot Verification Next Steps\",\"ts\":\"2026-07-17T01:48:55.879096Z\",\"type\":\"compiled\"},\"affects\":[\"hybrid-mobile-poc-ios-reboot-verification-next-steps\"]}",
+    "redactions": [
+      {
+        "kind": "repository-worktree-path",
+        "occurrences": 1
+      }
+    ],
+    "sources": [
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 39,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      }
+    ]
+  },
+  {
+    "original_sha256": "fb74751316e05af300da66d675e7f29e9dae0054d74b56c4e67428e774be7724",
+    "record": "{\"id\":\"7a75c1cc-e102-41d3-846e-129cfe4c0121\",\"kind\":\"compiled\",\"session_id\":\"8c67689c-a5b9-42c8-824c-4aa038191ecc\",\"project_root\":\"$REPO_ROOT\",\"scope\":\"project\",\"timestamp\":\"2026-07-17T02:07:28.527870Z\",\"payload\":{\"entry_id\":\"phase-codegen-and-ci-verification-status-update\",\"tags\":[\"hybrid-mobile\",\"phase-status\",\"proof-of-concept\",\"codegen\",\"ci-verification\",\"cargo\",\"flutter-rust-bridge\"],\"title\":\"Phase codegen and CI verification status update\",\"ts\":\"2026-07-17T02:07:28.527870Z\",\"type\":\"compiled\"},\"affects\":[\"phase-codegen-and-ci-verification-status-update\"]}",
+    "redactions": [
+      {
+        "kind": "repository-worktree-path",
+        "occurrences": 1
+      }
+    ],
+    "sources": [
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 40,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      }
+    ]
+  },
+  {
+    "original_sha256": "e6f8b9b4c6556b22659452b1a064902c6c96853ff954f38ecc23b3821a1072e4",
+    "record": "{\"id\":\"b7697913-4733-486b-a567-65a2432fe4d9\",\"kind\":\"compiled\",\"session_id\":\"31d8d970-1593-4ae2-bebf-881e22506dea\",\"project_root\":\"$REPO_ROOT\",\"scope\":\"project\",\"timestamp\":\"2026-07-17T02:07:41.948966Z\",\"payload\":{\"entry_id\":\"prometheus-entity-management-universal-platform-evolution-status\",\"tags\":[\"prometheus-entity-management\",\"entity-graph\",\"platform-evolution\",\"zustand\",\"react-bindings\",\"svelte\",\"solidjs\",\"git-status\"],\"title\":\"Prometheus Entity Management universal platform evolution status\",\"ts\":\"2026-07-17T02:07:41.948966Z\",\"type\":\"compiled\"},\"affects\":[\"prometheus-entity-management-universal-platform-evolution-status\"]}",
+    "redactions": [
+      {
+        "kind": "repository-worktree-path",
+        "occurrences": 1
+      }
+    ],
+    "sources": [
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 41,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      }
+    ]
+  },
+  {
+    "original_sha256": "969a0ade019b6b1c108fae07982d73bd818cf904361ec94b389b5840b101ab4d",
+    "record": "{\"id\":\"59e5e00b-b871-4911-815c-92e4e4f580f5\",\"kind\":\"compiled\",\"session_id\":\"2a480e96-1e31-4ff4-82bc-b57d4e8b5519\",\"project_root\":\"$REPO_ROOT\",\"scope\":\"project\",\"timestamp\":\"2026-07-17T02:07:51.964952Z\",\"payload\":{\"entry_id\":\"hybrid-mobile-codegen-and-ci-phase-executor-completion\",\"tags\":[\"hybrid-mobile\",\"codegen\",\"ci-verification\",\"executor-session\",\"phase-tracking\"],\"title\":\"Hybrid Mobile Codegen and CI Phase Executor Completion\",\"ts\":\"2026-07-17T02:07:51.964952Z\",\"type\":\"compiled\"},\"affects\":[\"hybrid-mobile-codegen-and-ci-phase-executor-completion\"]}",
+    "redactions": [
+      {
+        "kind": "repository-worktree-path",
+        "occurrences": 1
+      }
+    ],
+    "sources": [
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 42,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      }
+    ]
+  },
+  {
+    "original_sha256": "bfd9b4163c271ba2a27fd2cf21ddb71cd051167dd228d89ab78dd2f37416b0dd",
+    "record": "{\"id\":\"432cecec-c124-4115-b043-d2fb96d66ca4\",\"kind\":\"compiled\",\"session_id\":\"82a9388e-ce24-41bb-b514-28e3d8dc2e13\",\"project_root\":\"$REPO_ROOT\",\"scope\":\"project\",\"timestamp\":\"2026-07-17T02:46:48.082151Z\",\"payload\":{\"entry_id\":\"c-111-relate-fix-now-passes-traversal-but-fails-rrf-ordering\",\"tags\":[\"hybrid-mobile\",\"phase-status\",\"proof-of-concept\",\"codegen\",\"ci-verification\",\"rrf-ranking\",\"session-state\"],\"title\":\"C-111 relate fix now passes traversal but fails RRF ordering\",\"ts\":\"2026-07-17T02:46:48.082151Z\",\"type\":\"compiled\"},\"affects\":[\"c-111-relate-fix-now-passes-traversal-but-fails-rrf-ordering\"]}",
+    "redactions": [
+      {
+        "kind": "repository-worktree-path",
+        "occurrences": 1
+      }
+    ],
+    "sources": [
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 43,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      }
+    ]
+  },
+  {
+    "original_sha256": "cbf515454d005218948d95e2af24da3958f62e8a091999ecfa48c4721b1d34ee",
+    "record": "{\"id\":\"6b567154-9cdd-4418-a86f-957a676d1446\",\"kind\":\"compiled\",\"session_id\":\"5a20f9f7-e31b-4802-9ceb-b8df3977f057\",\"project_root\":\"$REPO_ROOT\",\"scope\":\"project\",\"timestamp\":\"2026-07-17T02:47:00.243889Z\",\"payload\":{\"entry_id\":\"hybrid-mobile-poc-worktree-cleanup-and-remaining-walkthrough-status\",\"tags\":[\"hybrid-mobile\",\"proof-of-concept\",\"codegen\",\"ci-verification\",\"git-worktrees\",\"flutter\",\"tauri\",\"pem\"],\"title\":\"Hybrid Mobile PoC worktree cleanup and remaining walkthrough status\",\"ts\":\"2026-07-17T02:47:00.243889Z\",\"type\":\"compiled\"},\"affects\":[\"hybrid-mobile-poc-worktree-cleanup-and-remaining-walkthrough-status\"]}",
+    "redactions": [
+      {
+        "kind": "repository-worktree-path",
+        "occurrences": 1
+      }
+    ],
+    "sources": [
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 44,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      }
+    ]
+  },
+  {
+    "original_sha256": "2d1a4a428c6c78303df07a00fffc2bdba8c4ae434b0b523ab5f969b5ca366a38",
+    "record": "{\"id\":\"6546ebfc-0e38-4442-8360-6661cc3a96bf\",\"kind\":\"compiled\",\"session_id\":\"78edb279-6e3a-4468-88d6-1f45cb6e38fd\",\"project_root\":\"$REPO_ROOT\",\"scope\":\"project\",\"timestamp\":\"2026-07-17T02:47:12.148752Z\",\"payload\":{\"entry_id\":\"hybrid-mobile-codegen-and-ci-verification-session-complete\",\"tags\":[\"hybrid-mobile\",\"codegen\",\"ci-verification\",\"executor-session\",\"phase-tracking\"],\"title\":\"Hybrid Mobile Codegen and CI Verification Session Complete\",\"ts\":\"2026-07-17T02:47:12.148752Z\",\"type\":\"compiled\"},\"affects\":[\"hybrid-mobile-codegen-and-ci-verification-session-complete\"]}",
+    "redactions": [
+      {
+        "kind": "repository-worktree-path",
+        "occurrences": 1
+      }
+    ],
+    "sources": [
+      {
+        "branch": "claude/funny-wozniak-06a4cc",
+        "line": 45,
+        "path": "apps/knowme-poc/rust/.prometheus/events.jsonl",
+        "source": "funny-wozniak-06a4cc"
+      }
+    ]
+  }
+]

@@ -1,0 +1,18 @@
+[package]
+name = "gen_ui_host"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+gen_ui_types = { path = "../gen_ui_types" }
+gen_ui_runtime = { path = "../gen_ui_runtime" }
+gen_ui_agent = { path = "../gen_ui_agent" }
+gen_ui_db = { path = "../gen_ui_db", features = ["pglite"] }
+gen_ui_db_graph = { path = "../gen_ui_db_graph", features = ["embed-native"] }
+tokio = { workspace = true, features = ["sync"] }
+thiserror.workspace = true
+serde.workspace = true
+tracing.workspace = true
+dashmap.workspace = true

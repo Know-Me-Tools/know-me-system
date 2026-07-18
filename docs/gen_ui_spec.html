@@ -1,0 +1,2022 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>gen_ui — Technical Specification &amp; Architecture · travisjames.ai</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&amp;family=Space+Grotesk:wght@400;500;600;700&amp;family=Roboto:wght@300;400;500;700&amp;family=JetBrains+Mono:wght@400;500;600;700&amp;display=swap" rel="stylesheet" />
+<style>
+/* ══════════════════════════════════════════════════════
+   DESIGN TOKENS — travisjames.ai dark mode
+══════════════════════════════════════════════════════ */
+:root {
+  --bg:            #0B0F14;
+  --card:          #0F1620;
+  --muted:         #141C26;
+  --elevated:      #18212E;
+  --border:        #1E2D3F;
+  --border-hi:     #2B3F55;
+  --fg:            #E8EDF3;
+  --fg-muted:      #A7B0BC;
+  --fg-subtle:     #5C6B7A;
+  --ember:         #FF6A3D;
+  --ember-soft:    #E04E28;
+  --ember-dim:     rgba(255,106,61,.12);
+  --ember-glow:    rgba(255,106,61,.07);
+  --ember-border:  rgba(255,106,61,.25);
+  --success:       #4ADE80;
+  --warn:          #FBBF24;
+  --error:         #EF4444;
+  --info:          #60A5FA;
+  --violet:        #8B78FF;
+  --cyan:          #22D3EE;
+  --font-display:  'Space Grotesk', sans-serif;
+  --font-ui:       'Inter', sans-serif;
+  --font-body:     'Roboto', sans-serif;
+  --font-mono:     'JetBrains Mono', monospace;
+  --r:             10px;
+  --r-lg:          16px;
+  --r-pill:        999px;
+  --nav-h:         56px;
+  --sidebar-w:     260px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; font-size: 16px; }
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.75;
+  -webkit-font-smoothing: antialiased;
+  padding-top: var(--nav-h);
+}
+
+/* ── SCROLLBAR ─────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 3px; }
+
+/* ══════════════════════════════════════════════════════
+   NAV
+══════════════════════════════════════════════════════ */
+.nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+  height: var(--nav-h);
+  background: rgba(11,15,20,.94);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 2rem;
+}
+.nav-brand {
+  font-family: var(--font-display);
+  font-weight: 700; font-size: .95rem; letter-spacing: -.025em;
+  color: var(--fg); text-decoration: none;
+  display: flex; align-items: center; gap: .5rem;
+}
+.nav-brand .ember { color: var(--ember); }
+.nav-brand .dot { color: var(--fg-subtle); }
+.nav-center {
+  font-family: var(--font-mono);
+  font-size: .65rem; color: var(--fg-subtle);
+  letter-spacing: .08em; text-transform: uppercase;
+}
+.nav-meta {
+  font-family: var(--font-mono);
+  font-size: .62rem; color: var(--fg-subtle);
+  letter-spacing: .06em;
+  display: flex; gap: 1.2rem; align-items: center;
+}
+.nav-badge {
+  background: var(--ember-dim);
+  border: 1px solid var(--ember-border);
+  color: var(--ember);
+  padding: 2px 10px; border-radius: var(--r-pill);
+  font-size: .6rem; letter-spacing: .07em;
+}
+
+/* ══════════════════════════════════════════════════════
+   LAYOUT — sidebar + content
+══════════════════════════════════════════════════════ */
+.layout { display: flex; min-height: calc(100vh - var(--nav-h)); }
+
+/* ── SIDEBAR ───────────────────────────────────────── */
+.sidebar {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  position: sticky;
+  top: var(--nav-h);
+  height: calc(100vh - var(--nav-h));
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+  padding: 1.75rem 0;
+  background: var(--bg);
+}
+.sidebar-group { margin-bottom: 1.5rem; }
+.sidebar-label {
+  font-family: var(--font-mono);
+  font-size: .6rem; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--fg-subtle);
+  padding: 0 1.25rem 0.5rem;
+}
+.sidebar-link {
+  display: flex; align-items: center; gap: .5rem;
+  padding: .38rem 1.25rem;
+  font-family: var(--font-ui);
+  font-size: .78rem; font-weight: 500;
+  color: var(--fg-muted);
+  text-decoration: none;
+  transition: color .15s, background .15s;
+  border-left: 2px solid transparent;
+}
+.sidebar-link:hover { color: var(--fg); background: var(--ember-glow); }
+.sidebar-link.active { color: var(--ember); border-left-color: var(--ember); background: var(--ember-dim); }
+.sidebar-num {
+  font-family: var(--font-mono); font-size: .6rem;
+  color: var(--fg-subtle); min-width: 1.4rem;
+}
+
+/* ── MAIN CONTENT ──────────────────────────────────── */
+.content {
+  flex: 1;
+  min-width: 0;
+  max-width: 900px;
+  padding: 3.5rem 3rem 6rem;
+}
+
+/* ══════════════════════════════════════════════════════
+   SECTION STRUCTURE
+══════════════════════════════════════════════════════ */
+.section { margin-bottom: 5rem; scroll-margin-top: calc(var(--nav-h) + 1.5rem); }
+
+.section-eyebrow {
+  font-family: var(--font-mono);
+  font-size: .65rem; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--ember);
+  display: flex; align-items: center; gap: .6rem;
+  margin-bottom: .75rem;
+}
+.section-eyebrow::before {
+  content: '';
+  display: block; width: 20px; height: 1px;
+  background: var(--ember);
+}
+.section-num {
+  color: var(--fg-subtle);
+}
+
+h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; }
+
+h1 {
+  font-size: clamp(2rem, 4vw, 2.8rem);
+  letter-spacing: -.03em; line-height: 1.08;
+  color: var(--fg); margin-bottom: 1rem;
+}
+h1 em { font-style: normal; color: var(--ember); }
+
+h2 {
+  font-size: clamp(1.4rem, 2.5vw, 1.9rem);
+  letter-spacing: -.025em; line-height: 1.15;
+  color: var(--fg); margin-bottom: .75rem;
+}
+
+h3 {
+  font-size: 1.15rem; letter-spacing: -.015em; line-height: 1.3;
+  color: var(--fg); margin-bottom: .5rem; margin-top: 2rem;
+}
+
+h4 {
+  font-size: .9rem; letter-spacing: -.01em;
+  color: var(--fg-muted); margin-bottom: .4rem; margin-top: 1.5rem;
+  font-weight: 600;
+}
+
+p {
+  font-family: var(--font-body);
+  font-size: .975rem; line-height: 1.78;
+  color: var(--fg-muted);
+  max-width: 65ch;
+  margin-bottom: 1rem;
+}
+
+.lead {
+  font-size: 1.05rem; line-height: 1.72;
+  color: var(--fg);
+  max-width: 60ch;
+  margin-bottom: 1.5rem;
+}
+
+.divider {
+  height: 1px; background: var(--border);
+  margin: 2rem 0;
+}
+
+/* ══════════════════════════════════════════════════════
+   CODE
+══════════════════════════════════════════════════════ */
+code {
+  font-family: var(--font-mono);
+  font-size: .82em;
+  color: var(--ember);
+  background: var(--ember-dim);
+  padding: 1px 6px; border-radius: 4px;
+}
+
+pre {
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 1.25rem 1.5rem;
+  overflow-x: auto;
+  margin: 1.5rem 0;
+}
+pre code {
+  font-size: .82rem; color: var(--fg-muted);
+  background: none; padding: 0;
+  line-height: 1.6;
+}
+.kw  { color: var(--violet); }
+.ty  { color: var(--cyan); }
+.st  { color: var(--success); }
+.cm  { color: var(--fg-subtle); font-style: italic; }
+.num { color: var(--warn); }
+
+/* ══════════════════════════════════════════════════════
+   CARDS
+══════════════════════════════════════════════════════ */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+}
+.card-ember {
+  border-color: var(--ember-border);
+  background: linear-gradient(135deg, var(--card), rgba(255,106,61,.04));
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.pill {
+  display: inline-flex; align-items: center; gap: .35rem;
+  background: var(--muted); border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  padding: 2px 10px;
+  font-family: var(--font-mono); font-size: .65rem;
+  color: var(--fg-muted); letter-spacing: .04em;
+}
+.pill-ember { background: var(--ember-dim); border-color: var(--ember-border); color: var(--ember); }
+.pill-success { background: rgba(74,222,128,.1); border-color: rgba(74,222,128,.25); color: var(--success); }
+.pill-info { background: rgba(96,165,250,.1); border-color: rgba(96,165,250,.25); color: var(--info); }
+.pill-violet { background: rgba(139,120,255,.1); border-color: rgba(139,120,255,.25); color: var(--violet); }
+.pill-warn { background: rgba(251,191,36,.1); border-color: rgba(251,191,36,.25); color: var(--warn); }
+
+/* ══════════════════════════════════════════════════════
+   TABLES
+══════════════════════════════════════════════════════ */
+.spec-table {
+  width: 100%; border-collapse: collapse;
+  font-family: var(--font-ui); font-size: .82rem;
+  margin: 1.5rem 0;
+}
+.spec-table th {
+  font-family: var(--font-mono); font-size: .65rem;
+  letter-spacing: .08em; text-transform: uppercase;
+  color: var(--fg-subtle);
+  border-bottom: 1px solid var(--border);
+  padding: .5rem .75rem;
+  text-align: left;
+}
+.spec-table td {
+  padding: .6rem .75rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--fg-muted);
+  vertical-align: top;
+}
+.spec-table tr:last-child td { border-bottom: none; }
+.spec-table tr:hover td { background: var(--ember-glow); }
+.spec-table td:first-child { font-family: var(--font-mono); font-size: .78rem; color: var(--fg); }
+
+/* ══════════════════════════════════════════════════════
+   SVG DIAGRAM WRAPPER
+══════════════════════════════════════════════════════ */
+.diagram-wrap {
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 2rem;
+  margin: 2rem 0;
+  overflow-x: auto;
+}
+.diagram-caption {
+  font-family: var(--font-mono);
+  font-size: .65rem; letter-spacing: .08em;
+  color: var(--fg-subtle); text-align: center;
+  margin-top: 1rem;
+  text-transform: uppercase;
+}
+
+/* ══════════════════════════════════════════════════════
+   BLOCK MAP (content block table)
+══════════════════════════════════════════════════════ */
+.block-map {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+  margin: 1.5rem 0;
+}
+.block-cell {
+  background: var(--card);
+  padding: .9rem 1rem;
+}
+.block-cell-header {
+  background: var(--muted);
+  padding: .5rem 1rem;
+  font-family: var(--font-mono); font-size: .6rem;
+  letter-spacing: .1em; text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.block-name {
+  font-family: var(--font-mono); font-size: .78rem;
+  color: var(--fg);
+  margin-bottom: .2rem;
+}
+.block-widget {
+  font-family: var(--font-ui); font-size: .72rem;
+  color: var(--fg-muted);
+}
+.block-source {
+  font-family: var(--font-mono); font-size: .65rem;
+  color: var(--fg-subtle);
+  margin-top: .2rem;
+}
+
+/* ══════════════════════════════════════════════════════
+   HERO SECTION
+══════════════════════════════════════════════════════ */
+.hero {
+  padding: 1rem 0 3rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4rem;
+}
+.hero-kicker {
+  display: flex; align-items: center; gap: .75rem;
+  margin-bottom: 1.5rem;
+}
+.hero-title { margin-bottom: 1.25rem; }
+.hero-pills {
+  display: flex; flex-wrap: wrap; gap: .5rem;
+  margin-top: 1.5rem;
+}
+.hero-meta {
+  display: flex; gap: 2rem;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+.hero-meta-item { }
+.hero-meta-label {
+  font-family: var(--font-mono); font-size: .62rem;
+  letter-spacing: .1em; text-transform: uppercase;
+  color: var(--fg-subtle); margin-bottom: .2rem;
+}
+.hero-meta-value {
+  font-family: var(--font-display); font-size: 1.1rem;
+  font-weight: 700; color: var(--fg);
+}
+.hero-meta-value em { color: var(--ember); font-style: normal; }
+
+/* ══════════════════════════════════════════════════════
+   CALLOUT
+══════════════════════════════════════════════════════ */
+.callout {
+  border-left: 3px solid var(--ember);
+  background: var(--ember-dim);
+  border-radius: 0 var(--r) var(--r) 0;
+  padding: 1rem 1.25rem;
+  margin: 1.5rem 0;
+}
+.callout p { margin: 0; color: var(--fg); max-width: none; font-size: .9rem; }
+.callout-label {
+  font-family: var(--font-mono); font-size: .62rem;
+  letter-spacing: .1em; text-transform: uppercase;
+  color: var(--ember); margin-bottom: .35rem;
+}
+
+.callout-info {
+  border-left-color: var(--info);
+  background: rgba(96,165,250,.07);
+}
+.callout-info .callout-label { color: var(--info); }
+
+/* ══════════════════════════════════════════════════════
+   STEP LIST
+══════════════════════════════════════════════════════ */
+.steps { display: flex; flex-direction: column; gap: .75rem; margin: 1.5rem 0; }
+.step {
+  display: flex; gap: 1rem; align-items: flex-start;
+}
+.step-num {
+  width: 28px; height: 28px; flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--ember-dim);
+  border: 1px solid var(--ember-border);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: .7rem;
+  font-weight: 700; color: var(--ember);
+}
+.step-body { padding-top: .15rem; }
+.step-title {
+  font-family: var(--font-ui); font-size: .88rem;
+  font-weight: 600; color: var(--fg);
+  margin-bottom: .15rem;
+}
+.step-desc {
+  font-family: var(--font-body); font-size: .82rem;
+  color: var(--fg-muted); line-height: 1.6;
+}
+
+/* ══════════════════════════════════════════════════════
+   FOOTER
+══════════════════════════════════════════════════════ */
+.footer {
+  border-top: 1px solid var(--border);
+  padding: 2rem 3rem;
+  margin-left: var(--sidebar-w);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.footer-brand {
+  font-family: var(--font-display); font-size: .85rem;
+  font-weight: 700; color: var(--fg-subtle);
+}
+.footer-brand em { color: var(--ember); font-style: normal; }
+.footer-meta {
+  font-family: var(--font-mono); font-size: .62rem;
+  color: var(--fg-subtle); letter-spacing: .06em;
+}
+
+/* ══════════════════════════════════════════════════════
+   RESPONSIVE
+══════════════════════════════════════════════════════ */
+@media (max-width: 900px) {
+  .sidebar { display: none; }
+  .content { padding: 2rem 1.5rem 4rem; }
+  .footer { margin-left: 0; }
+  .block-map { grid-template-columns: 1fr 1fr; }
+  .card-grid { grid-template-columns: 1fr; }
+  .hero-meta { flex-wrap: wrap; gap: 1rem; }
+  .nav-center { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════
+     NAV
+══════════════════════════════════════════════════ -->
+<nav class="nav">
+  <a class="nav-brand" href="#overview">
+    travis<span class="ember">james</span><span class="dot">.</span>ai
+  </a>
+  <span class="nav-center">gen_ui — Technical Specification &amp; Architecture</span>
+  <div class="nav-meta">
+    <span>v1.0.0</span>
+    <span>March 2026</span>
+    <span class="nav-badge">PROMETHEUS AGS</span>
+  </div>
+</nav>
+
+<!-- ══════════════════════════════════════════════════
+     LAYOUT
+══════════════════════════════════════════════════ -->
+<div class="layout">
+
+<!-- ── SIDEBAR ──────────────────────────────────── -->
+<aside class="sidebar">
+  <div class="sidebar-group">
+    <div class="sidebar-label">Overview</div>
+    <a class="sidebar-link active" href="#overview">
+      <span class="sidebar-num">01</span> Introduction
+    </a>
+    <a class="sidebar-link" href="#design-philosophy">
+      <span class="sidebar-num">02</span> Design Philosophy
+    </a>
+  </div>
+  <div class="sidebar-group">
+    <div class="sidebar-label">Architecture</div>
+    <a class="sidebar-link" href="#system-architecture">
+      <span class="sidebar-num">03</span> System Architecture
+    </a>
+    <a class="sidebar-link" href="#threading">
+      <span class="sidebar-num">04</span> Threading Model
+    </a>
+    <a class="sidebar-link" href="#content-blocks">
+      <span class="sidebar-num">05</span> Content Block System
+    </a>
+  </div>
+  <div class="sidebar-group">
+    <div class="sidebar-label">Protocols</div>
+    <a class="sidebar-link" href="#a2ui-protocol">
+      <span class="sidebar-num">06</span> A2UI Protocol
+    </a>
+    <a class="sidebar-link" href="#agui-protocol">
+      <span class="sidebar-num">07</span> AG-UI Protocol
+    </a>
+    <a class="sidebar-link" href="#protocol-pipeline">
+      <span class="sidebar-num">08</span> Protocol Pipeline
+    </a>
+  </div>
+  <div class="sidebar-group">
+    <div class="sidebar-label">Infrastructure</div>
+    <a class="sidebar-link" href="#inference">
+      <span class="sidebar-num">09</span> Local Inference
+    </a>
+    <a class="sidebar-link" href="#surrealdb">
+      <span class="sidebar-num">10</span> SurrealDB Integration
+    </a>
+    <a class="sidebar-link" href="#mcp">
+      <span class="sidebar-num">11</span> MCP Client
+    </a>
+    <a class="sidebar-link" href="#agent-runtime">
+      <span class="sidebar-num">12</span> Agent Runtime
+    </a>
+  </div>
+  <div class="sidebar-group">
+    <div class="sidebar-label">Delivery</div>
+    <a class="sidebar-link" href="#build-system">
+      <span class="sidebar-num">13</span> Build System
+    </a>
+    <a class="sidebar-link" href="#project-structure">
+      <span class="sidebar-num">14</span> Project Structure
+    </a>
+    <a class="sidebar-link" href="#extension-guide">
+      <span class="sidebar-num">15</span> Extension Guide
+    </a>
+  </div>
+</aside>
+
+<!-- ── MAIN CONTENT ─────────────────────────────── -->
+<main class="content">
+
+<!-- ══════════════════════════════════════════════
+     01 — HERO / OVERVIEW
+══════════════════════════════════════════════ -->
+<section class="section hero" id="overview">
+  <div class="hero-kicker">
+    <span class="pill pill-ember">SPECIFICATION</span>
+    <span class="pill">TJ-SPEC-GENUI-001</span>
+    <span class="pill">March 2026</span>
+  </div>
+
+  <h1 class="hero-title">
+    <em>gen_ui</em> — Generative AI<br/>Native Platform
+  </h1>
+
+  <p class="lead">
+    A production-grade Flutter + Rust application delivering native AI agent interaction on iOS and Android. Combines Flutter's rendering with Rust's performance through a zero-copy FFI bridge, implementing the A2UI and AG-UI protocols for structured agent output, local on-device inference, MCP tool use, and embedded SurrealDB for graph and vector operations.
+  </p>
+
+  <div class="hero-pills">
+    <span class="pill pill-ember">Flutter 3.x</span>
+    <span class="pill pill-ember">Rust 1.80+</span>
+    <span class="pill pill-info">A2UI Protocol</span>
+    <span class="pill pill-info">AG-UI Protocol</span>
+    <span class="pill pill-violet">flutter_rust_bridge v2</span>
+    <span class="pill pill-success">candle GGUF</span>
+    <span class="pill pill-success">SurrealDB Embedded</span>
+    <span class="pill pill-warn">MCP JSON-RPC 2.0</span>
+    <span class="pill">Riverpod</span>
+    <span class="pill">Tokio</span>
+    <span class="pill">Metal / BLAS</span>
+  </div>
+
+  <div class="hero-meta">
+    <div class="hero-meta-item">
+      <div class="hero-meta-label">Source Files</div>
+      <div class="hero-meta-value"><em>41</em> files</div>
+    </div>
+    <div class="hero-meta-item">
+      <div class="hero-meta-label">Rust Modules</div>
+      <div class="hero-meta-value"><em>14</em> modules</div>
+    </div>
+    <div class="hero-meta-item">
+      <div class="hero-meta-label">Block Types</div>
+      <div class="hero-meta-value"><em>11</em> variants</div>
+    </div>
+    <div class="hero-meta-item">
+      <div class="hero-meta-label">Local Models</div>
+      <div class="hero-meta-value"><em>7</em> supported</div>
+    </div>
+    <div class="hero-meta-item">
+      <div class="hero-meta-label">Author</div>
+      <div class="hero-meta-value">Travis James</div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     02 — DESIGN PHILOSOPHY
+══════════════════════════════════════════════ -->
+<section class="section" id="design-philosophy">
+  <div class="section-eyebrow"><span class="section-num">02</span> Design Philosophy</div>
+  <h2>The Right Language for Each Layer</h2>
+  <div class="divider"></div>
+
+  <p class="lead">
+    Four interlocking principles drive every architectural decision. Each concern lives at the layer where it has the best combination of performance and information.
+  </p>
+
+  <div class="card-grid">
+    <div class="card card-ember">
+      <h4 style="margin-top:0; color:var(--ember);">Language Stratification</h4>
+      <p style="max-width:none; font-size:.85rem;">Dart owns pixels and reactive state. Rust owns bytes and threads. The FFI boundary is essentially free — flutter_rust_bridge generates zero-copy marshalling with no heap duplication where avoidable.</p>
+    </div>
+    <div class="card">
+      <h4 style="margin-top:0; color:var(--fg);">Single Runtime Principle</h4>
+      <p style="max-width:none; font-size:.85rem;">One Tokio runtime per process, globally owned. All async tasks share one work-stealing scheduler. The blocking pool (max 8 threads) handles GGUF loading and inference forward passes — never mixing them with SSE event loops.</p>
+    </div>
+    <div class="card">
+      <h4 style="margin-top:0; color:var(--fg);">Sealed Content Block as Protocol</h4>
+      <p style="max-width:none; font-size:.85rem;">The <code>ContentBlock</code> sealed union is not just a data type — it is the protocol between the agent runtime and the UI. Semantic annotation happens once, at the stream boundary, in the layer with full context.</p>
+    </div>
+    <div class="card">
+      <h4 style="margin-top:0; color:var(--fg);">Locality-First Agent Loop</h4>
+      <p style="max-width:none; font-size:.85rem;">The PMPO loop runs entirely in Rust, adjacent to both the network and state. Tool dispatch, memory hydration, and result caching happen before Dart sees a single event. The <code>max_turns</code> budget enforces loop termination structurally.</p>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-label">Core Invariant</div>
+    <p>Push semantic annotation as early as possible; let downstream code stay dumb and declarative. The compiler enforces exhaustiveness at every layer boundary.</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     03 — SYSTEM ARCHITECTURE
+══════════════════════════════════════════════ -->
+<section class="section" id="system-architecture">
+  <div class="section-eyebrow"><span class="section-num">03</span> Architecture</div>
+  <h2>System Architecture</h2>
+  <div class="divider"></div>
+
+  <p>The system is structured in three horizontal layers separated by two well-defined boundaries: the FFI bridge and the SSE stream parser. No layer reaches past its adjacent neighbour.</p>
+
+  <div class="diagram-wrap">
+    <svg viewBox="0 0 820 560" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">
+      <defs>
+        <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#5C6B7A"/>
+        </marker>
+        <marker id="arr-ember" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#FF6A3D"/>
+        </marker>
+        <linearGradient id="emberGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" style="stop-color:#E04E28;stop-opacity:1"/>
+          <stop offset="100%" style="stop-color:#FF6A3D;stop-opacity:1"/>
+        </linearGradient>
+      </defs>
+
+      <!-- LAYER 1: Flutter/Dart -->
+      <rect x="10" y="10" width="800" height="175" rx="10" fill="#0F1620" stroke="#2B3F55" stroke-width="1"/>
+      <text x="24" y="32" font-family="JetBrains Mono,monospace" font-size="9" fill="#5C6B7A" letter-spacing="2">FLUTTER / DART — UI LAYER</text>
+
+      <!-- Widget blocks row -->
+      <rect x="24" y="42" width="100" height="52" rx="6" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="74" y="63" font-family="JetBrains Mono,monospace" font-size="8" fill="#E8EDF3" text-anchor="middle">Thinking</text>
+      <text x="74" y="74" font-family="JetBrains Mono,monospace" font-size="8" fill="#A7B0BC" text-anchor="middle">Block</text>
+      <text x="74" y="85" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">ThinkingBlockWidget</text>
+
+      <rect x="134" y="42" width="100" height="52" rx="6" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="184" y="63" font-family="JetBrains Mono,monospace" font-size="8" fill="#E8EDF3" text-anchor="middle">Code</text>
+      <text x="184" y="74" font-family="JetBrains Mono,monospace" font-size="8" fill="#A7B0BC" text-anchor="middle">Block</text>
+      <text x="184" y="85" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">CodeBlockWidget</text>
+
+      <rect x="244" y="42" width="100" height="52" rx="6" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="294" y="63" font-family="JetBrains Mono,monospace" font-size="8" fill="#E8EDF3" text-anchor="middle">Tool / Skill</text>
+      <text x="294" y="74" font-family="JetBrains Mono,monospace" font-size="8" fill="#A7B0BC" text-anchor="middle">Block</text>
+      <text x="294" y="85" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">Tool/SkillBlock</text>
+
+      <rect x="354" y="42" width="100" height="52" rx="6" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="404" y="63" font-family="JetBrains Mono,monospace" font-size="8" fill="#E8EDF3" text-anchor="middle">Artifact</text>
+      <text x="404" y="74" font-family="JetBrains Mono,monospace" font-size="8" fill="#A7B0BC" text-anchor="middle">Block</text>
+      <text x="404" y="85" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">ArtifactBlockWidget</text>
+
+      <rect x="464" y="42" width="100" height="52" rx="6" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="514" y="63" font-family="JetBrains Mono,monospace" font-size="8" fill="#E8EDF3" text-anchor="middle">Memory</text>
+      <text x="514" y="74" font-family="JetBrains Mono,monospace" font-size="8" fill="#A7B0BC" text-anchor="middle">Block</text>
+      <text x="514" y="85" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">MemoryBlockWidget</text>
+
+      <rect x="574" y="42" width="100" height="52" rx="6" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="624" y="63" font-family="JetBrains Mono,monospace" font-size="8" fill="#E8EDF3" text-anchor="middle">Citation</text>
+      <text x="624" y="74" font-family="JetBrains Mono,monospace" font-size="8" fill="#A7B0BC" text-anchor="middle">Block</text>
+      <text x="624" y="85" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">CitationBlockWidget</text>
+
+      <rect x="684" y="42" width="116" height="52" rx="6" fill="#0B1A2E" stroke="#2B3F55" stroke-width="1" stroke-dasharray="3,2"/>
+      <text x="742" y="63" font-family="JetBrains Mono,monospace" font-size="8" fill="#A7B0BC" text-anchor="middle">+ 5 more</text>
+      <text x="742" y="74" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">Text · Image · Divider</text>
+      <text x="742" y="85" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">compiler-enforced</text>
+
+      <!-- Riverpod row -->
+      <rect x="24" y="108" width="450" height="62" rx="6" fill="#18212E" stroke="#2B3F55" stroke-width="1"/>
+      <text x="249" y="127" font-family="Inter,sans-serif" font-size="9" fill="#A7B0BC" text-anchor="middle" font-weight="600">Riverpod — ChatNotifier · A2uiContentDriver · A2uiSession · AguiClient</text>
+      <text x="249" y="142" font-family="JetBrains Mono,monospace" font-size="8" fill="#5C6B7A" text-anchor="middle">A2uiEvent sealed → ContentBlock mutations → MessageBubble exhaustive switch</text>
+      <text x="249" y="157" font-family="JetBrains Mono,monospace" font-size="8" fill="#5C6B7A" text-anchor="middle">AguiClient: state tree · pending confirmations · render slots · bidirectional events</text>
+
+      <rect x="488" y="108" width="312" height="62" rx="6" fill="#18212E" stroke="#2B3F55" stroke-width="1"/>
+      <text x="644" y="127" font-family="Inter,sans-serif" font-size="9" fill="#A7B0BC" text-anchor="middle" font-weight="600">Dart Sealed Event Hierarchies</text>
+      <text x="644" y="142" font-family="JetBrains Mono,monospace" font-size="8" fill="#5C6B7A" text-anchor="middle">A2uiEvent (27 variants) · AguiEvent (12 variants)</text>
+      <text x="644" y="157" font-family="JetBrains Mono,monospace" font-size="8" fill="#5C6B7A" text-anchor="middle">fromFrb() factory · JSON deserialization · type dispatch</text>
+
+      <!-- FFI BOUNDARY -->
+      <rect x="10" y="196" width="800" height="28" rx="0" fill="none" stroke="none"/>
+      <line x1="10" y1="210" x2="810" y2="210" stroke="#FF6A3D" stroke-width="1.5" stroke-dasharray="6,3"/>
+      <rect x="320" y="200" width="180" height="20" rx="10" fill="#FF6A3D"/>
+      <text x="410" y="214" font-family="JetBrains Mono,monospace" font-size="8" fill="#0B0F14" text-anchor="middle" font-weight="700" letter-spacing="1">flutter_rust_bridge v2 FFI</text>
+
+      <!-- LAYER 2: Rust Protocol -->
+      <rect x="10" y="230" width="800" height="150" rx="10" fill="#0F1620" stroke="#2B3F55" stroke-width="1"/>
+      <text x="24" y="252" font-family="JetBrains Mono,monospace" font-size="9" fill="#5C6B7A" letter-spacing="2">RUST — PROTOCOL LAYER</text>
+
+      <rect x="24" y="262" width="190" height="100" rx="6" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="119" y="282" font-family="Inter,sans-serif" font-size="9" fill="#E8EDF3" text-anchor="middle" font-weight="700">api.rs — FFI Surface</text>
+      <text x="119" y="297" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">stream_agent_a2ui()</text>
+      <text x="119" y="310" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">stream_agent_agui()</text>
+      <text x="119" y="323" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">local_generate()</text>
+      <text x="119" y="336" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">memory_write/read()</text>
+      <text x="119" y="349" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">mcp_call_tool()</text>
+
+      <rect x="228" y="262" width="180" height="100" rx="6" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="318" y="282" font-family="Inter,sans-serif" font-size="9" fill="#E8EDF3" text-anchor="middle" font-weight="700">protocol/</text>
+      <text x="318" y="297" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">A2uiAdapter (27 events)</text>
+      <text x="318" y="310" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">AguiAdapter (translate)</text>
+      <text x="318" y="323" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">ProtocolPipeline</text>
+      <text x="318" y="336" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">broadcast::channel ×2</text>
+
+      <rect x="422" y="262" width="180" height="100" rx="6" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="512" y="282" font-family="Inter,sans-serif" font-size="9" fill="#E8EDF3" text-anchor="middle" font-weight="700">streaming.rs</text>
+      <text x="512" y="297" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">parse_anthropic_event()</text>
+      <text x="512" y="310" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">StreamEvent (sealed)</text>
+      <text x="512" y="323" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">ContentBlockType</text>
+      <text x="512" y="336" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">raw SSE → typed events</text>
+
+      <rect x="616" y="262" width="184" height="100" rx="6" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="708" y="282" font-family="Inter,sans-serif" font-size="9" fill="#E8EDF3" text-anchor="middle" font-weight="700">runtime.rs</text>
+      <text x="708" y="297" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">global Tokio runtime</text>
+      <text x="708" y="310" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">N-1 worker threads</text>
+      <text x="708" y="323" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">8 blocking threads</text>
+      <text x="708" y="336" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">spawn / spawn_blocking</text>
+
+      <!-- LAYER 3: Rust Infrastructure -->
+      <rect x="10" y="392" width="800" height="150" rx="10" fill="#0F1620" stroke="#2B3F55" stroke-width="1"/>
+      <text x="24" y="414" font-family="JetBrains Mono,monospace" font-size="9" fill="#5C6B7A" letter-spacing="2">RUST — INFRASTRUCTURE LAYER</text>
+
+      <rect x="24" y="424" width="145" height="100" rx="6" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="96" y="444" font-family="Inter,sans-serif" font-size="9" fill="#E8EDF3" text-anchor="middle" font-weight="700">agent/</text>
+      <text x="96" y="459" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">AgentRuntime</text>
+      <text x="96" y="472" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">PMPO loop</text>
+      <text x="96" y="485" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">max_turns guard</text>
+      <text x="96" y="498" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">tool routing</text>
+
+      <rect x="179" y="424" width="145" height="100" rx="6" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="251" y="444" font-family="Inter,sans-serif" font-size="9" fill="#E8EDF3" text-anchor="middle" font-weight="700">api_http.rs</text>
+      <text x="251" y="459" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">AnthropicClient</text>
+      <text x="251" y="472" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">reqwest HTTP/2</text>
+      <text x="251" y="485" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">rustls TLS</text>
+      <text x="251" y="498" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">prompt caching</text>
+
+      <rect x="334" y="424" width="145" height="100" rx="6" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="406" y="444" font-family="Inter,sans-serif" font-size="9" fill="#E8EDF3" text-anchor="middle" font-weight="700">inference/</text>
+      <text x="406" y="459" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">candle GGUF</text>
+      <text x="406" y="472" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">7 model catalog</text>
+      <text x="406" y="485" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">Metal / BLAS</text>
+      <text x="406" y="498" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">sampler.rs</text>
+
+      <rect x="489" y="424" width="145" height="100" rx="6" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="561" y="444" font-family="Inter,sans-serif" font-size="9" fill="#E8EDF3" text-anchor="middle" font-weight="700">mcp/</text>
+      <text x="561" y="459" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">McpRegistry</text>
+      <text x="561" y="472" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">SSE transport</text>
+      <text x="561" y="485" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">stdio transport</text>
+      <text x="561" y="498" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">tool namespace routing</text>
+
+      <rect x="644" y="424" width="156" height="100" rx="6" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="722" y="444" font-family="Inter,sans-serif" font-size="9" fill="#E8EDF3" text-anchor="middle" font-weight="700">db/</text>
+      <text x="722" y="459" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">SurrealDB RocksDB</text>
+      <text x="722" y="472" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">MemoryStore</text>
+      <text x="722" y="485" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">ToolCache + EntityGraph</text>
+      <text x="722" y="498" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">vector similarity search</text>
+
+      <!-- Down arrows from protocol to infra -->
+      <line x1="96" y1="370" x2="96" y2="420" stroke="#2B3F55" stroke-width="1" marker-end="url(#arr)"/>
+      <line x1="251" y1="370" x2="251" y2="420" stroke="#2B3F55" stroke-width="1" marker-end="url(#arr)"/>
+      <line x1="406" y1="370" x2="406" y2="420" stroke="#2B3F55" stroke-width="1" marker-end="url(#arr)"/>
+      <line x1="561" y1="370" x2="561" y2="420" stroke="#2B3F55" stroke-width="1" marker-end="url(#arr)"/>
+      <line x1="722" y1="370" x2="722" y2="420" stroke="#2B3F55" stroke-width="1" marker-end="url(#arr)"/>
+
+      <!-- Platform labels bottom -->
+      <text x="205" y="552" font-family="JetBrains Mono,monospace" font-size="8" fill="#5C6B7A" text-anchor="middle">Android arm64 / armv7 / x86 → .so (JNI)</text>
+      <text x="615" y="552" font-family="JetBrains Mono,monospace" font-size="8" fill="#5C6B7A" text-anchor="middle">iOS aarch64 / sim → XCFramework (Metal)</text>
+      <line x1="10" y1="545" x2="400" y2="545" stroke="#1E2D3F" stroke-width="1"/>
+      <line x1="420" y1="545" x2="810" y2="545" stroke="#1E2D3F" stroke-width="1"/>
+    </svg>
+    <div class="diagram-caption">Figure 1 — Full System Architecture: Flutter UI Layer · Rust Protocol Layer · Rust Infrastructure Layer</div>
+  </div>
+
+</section>
+
+<!-- ══════════════════════════════════════════════
+     04 — THREADING MODEL
+══════════════════════════════════════════════ -->
+<section class="section" id="threading">
+  <div class="section-eyebrow"><span class="section-num">04</span> Threading</div>
+  <h2>Threading Model</h2>
+  <div class="divider"></div>
+
+  <p>Three distinct execution contexts, each assigned work that matches its performance profile. Tokio work-stealing ensures idle workers pull tasks from busy workers automatically — no manual thread coordination.</p>
+
+  <div class="diagram-wrap">
+    <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">
+      <defs>
+        <marker id="arr2" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L7,3 z" fill="#5C6B7A"/>
+        </marker>
+      </defs>
+
+      <!-- Flutter/Dart Main Thread -->
+      <rect x="10" y="10" width="210" height="290" rx="10" fill="#0F1620" stroke="#2B3F55" stroke-width="1"/>
+      <rect x="10" y="10" width="210" height="30" rx="10" fill="#141C26" stroke="none"/>
+      <rect x="10" y="36" width="210" height="4" rx="0" fill="#141C26"/>
+      <text x="115" y="30" font-family="Inter,sans-serif" font-size="9" fill="#E8EDF3" text-anchor="middle" font-weight="700">Flutter Main Thread</text>
+      <text x="115" y="58" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">Widget build / layout / paint</text>
+      <text x="115" y="72" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">Riverpod state propagation</text>
+      <text x="115" y="86" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">Dart event loop</text>
+      <text x="115" y="100" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">A2uiContentDriver dispatch</text>
+      <text x="115" y="114" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">AguiClient state patches</text>
+
+      <rect x="24" y="130" width="182" height="30" rx="5" fill="#18212E" stroke="#2B3F55" stroke-width="1"/>
+      <text x="115" y="149" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#FF6A3D" text-anchor="middle">⚡ frb async → Dart Future</text>
+
+      <rect x="24" y="170" width="182" height="55" rx="5" fill="#18212E" stroke="#2B3F55" stroke-width="1"/>
+      <text x="115" y="186" font-family="Inter,sans-serif" font-size="8" fill="#E8EDF3" text-anchor="middle" font-weight="600">Stream Sinks</text>
+      <text x="115" y="200" font-family="JetBrains Mono,monospace" font-size="7" fill="#A7B0BC" text-anchor="middle">A2uiEvent → ContentBlock</text>
+      <text x="115" y="213" font-family="JetBrains Mono,monospace" font-size="7" fill="#A7B0BC" text-anchor="middle">back-pressure: channel(256)</text>
+
+      <rect x="24" y="236" width="182" height="50" rx="5" fill="#18212E" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="115" y="252" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">GC runs here — isolated</text>
+      <text x="115" y="265" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">from inference loop</text>
+      <text x="115" y="278" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">no GC pauses in stream</text>
+
+      <!-- FFI arrow -->
+      <line x1="222" y1="155" x2="258" y2="155" stroke="#FF6A3D" stroke-width="1.5" marker-end="url(#arr2)"/>
+      <text x="240" y="148" font-family="JetBrains Mono,monospace" font-size="6.5" fill="#FF6A3D" text-anchor="middle">FFI</text>
+
+      <!-- Tokio Worker Pool -->
+      <rect x="262" y="10" width="240" height="290" rx="10" fill="#0F1620" stroke="#2B3F55" stroke-width="1"/>
+      <rect x="262" y="10" width="240" height="30" rx="10" fill="#141C26" stroke="none"/>
+      <rect x="262" y="36" width="240" height="4" rx="0" fill="#141C26"/>
+      <text x="382" y="30" font-family="Inter,sans-serif" font-size="9" fill="#E8EDF3" text-anchor="middle" font-weight="700">Tokio Worker Pool (N−1 cores)</text>
+
+      <rect x="276" y="50" width="212" height="42" rx="5" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="382" y="66" font-family="Inter,sans-serif" font-size="8" fill="#E8EDF3" text-anchor="middle" font-weight="600">SSE Event Loop</text>
+      <text x="382" y="80" font-family="JetBrains Mono,monospace" font-size="7" fill="#A7B0BC" text-anchor="middle">reqwest-eventsource · sub-ms response</text>
+
+      <rect x="276" y="102" width="212" height="42" rx="5" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="382" y="118" font-family="Inter,sans-serif" font-size="8" fill="#E8EDF3" text-anchor="middle" font-weight="600">Protocol Pipeline</text>
+      <text x="382" y="132" font-family="JetBrains Mono,monospace" font-size="7" fill="#A7B0BC" text-anchor="middle">A2uiAdapter + AguiAdapter · broadcast</text>
+
+      <rect x="276" y="154" width="212" height="42" rx="5" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="382" y="170" font-family="Inter,sans-serif" font-size="8" fill="#E8EDF3" text-anchor="middle" font-weight="600">Agent PMPO Loop</text>
+      <text x="382" y="184" font-family="JetBrains Mono,monospace" font-size="7" fill="#A7B0BC" text-anchor="middle">tool dispatch · memory · HTTP calls</text>
+
+      <rect x="276" y="206" width="212" height="42" rx="5" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="382" y="222" font-family="Inter,sans-serif" font-size="8" fill="#E8EDF3" text-anchor="middle" font-weight="600">MCP Client I/O</text>
+      <text x="382" y="236" font-family="JetBrains Mono,monospace" font-size="7" fill="#A7B0BC" text-anchor="middle">per-server async req/resp</text>
+
+      <rect x="276" y="258" width="212" height="30" rx="5" fill="#0A1020" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="382" y="276" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">work-stealing across all tasks · thread_keep_alive 60s</text>
+
+      <!-- Arrow to blocking pool -->
+      <line x1="504" y1="200" x2="540" y2="200" stroke="#5C6B7A" stroke-width="1" marker-end="url(#arr2)"/>
+      <text x="522" y="193" font-family="JetBrains Mono,monospace" font-size="6.5" fill="#5C6B7A" text-anchor="middle">spawn_blocking</text>
+
+      <!-- Blocking Thread Pool -->
+      <rect x="544" y="10" width="206" height="290" rx="10" fill="#0F1620" stroke="#2B3F55" stroke-width="1"/>
+      <rect x="544" y="10" width="206" height="30" rx="10" fill="#141C26" stroke="none"/>
+      <rect x="544" y="36" width="206" height="4" rx="0" fill="#141C26"/>
+      <text x="647" y="30" font-family="Inter,sans-serif" font-size="9" fill="#E8EDF3" text-anchor="middle" font-weight="700">Blocking Pool (max 8)</text>
+
+      <rect x="558" y="50" width="178" height="52" rx="5" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="647" y="66" font-family="Inter,sans-serif" font-size="8" fill="#E8EDF3" text-anchor="middle" font-weight="600">GGUF Model Loading</text>
+      <text x="647" y="80" font-family="JetBrains Mono,monospace" font-size="7" fill="#A7B0BC" text-anchor="middle">disk I/O + memory map</text>
+      <text x="647" y="93" font-family="JetBrains Mono,monospace" font-size="7" fill="#A7B0BC" text-anchor="middle">tokenizer init</text>
+
+      <rect x="558" y="112" width="178" height="52" rx="5" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="647" y="128" font-family="Inter,sans-serif" font-size="8" fill="#E8EDF3" text-anchor="middle" font-weight="600">Inference Forward Pass</text>
+      <text x="647" y="142" font-family="JetBrains Mono,monospace" font-size="7" fill="#A7B0BC" text-anchor="middle">CPU: rayon BLAS</text>
+      <text x="647" y="155" font-family="JetBrains Mono,monospace" font-size="7" fill="#A7B0BC" text-anchor="middle">token sampling loop</text>
+
+      <rect x="558" y="174" width="178" height="52" rx="5" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="647" y="190" font-family="Inter,sans-serif" font-size="8" fill="#E8EDF3" text-anchor="middle" font-weight="600">SurrealDB RocksDB</text>
+      <text x="647" y="204" font-family="JetBrains Mono,monospace" font-size="7" fill="#A7B0BC" text-anchor="middle">vector search · graph ops</text>
+      <text x="647" y="217" font-family="JetBrains Mono,monospace" font-size="7" fill="#A7B0BC" text-anchor="middle">memory writes / reads</text>
+
+      <rect x="558" y="236" width="178" height="42" rx="5" fill="#18212E" stroke="#2B3F55" stroke-width="1" stroke-dasharray="3,2"/>
+      <text x="647" y="252" font-family="Inter,sans-serif" font-size="8" fill="#A7B0BC" text-anchor="middle" font-weight="600">Metal Command Queue</text>
+      <text x="647" y="265" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">iOS/macOS GPU dispatch</text>
+      <text x="647" y="278" font-family="JetBrains Mono,monospace" font-size="6.5" fill="#5C6B7A" text-anchor="middle">(outside Tokio, async GPU)</text>
+    </svg>
+    <div class="diagram-caption">Figure 2 — Three-Context Threading Model: Flutter Main · Tokio Workers · Blocking Pool</div>
+  </div>
+
+  <table class="spec-table">
+    <thead>
+      <tr><th>Context</th><th>Thread Count</th><th>Work Profile</th><th>Back-Pressure</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Flutter main / Dart event loop</td>
+        <td>1 (+ Dart isolates)</td>
+        <td>Widget render, reactive state, GC</td>
+        <td>mpsc channel(256) → parks Rust</td>
+      </tr>
+      <tr>
+        <td>Tokio worker pool</td>
+        <td>cpu_count − 1</td>
+        <td>SSE I/O, protocol adaptation, HTTP, agent loop</td>
+        <td>Tokio back-pressure + bounded channels</td>
+      </tr>
+      <tr>
+        <td>Tokio blocking pool</td>
+        <td>max 8</td>
+        <td>GGUF loading, tensor math, RocksDB I/O</td>
+        <td>spawn_blocking queue depth</td>
+      </tr>
+      <tr>
+        <td>Metal command queue (iOS)</td>
+        <td>GPU async</td>
+        <td>candle Metal dispatch for forward pass</td>
+        <td>GPU command buffer</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+
+<!-- ══════════════════════════════════════════════
+     05 — CONTENT BLOCK SYSTEM
+══════════════════════════════════════════════ -->
+<section class="section" id="content-blocks">
+  <div class="section-eyebrow"><span class="section-num">05</span> Content Blocks</div>
+  <h2>Content Block System</h2>
+  <div class="divider"></div>
+
+  <p>The <code>ContentBlock</code> sealed union is the central data primitive of the entire application. It is simultaneously the Dart model, the widget dispatch table, and the UI-layer projection of the A2UI protocol schema. Eleven variants, each mapped exhaustively to a dedicated widget by the compiler.</p>
+
+  <div class="callout">
+    <div class="callout-label">Compiler Invariant</div>
+    <p>Adding a new <code>ContentBlock</code> variant produces compile errors at: <code>MessageBubble._buildBlock()</code> and <code>A2uiContentDriver._handle()</code>. The compiler guides you to every location that needs updating — you cannot forget a case.</p>
+  </div>
+
+  <div class="diagram-wrap">
+    <svg viewBox="0 0 780 420" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">
+
+      <!-- Central sealed union -->
+      <rect x="280" y="170" width="220" height="80" rx="10" fill="#18212E" stroke="#FF6A3D" stroke-width="1.5"/>
+      <text x="390" y="200" font-family="Space Grotesk,sans-serif" font-size="12" fill="#FF6A3D" text-anchor="middle" font-weight="700">ContentBlock</text>
+      <text x="390" y="216" font-family="JetBrains Mono,monospace" font-size="8" fill="#A7B0BC" text-anchor="middle">sealed union · freezed</text>
+      <text x="390" y="230" font-family="JetBrains Mono,monospace" font-size="8" fill="#A7B0BC" text-anchor="middle">11 variants · compiler-exhaustive</text>
+
+      <!-- Block cells - row 1 -->
+      <rect x="10" y="10" width="130" height="72" rx="8" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="75" y="30" font-family="JetBrains Mono,monospace" font-size="9" fill="#E8EDF3" text-anchor="middle" font-weight="600">TextBlock</text>
+      <text x="75" y="46" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">text · isStreaming</text>
+      <text x="75" y="60" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">→ StreamingTextWidget</text>
+      <text x="75" y="73" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">→ GenUIMarkdown</text>
+
+      <rect x="10" y="98" width="130" height="72" rx="8" fill="#120E24" stroke="#8B78FF" stroke-width="1"/>
+      <text x="75" y="118" font-family="JetBrains Mono,monospace" font-size="9" fill="#8B78FF" text-anchor="middle" font-weight="600">ThinkingBlock</text>
+      <text x="75" y="134" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">thinking · isStreaming</text>
+      <text x="75" y="148" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">→ ThinkingBlockWidget</text>
+      <text x="75" y="161" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">pulse dot · collapsible</text>
+
+      <rect x="10" y="186" width="130" height="72" rx="8" fill="#0A0A14" stroke="#2C2C50" stroke-width="1"/>
+      <text x="75" y="206" font-family="JetBrains Mono,monospace" font-size="9" fill="#E8EDF3" text-anchor="middle" font-weight="600">CodeBlock</text>
+      <text x="75" y="222" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">code · language · filename</text>
+      <text x="75" y="236" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">→ CodeBlockWidget</text>
+      <text x="75" y="249" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">highlight.js · copy button</text>
+
+      <rect x="10" y="274" width="130" height="72" rx="8" fill="#0C1A28" stroke="#22D3EE" stroke-width="1"/>
+      <text x="75" y="294" font-family="JetBrains Mono,monospace" font-size="9" fill="#22D3EE" text-anchor="middle" font-weight="600">CitationBlock</text>
+      <text x="75" y="310" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">text · sources[]</text>
+      <text x="75" y="324" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">→ CitationBlockWidget</text>
+      <text x="75" y="337" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">source chips · score</text>
+
+      <rect x="10" y="362" width="130" height="50" rx="8" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="75" y="381" font-family="JetBrains Mono,monospace" font-size="9" fill="#E8EDF3" text-anchor="middle" font-weight="600">ImageBlock</text>
+      <text x="75" y="397" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">source · altText · ratio</text>
+
+      <!-- Row 2 — right side -->
+      <rect x="640" y="10" width="130" height="72" rx="8" fill="#1A140A" stroke="#F5A623" stroke-width="1"/>
+      <text x="705" y="30" font-family="JetBrains Mono,monospace" font-size="9" fill="#F5A623" text-anchor="middle" font-weight="600">MemoryBlock</text>
+      <text x="705" y="46" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">key · type · isNew · ns</text>
+      <text x="705" y="60" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">→ MemoryBlockWidget</text>
+      <text x="705" y="73" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">type icon · recall badge</text>
+
+      <rect x="640" y="98" width="130" height="72" rx="8" fill="#0E1A12" stroke="#34D399" stroke-width="1"/>
+      <text x="705" y="118" font-family="JetBrains Mono,monospace" font-size="9" fill="#34D399" text-anchor="middle" font-weight="600">ToolUseBlock</text>
+      <text x="705" y="134" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">toolName · input · status</text>
+      <text x="705" y="148" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">→ ToolUseBlockWidget</text>
+      <text x="705" y="161" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">expand JSON · spin icon</text>
+
+      <rect x="640" y="186" width="130" height="72" rx="8" fill="#0E1A12" stroke="#34D399" stroke-width="1"/>
+      <text x="705" y="206" font-family="JetBrains Mono,monospace" font-size="9" fill="#34D399" text-anchor="middle" font-weight="600">ToolResultBlock</text>
+      <text x="705" y="222" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">content · isError · time</text>
+      <text x="705" y="236" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">→ ToolResultBlockWidget</text>
+      <text x="705" y="249" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">elapsed · error tint</text>
+
+      <rect x="640" y="274" width="130" height="72" rx="8" fill="#0F1A1A" stroke="#38BDF8" stroke-width="1"/>
+      <text x="705" y="294" font-family="JetBrains Mono,monospace" font-size="9" fill="#38BDF8" text-anchor="middle" font-weight="600">SkillBlock</text>
+      <text x="705" y="310" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">skillName · status · tools</text>
+      <text x="705" y="324" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">→ SkillBlockWidget</text>
+      <text x="705" y="337" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">orbit icon · progress bar</text>
+
+      <rect x="640" y="362" width="130" height="50" rx="8" fill="#14100A" stroke="#FB923C" stroke-width="1"/>
+      <text x="705" y="381" font-family="JetBrains Mono,monospace" font-size="9" fill="#FB923C" text-anchor="middle" font-weight="600">ArtifactBlock</text>
+      <text x="705" y="397" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">type · contentJson · lang</text>
+
+      <!-- Connection lines left side -->
+      <line x1="142" y1="46" x2="280" y2="200" stroke="#2B3F55" stroke-width="1"/>
+      <line x1="142" y1="134" x2="280" y2="200" stroke="#2B3F55" stroke-width="1"/>
+      <line x1="142" y1="222" x2="280" y2="210" stroke="#2B3F55" stroke-width="1"/>
+      <line x1="142" y1="310" x2="280" y2="220" stroke="#2B3F55" stroke-width="1"/>
+      <line x1="142" y1="387" x2="280" y2="230" stroke="#2B3F55" stroke-width="1"/>
+
+      <!-- Connection lines right side -->
+      <line x1="638" y1="46" x2="500" y2="200" stroke="#2B3F55" stroke-width="1"/>
+      <line x1="638" y1="134" x2="500" y2="200" stroke="#2B3F55" stroke-width="1"/>
+      <line x1="638" y1="222" x2="500" y2="210" stroke="#2B3F55" stroke-width="1"/>
+      <line x1="638" y1="310" x2="500" y2="220" stroke="#2B3F55" stroke-width="1"/>
+      <line x1="638" y1="387" x2="500" y2="230" stroke="#2B3F55" stroke-width="1"/>
+
+      <!-- DividerBlock bottom center -->
+      <rect x="325" y="275" width="130" height="42" rx="8" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="390" y="294" font-family="JetBrains Mono,monospace" font-size="9" fill="#E8EDF3" text-anchor="middle" font-weight="600">DividerBlock</text>
+      <text x="390" y="308" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">→ styled hr separator</text>
+      <line x1="390" y1="250" x2="390" y2="273" stroke="#2B3F55" stroke-width="1"/>
+    </svg>
+    <div class="diagram-caption">Figure 3 — ContentBlock Sealed Union: 11 Variants · Each Variant = One Widget</div>
+  </div>
+
+  <table class="spec-table">
+    <thead>
+      <tr><th>Variant</th><th>A2UI Source Event</th><th>Widget Class</th><th>Key Features</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>TextBlock</td>
+        <td><code>TextDelta</code></td>
+        <td>StreamingTextWidget → GenUIMarkdown</td>
+        <td>Blinking cursor while streaming; full markdown on complete</td>
+      </tr>
+      <tr>
+        <td>ThinkingBlock</td>
+        <td><code>ThinkingDelta</code></td>
+        <td>ThinkingBlockWidget</td>
+        <td>Pulsing dot, collapsible, italic prose</td>
+      </tr>
+      <tr>
+        <td>CodeBlock</td>
+        <td><code>CodeBlock</code></td>
+        <td>CodeBlockWidget</td>
+        <td>highlight.js 30+ languages, copy, filename badge</td>
+      </tr>
+      <tr>
+        <td>CitationBlock</td>
+        <td><code>CitationBlock</code></td>
+        <td>CitationBlockWidget</td>
+        <td>Source chips, relevance score, external link</td>
+      </tr>
+      <tr>
+        <td>MemoryBlock</td>
+        <td><code>MemoryWrite / MemoryRead</code></td>
+        <td>MemoryBlockWidget</td>
+        <td>Type icon (episodic/semantic/working/procedural), new/recall badge, namespace</td>
+      </tr>
+      <tr>
+        <td>ToolUseBlock</td>
+        <td><code>ToolCallStarted / Complete</code></td>
+        <td>ToolUseBlockWidget</td>
+        <td>Status enum, expandable JSON input, spin animation for running</td>
+      </tr>
+      <tr>
+        <td>ToolResultBlock</td>
+        <td><code>ToolResultReceived</code></td>
+        <td>ToolResultBlockWidget</td>
+        <td>Execution time, error tint, JSON/text content</td>
+      </tr>
+      <tr>
+        <td>SkillBlock</td>
+        <td><code>SkillActivated / SkillComplete</code></td>
+        <td>SkillBlockWidget</td>
+        <td>Orbit icon, progress bar, output summary, tool call count</td>
+      </tr>
+      <tr>
+        <td>ArtifactBlock</td>
+        <td><code>ArtifactBlock</code></td>
+        <td>ArtifactBlockWidget</td>
+        <td>Type router (code/data/document/UI), full-screen expand, copy</td>
+      </tr>
+      <tr>
+        <td>ImageBlock</td>
+        <td>inline image</td>
+        <td>_ImageBlock</td>
+        <td>URL/base64, aspect ratio, alt text</td>
+      </tr>
+      <tr>
+        <td>DividerBlock</td>
+        <td>separator sentinel</td>
+        <td>styled Divider</td>
+        <td>Token-matched border color</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     06 — A2UI PROTOCOL
+══════════════════════════════════════════════ -->
+<section class="section" id="a2ui-protocol">
+  <div class="section-eyebrow"><span class="section-num">06</span> Protocols</div>
+  <h2>A2UI Protocol</h2>
+  <div class="divider"></div>
+
+  <p>A2UI (Agent-to-UI &#8212; gen_ui&#8217;s internal protocol; <em>not</em> Google&#8217;s A2UI standard at a2ui.org &#8212; see <code>docs/corrections-2026-07-16.md</code>) is the semantic event envelope that sits above the raw Anthropic SSE stream. Where raw SSE delivers <code>content_block_delta</code> bytes, A2UI delivers structured, named events with typed payloads that map 1:1 to renderable UI blocks.</p>
+
+  <div class="diagram-wrap">
+    <svg viewBox="0 0 760 380" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">
+      <defs>
+        <marker id="arr3" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L7,3 z" fill="#5C6B7A"/>
+        </marker>
+        <marker id="arr3e" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L7,3 z" fill="#FF6A3D"/>
+        </marker>
+      </defs>
+
+      <!-- Anthropic API -->
+      <rect x="10" y="140" width="120" height="60" rx="8" fill="#141C26" stroke="#2B3F55" stroke-width="1"/>
+      <text x="70" y="166" font-family="Inter,sans-serif" font-size="9" fill="#E8EDF3" text-anchor="middle" font-weight="700">Anthropic</text>
+      <text x="70" y="180" font-family="Inter,sans-serif" font-size="9" fill="#E8EDF3" text-anchor="middle" font-weight="700">Messages API</text>
+      <text x="70" y="193" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">SSE stream</text>
+
+      <!-- SSE parser -->
+      <line x1="132" y1="170" x2="168" y2="170" stroke="#5C6B7A" stroke-width="1" marker-end="url(#arr3)"/>
+      <rect x="170" y="130" width="120" height="80" rx="8" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="230" y="158" font-family="Inter,sans-serif" font-size="9" fill="#E8EDF3" text-anchor="middle" font-weight="700">streaming.rs</text>
+      <text x="230" y="172" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">parse_anthropic</text>
+      <text x="230" y="184" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">_event()</text>
+      <text x="230" y="198" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">StreamEvent enum</text>
+
+      <!-- A2UI adapter -->
+      <line x1="292" y1="170" x2="328" y2="170" stroke="#5C6B7A" stroke-width="1" marker-end="url(#arr3)"/>
+      <rect x="330" y="120" width="140" height="100" rx="8" fill="#18212E" stroke="#FF6A3D" stroke-width="1.5"/>
+      <text x="400" y="148" font-family="Inter,sans-serif" font-size="9" fill="#FF6A3D" text-anchor="middle" font-weight="700">A2uiAdapter</text>
+      <text x="400" y="162" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">ingest(StreamEvent)</text>
+      <text x="400" y="175" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">→ Vec&lt;A2uiEvent&gt;</text>
+      <text x="400" y="188" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">stateful block accumulator</text>
+      <text x="400" y="200" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">tool_map: HashMap&lt;u32,usize&gt;</text>
+
+      <!-- FFI -->
+      <line x1="472" y1="170" x2="508" y2="170" stroke="#FF6A3D" stroke-width="1.5" marker-end="url(#arr3e)"/>
+      <text x="490" y="163" font-family="JetBrains Mono,monospace" font-size="6.5" fill="#FF6A3D" text-anchor="middle">FFI</text>
+
+      <!-- Dart sealed -->
+      <rect x="510" y="120" width="140" height="100" rx="8" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="580" y="148" font-family="Inter,sans-serif" font-size="9" fill="#E8EDF3" text-anchor="middle" font-weight="700">A2uiEvent</text>
+      <text x="580" y="162" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">Dart sealed class</text>
+      <text x="580" y="175" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">27 variants</text>
+      <text x="580" y="188" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">fromFrb() factory</text>
+      <text x="580" y="200" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">JSON deserialization</text>
+
+      <!-- Content driver -->
+      <line x1="652" y1="170" x2="688" y2="170" stroke="#5C6B7A" stroke-width="1" marker-end="url(#arr3)"/>
+      <rect x="690" y="120" width="60" height="100" rx="8" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="720" y="148" font-family="Inter,sans-serif" font-size="7.5" fill="#E8EDF3" text-anchor="middle" font-weight="700">Content</text>
+      <text x="720" y="161" font-family="Inter,sans-serif" font-size="7.5" fill="#E8EDF3" text-anchor="middle" font-weight="700">Driver</text>
+      <text x="720" y="176" font-family="JetBrains Mono,monospace" font-size="6.5" fill="#A7B0BC" text-anchor="middle">_blockIndex</text>
+      <text x="720" y="188" font-family="JetBrains Mono,monospace" font-size="6.5" fill="#A7B0BC" text-anchor="middle">_blockTexts</text>
+      <text x="720" y="200" font-family="JetBrains Mono,monospace" font-size="6.5" fill="#5C6B7A" text-anchor="middle">→ CB</text>
+
+      <!-- A2UI event types grid -->
+      <text x="50" y="270" font-family="JetBrains Mono,monospace" font-size="8" fill="#FF6A3D" letter-spacing="1">A2UI EVENT TYPES — 27 variants</text>
+
+      <rect x="10" y="280" width="108" height="22" rx="4" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="64" y="295" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">RunStarted</text>
+
+      <rect x="124" y="280" width="108" height="22" rx="4" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="178" y="295" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">RunFinished</text>
+
+      <rect x="238" y="280" width="108" height="22" rx="4" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="292" y="295" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">RunError</text>
+
+      <rect x="352" y="280" width="108" height="22" rx="4" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="406" y="295" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">TextDelta</text>
+
+      <rect x="466" y="280" width="108" height="22" rx="4" fill="#120E24" stroke="#8B78FF" stroke-width="1"/>
+      <text x="520" y="295" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#8B78FF" text-anchor="middle">ThinkingDelta</text>
+
+      <rect x="580" y="280" width="108" height="22" rx="4" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="634" y="295" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">CodeBlock</text>
+
+      <rect x="10" y="310" width="108" height="22" rx="4" fill="#0E1A12" stroke="#34D399" stroke-width="1"/>
+      <text x="64" y="325" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#34D399" text-anchor="middle">ToolCallStarted</text>
+
+      <rect x="124" y="310" width="108" height="22" rx="4" fill="#0E1A12" stroke="#34D399" stroke-width="1"/>
+      <text x="178" y="325" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#34D399" text-anchor="middle">ToolCallComplete</text>
+
+      <rect x="238" y="310" width="108" height="22" rx="4" fill="#0E1A12" stroke="#34D399" stroke-width="1"/>
+      <text x="292" y="325" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#34D399" text-anchor="middle">ToolResultReceived</text>
+
+      <rect x="352" y="310" width="108" height="22" rx="4" fill="#0C1A28" stroke="#22D3EE" stroke-width="1"/>
+      <text x="406" y="325" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#22D3EE" text-anchor="middle">CitationBlock</text>
+
+      <rect x="466" y="310" width="108" height="22" rx="4" fill="#1A140A" stroke="#F5A623" stroke-width="1"/>
+      <text x="520" y="325" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#F5A623" text-anchor="middle">MemoryWrite</text>
+
+      <rect x="580" y="310" width="108" height="22" rx="4" fill="#1A140A" stroke="#F5A623" stroke-width="1"/>
+      <text x="634" y="325" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#F5A623" text-anchor="middle">MemoryRead</text>
+
+      <rect x="10" y="340" width="108" height="22" rx="4" fill="#0F1A1A" stroke="#38BDF8" stroke-width="1"/>
+      <text x="64" y="355" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#38BDF8" text-anchor="middle">SkillActivated</text>
+
+      <rect x="124" y="340" width="108" height="22" rx="4" fill="#0F1A1A" stroke="#38BDF8" stroke-width="1"/>
+      <text x="178" y="355" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#38BDF8" text-anchor="middle">SkillComplete</text>
+
+      <rect x="238" y="340" width="108" height="22" rx="4" fill="#14100A" stroke="#FB923C" stroke-width="1"/>
+      <text x="292" y="355" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#FB923C" text-anchor="middle">ArtifactBlock</text>
+
+      <rect x="352" y="340" width="108" height="22" rx="4" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="406" y="355" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">StateSnapshot</text>
+
+      <rect x="466" y="340" width="108" height="22" rx="4" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="520" y="355" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">StateDelta</text>
+
+      <rect x="580" y="340" width="108" height="22" rx="4" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="634" y="355" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">+9 more variants</text>
+    </svg>
+    <div class="diagram-caption">Figure 4 — A2UI Pipeline: SSE → StreamEvent → A2uiAdapter → FFI → Dart → ContentBlock</div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     07 — AG-UI PROTOCOL
+══════════════════════════════════════════════ -->
+<section class="section" id="agui-protocol">
+  <div class="section-eyebrow"><span class="section-num">07</span> Protocols</div>
+  <h2>AG-UI Protocol — Bidirectional</h2>
+  <div class="divider"></div>
+
+  <p>AG-UI (CopilotKit open standard) extends A2UI with bidirectionality. Where A2UI is agent→UI only, AG-UI supports <em>frontend→agent</em> events: interrupts, confirmations, state requests. The <code>AguiClient</code> Riverpod notifier is the Flutter-side owner of agent state, pending confirmations, and generative UI render slots.</p>
+
+  <div class="diagram-wrap">
+    <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">
+      <defs>
+        <marker id="arr4" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L7,3 z" fill="#5C6B7A"/>
+        </marker>
+        <marker id="arr4r" markerWidth="7" markerHeight="7" refX="2" refY="3" orient="auto">
+          <path d="M7,0 L7,6 L0,3 z" fill="#5C6B7A"/>
+        </marker>
+      </defs>
+
+      <!-- Agent (Rust) -->
+      <rect x="10" y="60" width="200" height="180" rx="10" fill="#0F1620" stroke="#2B3F55" stroke-width="1"/>
+      <text x="110" y="84" font-family="Inter,sans-serif" font-size="10" fill="#E8EDF3" text-anchor="middle" font-weight="700">Agent Runtime (Rust)</text>
+      <rect x="24" y="95" width="172" height="30" rx="5" fill="#141C26" stroke="#1E2D3F"/>
+      <text x="110" y="114" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">AguiAdapter::translate()</text>
+      <rect x="24" y="135" width="172" height="30" rx="5" fill="#141C26" stroke="#1E2D3F"/>
+      <text x="110" y="154" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">broadcast::Sender&lt;AguiEvent&gt;</text>
+      <rect x="24" y="175" width="172" height="30" rx="5" fill="#0E1A12" stroke="#34D399" stroke-width="1"/>
+      <text x="110" y="194" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#34D399" text-anchor="middle">ConfirmationRequest park</text>
+      <rect x="24" y="215" width="172" height="18" rx="5" fill="#141C26" stroke="#1E2D3F"/>
+      <text x="110" y="228" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">oneshot::Receiver&lt;String&gt;</text>
+
+      <!-- Agent → Flutter arrows (downstream) -->
+      <line x1="212" y1="110" x2="268" y2="110" stroke="#5C6B7A" stroke-width="1" marker-end="url(#arr4)"/>
+      <line x1="212" y1="150" x2="268" y2="150" stroke="#5C6B7A" stroke-width="1" marker-end="url(#arr4)"/>
+      <line x1="212" y1="190" x2="268" y2="190" stroke="#5C6B7A" stroke-width="1" marker-end="url(#arr4)"/>
+
+      <!-- Flutter → Agent arrows (upstream) -->
+      <line x1="268" y1="240" x2="212" y2="240" stroke="#FF6A3D" stroke-width="1.5" marker-end="url(#arr4r)"/>
+      <text x="240" y="233" font-family="JetBrains Mono,monospace" font-size="6.5" fill="#FF6A3D" text-anchor="middle">bidirectional</text>
+
+      <!-- FFI bridge center -->
+      <rect x="270" y="80" width="80" height="180" rx="5" fill="#141C26" stroke="#FF6A3D" stroke-width="1" stroke-dasharray="4,2"/>
+      <text x="310" y="165" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#FF6A3D" text-anchor="middle" writing-mode="tb">frb StreamSink</text>
+
+      <!-- Flutter AguiClient -->
+      <rect x="360" y="60" width="200" height="180" rx="10" fill="#0F1620" stroke="#2B3F55" stroke-width="1"/>
+      <text x="460" y="84" font-family="Inter,sans-serif" font-size="10" fill="#E8EDF3" text-anchor="middle" font-weight="700">AguiClient (Flutter)</text>
+      <rect x="374" y="95" width="172" height="30" rx="5" fill="#141C26" stroke="#1E2D3F"/>
+      <text x="460" y="114" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">agentState: Map&lt;String, dynamic&gt;</text>
+      <rect x="374" y="135" width="172" height="30" rx="5" fill="#1A140A" stroke="#F5A623" stroke-width="1"/>
+      <text x="460" y="154" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#F5A623" text-anchor="middle">pendingConfirmations: List</text>
+      <rect x="374" y="175" width="172" height="30" rx="5" fill="#0F1A1A" stroke="#38BDF8" stroke-width="1"/>
+      <text x="460" y="194" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#38BDF8" text-anchor="middle">renderSlots: Map&lt;String, Comp&gt;</text>
+      <rect x="374" y="215" width="172" height="18" rx="5" fill="#18212E" stroke="#FF6A3D" stroke-width="1"/>
+      <text x="460" y="228" font-family="JetBrains Mono,monospace" font-size="7" fill="#FF6A3D" text-anchor="middle">aguiSendClientEvent(json)</text>
+
+      <!-- Downstream components -->
+      <rect x="578" y="75" width="162" height="50" rx="8" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="659" y="96" font-family="Inter,sans-serif" font-size="9" fill="#E8EDF3" text-anchor="middle" font-weight="700">StateSnapshot / StateDelta</text>
+      <text x="659" y="110" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">RFC 6902 JSON Patch applied locally</text>
+      <line x1="562" y1="100" x2="576" y2="100" stroke="#5C6B7A" stroke-width="1" marker-end="url(#arr4)"/>
+
+      <rect x="578" y="140" width="162" height="50" rx="8" fill="#141C26" stroke="#F5A623" stroke-width="1"/>
+      <text x="659" y="161" font-family="Inter,sans-serif" font-size="9" fill="#F5A623" text-anchor="middle" font-weight="700">ConfirmationOverlay</text>
+      <text x="659" y="175" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">showDialog → confirm() → resume</text>
+      <line x1="562" y1="165" x2="576" y2="165" stroke="#5C6B7A" stroke-width="1" marker-end="url(#arr4)"/>
+
+      <rect x="578" y="205" width="162" height="50" rx="8" fill="#141C26" stroke="#38BDF8" stroke-width="1"/>
+      <text x="659" y="226" font-family="Inter,sans-serif" font-size="9" fill="#38BDF8" text-anchor="middle" font-weight="700">AguiRenderSlot</text>
+      <text x="659" y="240" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">registry map → ComponentBuilder</text>
+      <line x1="562" y1="230" x2="576" y2="230" stroke="#5C6B7A" stroke-width="1" marker-end="url(#arr4)"/>
+    </svg>
+    <div class="diagram-caption">Figure 5 — AG-UI Bidirectional Protocol: Agent State · Confirmations · Generative UI Slots</div>
+  </div>
+
+  <h3>Human-in-the-Loop Pattern</h3>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Agent signals confirmation needed</div>
+        <div class="step-desc">Before executing a destructive action, the agent emits <code>A2uiConfirmationRequest</code> with a prompt and option list. The Rust runtime parks a <code>oneshot::Receiver&lt;String&gt;</code> in a <code>DashMap</code> keyed by <code>confirmation_id</code>.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Flutter renders confirmation dialog</div>
+        <div class="step-desc"><code>AguiConfirmationOverlay</code> listens to the <code>AguiClient</code> provider. When a new confirmation arrives, <code>showDialog()</code> is called with the options. No polling, no timers — pure reactive.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">User responds</div>
+        <div class="step-desc"><code>AguiClient.confirm(id, option)</code> calls <code>ffi.aguiSendClientEvent()</code>, which routes to the Rust <code>AguiClientEventRouter</code>, resolves the oneshot, and resumes the PMPO loop.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-title">Agent loop resumes</div>
+        <div class="step-desc">The confirmation is appended to the conversation as a tool result. The next agent turn has full context of what was approved. No blocking thread was held during the wait.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════
+     08 — PROTOCOL PIPELINE
+══════════════════════════════════════════════ -->
+<section class="section" id="protocol-pipeline">
+  <div class="section-eyebrow"><span class="section-num">08</span> Protocols</div>
+  <h2>Dual Protocol Pipeline</h2>
+  <div class="divider"></div>
+
+  <p>The <code>ProtocolPipeline</code> drives a single <code>mpsc::Receiver&lt;StreamEvent&gt;</code> through both adapters sequentially. A2UI events are produced first (no re-parsing), then passed directly to <code>AguiAdapter::translate()</code>. Two <code>broadcast</code> channels fan out to any number of subscribers with zero duplication.</p>
+
+  <div class="diagram-wrap">
+    <svg viewBox="0 0 760 240" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">
+      <defs>
+        <marker id="arr5" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L7,3 z" fill="#5C6B7A"/>
+        </marker>
+        <marker id="arr5e" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L7,3 z" fill="#FF6A3D"/>
+        </marker>
+      </defs>
+
+      <!-- Agent raw output -->
+      <rect x="10" y="90" width="100" height="60" rx="8" fill="#141C26" stroke="#2B3F55" stroke-width="1"/>
+      <text x="60" y="116" font-family="Inter,sans-serif" font-size="8.5" fill="#E8EDF3" text-anchor="middle" font-weight="700">Agent</text>
+      <text x="60" y="130" font-family="Inter,sans-serif" font-size="8.5" fill="#E8EDF3" text-anchor="middle" font-weight="700">Runtime</text>
+      <text x="60" y="144" font-family="JetBrains Mono,monospace" font-size="6.5" fill="#5C6B7A" text-anchor="middle">Sender&lt;StreamEvent&gt;</text>
+      <line x1="112" y1="120" x2="148" y2="120" stroke="#5C6B7A" stroke-width="1" marker-end="url(#arr5)"/>
+
+      <!-- Protocol pipeline box -->
+      <rect x="150" y="20" width="360" height="200" rx="10" fill="#0F1620" stroke="#2B3F55" stroke-width="1"/>
+      <text x="330" y="44" font-family="Inter,sans-serif" font-size="9" fill="#E8EDF3" text-anchor="middle" font-weight="700">ProtocolPipeline::drive()</text>
+
+      <!-- StreamEvent receiver -->
+      <rect x="164" y="56" width="110" height="42" rx="6" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="219" y="75" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">mpsc::Receiver</text>
+      <text x="219" y="88" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">&lt;StreamEvent&gt;</text>
+      <line x1="276" y1="77" x2="298" y2="77" stroke="#5C6B7A" stroke-width="1" marker-end="url(#arr5)"/>
+
+      <!-- A2UI Adapter -->
+      <rect x="300" y="56" width="100" height="42" rx="6" fill="#18212E" stroke="#FF6A3D" stroke-width="1.5"/>
+      <text x="350" y="75" font-family="Inter,sans-serif" font-size="8.5" fill="#FF6A3D" text-anchor="middle" font-weight="700">A2uiAdapter</text>
+      <text x="350" y="88" font-family="JetBrains Mono,monospace" font-size="7" fill="#A7B0BC" text-anchor="middle">ingest()</text>
+
+      <line x1="350" y1="100" x2="350" y2="122" stroke="#5C6B7A" stroke-width="1" marker-end="url(#arr5)"/>
+
+      <!-- AG-UI Adapter -->
+      <rect x="300" y="124" width="100" height="42" rx="6" fill="#141C26" stroke="#22D3EE" stroke-width="1"/>
+      <text x="350" y="143" font-family="Inter,sans-serif" font-size="8.5" fill="#22D3EE" text-anchor="middle" font-weight="700">AguiAdapter</text>
+      <text x="350" y="156" font-family="JetBrains Mono,monospace" font-size="7" fill="#A7B0BC" text-anchor="middle">translate()</text>
+
+      <!-- A2UI broadcast out -->
+      <line x1="402" y1="77" x2="426" y2="77" stroke="#FF6A3D" stroke-width="1.5" marker-end="url(#arr5e)"/>
+      <rect x="428" y="56" width="72" height="42" rx="6" fill="#141C26" stroke="#FF6A3D" stroke-width="1"/>
+      <text x="464" y="73" font-family="JetBrains Mono,monospace" font-size="7" fill="#FF6A3D" text-anchor="middle">broadcast</text>
+      <text x="464" y="86" font-family="JetBrains Mono,monospace" font-size="7" fill="#FF6A3D" text-anchor="middle">A2uiEvent</text>
+
+      <!-- AG-UI broadcast out -->
+      <line x1="402" y1="145" x2="426" y2="145" stroke="#22D3EE" stroke-width="1" marker-end="url(#arr5)"/>
+      <rect x="428" y="124" width="72" height="42" rx="6" fill="#141C26" stroke="#22D3EE" stroke-width="1"/>
+      <text x="464" y="141" font-family="JetBrains Mono,monospace" font-size="7" fill="#22D3EE" text-anchor="middle">broadcast</text>
+      <text x="464" y="154" font-family="JetBrains Mono,monospace" font-size="7" fill="#22D3EE" text-anchor="middle">AguiEvent</text>
+
+      <!-- Flutter subscribers -->
+      <line x1="512" y1="77" x2="548" y2="77" stroke="#FF6A3D" stroke-width="1.5" marker-end="url(#arr5e)"/>
+      <rect x="550" y="56" width="150" height="42" rx="6" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="625" y="74" font-family="Inter,sans-serif" font-size="8" fill="#E8EDF3" text-anchor="middle" font-weight="600">Flutter A2uiContentDriver</text>
+      <text x="625" y="87" font-family="JetBrains Mono,monospace" font-size="6.5" fill="#5C6B7A" text-anchor="middle">→ ContentBlock mutations</text>
+
+      <line x1="512" y1="145" x2="548" y2="145" stroke="#22D3EE" stroke-width="1" marker-end="url(#arr5)"/>
+      <rect x="550" y="124" width="150" height="42" rx="6" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="625" y="141" font-family="Inter,sans-serif" font-size="8" fill="#E8EDF3" text-anchor="middle" font-weight="600">Flutter AguiClient</text>
+      <text x="625" y="154" font-family="JetBrains Mono,monospace" font-size="6.5" fill="#5C6B7A" text-anchor="middle">→ state · confirm · slots</text>
+
+      <!-- Optional web consumer -->
+      <line x1="512" y1="77" x2="530" y2="195" stroke="#FF6A3D" stroke-width="0.75" stroke-dasharray="4,3"/>
+      <line x1="512" y1="145" x2="536" y2="195" stroke="#22D3EE" stroke-width="0.75" stroke-dasharray="4,3"/>
+      <rect x="550" y="192" width="150" height="26" rx="6" fill="#0A1020" stroke="#2B3F55" stroke-width="1" stroke-dasharray="3,2"/>
+      <text x="625" y="208" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">optional: HTTP SSE / CopilotKit</text>
+    </svg>
+    <div class="diagram-caption">Figure 6 — Dual Protocol Pipeline: one stream, two adapters, broadcast to N subscribers</div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     09 — LOCAL INFERENCE
+══════════════════════════════════════════════ -->
+<section class="section" id="inference">
+  <div class="section-eyebrow"><span class="section-num">09</span> Infrastructure</div>
+  <h2>Local Inference Engine</h2>
+  <div class="divider"></div>
+
+  <p>On-device LLM inference using candle with GGUF quantized models downloaded from HuggingFace Hub. Metal-accelerated on Apple Silicon; rayon BLAS multi-core on Android. The inference loop runs entirely on the Tokio blocking thread pool — never touching the SSE event loop.</p>
+
+  <h3>Supported Models</h3>
+  <table class="spec-table">
+    <thead>
+      <tr><th>Model ID</th><th>HF Repository</th><th>GGUF Size</th><th>RAM Required</th><th>Best Use</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>qwen2_5_0_5b</td><td>Qwen/Qwen2.5-0.5B-Instruct-GGUF</td><td>~400 MB</td><td>~600 MB</td><td>Ultra-fast completions</td></tr>
+      <tr><td>qwen2_5_1_5b</td><td>Qwen/Qwen2.5-1.5B-Instruct-GGUF</td><td>~1.0 GB</td><td>~1.4 GB</td><td>Quality + speed balance</td></tr>
+      <tr><td>phi3_5_mini</td><td>bartowski/Phi-3.5-mini-instruct-GGUF</td><td>~2.2 GB</td><td>~3 GB</td><td>Best reasoning per size</td></tr>
+      <tr><td>llama3_2_1b</td><td>bartowski/Llama-3.2-1B-Instruct-GGUF</td><td>~650 MB</td><td>~900 MB</td><td>Llama family tasks</td></tr>
+      <tr><td>llama3_2_3b</td><td>bartowski/Llama-3.2-3B-Instruct-GGUF</td><td>~1.8 GB</td><td>~2.4 GB</td><td>Strong instruction following</td></tr>
+      <tr><td>gemma2_2b</td><td>bartowski/gemma-2-2b-it-GGUF</td><td>~1.5 GB</td><td>~2 GB</td><td>Google instruction model</td></tr>
+      <tr><td>smollm2_1_7b</td><td>HuggingFaceTB/SmolLM2-1.7B-Instruct-GGUF</td><td>~1.1 GB</td><td>~1.5 GB</td><td>Compact, capable</td></tr>
+    </tbody>
+  </table>
+
+  <p>All models use Q4_K_M quantization. Cached at platform HuggingFace default path. Download streams <code>DownloadEvent</code> progress to Dart via <code>StreamSink</code>.</p>
+
+  <h3>Chat Templates</h3>
+  <table class="spec-table">
+    <thead>
+      <tr><th>Template</th><th>Format</th><th>Used By</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>ChatML</td><td><code>&lt;|im_start|&gt;role\ncontent&lt;|im_end|&gt;</code></td><td>Qwen 2.5, SmolLM2</td></tr>
+      <tr><td>Llama3</td><td><code>&lt;|start_header_id|&gt;role…&lt;|eot_id|&gt;</code></td><td>Llama 3.2 1B / 3B</td></tr>
+      <tr><td>Phi3</td><td><code>&lt;|role|&gt;\ncontent&lt;|end|&gt;</code></td><td>Phi-3.5 Mini</td></tr>
+      <tr><td>Gemma</td><td><code>&lt;start_of_turn&gt;role\ncontent&lt;end_of_turn&gt;</code></td><td>Gemma 2 2B</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Sampling Pipeline</h3>
+  <p>Each token passes through: <strong>repeat penalty</strong> (penalizes recently generated tokens) → <strong>temperature scaling</strong> → <strong>softmax normalization</strong> → <strong>top-k filtering</strong> → <strong>top-p (nucleus) filtering</strong> → <strong>weighted random sample</strong>. All sampling runs synchronously on the blocking thread; tokens stream to Dart via bounded <code>mpsc::channel(256)</code>.</p>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     10 — SURREALDB
+══════════════════════════════════════════════ -->
+<section class="section" id="surrealdb">
+  <div class="section-eyebrow"><span class="section-num">10</span> Infrastructure</div>
+  <h2>SurrealDB Integration</h2>
+  <div class="divider"></div>
+
+  <p>SurrealDB with RocksDB backend runs embedded — no separate process, no network hop. Initialized once on app start from the <code>dataDir</code> passed to <code>initCore()</code>. Schema migration runs automatically on first open.</p>
+
+  <div class="diagram-wrap">
+    <svg viewBox="0 0 700 280" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">
+
+      <!-- Three stores -->
+      <rect x="10" y="50" width="200" height="200" rx="10" fill="#0F1620" stroke="#2B3F55" stroke-width="1"/>
+      <text x="110" y="74" font-family="Inter,sans-serif" font-size="10" fill="#E8EDF3" text-anchor="middle" font-weight="700">MemoryStore</text>
+      <rect x="24" y="85" width="172" height="26" rx="5" fill="#1A140A" stroke="#F5A623" stroke-width="1"/>
+      <text x="110" y="102" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#F5A623" text-anchor="middle">write(key, value, type, ns, emb)</text>
+      <rect x="24" y="119" width="172" height="26" rx="5" fill="#141C26" stroke="#1E2D3F"/>
+      <text x="110" y="136" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">read(key, namespace)</text>
+      <rect x="24" y="153" width="172" height="26" rx="5" fill="#141C26" stroke="#1E2D3F"/>
+      <text x="110" y="170" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">vector_search(query_emb, top_k)</text>
+      <rect x="24" y="187" width="172" height="26" rx="5" fill="#141C26" stroke="#1E2D3F"/>
+      <text x="110" y="204" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">search(query, namespace)</text>
+      <text x="110" y="232" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">episodic · semantic · working · procedural</text>
+
+      <rect x="250" y="50" width="200" height="200" rx="10" fill="#0F1620" stroke="#2B3F55" stroke-width="1"/>
+      <text x="350" y="74" font-family="Inter,sans-serif" font-size="10" fill="#E8EDF3" text-anchor="middle" font-weight="700">ToolCache</text>
+      <rect x="264" y="85" width="172" height="26" rx="5" fill="#0E1A12" stroke="#34D399" stroke-width="1"/>
+      <text x="350" y="102" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#34D399" text-anchor="middle">get(tool_name, input_hash)</text>
+      <rect x="264" y="119" width="172" height="26" rx="5" fill="#141C26" stroke="#1E2D3F"/>
+      <text x="350" y="136" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">set(name, hash, result, ttl)</text>
+      <text x="350" y="170" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">TTL-based expiry</text>
+      <text x="350" y="186" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">default: 300 seconds</text>
+      <text x="350" y="210" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">hash = DefaultHasher(input_json)</text>
+      <text x="350" y="224" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">reduces repeated MCP round-trips</text>
+
+      <rect x="490" y="50" width="200" height="200" rx="10" fill="#0F1620" stroke="#2B3F55" stroke-width="1"/>
+      <text x="590" y="74" font-family="Inter,sans-serif" font-size="10" fill="#E8EDF3" text-anchor="middle" font-weight="700">EntityGraph</text>
+      <rect x="504" y="85" width="172" height="26" rx="5" fill="#141C26" stroke="#8B78FF" stroke-width="1"/>
+      <text x="590" y="102" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#8B78FF" text-anchor="middle">upsert_entity(name, type, props, emb)</text>
+      <rect x="504" y="119" width="172" height="26" rx="5" fill="#141C26" stroke="#1E2D3F"/>
+      <text x="590" y="136" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">relate(from, relation, to, weight)</text>
+      <rect x="504" y="153" width="172" height="26" rx="5" fill="#141C26" stroke="#1E2D3F"/>
+      <text x="590" y="170" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">neighbors(name, depth)</text>
+      <text x="590" y="200" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#A7B0BC" text-anchor="middle">FETCH relates_to.N..</text>
+      <text x="590" y="216" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">depth-N graph traversal</text>
+      <text x="590" y="230" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">cosine similarity on embeddings</text>
+
+      <!-- SurrealDB foundation bar -->
+      <rect x="10" y="262" width="680" height="12" rx="6" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="350" y="272" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">SurrealDB 2.x — RocksDB backend — embedded in process — no separate daemon</text>
+
+      <!-- Single connection indicator -->
+      <rect x="305" y="22" width="90" height="20" rx="5" fill="#FF6A3D"/>
+      <text x="350" y="36" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#0B0F14" text-anchor="middle" font-weight="700">OnceCell&lt;Arc&lt;Surreal&gt;&gt;</text>
+    </svg>
+    <div class="diagram-caption">Figure 7 — SurrealDB: Three Access Patterns — Memory · Tool Cache · Entity Graph</div>
+  </div>
+
+  <h3>Schema Summary</h3>
+  <table class="spec-table">
+    <thead>
+      <tr><th>Table</th><th>Key Fields</th><th>Purpose</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>memory</td><td>key, value, memory_type, namespace, embedding</td><td>Agent memory — all four types + vector index</td></tr>
+      <tr><td>conversation</td><td>title, created_at, updated_at</td><td>Conversation thread metadata</td></tr>
+      <tr><td>message</td><td>conversation_id, role, content_json</td><td>Full message history with content JSON</td></tr>
+      <tr><td>tool_cache</td><td>tool_name, input_hash, result_json, expires_at</td><td>TTL-based tool result cache</td></tr>
+      <tr><td>entity</td><td>name, entity_type, properties, embedding</td><td>Graph nodes with optional embeddings</td></tr>
+      <tr><td>relates_to</td><td>weight, relation, properties</td><td>Graph edges (source → target)</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     11 — MCP CLIENT
+══════════════════════════════════════════════ -->
+<section class="section" id="mcp">
+  <div class="section-eyebrow"><span class="section-num">11</span> Infrastructure</div>
+  <h2>MCP Client Architecture</h2>
+  <div class="divider"></div>
+
+  <p>The MCP registry manages N servers simultaneously. Tool names are namespaced as <code>server_name::tool_name</code> to avoid collisions across servers. The agent runtime routes tool calls through the registry transparently — the PMPO loop has no knowledge of which server handled a call.</p>
+
+  <table class="spec-table">
+    <thead>
+      <tr><th>Transport</th><th>Protocol</th><th>Connection Pattern</th><th>Status</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>SSE Transport</td>
+        <td>GET {url}/sse → POST {endpoint}</td>
+        <td>Persistent SSE channel; JSON-RPC over POST. Responses return via SSE channel using request ID correlation.</td>
+        <td><span class="pill pill-success">Implemented</span></td>
+      </tr>
+      <tr>
+        <td>Stdio Transport</td>
+        <td>subprocess stdin/stdout</td>
+        <td>Spawn process, write JSON-RPC to stdin, read from stdout. Used for local MCP servers like filesystem, git.</td>
+        <td><span class="pill pill-warn">Stub — wire tokio::process</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Tool Name Routing</h3>
+  <pre><code><span class="cm">// Qualified call — explicit server</span>
+mcp_reg.call_tool(<span class="st">"tavily::web_search"</span>, args).await
+
+<span class="cm">// Unqualified — scans all servers for first match</span>
+mcp_reg.call_tool(<span class="st">"web_search"</span>, args).await
+
+<span class="cm">// Local Rust tool — no network hop, sub-microsecond</span>
+agent.register_tool(<span class="st">"memory_recall"</span>, <span class="st">"..."</span>, schema, |args| {
+    Ok(<span class="kw">format!</span>(<span class="st">"recalled: {:?}"</span>, args.get(<span class="st">"key"</span>)))
+});</code></pre>
+
+  <h3>Well-Known MCP Servers</h3>
+  <table class="spec-table">
+    <thead>
+      <tr><th>Server</th><th>URL</th><th>Capability</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Tavily</td><td>https://mcp.tavily.com/mcp</td><td>Web search with citations</td></tr>
+      <tr><td>Filesystem</td><td>http://localhost:3000/mcp</td><td>File read/write/list</td></tr>
+      <tr><td>Supabase</td><td>http://localhost:54321/mcp</td><td>Database queries</td></tr>
+      <tr><td>SurrealDB</td><td>local (db/ module)</td><td>Memory, vector search, graph</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     12 — AGENT RUNTIME
+══════════════════════════════════════════════ -->
+<section class="section" id="agent-runtime">
+  <div class="section-eyebrow"><span class="section-num">12</span> Infrastructure</div>
+  <h2>Universal Agent Runtime</h2>
+  <div class="divider"></div>
+
+  <p>The PMPO (Prometheus Meta-Prompting Orchestration) loop drives every agent run. Tool calls, memory hydration, and result caching happen within the Rust loop — before any event reaches Dart. A hard <code>max_turns</code> budget enforces termination.</p>
+
+  <div class="diagram-wrap">
+    <svg viewBox="0 0 700 360" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">
+      <defs>
+        <marker id="arr6" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L7,3 z" fill="#5C6B7A"/>
+        </marker>
+        <marker id="arr6e" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L7,3 z" fill="#FF6A3D"/>
+        </marker>
+      </defs>
+
+      <!-- Main PMPO loop box -->
+      <rect x="200" y="10" width="300" height="300" rx="12" fill="#0F1620" stroke="#2B3F55" stroke-width="1"/>
+      <text x="350" y="34" font-family="Inter,sans-serif" font-size="10" fill="#E8EDF3" text-anchor="middle" font-weight="700">PMPO Loop (Rust)</text>
+      <text x="350" y="50" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">for turn in 0..config.max_turns</text>
+
+      <!-- Steps inside loop -->
+      <rect x="218" y="60" width="264" height="38" rx="6" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="350" y="77" font-family="Inter,sans-serif" font-size="9" fill="#E8EDF3" text-anchor="middle" font-weight="600">1. Hydrate context from SurrealDB</text>
+      <text x="350" y="90" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">memory search · recent tool results</text>
+
+      <rect x="218" y="108" width="264" height="38" rx="6" fill="#141C26" stroke="#FF6A3D" stroke-width="1"/>
+      <text x="350" y="125" font-family="Inter,sans-serif" font-size="9" fill="#FF6A3D" text-anchor="middle" font-weight="600">2. Build AnthropicRequest</text>
+      <text x="350" y="138" font-family="JetBrains Mono,monospace" font-size="7" fill="#A7B0BC" text-anchor="middle">system · messages · tools (cache-pinned) · thinking</text>
+
+      <rect x="218" y="156" width="264" height="38" rx="6" fill="#18212E" stroke="#FF6A3D" stroke-width="1.5"/>
+      <text x="350" y="173" font-family="Inter,sans-serif" font-size="9" fill="#FF6A3D" text-anchor="middle" font-weight="700">3. Stream SSE Response</text>
+      <text x="350" y="186" font-family="JetBrains Mono,monospace" font-size="7" fill="#A7B0BC" text-anchor="middle">→ protocol pipeline → Flutter events</text>
+
+      <rect x="218" y="204" width="264" height="38" rx="6" fill="#0E1A12" stroke="#34D399" stroke-width="1"/>
+      <text x="350" y="221" font-family="Inter,sans-serif" font-size="9" fill="#34D399" text-anchor="middle" font-weight="600">4. Execute Tool Calls (if any)</text>
+      <text x="350" y="234" font-family="JetBrains Mono,monospace" font-size="7" fill="#A7B0BC" text-anchor="middle">local → MCP → cache result in SurrealDB</text>
+
+      <rect x="218" y="252" width="264" height="38" rx="6" fill="#141C26" stroke="#1E2D3F" stroke-width="1"/>
+      <text x="350" y="269" font-family="Inter,sans-serif" font-size="9" fill="#E8EDF3" text-anchor="middle" font-weight="600">5. Check stop_reason</text>
+      <text x="350" y="282" font-family="JetBrains Mono,monospace" font-size="7" fill="#A7B0BC" text-anchor="middle">end_turn → break · tool_use → continue</text>
+
+      <!-- Arrows between steps -->
+      <line x1="350" y1="100" x2="350" y2="106" stroke="#5C6B7A" stroke-width="1" marker-end="url(#arr6)"/>
+      <line x1="350" y1="148" x2="350" y2="154" stroke="#5C6B7A" stroke-width="1" marker-end="url(#arr6)"/>
+      <line x1="350" y1="196" x2="350" y2="202" stroke="#5C6B7A" stroke-width="1" marker-end="url(#arr6)"/>
+      <line x1="350" y1="244" x2="350" y2="250" stroke="#5C6B7A" stroke-width="1" marker-end="url(#arr6)"/>
+
+      <!-- Loop back arrow -->
+      <path d="M 218 270 C 170 270 170 125 218 125" fill="none" stroke="#2B3F55" stroke-width="1" stroke-dasharray="4,2" marker-end="url(#arr6)"/>
+      <text x="148" y="200" font-family="JetBrains Mono,monospace" font-size="7" fill="#5C6B7A" text-anchor="middle">next turn</text>
+
+      <!-- Max turns guard -->
+      <rect x="218" y="318" width="264" height="22" rx="5" fill="#1A0E0E" stroke="#EF4444" stroke-width="1"/>
+      <text x="350" y="333" font-family="JetBrains Mono,monospace" font-size="7.5" fill="#EF4444" text-anchor="middle">max_turns guard — structural termination</text>
+
+      <!-- Right side: inputs/outputs -->
+      <text x="540" y="80" font-family="JetBrains Mono,monospace" font-size="8" fill="#FF6A3D" letter-spacing="1">INPUTS</text>
+      <rect x="540" y="90" width="148" height="22" rx="5" fill="#141C26" stroke="#1E2D3F"/>
+      <text x="614" y="105" font-family="JetBrains Mono,monospace" font-size="7" fill="#A7B0BC" text-anchor="middle">AnthropicClient</text>
+      <rect x="540" y="118" width="148" height="22" rx="5" fill="#141C26" stroke="#1E2D3F"/>
+      <text x="614" y="133" font-family="JetBrains Mono,monospace" font-size="7" fill="#A7B0BC" text-anchor="middle">McpRegistry</text>
+      <rect x="540" y="146" width="148" height="22" rx="5" fill="#141C26" stroke="#1E2D3F"/>
+      <text x="614" y="161" font-family="JetBrains Mono,monospace" font-size="7" fill="#A7B0BC" text-anchor="middle">MemoryStore</text>
+      <rect x="540" y="174" width="148" height="22" rx="5" fill="#141C26" stroke="#1E2D3F"/>
+      <text x="614" y="189" font-family="JetBrains Mono,monospace" font-size="7" fill="#A7B0BC" text-anchor="middle">ToolCache</text>
+      <rect x="540" y="202" width="148" height="22" rx="5" fill="#141C26" stroke="#1E2D3F"/>
+      <text x="614" y="217" font-family="JetBrains Mono,monospace" font-size="7" fill="#A7B0BC" text-anchor="middle">Local tool registry</text>
+
+      <line x1="538" y1="101" x2="502" y2="101" stroke="#2B3F55" stroke-width="1" marker-end="url(#arr6)"/>
+      <line x1="538" y1="129" x2="502" y2="225" stroke="#2B3F55" stroke-width="0.75" stroke-dasharray="3,2"/>
+      <line x1="538" y1="157" x2="502" y2="79" stroke="#2B3F55" stroke-width="0.75" stroke-dasharray="3,2"/>
+    </svg>
+    <div class="diagram-caption">Figure 8 — PMPO Agent Loop: Hydrate → Build → Stream → Execute → Check</div>
+  </div>
+
+  <table class="spec-table">
+    <thead>
+      <tr><th>Config Field</th><th>Default</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>model</td><td>claude-opus-4-5-20251101</td><td>Anthropic model string</td></tr>
+      <tr><td>max_tokens</td><td>16,000</td><td>Maximum output tokens per turn</td></tr>
+      <tr><td>max_turns</td><td>10</td><td>Hard limit on agentic loop iterations</td></tr>
+      <tr><td>thinking_budget</td><td>10,000</td><td>Extended thinking token budget (None to disable)</td></tr>
+      <tr><td>enable_mcp</td><td>true</td><td>Include all registered MCP tools</td></tr>
+      <tr><td>enable_db_memory</td><td>true</td><td>Hydrate context from SurrealDB on each turn</td></tr>
+      <tr><td>tool_cache_ttl</td><td>300 seconds</td><td>TTL for tool result caching in SurrealDB</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     13 — BUILD SYSTEM
+══════════════════════════════════════════════ -->
+<section class="section" id="build-system">
+  <div class="section-eyebrow"><span class="section-num">13</span> Delivery</div>
+  <h2>Build System</h2>
+  <div class="divider"></div>
+
+  <h3>Android</h3>
+  <pre><code><span class="cm"># Install tools</span>
+cargo install cargo-ndk
+rustup target add \
+  aarch64-linux-android \
+  armv7-linux-androideabi \
+  x86_64-linux-android
+
+<span class="cm"># Build all ABIs</span>
+./scripts/android/build.sh release
+
+<span class="cm"># Output locations</span>
+<span class="st">gen_ui/android/app/src/main/jniLibs/</span>
+  arm64-v8a/libgen_ui_core.so
+  armeabi-v7a/libgen_ui_core.so
+  x86_64/libgen_ui_core.so</code></pre>
+
+  <h3>iOS / macOS</h3>
+  <pre><code><span class="cm"># Install tools</span>
+rustup target add \
+  aarch64-apple-ios \
+  aarch64-apple-ios-sim \
+  x86_64-apple-ios
+
+<span class="cm"># Build universal XCFramework</span>
+./scripts/ios/build_xcframework.sh release
+
+<span class="cm"># Output</span>
+<span class="st">gen_ui/ios/Frameworks/GenUICore.xcframework/</span></code></pre>
+
+  <h3>Dart Bindings (post-build)</h3>
+  <pre><code>flutter_rust_bridge_codegen generate \
+  --rust-input  rust/gen_ui_core/src/api.rs \
+  --dart-output gen_ui/lib/bridge/generated_api.dart \
+  --c-output    scripts/ios/Headers/gen_ui_core.h</code></pre>
+
+  <h3>Cargo Profile</h3>
+  <table class="spec-table">
+    <thead>
+      <tr><th>Setting</th><th>Value</th><th>Rationale</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>opt-level</td><td>3</td><td>Maximum optimization</td></tr>
+      <tr><td>lto</td><td>thin</td><td>Link-time optimization across crates — fast enough for CI</td></tr>
+      <tr><td>codegen-units</td><td>1</td><td>Single unit enables maximum cross-function inlining</td></tr>
+      <tr><td>panic</td><td>abort</td><td>Eliminates panic unwind code — ~15% binary size reduction</td></tr>
+      <tr><td>strip</td><td>symbols</td><td>Debug symbols stripped from release binary</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     14 — PROJECT STRUCTURE
+══════════════════════════════════════════════ -->
+<section class="section" id="project-structure">
+  <div class="section-eyebrow"><span class="section-num">14</span> Delivery</div>
+  <h2>Project Structure</h2>
+  <div class="divider"></div>
+
+  <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+    <div>
+      <h3 style="margin-top:0;">Flutter — <code>gen_ui/lib/</code></h3>
+      <pre style="font-size:.75rem; line-height:1.6;"><code>core/theme/
+  tokens.dart          <span class="cm">← all design tokens</span>
+  app_theme.dart       <span class="cm">← ThemeData</span>
+
+bridge/
+  rust_bridge_provider.dart
+  a2ui/
+    a2ui_event.dart    <span class="cm">← sealed hierarchy</span>
+    a2ui_content_driver.dart
+  agui/
+    agui_provider.dart
+
+features/chat/
+  models/message.dart  <span class="cm">← ContentBlock union</span>
+  providers/
+    chat_provider.dart
+  screens/
+    chat_screen.dart
+  widgets/
+    message_bubble.dart
+    blocks/
+      thinking_block.dart
+      code_block.dart
+      citation_block.dart
+      memory_block.dart
+      tool_block.dart
+      skill_block.dart
+      artifact_block.dart
+    markdown/
+      gen_ui_markdown.dart
+    input/
+      chat_input_bar.dart</code></pre>
+    </div>
+    <div>
+      <h3 style="margin-top:0;">Rust — <code>rust/gen_ui_core/src/</code></h3>
+      <pre style="font-size:.75rem; line-height:1.6;"><code>lib.rs               <span class="cm">← module declarations</span>
+api.rs               <span class="cm">← FFI surface (frb target)</span>
+api_http.rs          <span class="cm">← Anthropic HTTP client</span>
+runtime.rs           <span class="cm">← Tokio runtime</span>
+streaming.rs         <span class="cm">← SSE parser + StreamEvent</span>
+
+protocol/
+  mod.rs             <span class="cm">← ProtocolPipeline</span>
+  a2ui.rs            <span class="cm">← A2UI adapter + events</span>
+  agui.rs            <span class="cm">← AG-UI adapter + events</span>
+
+agent/mod.rs         <span class="cm">← PMPO loop</span>
+inference/
+  mod.rs             <span class="cm">← InferenceEngine</span>
+  sampler.rs         <span class="cm">← token sampling</span>
+mcp/
+  mod.rs             <span class="cm">← McpClient + Registry</span>
+  sse_transport.rs
+  stdio_transport.rs
+db/mod.rs            <span class="cm">← SurrealDB stores</span>
+
+scripts/
+  android/build.sh
+  ios/build_xcframework.sh</code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     15 — EXTENSION GUIDE
+══════════════════════════════════════════════ -->
+<section class="section" id="extension-guide">
+  <div class="section-eyebrow"><span class="section-num">15</span> Delivery</div>
+  <h2>Extension Guide</h2>
+  <div class="divider"></div>
+
+  <h3>Adding a New Content Block Type</h3>
+  <p>The compiler enforces every step. You cannot skip step 4 or 6 — they produce exhaustive switch errors.</p>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Add variant to <code>ContentBlock</code></div>
+        <div class="step-desc">In <code>gen_ui/lib/features/chat/models/message.dart</code>, add a new <code>const factory ContentBlock.myBlock({...}) = MyBlock;</code> variant.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Regenerate freezed</div>
+        <div class="step-desc"><code>dart run build_runner build</code> — generates the <code>.freezed.dart</code> and <code>.g.dart</code> files.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">Create the widget</div>
+        <div class="step-desc">Create <code>widgets/blocks/my_block.dart</code>. Follow the token system — use <code>T.blockDecoration(bg:..., accent:...)</code> for consistent visual language.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-title">Add case to <code>MessageBubble._buildBlock()</code></div>
+        <div class="step-desc"><span style="color:var(--error);">Compiler enforced.</span> The exhaustive switch in <code>message_bubble.dart</code> fails to compile until this case is added.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        <div class="step-title">Add StreamEvent variant (Rust)</div>
+        <div class="step-desc">In <code>rust/gen_ui_core/src/streaming.rs</code>, add a new arm to the <code>StreamEvent</code> enum. Add ingestion logic to <code>A2uiAdapter::ingest()</code>.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">6</div>
+      <div class="step-body">
+        <div class="step-title">Add A2uiEvent Dart class + driver case</div>
+        <div class="step-desc">Add the sealed subclass in <code>bridge/a2ui/a2ui_event.dart</code>. Add the mapping case in <code>A2uiContentDriver._handle()</code>. <span style="color:var(--error);">Compiler enforced.</span></div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">7</div>
+      <div class="step-body">
+        <div class="step-title">Run frb codegen</div>
+        <div class="step-desc">If the Rust FFI surface changed, re-run <code>flutter_rust_bridge_codegen generate</code> to regenerate <code>lib/bridge/generated_api.dart</code>.</div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Registering a Generative UI Component</h3>
+  <pre><code><span class="cm">// Register once at app startup (main.dart or provider init)</span>
+AguiRenderSlot.<span class="kw">register</span>(<span class="st">'stock_chart'</span>, (context, props) {
+  <span class="kw">return</span> StockChartWidget(
+    symbol: props[<span class="st">'symbol'</span>] <span class="kw">as</span> String,
+    period: props[<span class="st">'period'</span>] <span class="kw">as</span> String,
+  );
+});
+
+<span class="cm">// Place anywhere in widget tree</span>
+<span class="ty">AguiRenderSlot</span>(slot: <span class="st">'stock_chart'</span>)
+
+<span class="cm">// Agent pushes the component at runtime:</span>
+<span class="cm">// A2uiEvent::RenderComponent { component: "stock_chart",</span>
+<span class="cm">//   props: { "symbol": "NVDA", "period": "1Y" }, slot: "stock_chart" }</span></code></pre>
+
+  <h3>Connecting the Real FFI Bridge</h3>
+  <p>Three changes activate the Rust backend for a production build.</p>
+  <pre><code><span class="cm">// 1. In lib/bridge/rust_bridge_provider.dart</span>
+<span class="kw">import</span> <span class="st">'generated_api.dart'</span> <span class="kw">as</span> ffi;  <span class="cm">// uncomment</span>
+<span class="cm">// replace stub bodies with ffi.* calls</span>
+
+<span class="cm">// 2. In lib/features/chat/providers/chat_provider.dart</span>
+<span class="cm">// Replace _simulateA2UI() with:</span>
+<span class="kw">final</span> stream = streamAgentA2ui(AgentRunRequest(
+  history: _buildFlatHistory(),
+  userMessage: text,
+  config: <span class="kw">const</span> AgentConfig(),
+));
+_driver = A2uiContentDriver(
+  messageId: assistantId,
+  onBlock: streamBlock,
+  onFinalize: finalizeMessage,
+)..connect(stream);
+
+<span class="cm">// 3. In lib/main.dart</span>
+<span class="kw">await</span> initRustBridge(dataDir: appDir.path);
+<span class="cm">// Local chat is ready without credentials. Optional cloud providers are
+// configured through the Rust provider-admin API and platform secure storage.</span></code></pre>
+
+  <div class="callout callout-info">
+    <div class="callout-label">Integration Checklist</div>
+    <p>Run build scripts → run frb codegen → uncomment imports → replace simulation → call initRustBridge() before runApp(). All other app code is unchanged — the simulation and production paths share the same <code>ContentBlock</code> model and widget tree.</p>
+  </div>
+</section>
+
+</main>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     FOOTER
+══════════════════════════════════════════════ -->
+<footer class="footer">
+  <div class="footer-brand">travis<em>james</em>.ai — Prometheus Agentic Growth Solutions</div>
+  <div class="footer-meta">TJ-SPEC-GENUI-001 · v1.0.0 · March 2026 · CONFIDENTIAL</div>
+</footer>
+
+<!-- ── Sidebar active-link highlighting on scroll ── -->
+<script>
+(function() {
+  const links = document.querySelectorAll('.sidebar-link');
+  const sections = Array.from(links).map(l => document.querySelector(l.getAttribute('href')));
+
+  function update() {
+    const y = window.scrollY + 80;
+    let active = sections[0];
+    for (const s of sections) { if (s && s.offsetTop <= y) active = s; }
+    links.forEach(l => {
+      l.classList.toggle('active', l.getAttribute('href') === '#' + active.id);
+    });
+  }
+  window.addEventListener('scroll', update, { passive: true });
+  update();
+})();
+</script>
+</body>
+</html>

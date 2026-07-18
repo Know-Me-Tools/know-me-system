@@ -1,0 +1,58 @@
+/// knowme:plugin@0.1.0 — the host↔plugin contract (FUNC-SPEC §08).
+///
+/// v0.1 is deliberately few, typed, and boring. The host surface is limited to
+/// log, scoped storage, UAR skill invocation (which is where network access
+/// lives, governed by Cedar), and event emission. v0.2 candidates —
+/// librefang-call, register-navigation, and the sandboxed-iframe UI bridge —
+/// are deferred until real plugins demonstrate the need, each with its own
+/// threat-model review (docs/assessment-2026-07-16.md, rec #9).
+///
+/// Versioning: pre-1.0, so a minor bump (0.2.0) signals a breaking change;
+/// backwards-compatible additions bump patch.
+package knowme:plugin@0.1.0;
+
+interface host {
+    /// Severity for host-side structured logging.
+    enum log-level {
+        debug,
+        info,
+        warn,
+        error,
+    }
+
+    /// Write a line to the host log, tagged with the plugin id.
+    log: func(level: log-level, message: string);
+
+    /// Scoped key-value storage. Keys are namespaced per plugin; a plugin can
+    /// never read or write another plugin's keys.
+    storage-get: func(key: string) -> option<list<u8>>;
+    storage-set: func(key: string, value: list<u8>) -> result<_, string>;
+    storage-delete: func(key: string) -> result<_, string>;
+
+    /// Invoke a UAR skill by name with a JSON-encoded payload. This is the
+    /// ONLY route to the network (`uar-invoke("web-fetch", ...)`): every call
+    /// passes through Cedar policy and the manifest's declared allow-list.
+    uar-invoke: func(skill: string, payload-json: string) -> result<string, string>;
+
+    /// Emit an event onto the host event bus. Inter-plugin communication goes
+    /// through here; plugins never call each other directly.
+    emit-event: func(topic: string, payload-json: string) -> result<_, string>;
+}
+
+interface plugin {
+    /// Called once after instantiation, before any events are delivered.
+    /// Returning an error aborts installation activation.
+    init: func() -> result<_, string>;
+
+    /// Handle one event. Bounded by the host: 64 MiB linear memory, 30 s per
+    /// invocation via epoch interruption.
+    handle-event: func(topic: string, payload-json: string) -> result<_, string>;
+
+    /// Called before the component is dropped. Best-effort cleanup.
+    shutdown: func();
+}
+
+world knowme-plugin {
+    import host;
+    export plugin;
+}

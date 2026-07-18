@@ -1,0 +1,15 @@
+# TJ-ARCH-MOB-001 compliant
+name: gen_ui_widgets
+description: ContentBlock widget set for gen_ui — an exhaustive Flutter renderer over the 11-variant ContentBlock contract (shadcn_flutter-compatible).
+version: 0.1.0
+publish_to: none # set to https://pub.dev when ready to publish
+environment:
+  sdk: ">=3.8.0 <4.0.0"
+  flutter: ">=3.29.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_lints: ^5.0.0

@@ -1,0 +1,12 @@
+[package]
+name = "gen_ui_protocol"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+gen_ui_types = { path = "../gen_ui_types" }
+serde.workspace = true
+serde_json.workspace = true
+futures.workspace = true

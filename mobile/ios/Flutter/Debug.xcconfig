@@ -1,0 +1,9 @@
+#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"
+#include "Generated.xcconfig"
+
+// ort (ONNX Runtime, via fastembed/gen_ui_db_graph's embed-native feature) ships
+// NO prebuilt binaries for x86_64-apple-ios — an Intel-simulator slice can never
+// link. Mirror of the same exclusion cargokit's plugin.gradle makes for Android
+// x86 ABIs. Apple-silicon simulators are arm64; Intel-sim debugging is
+// unsupported until ort adds x86_64 binaries or a build-from-source path.
+EXCLUDED_ARCHS[sdk=iphonesimulator*] = i386 x86_64

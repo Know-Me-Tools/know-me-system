@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-graph-expand"
+description = "Enables the graph_expand command without any pre-configured scope."
+commands.allow = ["graph_expand"]
+
+[[permission]]
+identifier = "deny-graph-expand"
+description = "Denies the graph_expand command without any pre-configured scope."
+commands.deny = ["graph_expand"]

@@ -1,0 +1,23 @@
+# TJ-ARCH-MOB-001 compliant
+"$schema" = "schemas/schema.json"
+
+[default]
+description = "Default gen-ui permissions: startup/read/chat intents. Mutating ENTITY commands require the gen-ui:allow-write set explicitly. set-active-lane writes an app setting (a user preference), not entity data, so it belongs here alongside the other chat intents — same category as memory-ingest."
+permissions = [
+    "allow-stream-agent-a2ui",
+    "allow-get-active-lane",
+    "allow-set-active-lane",
+    "allow-has-local-engine",
+    "allow-run-migrations",
+    "allow-load-seeds",
+    "allow-attach-sync-shapes",
+    "allow-memory-ingest",
+    "allow-entity-runtime-start",
+    "allow-entity-runtime-stop",
+    "allow-entity-list",
+    "allow-entity-get",
+    "allow-memory-search",
+    "allow-graph-expand",
+    "allow-scribe-start",
+    "allow-scribe-stop",
+]

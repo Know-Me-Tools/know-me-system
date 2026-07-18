@@ -1,0 +1,4 @@
+interface:
+  display_name: "Deploy Hybrid Agentic Stack"
+  short_description: "Scaffold web, desktop, mobile, data, sync, and auth"
+  default_prompt: "Use $deploy-hybrid-agentic-stack to configure a deployable hybrid agentic application stack."

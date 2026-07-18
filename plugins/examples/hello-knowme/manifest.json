@@ -1,0 +1,13 @@
+{
+  "id": "tools.know-me.examples.hello",
+  "name": "Hello KnowMe",
+  "version": "0.1.0",
+  "description": "Minimal example plugin for the knowme:plugin@0.1.0 contract. Logs on init, echoes events into scoped storage.",
+  "wasm": {
+    "cid": "<pin plugin.wasm to IPFS and paste the CID here>",
+    "sha256": "<sha256 of plugin.wasm>"
+  },
+  "permissions": ["storage"],
+  "uar_skill_allowlist": [],
+  "signature": null
+}

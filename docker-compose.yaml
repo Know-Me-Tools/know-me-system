@@ -1,0 +1,183 @@
+name: knowme-reference
+
+services:
+  knowme-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: knowme-web:local
+    environment:
+      KNOWME_BIND: 0.0.0.0:8080
+      KNOWME_DATA_DIR: /var/lib/knowme
+      RUST_LOG: ${RUST_LOG:-info}
+    ports:
+      - "${KNOWME_PORT:-8080}:8080"
+    volumes:
+      - knowme_data:/var/lib/knowme
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/api/v1/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+
+  forge-postgres:
+    profiles: ["realtime", "authenticated", "full-agentic"]
+    build:
+      context: ${FLINT_FORGE_CONTEXT:-../../../prometheus/flint-forge}
+      dockerfile: images/postgres18/Dockerfile
+    image: flint-forge-postgres:local
+    environment:
+      POSTGRES_USER: flint
+      POSTGRES_PASSWORD: ${FLINT_POSTGRES_PASSWORD:-flint-local-only}
+      POSTGRES_DB: flint
+    volumes:
+      - forge_postgres_data:/var/lib/postgresql/data
+      - ./deploy/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flint -d flint"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 15s
+
+  forge-gateway:
+    profiles: ["realtime", "full-agentic"]
+    build:
+      context: ${FLINT_FORGE_CONTEXT:-../../../prometheus/flint-forge}
+      dockerfile: docker/fdb-gateway/Dockerfile
+    image: flint-forge-gateway:local
+    environment:
+      DATABASE_URL: postgres://flint:${FLINT_POSTGRES_PASSWORD:-flint-local-only}@forge-postgres:5432/flint
+      FLINT_JWT_SECRET: ${FLINT_GATE_JWT_SECRET:-local-only-change-before-exposure}
+      FLINT_CHANGE_SOURCE: listen
+    depends_on:
+      forge-postgres:
+        condition: service_healthy
+    ports:
+      - "${FLINT_FORGE_PORT:-18081}:8080"
+
+  kratos-migrate:
+    profiles: ["realtime", "authenticated", "full-agentic"]
+    image: oryd/kratos:v1.2@sha256:850d4fd01b8902bc9bdb5d826906876d54695b322f2fea896a4af7524815beac
+    command: migrate sql -e --yes
+    environment:
+      DSN: postgres://flint:${FLINT_POSTGRES_PASSWORD:-flint-local-only}@forge-postgres:5432/kratos?sslmode=disable
+    depends_on:
+      forge-postgres:
+        condition: service_healthy
+    restart: "no"
+
+  kratos:
+    profiles: ["realtime", "authenticated", "full-agentic"]
+    image: oryd/kratos:v1.2@sha256:850d4fd01b8902bc9bdb5d826906876d54695b322f2fea896a4af7524815beac
+    command: serve all --dev
+    environment:
+      DSN: postgres://flint:${FLINT_POSTGRES_PASSWORD:-flint-local-only}@forge-postgres:5432/kratos?sslmode=disable
+      LOG_LEVEL: info
+      SERVE_PUBLIC_BASE_URL: http://localhost:${KRATOS_PUBLIC_PORT:-4433}/
+      SERVE_ADMIN_BASE_URL: http://kratos:4434/
+    depends_on:
+      kratos-migrate:
+        condition: service_completed_successfully
+    ports:
+      - "${KRATOS_PUBLIC_PORT:-4433}:4433"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4433/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  flint-gate:
+    profiles: ["realtime", "authenticated", "full-agentic"]
+    build:
+      context: ${FLINT_GATE_CONTEXT:-../../../prometheus/flint-gate}
+      dockerfile: Dockerfile
+    image: flint-gate:local
+    environment:
+      DATABASE_URL: postgres://flint:${FLINT_POSTGRES_PASSWORD:-flint-local-only}@forge-postgres:5432/flintgate
+      FLINT_GATE_JWT_SECRET: ${FLINT_GATE_JWT_SECRET:-local-only-change-before-exposure}
+      FLINT_GATE_CONFIG: /app/config/config.yaml
+      RUST_LOG: ${RUST_LOG:-info}
+    volumes:
+      - ./deploy/flint-gate/config.yaml:/app/config/config.yaml:ro
+    ports:
+      - "${FLINT_GATE_PORT:-4456}:4456"
+    depends_on:
+      forge-postgres:
+        condition: service_healthy
+      kratos:
+        condition: service_healthy
+
+  keto-migrate:
+    profiles: ["realtime", "full-agentic"]
+    image: oryd/keto:v0.12@sha256:eecd1cba4e7442e989e4f577a24165d9f8985064bc4bd706aa34b879eba0c9d6
+    command: migrate up -c /etc/config/keto/keto.yml -y
+    volumes:
+      - ./deploy/keto/keto.yml:/etc/config/keto/keto.yml:ro
+    restart: "no"
+
+  keto:
+    profiles: ["realtime", "full-agentic"]
+    image: oryd/keto:v0.12@sha256:eecd1cba4e7442e989e4f577a24165d9f8985064bc4bd706aa34b879eba0c9d6
+    command: serve -c /etc/config/keto/keto.yml
+    volumes:
+      - ./deploy/keto/keto.yml:/etc/config/keto/keto.yml:ro
+    depends_on:
+      keto-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4466/health/ready || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  iggy:
+    profiles: ["realtime", "full-agentic"]
+    image: ${IGGY_IMAGE:-iggyrs/iggy@sha256:68a314c1380be5a792a134f3bd346ded42bd49d9f7114c86f70b48fc85bc5272}
+    environment:
+      IGGY_SYSTEM_PATH: /data
+    volumes:
+      - iggy_data:/data
+
+  fabric-gateway:
+    profiles: ["realtime", "full-agentic"]
+    build:
+      context: ${FLINT_FABRIC_CONTEXT:-../../../prometheus/flint-realtime-fabric}
+      dockerfile: Dockerfile
+    image: flint-realtime-fabric:local
+    environment:
+      BIND_ADDR: 0.0.0.0:8080
+      GRPC_PORT: 9090
+      IGGY_CONNECTION_STRING: iggy://iggy:iggy@iggy:8090
+      KETO_BASE_URL: http://keto:4466
+      KETO_NAMESPACE: default
+      GATEWAY_JWKS_URL: http://flint-gate:4457/signing-keys
+      JWT_AUDIENCE: frf-gateway
+      SFU_MODE: sovereign
+      CDC_ENABLED: "true"
+      CDC_REPLICATION_URL: postgres://flint:${FLINT_POSTGRES_PASSWORD:-flint-local-only}@forge-postgres:5432/flint?replication=database
+      CDC_SLOT_NAME: knowme_fabric
+      CDC_PUBLICATION_NAME: knowme_entities
+      CDC_TENANT_ID: 00000000-0000-0000-0000-000000000001
+      CDC_CHANNEL_PATH: entities
+      RUST_LOG: ${RUST_LOG:-info}
+    depends_on:
+      forge-postgres:
+        condition: service_healthy
+      flint-gate:
+        condition: service_started
+      keto:
+        condition: service_healthy
+      iggy:
+        condition: service_started
+    ports:
+      - "${FLINT_FABRIC_PORT:-28080}:8080"
+      - "${FLINT_FABRIC_GRPC_PORT:-29090}:9090"
+
+volumes:
+  knowme_data:
+  forge_postgres_data:
+  iggy_data:

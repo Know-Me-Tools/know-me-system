@@ -1,0 +1,63 @@
+// The Android Gradle Plugin builds the native code with the Android NDK.
+
+group 'com.flutter_rust_bridge.gen_ui_ffi'
+version '1.0'
+
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+
+    dependencies {
+        // The Android Gradle Plugin knows how to build native code with the NDK.
+        classpath 'com.android.tools.build:gradle:7.3.0'
+    }
+}
+
+rootProject.allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+apply plugin: 'com.android.library'
+
+android {
+    if (project.android.hasProperty("namespace")) {
+        namespace 'com.flutter_rust_bridge.gen_ui_ffi'
+    }
+
+    // Bumping the plugin compileSdkVersion requires all clients of this plugin
+    // to bump the version in their app. Matched to the app's own compileSdk
+    // (flutter.compileSdkVersion, currently 36 per FlutterExtension.kt) since
+    // newer AndroidX transitive deps (androidx.core 1.13+, lifecycle 2.7+,
+    // etc.) refuse to link against anything older than API 34. Hardcoded
+    // rather than referencing `android.compileSdkVersion` cross-project:
+    // under AGP 9+'s "new DSL only" read mode that cross-project property
+    // lookup resolves to null here (see AGP 9.0.0 release notes on
+    // android.newDsl) even though it's set correctly in app/build.gradle.kts.
+    compileSdkVersion 36
+
+    // Use the NDK version
+    // declared in /android/app/build.gradle file of the Flutter project.
+    // Replace it with a version number if this plugin requires a specfic NDK version.
+    // (e.g. ndkVersion "23.1.7779620")
+    ndkVersion android.ndkVersion
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    defaultConfig {
+        minSdkVersion 19
+    }
+}
+
+apply from: "../cargokit/gradle/plugin.gradle"
+cargokit {
+    manifestDir = "../../../rust/crates/gen_ui_ffi"
+    libname = "gen_ui_ffi"
+}

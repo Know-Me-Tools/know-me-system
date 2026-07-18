@@ -1,0 +1,28 @@
+PODS:
+  - Flutter (1.0.0)
+  - flutter_secure_storage (6.0.0):
+    - Flutter
+  - gen_ui_ffi (0.0.1):
+    - Flutter
+
+DEPENDENCIES:
+  - Flutter (from `Flutter`)
+  - flutter_secure_storage (from `.symlinks/plugins/flutter_secure_storage/ios`)
+  - gen_ui_ffi (from `.symlinks/plugins/gen_ui_ffi/ios`)
+
+EXTERNAL SOURCES:
+  Flutter:
+    :path: Flutter
+  flutter_secure_storage:
+    :path: ".symlinks/plugins/flutter_secure_storage/ios"
+  gen_ui_ffi:
+    :path: ".symlinks/plugins/gen_ui_ffi/ios"
+
+SPEC CHECKSUMS:
+  Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
+  flutter_secure_storage: d33dac7ae2ea08509be337e775f6b59f1ff45f12
+  gen_ui_ffi: d1a9a2e2e2f88a6e56eb1e7867ea7f6f011e8757
+
+PODFILE CHECKSUM: 22094309fe7e153f90ba34923df495bb63fed6ae
+
+COCOAPODS: 1.16.2

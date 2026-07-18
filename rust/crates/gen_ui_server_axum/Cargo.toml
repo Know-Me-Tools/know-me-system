@@ -1,0 +1,18 @@
+[package]
+name = "gen_ui_server_axum"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+gen_ui_types = { path = "../gen_ui_types" }
+gen_ui_host = { path = "../gen_ui_host" }
+axum.workspace = true
+async-stream.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio = { workspace = true, features = ["sync", "time"] }
+tower-http.workspace = true
+tracing.workspace = true
+futures.workspace = true

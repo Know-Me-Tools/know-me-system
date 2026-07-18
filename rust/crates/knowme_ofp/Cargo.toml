@@ -1,0 +1,14 @@
+[package]
+name = "knowme_ofp"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "OFP — Open Fang Protocol peer sync (FUNC-SPEC §07). Skeleton crate: entity/peer/clock domain types are real; QUIC transport, gossip rounds, and CRDT merge are stubbed."
+
+[dependencies]
+# gen_ui_types::sync / gen_ui_db_graph become dependencies when transport + CRDT merge land (roadmap M2).
+workspace-hack = { path = "../workspace-hack" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true

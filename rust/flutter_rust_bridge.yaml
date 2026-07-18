@@ -1,0 +1,17 @@
+# TJ-ARCH-MOB-001 compliant
+# flutter_rust_bridge 2.12 codegen. Run from a hybrid project root:
+#   flutter_rust_bridge_codegen generate --config-file rust/flutter_rust_bridge.yaml
+# Multi-crate rust_input (frb 2.x): crate::api is the codegen root; the
+# comma-separated crate::module paths that follow tell frb to ALSO cargo-expand
+# those crates so their struct bodies (not just `pub use` paths) are visible to
+# the parser — without this, ANY type re-exported via `pub use other_crate::X`
+# (EntityRecord, ListResult, ViewDescriptor, MemoryHit, RelatedEntity, ...)
+# falls back to an opaque RustOpaque wrapper with no Dart-visible fields at
+# all, since frb only ever expands the self crate (gen_ui_ffi) by default.
+rust_input: crate::api,gen_ui_types::transport,gen_ui_types::view,gen_ui_types::error,gen_ui_types::events,gen_ui_types::sync,gen_ui_db_graph::store
+rust_root: crates/gen_ui_ffi
+# Written into the Flutter app (adjust if your mobile dir differs):
+dart_output: ../mobile/lib/bridge
+dart_entrypoint_class_name: GenUiCore
+# Keep the generated Rust glue beside the api it wraps.
+rust_output: crates/gen_ui_ffi/src/frb_generated.rs

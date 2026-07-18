@@ -1,0 +1,35 @@
+[package]
+name = "gen_ui_types"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace       = true
+serde_json.workspace  = true
+thiserror.workspace   = true
+uuid.workspace        = true
+chrono.workspace      = true
+async-trait.workspace = true
+futures.workspace     = true
+# Proc-macro-only crate (deps: hex, md-5, proc-macro2, quote, syn — no runtime,
+# no wasm surface, never links into the compiled artifact). Provides the same
+# `#[frb(...)]` attribute macro flutter_rust_bridge re-exports, so ChangeEvent
+# can carry `#[frb(unignore)]` without gen_ui_types depending on the full
+# flutter_rust_bridge runtime crate. Version-pinned to match gen_ui_ffi's
+# `flutter_rust_bridge = "=2.12.0"`.
+flutter_rust_bridge_macros = "=2.12.0"
+
+[lints.rust]
+# `#[frb(...)]` expands to code guarded by `cfg(frb_expand)`, a cfg name that
+# only frb codegen's own cargo-expand pass defines. Same gate as gen_ui_ffi's
+# Cargo.toml — keeps this warning-clean under `-D warnings`.
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }
+
+# uuid v4/fast-rng needs getrandom's wasm backend to compile for the browser.
+# Without the "js" feature, getrandom has no wasm32-unknown-unknown source of
+# entropy and the build fails (E0433). Native targets ignore this.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+uuid = { version = "1.10", features = ["v4", "js"] }
+getrandom = { version = "0.2", features = ["js"] }

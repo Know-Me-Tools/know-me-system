@@ -1,0 +1,57 @@
+[package]
+name = "gen_ui_client"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+gen_ui_types    = { path = "../gen_ui_types" }
+gen_ui_runtime  = { path = "../gen_ui_runtime" }
+gen_ui_protocol = { path = "../gen_ui_protocol" }
+gen_ui_mcp      = { path = "../gen_ui_mcp" }
+async-trait.workspace = true
+serde.workspace       = true
+serde_json.workspace  = true
+futures.workspace     = true
+parking_lot.workspace = true
+tracing.workspace     = true
+reqwest.workspace     = true
+reqwest-eventsource.workspace = true
+jsonwebtoken.workspace = true
+liter-llm.workspace   = true
+
+[features]
+# Default to native-http: this crate's flint gate/forge module already needs
+# reqwest/tokio unconditionally, so native is the sane default for every consumer
+# except the wasm32 leaf (gen_ui_wasm), which opts out via default-features=false
+# and requests wasm-http instead. Liter-llm's native-http and wasm-http are NOT
+# safe to unify together (their reqwest/tokio cfg-gated code paths conflict) —
+# always select exactly one explicitly per build, never leave this unset.
+default = ["native-http"]
+native-http = ["liter-llm/native-http"]
+# wasm32 target (web): liter-llm's fetch-based client — no tokio multithread.
+wasm-http = ["liter-llm/wasm-http"]
+# FRF peer-sync spine (tonic gRPC over HTTP/2). Native-only — tonic's transport does
+# not build for wasm32-unknown-unknown. The browser surface uses frf-wasm/Connect-web
+# from the JS side (see references), NOT this crate. Off by default so the common
+# gate+forge path stays wasm-safe and fast to compile.
+#
+# The feature FLAGS are declared (so `cfg(feature = "frf")` is a known cfg and the
+# offline gate+forge build is clippy-clean) but activate NO deps here, because the
+# FRF crates are private/unpublished (see workspace Cargo.toml). To actually enable
+# the spine: uncomment the three FRF workspace deps + the optional-dep block below,
+# then change these two lines to pull them in:
+#     frf = ["dep:frf-sdk-rust"]
+#     peer-crdt = ["frf", "dep:frf-crdt", "dep:frf-store-redb"]
+frf = []
+peer-crdt = ["frf"]
+
+# [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+# frf-sdk-rust   = { workspace = true, optional = true }
+# frf-crdt       = { workspace = true, optional = true }
+# frf-store-redb = { workspace = true, optional = true }
+
+[dev-dependencies]
+jsonwebtoken.workspace = true
+serde_json.workspace   = true

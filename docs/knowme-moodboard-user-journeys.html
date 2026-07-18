@@ -1,0 +1,2316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KnowMe — Moodboard &amp; User Journeys</title>
+<script src="https://unpkg.com/htmx.org@2.0.3" defer></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Roboto:wght@300;400;500&family=JetBrains+Mono:wght@400;500;600&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box;}
+  :root{
+    --bg:#0B0F14; --bg-2:#111620; --surface:#161D29; --card:#1C2535;
+    --card-hov:#202B40; --border:#1F2D40; --border-soft:#233041;
+    --muted:#253044; --muted-fg:#4B6080;
+    --fg:#E8EDF3; --fg-sub:#A7B0BC; --fg-faint:#6B7280;
+    --ember:#FF6A3D; --ember-2:#E04E28;
+    --ember-glow:rgba(255,106,61,0.15); --ember-soft:rgba(255,106,61,0.06);
+    --cyan:#00C2DC; --cyan-soft:rgba(0,194,220,0.10);
+    --green:#22C55E; --amber:#F59E0B; --red:#EF4444;
+    --device-bg:#0B0F14; --device-surface:#111620;
+  }
+  body.light{
+    --bg:#F7F7F8; --bg-2:#FFFFFF; --surface:#FAFBFC; --card:#FFFFFF;
+    --card-hov:#F2F4F7; --border:#E5E8ED; --border-soft:#EEF0F3;
+    --muted:#F2F4F7; --muted-fg:#9AA3B0;
+    --fg:#0B0F14; --fg-sub:#4B5563; --fg-faint:#6B7280;
+    --ember:#E04E28; --ember-2:#C13E1E;
+    --ember-glow:rgba(224,78,40,0.10); --ember-soft:rgba(224,78,40,0.04);
+    --cyan:#0891B2; --cyan-soft:rgba(8,145,178,0.08);
+    --green:#16A34A; --amber:#D97706; --red:#DC2626;
+  }
+  body{
+    font-family:'Inter',sans-serif;
+    background:var(--bg); color:var(--fg);
+    transition:background 0.3s,color 0.3s;
+    line-height:1.6;
+    min-height:100vh;
+  }
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  ::-webkit-scrollbar-thumb{background:var(--muted);border-radius:4px;}
+  /* ─ Top nav ─ */
+  .topnav{
+    position:sticky; top:0; z-index:50;
+    background:var(--bg-2);
+    border-bottom:1px solid var(--border);
+    backdrop-filter:blur(8px);
+    padding:14px 28px;
+    display:flex; align-items:center; gap:18px;
+  }
+  .topnav .brand-lockup{display:flex;align-items:center;gap:10px;}
+  .topnav .wordmark{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:19px; font-weight:700;
+    letter-spacing:-0.025em; color:var(--fg); line-height:1;
+  }
+  .topnav .wordmark .me{color:var(--ember);}
+  .topnav .doc-meta{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px; color:var(--fg-faint);
+    letter-spacing:0.05em;
+  }
+  .topnav .spacer{flex:1;}
+  .btn-toggle{
+    background:var(--muted); color:var(--fg-sub);
+    border:1px solid var(--border); border-radius:8px;
+    padding:6px 12px; font-family:'JetBrains Mono',monospace;
+    font-size:10px; letter-spacing:0.05em;
+    cursor:pointer; transition:all 0.15s;
+  }
+  .btn-toggle:hover{color:var(--fg);border-color:var(--ember-2);}
+  /* ─ Doc shell ─ */
+  .doc-wrap{
+    max-width:1240px; margin:0 auto;
+    padding:48px 32px;
+  }
+  @media (max-width:700px){.doc-wrap{padding:24px 16px;}}
+  /* ─ Hero ─ */
+  .hero{
+    padding-bottom:36px;
+    border-bottom:1px solid var(--border);
+    margin-bottom:48px;
+  }
+  .hero .eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px; font-weight:600;
+    letter-spacing:0.12em; text-transform:uppercase;
+    color:var(--ember); margin-bottom:14px;
+  }
+  .hero h1{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:46px; font-weight:700;
+    letter-spacing:-0.03em; line-height:1.05;
+    color:var(--fg); margin-bottom:16px;
+  }
+  .hero h1 em{color:var(--ember);font-style:normal;}
+  .hero .lead{
+    font-family:'Roboto',sans-serif;
+    font-size:18px; font-weight:300;
+    color:var(--fg-sub); line-height:1.7;
+    max-width:65ch;
+  }
+  .hero .meta-row{
+    display:flex; gap:20px; flex-wrap:wrap;
+    margin-top:26px; padding-top:22px;
+    border-top:1px solid var(--border-soft);
+  }
+  .meta-item{display:flex;flex-direction:column;gap:3px;}
+  .meta-item .ml{
+    font-family:'JetBrains Mono',monospace;
+    font-size:9.5px; font-weight:600;
+    letter-spacing:0.1em; text-transform:uppercase;
+    color:var(--muted-fg);
+  }
+  .meta-item .mv{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px; color:var(--fg);
+  }
+  /* ─ Persona ribbon ─ */
+  .persona-ribbon{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:10px;
+    margin-bottom:48px;
+  }
+  @media (max-width:800px){.persona-ribbon{grid-template-columns:repeat(2,1fr);}}
+  .persona-pill{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:12px 14px;
+    display:flex; align-items:center; gap:10px;
+  }
+  .persona-pill .av{
+    width:30px; height:30px; border-radius:50%;
+    background:var(--ember-soft);
+    border:1.5px solid var(--ember-2);
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Space Grotesk',sans-serif;
+    font-size:11px; font-weight:700; color:var(--ember);
+    flex-shrink:0;
+  }
+  .persona-pill .pn{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:12.5px; font-weight:600;
+    color:var(--fg); letter-spacing:-0.01em;
+  }
+  .persona-pill .pr{
+    font-family:'JetBrains Mono',monospace;
+    font-size:9px; color:var(--fg-faint);
+    letter-spacing:0.05em; margin-top:2px;
+  }
+  /* ─ Section ─ */
+  section.screen{
+    margin-bottom:72px; scroll-margin-top:80px;
+  }
+  .screen-eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px; font-weight:600;
+    letter-spacing:0.12em; text-transform:uppercase;
+    color:var(--ember); margin-bottom:8px;
+  }
+  .screen h2{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:30px; font-weight:700;
+    letter-spacing:-0.025em; color:var(--fg);
+    margin-bottom:8px; line-height:1.15;
+  }
+  .screen-sub{
+    font-family:'Roboto',sans-serif;
+    font-size:15px; color:var(--fg-sub);
+    line-height:1.65; margin-bottom:24px;
+    max-width:65ch;
+  }
+  /* ─ Layout: shot + narrative ─ */
+  .shot-row{
+    display:grid;
+    grid-template-columns:1.4fr 1fr;
+    gap:28px;
+    align-items:start;
+    margin-bottom:24px;
+  }
+  @media (max-width:1000px){.shot-row{grid-template-columns:1fr;}}
+  .shot-row.equal{grid-template-columns:1fr 1fr;}
+  .shot-row.dual-shot{grid-template-columns:1.5fr 1fr 1fr;}
+  @media (max-width:1100px){.shot-row.dual-shot{grid-template-columns:1fr;}}
+  /* ─ Narrative panel ─ */
+  .narrative{
+    padding:4px 0;
+  }
+  .narrative .moment{
+    font-family:'JetBrains Mono',monospace;
+    font-size:9.5px; font-weight:600;
+    letter-spacing:0.1em; text-transform:uppercase;
+    color:var(--cyan); margin-bottom:12px;
+  }
+  .narrative h3{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:18px; font-weight:600;
+    letter-spacing:-0.015em; color:var(--fg);
+    margin-bottom:10px;
+  }
+  .narrative p{
+    font-family:'Roboto',sans-serif;
+    font-size:14px; color:var(--fg-sub);
+    line-height:1.7; margin-bottom:12px;
+    max-width:48ch;
+  }
+  .narrative p strong{color:var(--fg);font-weight:500;}
+  .narrative p em{color:var(--ember);font-style:italic;}
+  .narrative .narrative-list{
+    list-style:none; padding:0;
+    margin:14px 0;
+    border-left:2px solid var(--ember);
+    padding-left:14px;
+  }
+  .narrative .narrative-list li{
+    font-family:'Roboto',sans-serif;
+    font-size:13.5px; color:var(--fg-sub);
+    line-height:1.6; margin-bottom:8px;
+    padding-left:0;
+  }
+  .narrative .narrative-list li strong{color:var(--fg);}
+  .narrative .annotations{
+    background:var(--cyan-soft);
+    border-left:2px solid var(--cyan);
+    border-radius:0 8px 8px 0;
+    padding:10px 14px; margin:14px 0;
+  }
+  .narrative .annotations .alabel{
+    font-family:'JetBrains Mono',monospace;
+    font-size:9.5px; font-weight:600;
+    letter-spacing:0.1em; text-transform:uppercase;
+    color:var(--cyan); margin-bottom:6px;
+  }
+  .narrative .annotations p{
+    font-family:'Roboto',sans-serif;
+    font-size:13px; color:var(--fg);
+    line-height:1.6; margin:0;
+  }
+  /* ─ Screenshot frame ─ */
+  .device{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:14px;
+    box-shadow:0 12px 32px rgba(0,0,0,0.25);
+  }
+  body.light .device{box-shadow:0 8px 24px rgba(11,15,20,0.10);}
+  .device .label-strip{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:0 4px 10px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:9px; color:var(--fg-faint);
+    letter-spacing:0.08em; text-transform:uppercase;
+  }
+  .device .label-strip .platform{color:var(--ember);font-weight:600;}
+  .device .canvas{
+    background:var(--device-bg);
+    border-radius:8px;
+    overflow:hidden;
+    border:1px solid var(--border-soft);
+  }
+  .canvas.desktop{aspect-ratio:16/10; min-height:480px;}
+  .canvas.mobile{aspect-ratio:9/19; max-width:280px; margin:0 auto;}
+  .canvas.tablet{aspect-ratio:4/3; min-height:380px;}
+  /* ─ The actual UI mockup ─ */
+  .ui-shell{
+    width:100%; height:100%;
+    display:flex;
+    background:var(--device-bg);
+    color:var(--fg);
+    font-family:'Inter',sans-serif;
+    overflow:hidden;
+  }
+  .ui-shell.dt{flex-direction:row;}
+  .ui-shell.mb{flex-direction:column;}
+  /* Desktop sidebar */
+  .ds{
+    width:170px; flex-shrink:0;
+    background:var(--device-surface);
+    border-right:1px solid var(--border);
+    padding:14px 8px;
+    display:flex; flex-direction:column;
+    font-size:11px;
+  }
+  .ds .ds-brand{
+    display:flex; align-items:center; gap:7px;
+    padding:0 6px; margin-bottom:4px;
+  }
+  .ds .ds-brand .wm{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:13px; font-weight:700;
+    letter-spacing:-0.02em; color:var(--fg);
+  }
+  .ds .ds-brand .wm .me{color:var(--ember);}
+  .ds .tagline{
+    padding:0 6px; margin-bottom:14px;
+    font-family:'Roboto',sans-serif;
+    font-size:8.5px; font-style:italic;
+    color:var(--fg-sub);
+  }
+  .ds .ds-nav-list{flex:1; display:flex; flex-direction:column; gap:1px;}
+  .ds .ds-item{
+    display:flex; align-items:center; gap:8px;
+    padding:5px 7px; border-radius:5px;
+    font-family:'Inter',sans-serif;
+    font-size:10px; font-weight:500;
+    color:var(--fg-sub);
+    border:1px solid transparent;
+    cursor:default;
+  }
+  .ds .ds-item .ic{
+    width:13px; font-size:11px; color:var(--muted-fg);
+    text-align:center;
+  }
+  .ds .ds-item.active{
+    background:var(--ember-glow);
+    border-color:rgba(224,78,40,0.4);
+    color:var(--ember);
+    font-weight:600;
+  }
+  .ds .ds-item.active .ic{color:var(--ember);}
+  .ds .ds-foot{
+    padding:8px 6px 0;
+    border-top:1px solid var(--border);
+    margin-top:6px;
+  }
+  .ds .ds-foot .row{
+    display:flex; align-items:center; gap:5px;
+    margin-bottom:4px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:8px; color:var(--green);
+    letter-spacing:0.05em;
+  }
+  .ds .ds-foot .row .dot{
+    width:5px; height:5px; border-radius:50%;
+    background:var(--green); box-shadow:0 0 4px var(--green);
+  }
+  .ds .ds-foot .ic2{
+    font-family:'JetBrains Mono',monospace;
+    font-size:7.5px; color:var(--muted-fg);
+    letter-spacing:0.05em;
+  }
+  /* Main content area */
+  .ds-main{
+    flex:1;
+    display:flex; flex-direction:column;
+    overflow:hidden;
+  }
+  .ds-header{
+    height:38px; flex-shrink:0;
+    border-bottom:1px solid var(--border);
+    padding:0 18px;
+    display:flex; align-items:center; gap:10px;
+    font-family:'Space Grotesk',sans-serif;
+    font-size:13px; font-weight:700;
+    color:var(--fg); letter-spacing:-0.01em;
+  }
+  .ds-body{
+    flex:1; overflow:auto;
+    padding:18px;
+  }
+  /* Mobile chrome */
+  .mb-status{
+    height:22px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 14px;
+    font-family:'Space Grotesk',sans-serif;
+    font-size:9.5px; font-weight:700;
+    color:var(--fg);
+  }
+  .mb-status .right{
+    font-family:'JetBrains Mono',monospace;
+    font-size:8px; color:var(--fg);
+  }
+  .mb-header{
+    padding:4px 14px 8px;
+    display:flex; align-items:center; justify-content:space-between;
+    flex-shrink:0;
+  }
+  .mb-header .left{display:flex;align-items:center;gap:7px;}
+  .mb-header .wm{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:14px; font-weight:700;
+    letter-spacing:-0.02em; color:var(--fg);
+  }
+  .mb-header .wm .me{color:var(--ember);}
+  .mb-tline{
+    padding:0 14px 6px;
+    font-family:'Roboto',sans-serif;
+    font-size:8px; font-style:italic;
+    color:var(--fg-sub);
+    flex-shrink:0;
+  }
+  .mb-body{
+    flex:1; overflow:auto;
+    padding:8px 12px;
+  }
+  .mb-bottom-nav{
+    height:44px; flex-shrink:0;
+    background:var(--device-surface);
+    border-top:1px solid var(--border);
+    display:flex; align-items:center;
+    padding:0 4px 4px;
+  }
+  .mb-bn-item{
+    flex:1; display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    gap:2px;
+  }
+  .mb-bn-item .ic{
+    width:22px; height:18px; border-radius:5px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:10px; color:var(--muted-fg);
+  }
+  .mb-bn-item .lb{
+    font-family:'Inter',sans-serif;
+    font-size:7px; color:var(--muted-fg);
+  }
+  .mb-bn-item.active .ic{
+    background:var(--ember-glow);
+    border:1px solid rgba(224,78,40,0.4);
+    color:var(--ember);
+  }
+  .mb-bn-item.active .lb{color:var(--ember);font-weight:600;}
+  /* Content elements (used in mockups) */
+  .ml-eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    font-size:8px; font-weight:600;
+    letter-spacing:0.1em; text-transform:uppercase;
+    color:var(--muted-fg);
+    margin-bottom:8px;
+  }
+  .ml-h1{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:18px; font-weight:700;
+    letter-spacing:-0.025em;
+    color:var(--fg); line-height:1.1;
+    margin-bottom:5px;
+  }
+  .ml-lead{
+    font-family:'Roboto',sans-serif;
+    font-size:9.5px; color:var(--fg-sub);
+    line-height:1.55;
+    margin-bottom:14px; max-width:42ch;
+  }
+  /* Tile (capability card) */
+  .tile{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:9px;
+    padding:11px 10px;
+    display:flex; flex-direction:column; gap:6px;
+  }
+  .tile .ic{
+    width:24px; height:24px; border-radius:6px;
+    background:var(--muted);
+    display:flex; align-items:center; justify-content:center;
+    font-size:11px; color:var(--fg-sub);
+  }
+  .tile .nm{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:10px; font-weight:600;
+    color:var(--fg);
+  }
+  .tile .sb{
+    font-family:'Inter',sans-serif;
+    font-size:8px; color:var(--fg-sub);
+    line-height:1.4;
+    flex:1;
+  }
+  .tile .pl{
+    align-self:flex-start;
+    font-family:'JetBrains Mono',monospace;
+    font-size:6.5px; font-weight:600;
+    letter-spacing:0.08em; text-transform:uppercase;
+    color:var(--ember); background:var(--ember-soft);
+    padding:1.5px 5px; border-radius:3px;
+    border:0.5px solid var(--ember-2);
+  }
+  .tile .pl.cyan{color:var(--cyan);background:var(--cyan-soft);border-color:var(--cyan);}
+  .tile .pl.amber{color:var(--amber);background:rgba(245,158,11,0.10);border-color:var(--amber);}
+  .tile .pl.muted{color:var(--fg-sub);background:var(--muted);border-color:var(--border);}
+  /* Engine card */
+  .engine-card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:9px;
+    padding:11px 13px;
+    margin-bottom:14px;
+    position:relative;
+    overflow:hidden;
+  }
+  .engine-card::before{
+    content:''; position:absolute;
+    top:-20px; right:-20px; width:70px; height:70px;
+    border-radius:50%;
+    background:var(--ember-soft);
+    filter:blur(18px);
+  }
+  .engine-card .head{
+    display:flex; align-items:center; gap:6px;
+    margin-bottom:8px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:8px; font-weight:600;
+    color:var(--green); letter-spacing:0.05em;
+  }
+  .engine-card .head .dot{
+    width:5px; height:5px; border-radius:50%;
+    background:var(--green); box-shadow:0 0 4px var(--green);
+  }
+  .engine-card .head .right{
+    margin-left:auto;
+    color:var(--muted-fg); font-weight:500;
+  }
+  .engine-card .model{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:14px; font-weight:700;
+    color:var(--fg); letter-spacing:-0.02em;
+    margin-bottom:2px;
+  }
+  .engine-card .ml-sub{
+    font-family:'JetBrains Mono',monospace;
+    font-size:7.5px; color:var(--muted-fg);
+    letter-spacing:0.05em;
+  }
+  .engine-card .stats{
+    display:grid; grid-template-columns:1fr 1fr 1fr;
+    margin-top:8px; padding-top:8px;
+    border-top:1px solid var(--border-soft);
+  }
+  .engine-card .stat .v{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:13px; font-weight:700;
+    color:var(--fg); letter-spacing:-0.02em;
+    line-height:1;
+  }
+  .engine-card .stat .v.amber{color:var(--amber);}
+  .engine-card .stat .v.cyan{color:var(--cyan);}
+  .engine-card .stat .v .u{
+    font-size:7.5px; color:var(--fg-sub);
+    font-weight:400; margin-left:1px;
+  }
+  .engine-card .stat .lb{
+    font-family:'JetBrains Mono',monospace;
+    font-size:6.5px; color:var(--muted-fg);
+    margin-top:2px; letter-spacing:0.05em;
+  }
+  .engine-card .stat.r{text-align:right;}
+  .engine-card .stat.c{text-align:center;}
+  /* Tile grid */
+  .tile-grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
+  .tile-grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;}
+  /* Section heading inside mockup */
+  .ml-section-row{
+    display:flex; align-items:baseline; justify-content:space-between;
+    margin:10px 0 8px;
+  }
+  .ml-section-row .lbl{
+    font-family:'JetBrains Mono',monospace;
+    font-size:8px; font-weight:600;
+    letter-spacing:0.1em; text-transform:uppercase;
+    color:var(--muted-fg);
+  }
+  .ml-section-row .cnt{
+    font-family:'JetBrains Mono',monospace;
+    font-size:7px; color:var(--fg-faint);
+    letter-spacing:0.05em;
+  }
+  /* Chat-specific */
+  .chat-msg{
+    display:flex; gap:7px; margin-bottom:10px;
+    align-items:flex-end;
+  }
+  .chat-msg.user{flex-direction:row-reverse;}
+  .chat-msg .av{
+    width:18px; height:18px; border-radius:5px;
+    flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'JetBrains Mono',monospace;
+    font-size:7px; font-weight:600;
+  }
+  .chat-msg .av.user{
+    background:var(--muted); border:1px solid var(--border);
+    color:var(--fg-sub);
+  }
+  .chat-msg .av.ai{
+    background:var(--ember-glow); border:1px solid var(--ember-2);
+    color:var(--ember);
+  }
+  .chat-bubble{
+    max-width:74%; padding:7px 10px;
+    border-radius:8px;
+    font-family:'Roboto',sans-serif;
+    font-size:9px; line-height:1.55;
+    color:var(--fg);
+    background:var(--card); border:1px solid var(--border);
+  }
+  .chat-msg.user .chat-bubble{
+    background:var(--muted);
+    border-radius:8px 3px 8px 8px;
+  }
+  .chat-msg.ai .chat-bubble{
+    border-radius:3px 8px 8px 8px;
+  }
+  .thinking-block{
+    display:flex; flex-direction:column; gap:4px;
+    max-width:74%;
+  }
+  .thinking-toggle{
+    align-self:flex-start;
+    background:var(--cyan-soft);
+    border:1px solid rgba(0,194,220,0.3);
+    color:var(--cyan);
+    padding:3px 7px; border-radius:5px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:6.5px; font-weight:500;
+    letter-spacing:0.05em;
+  }
+  .thinking-content{
+    background:var(--cyan-soft);
+    border-left:1.5px solid rgba(0,194,220,0.4);
+    padding:6px 9px;
+    border-radius:0 6px 6px 0;
+    font-family:'Roboto',sans-serif;
+    font-size:8.5px; font-style:italic;
+    color:var(--fg-sub); line-height:1.5;
+  }
+  /* Composer */
+  .composer{
+    border-top:1px solid var(--border);
+    padding:10px 14px;
+    display:flex; gap:6px; align-items:flex-end;
+    flex-shrink:0;
+  }
+  .composer .input{
+    flex:1; background:var(--card);
+    border:1px solid var(--border);
+    border-radius:8px; padding:7px 9px;
+    font-family:'Roboto',sans-serif;
+    font-size:9px; color:var(--fg-sub);
+    min-height:26px;
+    display:flex; align-items:center;
+  }
+  .composer .send-btn{
+    width:26px; height:26px; border-radius:7px;
+    background:var(--ember-2); color:#fff;
+    display:flex; align-items:center; justify-content:center;
+    font-size:11px; flex-shrink:0;
+  }
+  /* Hand card */
+  .hand-card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:9px 11px;
+    margin-bottom:6px;
+    display:flex; flex-direction:column; gap:7px;
+  }
+  .hand-card .top{
+    display:flex; align-items:flex-start; gap:7px;
+  }
+  .hand-card .ic{
+    width:24px; height:24px; border-radius:6px;
+    background:var(--ember-soft);
+    border:1px solid var(--ember-2);
+    display:flex; align-items:center; justify-content:center;
+    font-size:11px; color:var(--ember);
+    flex-shrink:0;
+  }
+  .hand-card .body{flex:1;min-width:0;}
+  .hand-card .nm{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:10.5px; font-weight:600;
+    color:var(--fg); letter-spacing:-0.01em;
+  }
+  .hand-card .desc{
+    font-family:'Inter',sans-serif;
+    font-size:8.5px; color:var(--fg-sub);
+    margin-top:2px; line-height:1.4;
+  }
+  .hand-card .status{
+    width:6px; height:6px; border-radius:50%;
+    background:var(--green); box-shadow:0 0 4px var(--green);
+    flex-shrink:0; margin-top:6px;
+  }
+  .hand-card .meta{
+    display:flex; flex-wrap:wrap; gap:8px;
+    padding-top:6px;
+    border-top:1px solid var(--border-soft);
+  }
+  .hand-card .meta-cell .lb{
+    font-family:'JetBrains Mono',monospace;
+    font-size:6.5px; font-weight:600;
+    letter-spacing:0.05em; text-transform:uppercase;
+    color:var(--muted-fg);
+  }
+  .hand-card .meta-cell .vl{
+    font-family:'JetBrains Mono',monospace;
+    font-size:7.5px; color:var(--fg);
+    margin-top:1px;
+  }
+  .hand-card .meta-cell.ember .vl{color:var(--ember);}
+  /* Hand template card */
+  .tpl-card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:9px 10px;
+    display:flex; flex-direction:column;
+  }
+  .tpl-card .row{display:flex;align-items:center;gap:7px;margin-bottom:6px;}
+  .tpl-card .ic{
+    width:21px; height:21px; border-radius:5px;
+    background:var(--muted);
+    display:flex;align-items:center;justify-content:center;
+    font-size:10px; color:var(--fg-sub);
+  }
+  .tpl-card .nm{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:9.5px; font-weight:600;
+    color:var(--fg); line-height:1.1;
+  }
+  .tpl-card .cat{
+    font-family:'JetBrains Mono',monospace;
+    font-size:6.5px; color:var(--muted-fg);
+    letter-spacing:0.05em; margin-top:1px;
+  }
+  .tpl-card .desc{
+    font-family:'Inter',sans-serif;
+    font-size:8px; color:var(--fg-sub);
+    line-height:1.4; margin-bottom:6px; flex:1;
+  }
+  .tpl-card .foot{
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .tpl-card .sched{
+    font-family:'JetBrains Mono',monospace;
+    font-size:6.5px; color:var(--muted-fg);
+    letter-spacing:0.05em;
+  }
+  .tpl-card .add{color:var(--ember);font-size:11px;line-height:1;}
+  /* Modal mock */
+  .modal-mock{
+    width:100%; max-width:380px; margin:0 auto;
+    background:var(--device-surface);
+    border:1px solid var(--border);
+    border-radius:11px;
+    overflow:hidden;
+  }
+  .modal-mock .mhead{
+    padding:10px 14px;
+    border-bottom:1px solid var(--border);
+    display:flex;align-items:center;gap:8px;
+  }
+  .modal-mock .mhead .ic{
+    width:26px;height:26px;border-radius:7px;
+    background:var(--ember-soft);
+    border:1px solid var(--ember-2);
+    display:flex;align-items:center;justify-content:center;
+    font-size:13px;color:var(--ember);
+  }
+  .modal-mock .mhead .ttl{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:11px; font-weight:600;
+    color:var(--fg);
+  }
+  .modal-mock .mhead .sb{
+    font-family:'JetBrains Mono',monospace;
+    font-size:7px; color:var(--muted-fg);
+    letter-spacing:0.05em; margin-top:2px;
+  }
+  .modal-mock .step-bar{
+    display:flex; gap:3px; padding:8px 14px;
+  }
+  .modal-mock .step-bar .seg{
+    flex:1; height:2px; border-radius:1px;
+    background:var(--muted);
+  }
+  .modal-mock .step-bar .seg.on{background:var(--ember);}
+  .modal-mock .mbody{padding:14px;}
+  .modal-mock .mfield{margin-bottom:10px;}
+  .modal-mock .mlbl{
+    font-family:'JetBrains Mono',monospace;
+    font-size:7.5px; font-weight:600;
+    letter-spacing:0.1em; text-transform:uppercase;
+    color:var(--muted-fg); margin-bottom:5px;
+  }
+  .modal-mock .minput{
+    width:100%; background:var(--card);
+    border:1px solid var(--border); border-radius:6px;
+    padding:6px 9px;
+    font-family:'Roboto',sans-serif;
+    font-size:9px; color:var(--fg);
+  }
+  .modal-mock .minput.muted{
+    background:var(--muted);
+    color:var(--fg-sub);
+  }
+  .modal-mock .cat-row{display:flex;flex-wrap:wrap;gap:3px;}
+  .modal-mock .cat-pill{
+    font-family:'JetBrains Mono',monospace;
+    font-size:7px; color:var(--fg-sub);
+    background:var(--muted); border:1px solid transparent;
+    padding:2px 6px; border-radius:4px;
+  }
+  .modal-mock .cat-pill.on{
+    background:var(--ember-soft);
+    border-color:var(--ember-2);
+    color:var(--ember); font-weight:500;
+  }
+  .modal-mock .mfoot{
+    padding:10px 14px;
+    border-top:1px solid var(--border);
+    display:flex;justify-content:space-between;gap:6px;
+  }
+  .modal-mock .mbtn{
+    border:1px solid var(--border);
+    background:transparent; color:var(--fg-sub);
+    border-radius:6px; padding:6px 14px;
+    font-family:'Space Grotesk',sans-serif;
+    font-size:9px; font-weight:500;
+  }
+  .modal-mock .mbtn.primary{
+    background:var(--ember-2); border:none; color:#fff;
+    font-weight:600;
+  }
+  /* Settings */
+  .set-tabs{
+    display:flex; flex-direction:column;
+    background:var(--device-surface);
+    border-right:1px solid var(--border);
+    width:120px; flex-shrink:0;
+    padding:10px 6px;
+  }
+  .set-item{
+    padding:5px 7px; border-radius:5px;
+    margin-bottom:1px;
+    display:flex; align-items:center; gap:6px;
+    font-family:'Inter',sans-serif;
+    font-size:9px; color:var(--fg-sub);
+    border:1px solid transparent;
+  }
+  .set-item .ic{width:11px;color:var(--muted-fg);text-align:center;}
+  .set-item.active{
+    background:var(--ember-glow);
+    border-color:rgba(224,78,40,0.4);
+    color:var(--ember); font-weight:600;
+  }
+  .set-item.active .ic{color:var(--ember);}
+  .set-content{flex:1;overflow:auto;padding:14px 16px;}
+  .set-h2{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:14px; font-weight:700;
+    color:var(--fg); letter-spacing:-0.02em;
+    margin-bottom:4px;
+  }
+  .set-sub{
+    font-family:'Roboto',sans-serif;
+    font-size:9px; color:var(--fg-sub);
+    line-height:1.5; margin-bottom:12px;
+  }
+  .set-row{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:7px;
+    padding:8px 11px;
+    margin-bottom:5px;
+    display:flex; align-items:center; gap:9px;
+  }
+  .set-row .dot{
+    width:5px; height:5px; border-radius:50%;
+    background:var(--green); box-shadow:0 0 3px var(--green);
+    flex-shrink:0;
+  }
+  .set-row .dot.amber{background:var(--amber);box-shadow:0 0 3px var(--amber);}
+  .set-row .dot.gray{background:var(--fg-faint);box-shadow:none;}
+  .set-row .body{flex:1;min-width:0;}
+  .set-row .nm{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:9.5px; font-weight:600;
+    color:var(--fg);
+  }
+  .set-row .url{
+    font-family:'JetBrains Mono',monospace;
+    font-size:7px; color:var(--fg-faint);
+    margin-top:2px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .set-row .pill-row{display:flex;gap:3px;margin-top:3px;}
+  .set-row .pl{
+    font-family:'JetBrains Mono',monospace;
+    font-size:6px; font-weight:600;
+    letter-spacing:0.05em; text-transform:uppercase;
+    padding:1px 4px; border-radius:2px;
+    color:var(--ember); background:var(--ember-soft);
+    border:0.5px solid var(--ember-2);
+  }
+  .set-row .pl.cyan{color:var(--cyan);background:var(--cyan-soft);border-color:var(--cyan);}
+  .set-row .pl.muted{color:var(--fg-sub);background:var(--muted);border-color:var(--border);}
+  .set-row .pl.green{color:var(--green);background:rgba(34,197,94,0.10);border-color:var(--green);}
+  .set-row .pl.amber{color:var(--amber);background:rgba(245,158,11,0.10);border-color:var(--amber);}
+  .set-row .btn{
+    border:1px solid var(--border);
+    background:transparent; color:var(--fg-sub);
+    border-radius:5px; padding:4px 10px;
+    font-family:'Space Grotesk',sans-serif;
+    font-size:8px; flex-shrink:0;
+  }
+  /* Toggle */
+  .toggle-row{
+    display:flex; align-items:center; gap:8px;
+    background:var(--card); border:1px solid var(--border);
+    border-radius:7px; padding:8px 11px;
+    margin-bottom:5px;
+  }
+  .toggle-row .body{flex:1;}
+  .toggle-row .nm{
+    font-family:'Inter',sans-serif;
+    font-size:9px; font-weight:500; color:var(--fg);
+  }
+  .toggle-row .dc{
+    font-family:'Inter',sans-serif;
+    font-size:7.5px; color:var(--fg-sub); margin-top:1px;
+  }
+  .toggle-sw{
+    width:22px; height:13px; border-radius:7px;
+    background:var(--muted); position:relative;
+    flex-shrink:0;
+  }
+  .toggle-sw::after{
+    content:''; position:absolute; top:2px; left:2px;
+    width:9px; height:9px; border-radius:50%; background:#fff;
+    transition:left 0.15s;
+  }
+  .toggle-sw.on{background:var(--ember-2);}
+  .toggle-sw.on::after{left:11px;}
+  /* Plugin install dialog */
+  .plug-install{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:9px;
+    padding:14px;
+  }
+  .plug-install .ttl{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:12px; font-weight:600;
+    color:var(--fg); margin-bottom:5px;
+  }
+  .plug-install .nt{
+    font-family:'Inter',sans-serif;
+    font-size:9px; color:var(--fg-sub);
+    line-height:1.5; margin-bottom:11px;
+  }
+  /* Stat block (sync) */
+  .sync-card{
+    background:var(--card); border:1px solid var(--border);
+    border-radius:9px; padding:11px 13px;
+    margin-bottom:14px; position:relative; overflow:hidden;
+  }
+  .sync-card::before{
+    content:''; position:absolute;
+    top:-15px; right:-15px; width:60px; height:60px;
+    border-radius:50%; background:var(--ember-soft); filter:blur(15px);
+  }
+  .sync-card .head{
+    display:flex; align-items:center; gap:6px;
+    margin-bottom:9px;
+    font-family:'Space Grotesk',sans-serif;
+    font-size:10px; font-weight:600;
+    color:var(--fg); letter-spacing:-0.01em;
+  }
+  .sync-card .head .dot{
+    width:5px;height:5px;border-radius:50%;
+    background:var(--green);box-shadow:0 0 4px var(--green);
+  }
+  .sync-card .head .right{
+    margin-left:auto;
+    font-family:'JetBrains Mono',monospace;
+    font-size:6.5px; font-weight:600;
+    letter-spacing:0.05em; text-transform:uppercase;
+    color:var(--green); background:rgba(34,197,94,0.1);
+    padding:1.5px 5px; border-radius:3px;
+    border:0.5px solid var(--green);
+  }
+  .sync-card .stats{
+    display:grid; grid-template-columns:1fr 1fr 1fr 1fr;
+    gap:6px; padding-top:8px;
+    border-top:1px solid var(--border-soft);
+  }
+  .sync-card .stat .v{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:11px; font-weight:700;
+    line-height:1; letter-spacing:-0.02em;
+    color:var(--fg);
+  }
+  .sync-card .stat .v.ember{color:var(--ember);}
+  .sync-card .stat .v.cyan{color:var(--cyan);}
+  .sync-card .stat .v.amber{color:var(--amber);}
+  .sync-card .stat .lb{
+    font-family:'JetBrains Mono',monospace;
+    font-size:6.5px; color:var(--muted-fg);
+    margin-top:2px; letter-spacing:0.05em;
+  }
+  /* Models */
+  .model-row{
+    display:flex; align-items:center; gap:8px;
+    background:var(--card); border:1px solid var(--border);
+    border-radius:6px; padding:6px 9px;
+    margin-bottom:4px;
+  }
+  .model-row .dot{
+    width:5px; height:5px; border-radius:50%;
+    background:var(--green); box-shadow:0 0 3px var(--green);
+    flex-shrink:0;
+  }
+  .model-row .dot.muted{background:var(--muted-fg);box-shadow:none;}
+  .model-row .nm{
+    flex:1;
+    font-family:'JetBrains Mono',monospace;
+    font-size:8px; color:var(--fg); font-weight:500;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .model-row .sz{
+    font-family:'JetBrains Mono',monospace;
+    font-size:7px; color:var(--muted-fg);
+    flex-shrink:0;
+  }
+  .model-row .pl{
+    font-family:'JetBrains Mono',monospace;
+    font-size:6px; font-weight:600;
+    letter-spacing:0.05em; text-transform:uppercase;
+    padding:1px 4px; border-radius:2px;
+    color:var(--cyan); background:var(--cyan-soft);
+    border:0.5px solid var(--cyan);
+    flex-shrink:0;
+  }
+  .model-row .btn-mini{
+    border:1px solid var(--border);
+    background:transparent; color:var(--fg-sub);
+    border-radius:4px; padding:2px 6px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:6.5px; letter-spacing:0.05em;
+    flex-shrink:0;
+  }
+  /* Workflow journey */
+  .journey-card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:24px 26px;
+    margin-bottom:22px;
+  }
+  .journey-card .jhead{
+    display:flex; align-items:center; gap:13px;
+    margin-bottom:14px;
+    padding-bottom:14px;
+    border-bottom:1px solid var(--border-soft);
+  }
+  .journey-card .javatar{
+    width:38px; height:38px; border-radius:50%;
+    background:var(--ember-soft);
+    border:2px solid var(--ember-2);
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Space Grotesk',sans-serif;
+    font-size:12px; font-weight:700; color:var(--ember);
+    flex-shrink:0;
+  }
+  .journey-card .jt{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:17px; font-weight:600;
+    letter-spacing:-0.015em; color:var(--fg);
+  }
+  .journey-card .js{
+    font-family:'JetBrains Mono',monospace;
+    font-size:9px; color:var(--ember);
+    letter-spacing:0.05em; margin-top:2px;
+  }
+  .journey-card .scenario{
+    font-family:'Roboto',sans-serif;
+    font-style:italic;
+    font-size:13.5px; color:var(--fg);
+    line-height:1.6; margin-bottom:18px;
+  }
+  .journey-steps{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));
+    gap:10px;
+  }
+  .journey-step{
+    background:var(--bg-2);
+    border:1px solid var(--border);
+    border-radius:9px;
+    padding:11px 13px;
+    position:relative;
+  }
+  .journey-step .num{
+    font-family:'JetBrains Mono',monospace;
+    font-size:8px; font-weight:600;
+    letter-spacing:0.1em; text-transform:uppercase;
+    color:var(--ember); margin-bottom:6px;
+  }
+  .journey-step h4{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:12px; font-weight:600;
+    letter-spacing:-0.01em;
+    color:var(--fg); margin-bottom:5px;
+  }
+  .journey-step p{
+    font-family:'Roboto',sans-serif;
+    font-size:11.5px; color:var(--fg-sub);
+    line-height:1.55; margin:0;
+  }
+  .journey-step p .scr{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px; color:var(--ember);
+    letter-spacing:0.03em;
+  }
+  /* Footer */
+  .doc-footer{
+    margin-top:60px;
+    padding:28px 0 16px;
+    border-top:1px solid var(--border);
+    display:flex; justify-content:space-between;
+    align-items:center; flex-wrap:wrap; gap:14px;
+  }
+  .doc-footer-brand{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:13px; font-weight:700;
+    letter-spacing:-0.025em; color:var(--fg);
+  }
+  .doc-footer-brand .me{color:var(--ember);}
+  .doc-footer-meta{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px; color:var(--fg-faint);
+    letter-spacing:0.05em;
+  }
+</style>
+</head>
+<body>
+<!-- Top nav -->
+<nav class="topnav">
+  <div class="brand-lockup">
+    <svg viewBox="0 0 200 200" width="28" height="28" xmlns="http://www.w3.org/2000/svg">
+      <g transform="translate(50, 38)">
+        <rect x="0" y="0" width="20" height="124" rx="10" fill="currentColor"/>
+        <path d="M 16,62 C 26,52 44,32 62,18 C 72,10 80,8 84,14 C 86,18 82,24 76,28 C 60,40 40,56 28,66 C 22,70 18,68 16,64 Z" fill="currentColor"/>
+        <path d="M 16,62 C 26,72 44,92 62,106 C 72,114 80,116 84,110 C 86,106 82,100 76,96 C 60,84 40,68 28,58 C 22,54 18,56 16,60 Z" fill="currentColor"/>
+        <circle cx="18" cy="62" r="10" fill="var(--ember)"/>
+      </g>
+    </svg>
+    <span class="wordmark">Know<span class="me">Me</span></span>
+  </div>
+  <span class="doc-meta">MOODBOARD &amp; USER JOURNEYS · v1.0</span>
+  <span class="spacer"></span>
+  <button class="btn-toggle" onclick="document.body.classList.toggle('light'); this.innerHTML = document.body.classList.contains('light') ? '☾ Dark' : '☀ Light';">☾ Dark</button>
+</nav>
+<div class="doc-wrap">
+<!-- Hero -->
+<div class="hero">
+  <div class="eyebrow">// UI/UX Reference · User Journey Atlas</div>
+  <h1>What KnowMe<br/><em>looks and feels like.</em></h1>
+  <p class="lead">
+    A walkthrough of every primary surface, paired with the user moment each surface is designed for. The screenshots are the actual React 19 codebase — same layouts, same brand tokens, same component decomposition. The narratives are what the user is doing, thinking, and getting from each view.
+  </p>
+  <div class="meta-row">
+    <div class="meta-item"><span class="ml">Document</span><span class="mv">UX-MOOD v1.0</span></div>
+    <div class="meta-item"><span class="ml">Date</span><span class="mv">May 2026</span></div>
+    <div class="meta-item"><span class="ml">Surfaces</span><span class="mv">8 tiles · 11 views</span></div>
+    <div class="meta-item"><span class="ml">Form factors</span><span class="mv">Desktop · Tablet · Phone</span></div>
+    <div class="meta-item"><span class="ml">Stack</span><span class="mv">Tauri 2 · React 19 · Tailwind 4</span></div>
+  </div>
+</div>
+<!-- Persona ribbon -->
+<div class="persona-ribbon">
+  <div class="persona-pill">
+    <div class="av">KW</div>
+    <div><div class="pn">Knowledge Worker</div><div class="pr">consultant · researcher</div></div>
+  </div>
+  <div class="persona-pill">
+    <div class="av">PP</div>
+    <div><div class="pn">Privacy-Conscious Pro</div><div class="pr">attorney · physician</div></div>
+  </div>
+  <div class="persona-pill">
+    <div class="av">BD</div>
+    <div><div class="pn">Builder / Developer</div><div class="pr">engineer · founder</div></div>
+  </div>
+  <div class="persona-pill">
+    <div class="av">CP</div>
+    <div><div class="pn">Cross-Device Power User</div><div class="pr">multi-device generalist</div></div>
+  </div>
+</div>
+<!-- ===== SCREEN 01: HOME (DESKTOP + MOBILE) ===== -->
+<section class="screen" id="screen-01">
+  <div class="screen-eyebrow">Screen 01 · Home / Capabilities Grid</div>
+  <h2>The first thing the user sees.</h2>
+  <p class="screen-sub">
+    Eight capability tiles, an Engine Card that confirms the local model is loaded and ready, and the personal tagline "AI that understands you." The desktop layout uses a 4-column grid with a left navigation rail; the mobile layout reflows to 2 columns with a bottom tab bar. The same React component tree drives both — only the layout chrome differs.
+  </p>
+  <div class="shot-row dual-shot">
+    <!-- Desktop screenshot -->
+    <div class="device">
+      <div class="label-strip">
+        <span>Home Screen — Active model: Gemma-3n-2B-Q4</span>
+        <span class="platform">DESKTOP · 1280×800</span>
+      </div>
+      <div class="canvas desktop">
+        <div class="ui-shell dt">
+          <!-- Sidebar -->
+          <div class="ds">
+            <div class="ds-brand">
+              <svg viewBox="0 0 200 200" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
+                <g transform="translate(50, 38)">
+                  <rect x="0" y="0" width="20" height="124" rx="10" fill="currentColor"/>
+                  <path d="M 16,62 C 26,52 44,32 62,18 C 72,10 80,8 84,14 C 86,18 82,24 76,28 C 60,40 40,56 28,66 C 22,70 18,68 16,64 Z" fill="currentColor"/>
+                  <path d="M 16,62 C 26,72 44,92 62,106 C 72,114 80,116 84,110 C 86,106 82,100 76,96 C 60,84 40,68 28,58 C 22,54 18,56 16,60 Z" fill="currentColor"/>
+                  <circle cx="18" cy="62" r="10" fill="var(--ember)"/>
+                </g>
+              </svg>
+              <span class="wm">Know<span class="me">Me</span></span>
+            </div>
+            <div class="tagline">AI that understands you.</div>
+            <div class="ds-nav-list">
+              <div class="ds-item active"><span class="ic">⊞</span><span>Home</span></div>
+              <div class="ds-item"><span class="ic">◎</span><span>AI Chat</span></div>
+              <div class="ds-item"><span class="ic">✦</span><span>Hands</span></div>
+              <div class="ds-item"><span class="ic">⊡</span><span>Ask Image</span></div>
+              <div class="ds-item"><span class="ic">◈</span><span>Audio Scribe</span></div>
+              <div class="ds-item"><span class="ic">◧</span><span>Prompt Lab</span></div>
+              <div class="ds-item"><span class="ic">◉</span><span>Skills</span></div>
+              <div class="ds-item"><span class="ic">▣</span><span>Models</span></div>
+              <div class="ds-item"><span class="ic">⊙</span><span>Settings</span></div>
+            </div>
+            <div class="ds-foot">
+              <div class="row"><span class="dot"></span><span>3 instances · OFP</span></div>
+              <div class="ic2">llama.cpp · UAR</div>
+            </div>
+          </div>
+          <!-- Main -->
+          <div class="ds-main">
+            <div class="ds-body">
+              <div class="ml-h1">Personal intelligence, on your device.</div>
+              <div class="ml-lead">Eight tools for thinking with AI. Sync agents and models with your BossFang instances when you want to.</div>
+              <div class="engine-card">
+                <div class="head"><span class="dot"></span><span>Engine Ready</span><span class="right">llama.cpp · UAR</span></div>
+                <div class="model">Gemma-3n-2B-Q4</div>
+                <div class="ml-sub">Active model · on-device</div>
+                <div class="stats">
+                  <div class="stat"><div class="v" style="color:var(--amber);">47<span class="u">/s</span></div><div class="lb">Tok/s</div></div>
+                  <div class="stat c"><div class="v cyan">4.2<span class="u"> GB</span></div><div class="lb">RAM Free</div></div>
+                  <div class="stat r"><div class="v">2</div><div class="lb">Sessions</div></div>
+                </div>
+              </div>
+              <div class="ml-section-row"><span class="lbl">Capabilities</span><span class="cnt">8 tiles</span></div>
+              <div class="tile-grid-4">
+                <div class="tile"><div class="ic">◎</div><div class="nm">AI Chat</div><div class="sb">Multi-turn · Thinking</div><div class="pl cyan">streaming</div></div>
+                <div class="tile"><div class="ic">✦</div><div class="nm">Hands</div><div class="sb">Autonomous agents</div><div class="pl">agentic</div></div>
+                <div class="tile"><div class="ic">⊡</div><div class="nm">Ask Image</div><div class="sb">Vision · Multimodal</div><div class="pl amber">vision</div></div>
+                <div class="tile"><div class="ic">◈</div><div class="nm">Audio Scribe</div><div class="sb">Transcribe · Translate</div><div class="pl">whisper</div></div>
+                <div class="tile"><div class="ic">◧</div><div class="nm">Prompt Lab</div><div class="sb">Single-turn · Params</div><div class="pl muted">sandbox</div></div>
+                <div class="tile"><div class="ic">◉</div><div class="nm">Agent Skills</div><div class="sb">MCP · UAR registry</div><div class="pl">agentic</div></div>
+                <div class="tile"><div class="ic">▣</div><div class="nm">Models</div><div class="sb">Download · Benchmark</div><div class="pl muted">gguf</div></div>
+                <div class="tile"><div class="ic">⊙</div><div class="nm">Settings</div><div class="sb">Server · Sync · Privacy</div><div class="pl muted">config</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Mobile screenshot -->
+    <div class="device">
+      <div class="label-strip">
+        <span>Home — phone</span>
+        <span class="platform">MOBILE · 380×820</span>
+      </div>
+      <div class="canvas mobile">
+        <div class="ui-shell mb">
+          <div class="mb-status"><span>9:41</span><span class="right">●●● 5G</span></div>
+          <div class="mb-header">
+            <div class="left">
+              <svg viewBox="0 0 200 200" width="18" height="18" xmlns="http://www.w3.org/2000/svg">
+                <g transform="translate(50, 38)">
+                  <rect x="0" y="0" width="20" height="124" rx="10" fill="currentColor"/>
+                  <path d="M 16,62 C 26,52 44,32 62,18 C 72,10 80,8 84,14 C 86,18 82,24 76,28 C 60,40 40,56 28,66 C 22,70 18,68 16,64 Z" fill="currentColor"/>
+                  <path d="M 16,62 C 26,72 44,92 62,106 C 72,114 80,116 84,110 C 86,106 82,100 76,96 C 60,84 40,68 28,58 C 22,54 18,56 16,60 Z" fill="currentColor"/>
+                  <circle cx="18" cy="62" r="10" fill="var(--ember)"/>
+                </g>
+              </svg>
+              <span class="wm">Know<span class="me">Me</span></span>
+            </div>
+            <div style="display:flex;gap:4px;"><div style="width:18px;height:18px;border-radius:5px;background:var(--muted);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--fg-sub);">☾</div><div style="width:18px;height:18px;border-radius:5px;background:var(--muted);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--fg-sub);">⊙</div></div>
+          </div>
+          <div class="mb-tline">AI that understands you.</div>
+          <div class="mb-body">
+            <div class="engine-card" style="padding:9px 11px;margin-bottom:10px;">
+              <div class="head"><span class="dot"></span><span>Engine Ready</span><span class="right">llama.cpp</span></div>
+              <div class="model" style="font-size:12px;">Gemma-3n-2B-Q4</div>
+              <div class="ml-sub" style="font-size:6.5px;">Active · on-device</div>
+              <div class="stats">
+                <div class="stat"><div class="v" style="font-size:11px;color:var(--amber);">47<span class="u">/s</span></div><div class="lb">Tok/s</div></div>
+                <div class="stat c"><div class="v cyan" style="font-size:11px;">4.2<span class="u"> GB</span></div><div class="lb">Free</div></div>
+                <div class="stat r"><div class="v" style="font-size:11px;">2</div><div class="lb">Active</div></div>
+              </div>
+            </div>
+            <div class="ml-section-row"><span class="lbl" style="font-size:7px;">Capabilities</span><span class="cnt" style="font-size:6px;">8 tiles</span></div>
+            <div class="tile-grid-2" style="gap:5px;">
+              <div class="tile" style="padding:8px;"><div class="ic" style="width:20px;height:20px;font-size:10px;">◎</div><div class="nm" style="font-size:9px;">AI Chat</div><div class="sb" style="font-size:7px;">Multi-turn</div><div class="pl cyan">stream</div></div>
+              <div class="tile" style="padding:8px;"><div class="ic" style="width:20px;height:20px;font-size:10px;">✦</div><div class="nm" style="font-size:9px;">Hands</div><div class="sb" style="font-size:7px;">Agents</div><div class="pl">agentic</div></div>
+              <div class="tile" style="padding:8px;"><div class="ic" style="width:20px;height:20px;font-size:10px;">⊡</div><div class="nm" style="font-size:9px;">Ask Image</div><div class="sb" style="font-size:7px;">Vision</div><div class="pl amber">vision</div></div>
+              <div class="tile" style="padding:8px;"><div class="ic" style="width:20px;height:20px;font-size:10px;">◈</div><div class="nm" style="font-size:9px;">Audio</div><div class="sb" style="font-size:7px;">Whisper</div><div class="pl">whisper</div></div>
+              <div class="tile" style="padding:8px;"><div class="ic" style="width:20px;height:20px;font-size:10px;">◧</div><div class="nm" style="font-size:9px;">Prompt Lab</div><div class="sb" style="font-size:7px;">Single-turn</div><div class="pl muted">box</div></div>
+              <div class="tile" style="padding:8px;"><div class="ic" style="width:20px;height:20px;font-size:10px;">▣</div><div class="nm" style="font-size:9px;">Models</div><div class="sb" style="font-size:7px;">Library</div><div class="pl muted">gguf</div></div>
+            </div>
+          </div>
+          <div class="mb-bottom-nav">
+            <div class="mb-bn-item active"><div class="ic">⊞</div><div class="lb">Home</div></div>
+            <div class="mb-bn-item"><div class="ic">◎</div><div class="lb">Chat</div></div>
+            <div class="mb-bn-item"><div class="ic">✦</div><div class="lb">Hands</div></div>
+            <div class="mb-bn-item"><div class="ic">▣</div><div class="lb">Models</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Narrative -->
+    <div class="narrative">
+      <div class="moment">User moment · Morning open</div>
+      <h3>"I just want to see what's running."</h3>
+      <p>The user picks up the device. The first beat answers two questions: <strong>is the AI ready</strong>, and <strong>what can I do right now</strong>. The Engine Card resolves both — green dot, model name, throughput, RAM headroom — without making the user think about it.</p>
+      <ul class="narrative-list">
+        <li><strong>Engine confirmation</strong> — <em>"Ready"</em> in green, with the active model and live tok/s. No hunting for status.</li>
+        <li><strong>Capabilities at a glance</strong> — eight tiles, alphabetized by frequency of use, each with one-line subtitle and a colored pill that hints at the workflow class.</li>
+        <li><strong>Sync awareness</strong> — bottom-left of the sidebar shows "3 instances · OFP" so the user knows their devices are talking.</li>
+      </ul>
+      <div class="annotations">
+        <div class="alabel">Design intent</div>
+        <p>The home is an instrument panel, not a marketing page. Information density is high; visual noise is low. Pills and the ember accent (<span style="color:var(--ember);font-family:'JetBrains Mono',monospace;">#FF6A3D</span>) carry the only color — everything else is monochrome surface differentiation.</p>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- ===== SCREEN 02: AI CHAT WITH THINKING MODE ===== -->
+<section class="screen" id="screen-02">
+  <div class="screen-eyebrow">Screen 02 · AI Chat</div>
+  <h2>Reasoning you can audit.</h2>
+  <p class="screen-sub">
+    The chat surface streams tokens via Tauri channels — no polling, no spinner. Thinking mode is a per-message toggle: the assistant's reasoning trace renders in a collapsed cyan block that the user can expand. Tool calls appear inline. The conversation persists to the local SurrealDB and is full-text searchable from anywhere else in the app.
+  </p>
+  <div class="shot-row">
+    <div class="device">
+      <div class="label-strip">
+        <span>AI Chat — Gemma-3n with Thinking enabled</span>
+        <span class="platform">DESKTOP · streaming</span>
+      </div>
+      <div class="canvas desktop">
+        <div class="ui-shell dt">
+          <div class="ds">
+            <div class="ds-brand">
+              <svg viewBox="0 0 200 200" width="20" height="20" xmlns="http://www.w3.org/2000/svg"><g transform="translate(50, 38)"><rect x="0" y="0" width="20" height="124" rx="10" fill="currentColor"/><path d="M 16,62 C 26,52 44,32 62,18 C 72,10 80,8 84,14 C 86,18 82,24 76,28 C 60,40 40,56 28,66 C 22,70 18,68 16,64 Z" fill="currentColor"/><path d="M 16,62 C 26,72 44,92 62,106 C 72,114 80,116 84,110 C 86,106 82,100 76,96 C 60,84 40,68 28,58 C 22,54 18,56 16,60 Z" fill="currentColor"/><circle cx="18" cy="62" r="10" fill="var(--ember)"/></g></svg>
+              <span class="wm">Know<span class="me">Me</span></span>
+            </div>
+            <div class="tagline">AI that understands you.</div>
+            <div class="ds-nav-list">
+              <div class="ds-item"><span class="ic">⊞</span><span>Home</span></div>
+              <div class="ds-item active"><span class="ic">◎</span><span>AI Chat</span></div>
+              <div class="ds-item"><span class="ic">✦</span><span>Hands</span></div>
+              <div class="ds-item"><span class="ic">⊡</span><span>Ask Image</span></div>
+              <div class="ds-item"><span class="ic">◈</span><span>Audio Scribe</span></div>
+              <div class="ds-item"><span class="ic">◧</span><span>Prompt Lab</span></div>
+              <div class="ds-item"><span class="ic">◉</span><span>Skills</span></div>
+              <div class="ds-item"><span class="ic">▣</span><span>Models</span></div>
+              <div class="ds-item"><span class="ic">⊙</span><span>Settings</span></div>
+            </div>
+            <div class="ds-foot">
+              <div class="row"><span class="dot"></span><span>3 instances · OFP</span></div>
+              <div class="ic2">llama.cpp · UAR</div>
+            </div>
+          </div>
+          <div class="ds-main">
+            <div class="ds-header">AI Chat</div>
+            <div style="padding:8px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0;">
+              <div style="background:var(--card);border:1px solid var(--border);border-radius:5px;padding:4px 9px;font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--fg);">Gemma-3n-2B-Q4 ▾</div>
+              <div class="pl cyan" style="font-family:'JetBrains Mono',monospace;font-size:7px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:var(--cyan);background:var(--cyan-soft);border:0.5px solid var(--cyan);padding:1.5px 5px;border-radius:3px;">streaming</div>
+            </div>
+            <div class="ds-body" style="padding:14px 18px;">
+              <div class="chat-msg user">
+                <div class="av user">TJ</div>
+                <div class="chat-bubble">Summarize the three biggest changes in the React 19 release that affect how I should structure new components.</div>
+              </div>
+              <div class="chat-msg ai">
+                <div class="av ai">K</div>
+                <div class="thinking-block">
+                  <div class="thinking-toggle">▼ Hide reasoning · 312 tokens</div>
+                  <div class="thinking-content">User asks for the top three changes in React 19 affecting component structure. Most impactful are: the new compiler that auto-memoizes — meaning manual <code style="background:rgba(0,194,220,0.15);padding:0 3px;border-radius:2px;color:var(--cyan);">useMemo</code> / <code style="background:rgba(0,194,220,0.15);padding:0 3px;border-radius:2px;color:var(--cyan);">useCallback</code> are mostly redundant; the <code style="background:rgba(0,194,220,0.15);padding:0 3px;border-radius:2px;color:var(--cyan);">use()</code> hook for promises and context; and Actions for server interaction. I'll order by frequency-of-impact for a typical developer and keep each point to 2 sentences max...</div>
+                  <div class="chat-bubble">Three big ones, in the order you'll feel them: <strong>(1) The React Compiler</strong> auto-memoizes components and values — most uses of <em>useMemo</em> and <em>useCallback</em> become noise you can delete. <strong>(2) The <em>use()</em> hook</strong> reads promises and context inline, replacing the <em>useEffect → useState</em> dance for one-shot async loads. <strong>(3) Actions</strong> handle form-submit and async state transitions natively — no more building your own pending/error state manually. The first one alone changes how you write components on day one.</div>
+                </div>
+              </div>
+            </div>
+            <div class="composer">
+              <div class="input">Follow up on any point...</div>
+              <div class="send-btn">↑</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="narrative">
+      <div class="moment">User moment · Mid-task question</div>
+      <h3>"Show me the reasoning, not just the answer."</h3>
+      <p>The user is mid-flow on something else — a task they need a quick decision on. They open Chat, ask a question, and want both the answer <em>and</em> a way to verify it. Thinking mode is the answer to that. It is collapsed by default, so casual users never see it. It expands on click for users who want to audit.</p>
+      <ul class="narrative-list">
+        <li><strong>Streaming, not polling</strong> — tokens arrive over a Tauri channel as the model produces them. The first token shows up in 80–120 ms.</li>
+        <li><strong>Thinking is auditable</strong> — the cyan reasoning block is the model's chain of thought, retained per-message, never silently discarded.</li>
+        <li><strong>Model selector at top</strong> — Gemma for everyday, Qwen-35B for hard problems (routes through Home Mac Pro), Claude for cloud-class reasoning when policy permits.</li>
+      </ul>
+      <div class="annotations">
+        <div class="alabel">Why this matters</div>
+        <p>Closed assistants present a finished answer with no inspectable reasoning. KnowMe's thinking mode is the structural opposite — every claim the model makes can be traced back to the steps it took. For users in regulated work, this is the difference between "useful" and "usable in a deposition."</p>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- ===== SCREEN 03: HANDS MAIN ===== -->
+<section class="screen" id="screen-03">
+  <div class="screen-eyebrow">Screen 03 · Hands</div>
+  <h2>Agents that work for you while you sleep.</h2>
+  <p class="screen-sub">
+    The distinction between Hands and Chat is the distinction between an agent the user works <em>with</em> and an agent that works <em>for</em> the user. The Hands tab is split: active Hands at the top — running, paused, or scheduled — and a templates strip below for spinning up new ones in three steps. Every Hand has a Cedar policy attached at creation; the policy travels with the Hand wherever it runs.
+  </p>
+  <div class="shot-row">
+    <div class="device">
+      <div class="label-strip">
+        <span>Hands — 2 active, 6 templates available</span>
+        <span class="platform">DESKTOP · 1280×800</span>
+      </div>
+      <div class="canvas desktop">
+        <div class="ui-shell dt">
+          <div class="ds">
+            <div class="ds-brand">
+              <svg viewBox="0 0 200 200" width="20" height="20" xmlns="http://www.w3.org/2000/svg"><g transform="translate(50, 38)"><rect x="0" y="0" width="20" height="124" rx="10" fill="currentColor"/><path d="M 16,62 C 26,52 44,32 62,18 C 72,10 80,8 84,14 C 86,18 82,24 76,28 C 60,40 40,56 28,66 C 22,70 18,68 16,64 Z" fill="currentColor"/><path d="M 16,62 C 26,72 44,92 62,106 C 72,114 80,116 84,110 C 86,106 82,100 76,96 C 60,84 40,68 28,58 C 22,54 18,56 16,60 Z" fill="currentColor"/><circle cx="18" cy="62" r="10" fill="var(--ember)"/></g></svg>
+              <span class="wm">Know<span class="me">Me</span></span>
+            </div>
+            <div class="tagline">AI that understands you.</div>
+            <div class="ds-nav-list">
+              <div class="ds-item"><span class="ic">⊞</span><span>Home</span></div>
+              <div class="ds-item"><span class="ic">◎</span><span>AI Chat</span></div>
+              <div class="ds-item active"><span class="ic">✦</span><span>Hands</span></div>
+              <div class="ds-item"><span class="ic">⊡</span><span>Ask Image</span></div>
+              <div class="ds-item"><span class="ic">◈</span><span>Audio Scribe</span></div>
+              <div class="ds-item"><span class="ic">◧</span><span>Prompt Lab</span></div>
+              <div class="ds-item"><span class="ic">◉</span><span>Skills</span></div>
+              <div class="ds-item"><span class="ic">▣</span><span>Models</span></div>
+              <div class="ds-item"><span class="ic">⊙</span><span>Settings</span></div>
+            </div>
+            <div class="ds-foot">
+              <div class="row"><span class="dot"></span><span>3 instances · OFP</span></div>
+              <div class="ic2">llama.cpp · UAR</div>
+            </div>
+          </div>
+          <div class="ds-main">
+            <div class="ds-header">
+              <span>Hands</span>
+              <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--muted-fg);font-weight:500;letter-spacing:0.05em;">2 ACTIVE · 6 TEMPLATES</span>
+              <div style="background:var(--ember-2);color:#fff;border-radius:5px;padding:4px 9px;font-family:'Space Grotesk',sans-serif;font-size:9px;font-weight:600;">+ New Hand</div>
+            </div>
+            <div class="ds-body">
+              <div class="ml-section-row" style="margin-top:0;"><span class="lbl">Active</span><span class="cnt">2 running</span></div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
+                <div class="hand-card">
+                  <div class="top">
+                    <div class="ic">📡</div>
+                    <div class="body">
+                      <div class="nm">Researcher · AI Architecture</div>
+                      <div class="desc">Watches: rust agent runtimes, WASM Component Model</div>
+                    </div>
+                    <div class="status"></div>
+                  </div>
+                  <div class="meta">
+                    <div class="meta-cell"><div class="lb">Last run</div><div class="vl">9:14 AM</div></div>
+                    <div class="meta-cell"><div class="lb">Next</div><div class="vl">Tomorrow 9 AM</div></div>
+                    <div class="meta-cell ember"><div class="lb">Runs</div><div class="vl">47</div></div>
+                    <div class="meta-cell"><div class="lb">On</div><div class="vl">Local</div></div>
+                  </div>
+                </div>
+                <div class="hand-card">
+                  <div class="top">
+                    <div class="ic">📬</div>
+                    <div class="body">
+                      <div class="nm">Inbox Triage</div>
+                      <div class="desc">Triages mail. Surfaces what needs attention.</div>
+                    </div>
+                    <div class="status"></div>
+                  </div>
+                  <div class="meta">
+                    <div class="meta-cell"><div class="lb">Last run</div><div class="vl">10:32 AM</div></div>
+                    <div class="meta-cell"><div class="lb">Next</div><div class="vl">12:32 PM</div></div>
+                    <div class="meta-cell ember"><div class="lb">Runs</div><div class="vl">128</div></div>
+                    <div class="meta-cell"><div class="lb">On</div><div class="vl">Home Mac</div></div>
+                  </div>
+                </div>
+              </div>
+              <div class="ml-section-row"><span class="lbl">Templates</span><span class="cnt">6 ready to deploy</span></div>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;">
+                <div class="tpl-card">
+                  <div class="row"><div class="ic">📡</div><div><div class="nm">Researcher</div><div class="cat">Productivity</div></div></div>
+                  <div class="desc">Watches a topic. Daily digest with sources.</div>
+                  <div class="foot"><span class="sched">daily 9am</span><span class="add">+</span></div>
+                </div>
+                <div class="tpl-card">
+                  <div class="row"><div class="ic">📬</div><div><div class="nm">Inbox Triage</div><div class="cat">Communication</div></div></div>
+                  <div class="desc">Triages messages. Flags decisions.</div>
+                  <div class="foot"><span class="sched">every 2h</span><span class="add">+</span></div>
+                </div>
+                <div class="tpl-card">
+                  <div class="row"><div class="ic">⌥</div><div><div class="nm">Code Watcher</div><div class="cat">Development</div></div></div>
+                  <div class="desc">Watches a repo. Summarizes diffs.</div>
+                  <div class="foot"><span class="sched">on commit</span><span class="add">+</span></div>
+                </div>
+                <div class="tpl-card">
+                  <div class="row"><div class="ic">📊</div><div><div class="nm">Market Pulse</div><div class="cat">Finance</div></div></div>
+                  <div class="desc">Tracks tickers. Daily delta.</div>
+                  <div class="foot"><span class="sched">daily 5pm</span><span class="add">+</span></div>
+                </div>
+                <div class="tpl-card">
+                  <div class="row"><div class="ic">📔</div><div><div class="nm">Daily Journal</div><div class="cat">Productivity</div></div></div>
+                  <div class="desc">Asks check-in. Builds memory.</div>
+                  <div class="foot"><span class="sched">daily 8pm</span><span class="add">+</span></div>
+                </div>
+                <div class="tpl-card">
+                  <div class="row"><div class="ic">🔖</div><div><div class="nm">Reading List</div><div class="cat">Content</div></div></div>
+                  <div class="desc">Captures URLs. Files by topic.</div>
+                  <div class="foot"><span class="sched">on capture</span><span class="add">+</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="narrative">
+      <div class="moment">User moment · Reviewing morning digests</div>
+      <h3>"What did my agents do overnight?"</h3>
+      <p>The user opens Hands first thing in the morning. The Researcher digest from 9:14 AM is waiting; the Inbox Triage has run twice since they slept and surfaced 4 messages flagged "decision needed." The pattern <em>repeats every day</em> — and that consistency is what makes Hands feel like staff, not features.</p>
+      <ul class="narrative-list">
+        <li><strong>Active section first</strong> — green status dot per Hand confirms it's running. Last-run time tells you when output was produced. Next-run tells you when to expect more.</li>
+        <li><strong>Run count in ember</strong> — small but visible. The user sees their Hand has executed 128 times and built up real history.</li>
+        <li><strong>"On Local" vs "On Home Mac"</strong> — the user knows which machine actually ran the work. A Hand that runs on the desktop's BossFang doesn't drain phone battery.</li>
+        <li><strong>Template strip below</strong> — the same 6 archetypes from the spec, ready to deploy with one click into the 3-step wizard.</li>
+      </ul>
+      <div class="annotations">
+        <div class="alabel">Design intent</div>
+        <p>Hands are not "automations." Automations are dumb cron jobs — Hands are agents with their own model, their own Cedar policy, and their own audit trail. The card layout shows enough metadata to convey that personality at a glance.</p>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- ===== SCREEN 04: HANDS CREATOR WIZARD ===== -->
+<section class="screen" id="screen-04">
+  <div class="screen-eyebrow">Screen 04 · Hands Creator Wizard</div>
+  <h2>Three steps. Always three steps.</h2>
+  <p class="screen-sub">
+    Identity → Configuration → Deployment. The constraint is intentional. Every Hand the user creates passes through the same three modal steps regardless of complexity. Predictability is what makes autonomous agents trustworthy — the user always knows what to expect, and the Cedar policy is reviewable before activation.
+  </p>
+  <!-- 3 steps shown side by side -->
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px;">
+    <!-- Step 1: Identity -->
+    <div class="device">
+      <div class="label-strip"><span>Step 1 · Identity</span><span class="platform">MODAL</span></div>
+      <div class="canvas tablet" style="background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;padding:14px;">
+        <div class="modal-mock">
+          <div class="mhead">
+            <div class="ic">📡</div>
+            <div>
+              <div class="ttl">New Researcher Hand</div>
+              <div class="sb">Step 1 of 3 · Identity</div>
+            </div>
+          </div>
+          <div class="step-bar">
+            <div class="seg on"></div><div class="seg"></div><div class="seg"></div>
+          </div>
+          <div class="mbody">
+            <div class="mfield">
+              <div class="mlbl">Name</div>
+              <div class="minput">Researcher · AI Architecture</div>
+            </div>
+            <div class="mfield">
+              <div class="mlbl">What it does</div>
+              <div class="minput muted" style="min-height:46px;line-height:1.5;">Watches three topics — Rust agent runtimes, WASM Component Model, sovereign AI deployment — and writes a daily digest with sources.</div>
+            </div>
+            <div class="mfield">
+              <div class="mlbl">Category</div>
+              <div class="cat-row">
+                <span class="cat-pill on">Productivity</span>
+                <span class="cat-pill">Communication</span>
+                <span class="cat-pill">Dev</span>
+                <span class="cat-pill">Finance</span>
+                <span class="cat-pill">Content</span>
+              </div>
+            </div>
+          </div>
+          <div class="mfoot">
+            <div class="mbtn">Cancel</div>
+            <div class="mbtn primary">Next →</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Step 2: Configuration -->
+    <div class="device">
+      <div class="label-strip"><span>Step 2 · Configuration</span><span class="platform">MODAL</span></div>
+      <div class="canvas tablet" style="background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;padding:14px;">
+        <div class="modal-mock">
+          <div class="mhead">
+            <div class="ic">⚙</div>
+            <div>
+              <div class="ttl">Configuration</div>
+              <div class="sb">Step 2 of 3 · Model · Schedule · Skills</div>
+            </div>
+          </div>
+          <div class="step-bar">
+            <div class="seg on"></div><div class="seg on"></div><div class="seg"></div>
+          </div>
+          <div class="mbody">
+            <div class="mfield">
+              <div class="mlbl">Model</div>
+              <div class="minput">Gemma-3n-2B-Q4 ▾</div>
+            </div>
+            <div class="mfield">
+              <div class="mlbl">Schedule</div>
+              <div class="minput">Daily at 9:00 AM (cron) ▾</div>
+            </div>
+            <div class="mfield">
+              <div class="mlbl">Required Skills</div>
+              <div style="display:flex;flex-direction:column;gap:4px;">
+                <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:5px 8px;display:flex;align-items:center;gap:6px;">
+                  <span style="width:5px;height:5px;border-radius:50%;background:var(--green);box-shadow:0 0 3px var(--green);"></span>
+                  <span style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--fg);">web-fetch</span>
+                  <span style="margin-left:auto;font-family:'Inter',sans-serif;font-size:7px;color:var(--fg-faint);">granted</span>
+                </div>
+                <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:5px 8px;display:flex;align-items:center;gap:6px;">
+                  <span style="width:5px;height:5px;border-radius:50%;background:var(--green);box-shadow:0 0 3px var(--green);"></span>
+                  <span style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--fg);">wikipedia</span>
+                  <span style="margin-left:auto;font-family:'Inter',sans-serif;font-size:7px;color:var(--fg-faint);">granted</span>
+                </div>
+                <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:5px 8px;display:flex;align-items:center;gap:6px;">
+                  <span style="width:5px;height:5px;border-radius:50%;background:var(--green);box-shadow:0 0 3px var(--green);"></span>
+                  <span style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--fg);">surreal-memory</span>
+                  <span style="margin-left:auto;font-family:'Inter',sans-serif;font-size:7px;color:var(--fg-faint);">granted</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="mfoot">
+            <div class="mbtn">← Back</div>
+            <div class="mbtn primary">Next →</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Step 3: Deployment -->
+    <div class="device">
+      <div class="label-strip"><span>Step 3 · Deployment</span><span class="platform">MODAL</span></div>
+      <div class="canvas tablet" style="background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;padding:14px;">
+        <div class="modal-mock">
+          <div class="mhead">
+            <div class="ic">🚀</div>
+            <div>
+              <div class="ttl">Deployment</div>
+              <div class="sb">Step 3 of 3 · Where it runs</div>
+            </div>
+          </div>
+          <div class="step-bar">
+            <div class="seg on"></div><div class="seg on"></div><div class="seg on"></div>
+          </div>
+          <div class="mbody">
+            <div class="mfield">
+              <div class="mlbl">Run on</div>
+              <div style="display:flex;flex-direction:column;gap:5px;">
+                <div style="background:var(--ember-soft);border:1px solid var(--ember-2);border-radius:6px;padding:8px 10px;display:flex;align-items:flex-start;gap:8px;">
+                  <span style="width:11px;height:11px;border-radius:50%;border:2px solid var(--ember);background:var(--ember);box-shadow:inset 0 0 0 2px var(--device-bg);flex-shrink:0;margin-top:1px;"></span>
+                  <div>
+                    <div style="font-family:'Space Grotesk',sans-serif;font-size:9.5px;font-weight:600;color:var(--fg);">This device</div>
+                    <div style="font-family:'Inter',sans-serif;font-size:7.5px;color:var(--fg-sub);margin-top:1px;">Local · always available · battery aware</div>
+                  </div>
+                </div>
+                <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:8px 10px;display:flex;align-items:flex-start;gap:8px;">
+                  <span style="width:11px;height:11px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;margin-top:1px;"></span>
+                  <div>
+                    <div style="font-family:'Space Grotesk',sans-serif;font-size:9.5px;font-weight:600;color:var(--fg);">Home Mac Pro</div>
+                    <div style="font-family:'Inter',sans-serif;font-size:7.5px;color:var(--fg-sub);margin-top:1px;">bossfang.local:8443 · 24/7</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div style="background:var(--cyan-soft);border-left:2px solid var(--cyan);border-radius:0 5px 5px 0;padding:7px 9px;margin-top:8px;">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:7px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--cyan);margin-bottom:3px;">Cedar policy</div>
+              <div style="font-family:'Inter',sans-serif;font-size:7.5px;color:var(--fg);line-height:1.5;">May read web · may write memory · cannot send mail · cannot exec shell</div>
+            </div>
+          </div>
+          <div class="mfoot">
+            <div class="mbtn">← Back</div>
+            <div class="mbtn primary">Activate Hand</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="narrative" style="max-width:none;">
+    <div class="moment">User moment · Spinning up a new agent</div>
+    <h3>"I want this to feel like staffing a person, not configuring a script."</h3>
+    <p style="max-width:75ch;">The wizard is short on purpose. <strong>Step 1</strong> establishes who this Hand is: a name, a description in plain English, a category. <strong>Step 2</strong> wires the brain — model, schedule, and the explicit list of skills the Hand may invoke (every grant is per-Hand and per-skill, never blanket). <strong>Step 3</strong> picks where the Hand lives: this device, or any connected BossFang instance — with the Cedar policy visible in cyan before the user clicks Activate.</p>
+    <div class="annotations">
+      <div class="alabel">Why the wizard never grows</div>
+      <p>Every team that ships agent platforms is tempted to add "advanced options" to creation flows. KnowMe deliberately puts those into a separate Edit panel after activation. Creation is always Identity → Config → Deployment. New users can't get lost; experienced users can't slow themselves down by over-configuring upfront.</p>
+    </div>
+  </div>
+</section>
+<!-- ===== SCREEN 05: SETTINGS · BOSSFANG INSTANCES ===== -->
+<section class="screen" id="screen-05">
+  <div class="screen-eyebrow">Screen 05 · Settings · BossFang Instances</div>
+  <h2>Your devices, talking to your servers.</h2>
+  <p class="screen-sub">
+    The Instances panel is the visible expression of the sovereignty thesis. Four entries: this device, the user's home Mac Pro, the user's rented personal cloud, and a team instance the user has joined. The user owns each row. There is no KnowMe LLC server in the list — and there isn't one in the path either.
+  </p>
+  <div class="shot-row">
+    <div class="device">
+      <div class="label-strip"><span>Settings — Instances tab active</span><span class="platform">DESKTOP · 1280×800</span></div>
+      <div class="canvas desktop">
+        <div class="ui-shell dt">
+          <div class="ds">
+            <div class="ds-brand">
+              <svg viewBox="0 0 200 200" width="20" height="20" xmlns="http://www.w3.org/2000/svg"><g transform="translate(50, 38)"><rect x="0" y="0" width="20" height="124" rx="10" fill="currentColor"/><path d="M 16,62 C 26,52 44,32 62,18 C 72,10 80,8 84,14 C 86,18 82,24 76,28 C 60,40 40,56 28,66 C 22,70 18,68 16,64 Z" fill="currentColor"/><path d="M 16,62 C 26,72 44,92 62,106 C 72,114 80,116 84,110 C 86,106 82,100 76,96 C 60,84 40,68 28,58 C 22,54 18,56 16,60 Z" fill="currentColor"/><circle cx="18" cy="62" r="10" fill="var(--ember)"/></g></svg>
+              <span class="wm">Know<span class="me">Me</span></span>
+            </div>
+            <div class="tagline">AI that understands you.</div>
+            <div class="ds-nav-list">
+              <div class="ds-item"><span class="ic">⊞</span><span>Home</span></div>
+              <div class="ds-item"><span class="ic">◎</span><span>AI Chat</span></div>
+              <div class="ds-item"><span class="ic">✦</span><span>Hands</span></div>
+              <div class="ds-item"><span class="ic">⊡</span><span>Ask Image</span></div>
+              <div class="ds-item"><span class="ic">◈</span><span>Audio Scribe</span></div>
+              <div class="ds-item"><span class="ic">◧</span><span>Prompt Lab</span></div>
+              <div class="ds-item"><span class="ic">◉</span><span>Skills</span></div>
+              <div class="ds-item"><span class="ic">▣</span><span>Models</span></div>
+              <div class="ds-item active"><span class="ic">⊙</span><span>Settings</span></div>
+            </div>
+            <div class="ds-foot">
+              <div class="row"><span class="dot"></span><span>3 instances · OFP</span></div>
+              <div class="ic2">llama.cpp · UAR</div>
+            </div>
+          </div>
+          <div class="ds-main">
+            <div class="ds-header">Settings</div>
+            <div style="display:flex;flex:1;overflow:hidden;">
+              <div class="set-tabs">
+                <div class="set-item active"><span class="ic">⌘</span>Instances</div>
+                <div class="set-item"><span class="ic">⇆</span>Sync</div>
+                <div class="set-item"><span class="ic">⊕</span>Plugins</div>
+                <div class="set-item"><span class="ic">⊘</span>Privacy</div>
+                <div class="set-item"><span class="ic">⌬</span>Providers</div>
+                <div class="set-item"><span class="ic">◐</span>Appearance</div>
+                <div class="set-item"><span class="ic">ℹ</span>About</div>
+              </div>
+              <div class="set-content">
+                <div class="set-h2">BossFang Instances</div>
+                <div class="set-sub">Peer-to-peer connections to your own runtime servers. No central broker — the OFP gossip protocol routes between them directly.</div>
+                <div class="set-row">
+                  <span class="dot"></span>
+                  <div class="body">
+                    <div class="nm">This device <span style="font-weight:400;color:var(--fg-faint);font-size:8px;">· primary</span></div>
+                    <div class="url">in-process · always available</div>
+                  </div>
+                  <div class="pill-row"><span class="pl muted">local</span></div>
+                </div>
+                <div class="set-row">
+                  <span class="dot"></span>
+                  <div class="body">
+                    <div class="nm">Home Mac Pro</div>
+                    <div class="url">https://bossfang.local:8443</div>
+                  </div>
+                  <div class="pill-row"><span class="pl">owner</span><span class="pl muted">peer</span></div>
+                  <div class="btn">Manage</div>
+                </div>
+                <div class="set-row">
+                  <span class="dot"></span>
+                  <div class="body">
+                    <div class="nm">Personal Cloud</div>
+                    <div class="url">https://bossfang.travisjames.cloud</div>
+                  </div>
+                  <div class="pill-row"><span class="pl">owner</span><span class="pl muted">peer</span></div>
+                  <div class="btn">Manage</div>
+                </div>
+                <div class="set-row">
+                  <span class="dot"></span>
+                  <div class="body">
+                    <div class="nm">Prometheus AGS Team</div>
+                    <div class="url">https://team.prometheusags.ai</div>
+                  </div>
+                  <div class="pill-row"><span class="pl cyan">member</span><span class="pl muted">peer</span></div>
+                  <div class="btn">Manage</div>
+                </div>
+                <div style="margin-top:10px;background:transparent;border:1px dashed var(--border);border-radius:7px;padding:10px;text-align:center;font-family:'Inter',sans-serif;font-size:9px;color:var(--fg-sub);">+ Connect to BossFang Server</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="narrative">
+      <div class="moment">User moment · First-time sync setup</div>
+      <h3>"My data goes only where I send it."</h3>
+      <p>The user has just received a new device. They open Settings → Instances. They see exactly four rows — and they own three of them. The fourth, the team instance, was added when they joined Prometheus AGS, and the cyan "member" pill makes their role explicit: they participate in shared resources but don't administer them.</p>
+      <ul class="narrative-list">
+        <li><strong>Status dot first</strong> — green means the peer is reachable now. A red dot would mean the peer is offline; the gossip log retries automatically.</li>
+        <li><strong>Owner vs Member roles</strong> — ember "owner" pills for instances the user runs themselves; cyan "member" pills for instances they have access to but don't operate.</li>
+        <li><strong>The URLs are the user's own</strong> — <code style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ember);background:var(--ember-soft);padding:1px 4px;border-radius:3px;">bossfang.local</code>, <code style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ember);background:var(--ember-soft);padding:1px 4px;border-radius:3px;">bossfang.&lt;you&gt;.cloud</code>. KnowMe's domain appears nowhere in this list.</li>
+      </ul>
+      <div class="annotations">
+        <div class="alabel">What this enforces</div>
+        <p>"My data goes only where I send it" is a marketing claim from most vendors. Here, it's an architectural fact you can see and audit. The list of instances <em>is</em> the list of places your data goes — nothing routes through anywhere else.</p>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- ===== SCREEN 06: SETTINGS · SYNC ===== -->
+<section class="screen" id="screen-06">
+  <div class="screen-eyebrow">Screen 06 · Settings · Sync</div>
+  <h2>Conservative defaults. The user opts in to anything that creates exposure.</h2>
+  <p class="screen-sub">
+    The Sync tab shows live OFP status, the most recent sync window, and per-entity toggles for what actually crosses the wire. Hands and conversations sync by default because users expect their agents to follow them across devices. Models — large, expensive to transfer, and rarely needed in real time — default to off.
+  </p>
+  <div class="shot-row">
+    <div class="device">
+      <div class="label-strip"><span>Settings — Sync · OFP active</span><span class="platform">DESKTOP · 1280×800</span></div>
+      <div class="canvas desktop">
+        <div class="ui-shell dt">
+          <div class="ds">
+            <div class="ds-brand">
+              <svg viewBox="0 0 200 200" width="20" height="20" xmlns="http://www.w3.org/2000/svg"><g transform="translate(50, 38)"><rect x="0" y="0" width="20" height="124" rx="10" fill="currentColor"/><path d="M 16,62 C 26,52 44,32 62,18 C 72,10 80,8 84,14 C 86,18 82,24 76,28 C 60,40 40,56 28,66 C 22,70 18,68 16,64 Z" fill="currentColor"/><path d="M 16,62 C 26,72 44,92 62,106 C 72,114 80,116 84,110 C 86,106 82,100 76,96 C 60,84 40,68 28,58 C 22,54 18,56 16,60 Z" fill="currentColor"/><circle cx="18" cy="62" r="10" fill="var(--ember)"/></g></svg>
+              <span class="wm">Know<span class="me">Me</span></span>
+            </div>
+            <div class="tagline">AI that understands you.</div>
+            <div class="ds-nav-list">
+              <div class="ds-item"><span class="ic">⊞</span><span>Home</span></div>
+              <div class="ds-item"><span class="ic">◎</span><span>AI Chat</span></div>
+              <div class="ds-item"><span class="ic">✦</span><span>Hands</span></div>
+              <div class="ds-item"><span class="ic">⊡</span><span>Ask Image</span></div>
+              <div class="ds-item"><span class="ic">◈</span><span>Audio Scribe</span></div>
+              <div class="ds-item"><span class="ic">◧</span><span>Prompt Lab</span></div>
+              <div class="ds-item"><span class="ic">◉</span><span>Skills</span></div>
+              <div class="ds-item"><span class="ic">▣</span><span>Models</span></div>
+              <div class="ds-item active"><span class="ic">⊙</span><span>Settings</span></div>
+            </div>
+            <div class="ds-foot">
+              <div class="row"><span class="dot"></span><span>3 instances · OFP</span></div>
+              <div class="ic2">llama.cpp · UAR</div>
+            </div>
+          </div>
+          <div class="ds-main">
+            <div class="ds-header">Settings</div>
+            <div style="display:flex;flex:1;overflow:hidden;">
+              <div class="set-tabs">
+                <div class="set-item"><span class="ic">⌘</span>Instances</div>
+                <div class="set-item active"><span class="ic">⇆</span>Sync</div>
+                <div class="set-item"><span class="ic">⊕</span>Plugins</div>
+                <div class="set-item"><span class="ic">⊘</span>Privacy</div>
+                <div class="set-item"><span class="ic">⌬</span>Providers</div>
+                <div class="set-item"><span class="ic">◐</span>Appearance</div>
+                <div class="set-item"><span class="ic">ℹ</span>About</div>
+              </div>
+              <div class="set-content">
+                <div class="set-h2">Peer Sync</div>
+                <div class="set-sub">Encrypted gossip over QUIC. Only entities you toggle on are sent across the wire.</div>
+                <div class="sync-card">
+                  <div class="head">
+                    <span class="dot"></span>
+                    <span>OFP Sync Active</span>
+                    <span class="right">3 peers</span>
+                  </div>
+                  <div class="stats">
+                    <div class="stat"><div class="v">23s</div><div class="lb">Last sync</div></div>
+                    <div class="stat"><div class="v ember">7</div><div class="lb">Hands</div></div>
+                    <div class="stat"><div class="v cyan">312</div><div class="lb">Conversations</div></div>
+                    <div class="stat"><div class="v amber">2.4M</div><div class="lb">Bytes</div></div>
+                  </div>
+                </div>
+                <div style="font-family:'JetBrains Mono',monospace;font-size:8px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted-fg);margin:4px 0 6px;">What to sync</div>
+                <div class="toggle-row">
+                  <div class="body">
+                    <div class="nm">Hands</div>
+                    <div class="dc">Definitions, schedules, run history</div>
+                  </div>
+                  <div class="toggle-sw on"></div>
+                </div>
+                <div class="toggle-row">
+                  <div class="body">
+                    <div class="nm">Conversation history</div>
+                    <div class="dc">AES-256-GCM encrypted in transit and at rest</div>
+                  </div>
+                  <div class="toggle-sw on"></div>
+                </div>
+                <div class="toggle-row">
+                  <div class="body">
+                    <div class="nm">SurrealDB memory</div>
+                    <div class="dc">Personal knowledge graph · CRDT merge</div>
+                  </div>
+                  <div class="toggle-sw on"></div>
+                </div>
+                <div class="toggle-row">
+                  <div class="body">
+                    <div class="nm">Skill registrations</div>
+                    <div class="dc">MCP servers · Cedar policies · grants</div>
+                  </div>
+                  <div class="toggle-sw on"></div>
+                </div>
+                <div class="toggle-row">
+                  <div class="body">
+                    <div class="nm">Models (GGUF files)</div>
+                    <div class="dc">Large transfers · Wi-Fi only · default off</div>
+                  </div>
+                  <div class="toggle-sw"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="narrative">
+      <div class="moment">User moment · Auditing what crosses the wire</div>
+      <h3>"Show me exactly what is leaving this device."</h3>
+      <p>The Sync card answers the question in one glance: <em>23 seconds since the last gossip round, 7 Hands tracked, 312 conversations replicated, 2.4 MB transferred.</em> Below it, every entity type is a labeled toggle — the user can flip any of them off and the next OFP round will exclude that data from the gossip set.</p>
+      <ul class="narrative-list">
+        <li><strong>Live status, not last-known</strong> — the green dot is bound to the OFP heartbeat. If a peer goes offline, the user sees it within seconds.</li>
+        <li><strong>Models default off</strong> — a 4 GB GGUF transfer over a hotel Wi-Fi is the wrong default. The user enables it deliberately when at home.</li>
+        <li><strong>Asymmetric exposure is opt-in</strong> — most categories are mutual, but skill registrations include credentials. The toggle off is a single click.</li>
+      </ul>
+      <div class="annotations">
+        <div class="alabel">A different kind of trust</div>
+        <p>Most consumer products tell users "we don't see your data." KnowMe shows users exactly what they themselves are sending. Trust is not a paragraph in a privacy policy — it is a visible, toggleable, auditable surface.</p>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- ===== SCREEN 07: PLUGINS + INSTALLER ===== -->
+<section class="screen" id="screen-07">
+  <div class="screen-eyebrow">Screen 07 · Settings · Plugins &amp; Installer</div>
+  <h2>Install by content address. Verify the signature. Review the permissions.</h2>
+  <p class="screen-sub">
+    Plugins are content-addressed and distributed via IPFS. The list shows what is installed, what permissions each plugin holds, and whether its signature was verified. Installing a new plugin is a CID-paste away — the installer fetches, verifies SHA-256 against the manifest, and shows the user the permission set <em>before</em> any code runs.
+  </p>
+  <div class="shot-row equal">
+    <!-- Plugins list -->
+    <div class="device">
+      <div class="label-strip"><span>Plugins — installed list</span><span class="platform">DESKTOP</span></div>
+      <div class="canvas desktop">
+        <div class="ui-shell dt">
+          <div class="ds">
+            <div class="ds-brand">
+              <svg viewBox="0 0 200 200" width="20" height="20" xmlns="http://www.w3.org/2000/svg"><g transform="translate(50, 38)"><rect x="0" y="0" width="20" height="124" rx="10" fill="currentColor"/><path d="M 16,62 C 26,52 44,32 62,18 C 72,10 80,8 84,14 C 86,18 82,24 76,28 C 60,40 40,56 28,66 C 22,70 18,68 16,64 Z" fill="currentColor"/><path d="M 16,62 C 26,72 44,92 62,106 C 72,114 80,116 84,110 C 86,106 82,100 76,96 C 60,84 40,68 28,58 C 22,54 18,56 16,60 Z" fill="currentColor"/><circle cx="18" cy="62" r="10" fill="var(--ember)"/></g></svg>
+              <span class="wm">Know<span class="me">Me</span></span>
+            </div>
+            <div class="tagline">AI that understands you.</div>
+            <div class="ds-nav-list">
+              <div class="ds-item"><span class="ic">⊞</span><span>Home</span></div>
+              <div class="ds-item"><span class="ic">◎</span><span>AI Chat</span></div>
+              <div class="ds-item"><span class="ic">✦</span><span>Hands</span></div>
+              <div class="ds-item"><span class="ic">◉</span><span>Skills</span></div>
+              <div class="ds-item"><span class="ic">▣</span><span>Models</span></div>
+              <div class="ds-item active"><span class="ic">⊙</span><span>Settings</span></div>
+            </div>
+            <div class="ds-foot">
+              <div class="row"><span class="dot"></span><span>3 instances</span></div>
+            </div>
+          </div>
+          <div class="ds-main">
+            <div class="ds-header">Settings</div>
+            <div style="display:flex;flex:1;overflow:hidden;">
+              <div class="set-tabs">
+                <div class="set-item"><span class="ic">⌘</span>Instances</div>
+                <div class="set-item"><span class="ic">⇆</span>Sync</div>
+                <div class="set-item active"><span class="ic">⊕</span>Plugins</div>
+                <div class="set-item"><span class="ic">⊘</span>Privacy</div>
+              </div>
+              <div class="set-content">
+                <div class="set-h2">Plugins</div>
+                <div class="set-sub">3 installed · WASM Component Model · IPFS distribution</div>
+                <div class="set-row">
+                  <span class="dot"></span>
+                  <div class="body">
+                    <div class="nm">Notion Bridge</div>
+                    <div class="url">CID: bafkreig...x7zq · v1.2.0</div>
+                  </div>
+                  <div class="pill-row"><span class="pl green">verified</span><span class="pl muted">network</span></div>
+                  <div class="btn">Manage</div>
+                </div>
+                <div class="set-row">
+                  <span class="dot"></span>
+                  <div class="body">
+                    <div class="nm">GitHub Issues Inbox</div>
+                    <div class="url">CID: bafkreih...m9fp · v0.8.1</div>
+                  </div>
+                  <div class="pill-row"><span class="pl green">verified</span><span class="pl muted">network</span><span class="pl muted">storage</span></div>
+                  <div class="btn">Manage</div>
+                </div>
+                <div class="set-row">
+                  <span class="dot amber"></span>
+                  <div class="body">
+                    <div class="nm">Local Time Logger</div>
+                    <div class="url">CID: bafkreij...8tyu · v0.1.0-dev</div>
+                  </div>
+                  <div class="pill-row"><span class="pl amber">unsigned</span><span class="pl muted">storage</span></div>
+                  <div class="btn">Manage</div>
+                </div>
+                <div style="margin-top:10px;background:var(--ember-2);color:#fff;border-radius:6px;padding:6px 12px;display:inline-flex;align-items:center;gap:5px;font-family:'Space Grotesk',sans-serif;font-size:9px;font-weight:600;">+ Install plugin</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Installer dialog -->
+    <div class="device">
+      <div class="label-strip"><span>Install plugin · CID input</span><span class="platform">DIALOG</span></div>
+      <div class="canvas desktop" style="background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;padding:32px;">
+        <div class="modal-mock" style="max-width:340px;">
+          <div class="mhead">
+            <div class="ic">⊕</div>
+            <div>
+              <div class="ttl">Install Plugin</div>
+              <div class="sb">Paste an IPFS CID</div>
+            </div>
+          </div>
+          <div class="mbody">
+            <div class="mfield">
+              <div class="mlbl">Plugin CID</div>
+              <div class="minput" style="font-family:'JetBrains Mono',monospace;font-size:8px;">bafkreig5kxhhqsjp4nfqo72r7vx7zqx7zq</div>
+            </div>
+            <div class="mfield" style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:8px 10px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+                <span style="font-family:'Space Grotesk',sans-serif;font-size:10px;font-weight:600;color:var(--fg);">Notion Bridge v1.2.0</span>
+                <span class="pl green" style="font-family:'JetBrains Mono',monospace;font-size:6.5px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:var(--green);background:rgba(34,197,94,0.10);border:0.5px solid var(--green);padding:1.5px 5px;border-radius:3px;">Ed25519 verified</span>
+              </div>
+              <div style="font-family:'Inter',sans-serif;font-size:8px;color:var(--fg-sub);line-height:1.5;margin-bottom:7px;">Read and write Notion pages from KnowMe. Adds a "Notion" navigation entry.</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:7px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted-fg);margin-bottom:3px;">Permissions</div>
+              <div style="display:flex;gap:3px;">
+                <span class="pl muted" style="font-family:'JetBrains Mono',monospace;font-size:6.5px;padding:1.5px 5px;border-radius:3px;color:var(--fg-sub);background:var(--muted);border:0.5px solid var(--border);">network</span>
+                <span class="pl muted" style="font-family:'JetBrains Mono',monospace;font-size:6.5px;padding:1.5px 5px;border-radius:3px;color:var(--fg-sub);background:var(--muted);border:0.5px solid var(--border);">storage</span>
+                <span class="pl muted" style="font-family:'JetBrains Mono',monospace;font-size:6.5px;padding:1.5px 5px;border-radius:3px;color:var(--fg-sub);background:var(--muted);border:0.5px solid var(--border);">uar_skills</span>
+              </div>
+            </div>
+            <div class="toggle-row" style="margin-top:6px;">
+              <div class="body">
+                <div class="nm" style="font-size:8.5px;">Allow unsigned plugins</div>
+                <div class="dc" style="font-size:7px;">Off by default · Ed25519 verification recommended</div>
+              </div>
+              <div class="toggle-sw"></div>
+            </div>
+          </div>
+          <div class="mfoot">
+            <div class="mbtn">Cancel</div>
+            <div class="mbtn primary">Install</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="narrative" style="max-width:none;">
+    <div class="moment">User moment · Adding capability without compromising trust</div>
+    <h3>"I want to extend KnowMe — but I want to see exactly what each plugin gets to do first."</h3>
+    <p style="max-width:75ch;">A developer at the office shares a CID. The user pastes it into the installer. Within milliseconds the fetcher resolves the manifest from IPFS, verifies the Ed25519 signature against the publisher's <code style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ember);background:var(--ember-soft);padding:1px 4px;border-radius:3px;">did:key:</code>, and the dialog renders: name, version, description, permission set, signature status. <em>Nothing executes</em> until the user clicks Install. The amber "unsigned" pill on dev plugins is impossible to miss; the green "Ed25519 verified" pill on the published plugin is exactly as visible.</p>
+    <div class="annotations">
+      <div class="alabel">The structural defense</div>
+      <p>Even a malicious gateway cannot serve a tampered binary — the SHA-256 in the manifest must match the bytes that arrived. Even an unsigned plugin cannot grant itself permissions — the manifest's permission set is reviewed by the user before WASM is instantiated. Plugin trust is structural, not contractual.</p>
+    </div>
+  </div>
+</section>
+<!-- ===== SCREEN 08: MODELS ===== -->
+<section class="screen" id="screen-08">
+  <div class="screen-eyebrow">Screen 08 · Models</div>
+  <h2>Your model library — local first, remote when you want.</h2>
+  <p class="screen-sub">
+    The Models tab inventories what is on this device, with size, acceleration backend, and live tok/s for the active model. Below it, models hosted on connected BossFang instances appear with cyan "remote" pills — they're available to chat sessions and Hands, but the user always knows which device is doing the work.
+  </p>
+  <div class="shot-row">
+    <div class="device">
+      <div class="label-strip"><span>Models — 4 local · 2 remote on Home Mac Pro</span><span class="platform">DESKTOP</span></div>
+      <div class="canvas desktop">
+        <div class="ui-shell dt">
+          <div class="ds">
+            <div class="ds-brand">
+              <svg viewBox="0 0 200 200" width="20" height="20" xmlns="http://www.w3.org/2000/svg"><g transform="translate(50, 38)"><rect x="0" y="0" width="20" height="124" rx="10" fill="currentColor"/><path d="M 16,62 C 26,52 44,32 62,18 C 72,10 80,8 84,14 C 86,18 82,24 76,28 C 60,40 40,56 28,66 C 22,70 18,68 16,64 Z" fill="currentColor"/><path d="M 16,62 C 26,72 44,92 62,106 C 72,114 80,116 84,110 C 86,106 82,100 76,96 C 60,84 40,68 28,58 C 22,54 18,56 16,60 Z" fill="currentColor"/><circle cx="18" cy="62" r="10" fill="var(--ember)"/></g></svg>
+              <span class="wm">Know<span class="me">Me</span></span>
+            </div>
+            <div class="tagline">AI that understands you.</div>
+            <div class="ds-nav-list">
+              <div class="ds-item"><span class="ic">⊞</span><span>Home</span></div>
+              <div class="ds-item"><span class="ic">◎</span><span>AI Chat</span></div>
+              <div class="ds-item"><span class="ic">✦</span><span>Hands</span></div>
+              <div class="ds-item"><span class="ic">⊡</span><span>Ask Image</span></div>
+              <div class="ds-item"><span class="ic">◈</span><span>Audio Scribe</span></div>
+              <div class="ds-item"><span class="ic">◧</span><span>Prompt Lab</span></div>
+              <div class="ds-item"><span class="ic">◉</span><span>Skills</span></div>
+              <div class="ds-item active"><span class="ic">▣</span><span>Models</span></div>
+              <div class="ds-item"><span class="ic">⊙</span><span>Settings</span></div>
+            </div>
+            <div class="ds-foot">
+              <div class="row"><span class="dot"></span><span>3 instances · OFP</span></div>
+              <div class="ic2">llama.cpp · UAR</div>
+            </div>
+          </div>
+          <div class="ds-main">
+            <div class="ds-header">
+              <span>Models</span>
+              <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--muted-fg);font-weight:500;letter-spacing:0.05em;">4 LOCAL · 2 REMOTE</span>
+              <div style="background:var(--card);color:var(--fg-sub);border:1px solid var(--border);border-radius:5px;padding:4px 9px;font-family:'Space Grotesk',sans-serif;font-size:9px;font-weight:500;">+ Browse Library</div>
+            </div>
+            <div class="ds-body">
+              <div class="ml-section-row" style="margin-top:0;"><span class="lbl">On this device</span><span class="cnt">4 models · 9.1 GB total</span></div>
+              <div class="model-row">
+                <span class="dot"></span>
+                <span class="nm">Gemma-3n-2B-Q4</span>
+                <span class="sz">1.5 GB</span>
+                <span class="pl">CUDA · 47 t/s</span>
+                <span class="btn-mini" style="background:var(--ember-soft);border-color:var(--ember-2);color:var(--ember);font-weight:600;">ACTIVE</span>
+              </div>
+              <div class="model-row">
+                <span class="dot muted"></span>
+                <span class="nm">Gemma-4-3B-Q4</span>
+                <span class="sz">2.1 GB</span>
+                <span class="pl">CUDA · 31 t/s</span>
+                <span class="btn-mini">USE</span>
+              </div>
+              <div class="model-row">
+                <span class="dot muted"></span>
+                <span class="nm">Qwen2.5-1.5B-Q4</span>
+                <span class="sz">1.0 GB</span>
+                <span class="pl">Metal · 58 t/s</span>
+                <span class="btn-mini">USE</span>
+              </div>
+              <div class="model-row">
+                <span class="dot muted"></span>
+                <span class="nm">Phi-3.5-mini-Q4</span>
+                <span class="sz">2.4 GB</span>
+                <span class="pl">CUDA · 28 t/s</span>
+                <span class="btn-mini">USE</span>
+              </div>
+              <div class="ml-section-row"><span class="lbl">Remote · via Home Mac Pro</span><span class="cnt">2 models · always available</span></div>
+              <div class="model-row">
+                <span class="dot muted"></span>
+                <span class="nm">Qwen-35B-A3B-Q4</span>
+                <span class="sz">21.4 GB</span>
+                <span class="pl cyan">Remote · 18 t/s</span>
+                <span class="pl" style="color:var(--amber);background:rgba(245,158,11,0.10);border-color:var(--amber);">licensed</span>
+                <span class="btn-mini">USE</span>
+              </div>
+              <div class="model-row">
+                <span class="dot muted"></span>
+                <span class="nm">Devstral-Small-Q4</span>
+                <span class="sz">14.2 GB</span>
+                <span class="pl cyan">Remote · 24 t/s</span>
+                <span class="btn-mini">USE</span>
+              </div>
+              <div style="margin-top:10px;background:transparent;border:1px dashed var(--border);border-radius:7px;padding:9px;font-family:'Inter',sans-serif;font-size:9px;color:var(--fg-sub);text-align:center;">+ Sideload custom GGUF · or browse curated library</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="narrative">
+      <div class="moment">User moment · Picking the right tool</div>
+      <h3>"Small for fast, big for hard, all under my control."</h3>
+      <p>Gemma-3n is the daily driver — fast enough for chat, small enough to run alongside the editor. When the user needs frontier-class reasoning, they switch to Qwen-35B running on the Home Mac Pro. The 18 tok/s is slower than Gemma's 47 — but the model is 17 times bigger, and the call still happens against <em>their own server</em>, not a vendor's.</p>
+      <ul class="narrative-list">
+        <li><strong>Active model marked clearly</strong> — green dot + ember "ACTIVE" pill. Other locals show as "USE" buttons; one click switches.</li>
+        <li><strong>Acceleration backend visible</strong> — CUDA, Metal, Vulkan, CPU. The user knows which path their query is taking.</li>
+        <li><strong>Remote models look different</strong> — cyan "Remote" pill makes it impossible to confuse with local. The amber "licensed" pill on Qwen-35B reflects the Pro tier inclusion.</li>
+        <li><strong>Sideload GGUF</strong> — drop a fine-tuned checkpoint into the folder, KnowMe registers it. No platform gatekeeping.</li>
+      </ul>
+      <div class="annotations">
+        <div class="alabel">A library, not an offering</div>
+        <p>Most consumer AI products show you their menu. KnowMe shows you your library. The distinction matters: a menu is what the vendor offers; a library is what the user owns. Sideloading is the proof — if you can drop in your own GGUF and run it, the platform isn't gating you.</p>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- ===== WORKFLOW JOURNEYS ===== -->
+<section class="screen" id="journeys" style="margin-top:80px;">
+  <div class="screen-eyebrow">Workflow Journeys · End-to-end</div>
+  <h2>How the surfaces compose into actual workdays.</h2>
+  <p class="screen-sub">
+    Three journeys, one for each persona archetype. Each is a chain of moves across the eight tiles — the path the user actually walks, not a feature inventory. The screen references in <span style="font-family:'JetBrains Mono',monospace;color:var(--ember);font-size:13px;">ember</span> link back to the mockups above.
+  </p>
+  <!-- Journey 1: Knowledge Worker -->
+  <div class="journey-card">
+    <div class="jhead">
+      <div class="javatar">KW</div>
+      <div>
+        <div class="jt">Morning Triage</div>
+        <div class="js">Knowledge Worker · 18 minutes from coffee to clear inbox</div>
+      </div>
+    </div>
+    <div class="scenario">"It's 8:42 AM. I want to know what happened overnight, decide what needs me today, and reply to anything urgent — without spending an hour doing it."</div>
+    <div class="journey-steps">
+      <div class="journey-step">
+        <div class="num">Step 01</div>
+        <h4>Open KnowMe on desktop</h4>
+        <p>Engine Card confirms Gemma-3n is loaded. Three Hand digests are waiting on the Home screen — produced overnight by the Researcher, Inbox Triage, and Daily Journal Hands. <span class="scr">→ Screen 01</span></p>
+      </div>
+      <div class="journey-step">
+        <div class="num">Step 02</div>
+        <h4>Read Researcher digest</h4>
+        <p>Click into Hands. The Researcher · AI Architecture digest names 4 papers and 2 GitHub PRs from the user's watch list. The user marks one paper as "deep read for tomorrow." <span class="scr">→ Screen 03</span></p>
+      </div>
+      <div class="journey-step">
+        <div class="num">Step 03</div>
+        <h4>Inbox Triage flags 4</h4>
+        <p>Of 27 overnight messages, the Inbox Triage Hand surfaced 4 with "decision needed." Two are scheduling, one is a contract redline, one needs a 2-paragraph response. <span class="scr">→ Screen 03</span></p>
+      </div>
+      <div class="journey-step">
+        <div class="num">Step 04</div>
+        <h4>Reply via Chat with Gemma-4-3B</h4>
+        <p>Switch to AI Chat, switch model to the larger Gemma-4-3B for nuance. Paste the redline thread. Thinking mode reveals the model's interpretation of the asks. The user accepts the draft, edits two phrases, sends. <span class="scr">→ Screen 02</span></p>
+      </div>
+      <div class="journey-step">
+        <div class="num">Step 05</div>
+        <h4>Save to memory</h4>
+        <p>Right-click the conversation, "Save to memory · client: Acme · topic: contract negotiation." The Daily Journal Hand will reference this in tonight's check-in. <span class="scr">→ Screen 02</span></p>
+      </div>
+    </div>
+  </div>
+  <!-- Journey 2: Privacy-Conscious Pro -->
+  <div class="journey-card">
+    <div class="jhead">
+      <div class="javatar">PP</div>
+      <div>
+        <div class="jt">Drafting Case Notes Offline</div>
+        <div class="js">Privacy-Conscious Pro · on a flight · zero network · zero compromise</div>
+      </div>
+    </div>
+    <div class="scenario">"I have 90 minutes between flights. I need to transcribe a client conversation and draft notes. The work is privileged. None of it can touch a SaaS service. None of it can leave this laptop."</div>
+    <div class="journey-steps">
+      <div class="journey-step">
+        <div class="num">Step 01</div>
+        <h4>Toggle on-device-only mode</h4>
+        <p>Settings → Privacy → "On-device only." Cedar policy is rewritten to deny every cloud call, every plugin network grant, every BossFang sync. Wi-Fi can stay off. <span class="scr">→ Screen 05</span></p>
+      </div>
+      <div class="journey-step">
+        <div class="num">Step 02</div>
+        <h4>Open Audio Scribe</h4>
+        <p>Drop the recording into Audio Scribe. Whisper.cpp transcribes locally — no upload, no API call. The audio file stays in the OS keychain-encrypted folder. <span class="scr">→ Screen 01</span></p>
+      </div>
+      <div class="journey-step">
+        <div class="num">Step 03</div>
+        <h4>Transcript appears in 4 minutes</h4>
+        <p>26 minutes of conversation, transcribed and diarized. The user reviews; the diarization is accurate enough to label speakers without hand-edits. <span class="scr">→ Screen 01</span></p>
+      </div>
+      <div class="journey-step">
+        <div class="num">Step 04</div>
+        <h4>Chat asks structured questions</h4>
+        <p>"Send the transcript to Chat" routes the artifact into a fresh conversation. The user pastes a structured-notes template. Local Qwen-1.5B drafts the case notes section by section, asking the user to confirm each gap. <span class="scr">→ Screen 02</span></p>
+      </div>
+      <div class="journey-step">
+        <div class="num">Step 05</div>
+        <h4>Encrypted save to memory</h4>
+        <p>"Save case notes to memory · matter: Smith v. Jones · privileged." SurrealDB writes the entry with AES-256-GCM at rest. Sync is off; nothing replicates. <span class="scr">→ Screen 06</span></p>
+      </div>
+    </div>
+  </div>
+  <!-- Journey 3: Cross-Device Power User -->
+  <div class="journey-card">
+    <div class="jhead">
+      <div class="javatar">CP</div>
+      <div>
+        <div class="jt">Phone-to-Desktop Continuity</div>
+        <div class="js">Cross-Device Power User · same conversation, three devices, one afternoon</div>
+      </div>
+    </div>
+    <div class="scenario">"I started thinking about a strategic question on the train. I want to keep going at my desk. Then I want to read the result on my tablet on the couch. The conversation should follow me — to my own infrastructure, not to anyone's cloud."</div>
+    <div class="journey-steps">
+      <div class="journey-step">
+        <div class="num">Step 01</div>
+        <h4>Quick chat on the phone</h4>
+        <p>Open KnowMe on iPhone. Gemma-3n-2B local. Type a 3-sentence question, get a 4-paragraph response. The conversation persists to the phone's local SurrealDB. <span class="scr">→ Screen 01 mobile</span></p>
+      </div>
+      <div class="journey-step">
+        <div class="num">Step 02</div>
+        <h4>OFP gossip in the background</h4>
+        <p>While the user pockets the phone, OFP propagates the conversation entity to Home Mac Pro. CRDT merge is automatic — the conversation has a Lamport clock and merges cleanly with whatever else is on the peer. <span class="scr">→ Screen 06</span></p>
+      </div>
+      <div class="journey-step">
+        <div class="num">Step 03</div>
+        <h4>Walk to desk, open desktop</h4>
+        <p>The same conversation appears in the AI Chat history. The user picks up where they left off — model selector still set to Gemma-3n by default. <span class="scr">→ Screen 02</span></p>
+      </div>
+      <div class="journey-step">
+        <div class="num">Step 04</div>
+        <h4>Switch to Qwen-35B for depth</h4>
+        <p>For the long-form follow-up, switch the model selector to Qwen-35B-A3B running on the Home Mac Pro. Cyan "Remote" pill confirms the call is routing to the user's own server. 18 tok/s — slower, much smarter. <span class="scr">→ Screen 08</span></p>
+      </div>
+      <div class="journey-step">
+        <div class="num">Step 05</div>
+        <h4>Tablet on the couch</h4>
+        <p>Hours later, on the iPad: open KnowMe, the conversation is there with both branches. Read mode hides the composer; the day's thinking is captured, searchable, and lives entirely on devices the user owns. <span class="scr">→ Screen 02</span></p>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- Footer -->
+<footer class="doc-footer">
+  <div class="doc-footer-brand">Know<span class="me">Me</span>, LLC</div>
+  <div class="doc-footer-meta">MOODBOARD &amp; USER JOURNEYS v1.0 · MAY 2026 · know-me.tools</div>
+</footer>
+</div>
+</body>
+</html>

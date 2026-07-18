@@ -1,0 +1,19 @@
+[package]
+name = "knowme_plugin_host"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "WASM plugin host — knowme:plugin@0.1.0 WIT contract, IPFS-addressed manifests, Ed25519 trust (FUNC-SPEC §08). Skeleton crate: manifest/permission domain types are real; the Wasmtime Component Model host is stubbed."
+
+[dependencies]
+# gen_ui_types / gen_ui_agent (UAR) become dependencies when the Wasmtime host is wired (roadmap M3).
+workspace-hack = { path = "../workspace-hack" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+# NOT yet enabled (v0.1 skeleton). Wire these when the host lands:
+# wasmtime = { version = "41", features = ["component-model"] }
+# ed25519-dalek = "2"
+# sha2 = "0.10"

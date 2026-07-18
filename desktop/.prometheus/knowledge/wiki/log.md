@@ -1,0 +1,20 @@
+# Update Log
+
+## 2026-07-16
+* **Creation**: [Codegen and CI Verification Phase Executor Marker](/codegen-and-ci-verification-phase-executor-marker.md)
+* **Creation**: [kbd-apply os_mark_done Top-Level Checkbox Ordinal Fix](/kbd-apply-os-mark-done-top-level-checkbox-ordinal-fix.md)
+* **Creation**: [Codegen and CI Verification Phase Executor Complete](/codegen-and-ci-verification-phase-executor-complete.md)
+* **Creation**: [KnowMe PoC Android assembleDebug Running on SM S936U](/knowme-poc-android-assembledebug-running-on-sm-s936u.md)
+* **Creation**: [Codegen and CI Verification Phase Completion Marker](/codegen-and-ci-verification-phase-completion-marker.md)
+* **Creation**: [KnowMe PoC Session Logs Committed but Public Repo Push Blocked](/knowme-poc-session-logs-committed-but-public-repo-push-blocked.md)
+* **Creation**: [Codegen and CI Verification Executor Completion Status](/codegen-and-ci-verification-executor-completion-status.md)
+* **Creation**: [KnowMe PoC wasm embed_blocking fix for gen_ui_db_graph](/knowme-poc-wasm-embed-blocking-fix-for-gen-ui-db-graph.md)
+* **Creation**: [Codegen and CI Verification Executor Completion Marker](/codegen-and-ci-verification-executor-completion-marker.md)
+* **Creation**: [Executor Completion Marker for Codegen and CI Verification Phase](/executor-completion-marker-for-codegen-and-ci-verification-phase.md)
+* **Creation**: [KnowMe Tauri Dev Build Clean After Branding and Startup Fixes](/knowme-tauri-dev-build-clean-after-branding-and-startup-fixes.md)
+* **Creation**: [KnowMe PoC Branding, Tauri Menu, and Startup Command Fixes](/knowme-poc-branding-tauri-menu-and-startup-command-fixes.md)
+* **Creation**: [Phase Codegen and CI Verification Session Status](/phase-codegen-and-ci-verification-session-status.md)
+* **Creation**: [KnowMe PoC Codegen and Tauri Verification C-102](/knowme-poc-codegen-and-tauri-verification-c-102.md)
+* **Creation**: [Codegen and CI Verification Executor Session Complete](/codegen-and-ci-verification-executor-session-complete.md)
+* **Creation**: [KnowMe PoC Test Failures Fixed in Tauri Plugin Packaging and Startup Store](/knowme-poc-test-failures-fixed-in-tauri-plugin-packaging-and-startup-store.md)
+* **Creation**: [learn-grade validation phase clarity rubric tuning](/learn-grade-validation-phase-clarity-rubric-tuning.md)

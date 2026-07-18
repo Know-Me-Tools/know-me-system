@@ -1,0 +1,62 @@
+[package]
+name = "gen_ui_ffi"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+
+[features]
+default = []
+# whisper.cpp and llama.cpp each embed their own GGML implementation. Linking
+# both into the single force-loaded iOS staticlib creates real duplicate global
+# symbols, not byte-identical archive members. Keep Scribe available as an
+# explicit build lane until it is split into its own Apple framework/process;
+# the default mobile lane guarantees local llama.cpp chat works out of the box.
+mobile-scribe = ["dep:gen_ui_audio"]
+
+[dependencies]
+gen_ui_types    = { path = "../gen_ui_types" }
+gen_ui_runtime  = { path = "../gen_ui_runtime" }
+gen_ui_protocol = { path = "../gen_ui_protocol" }
+gen_ui_agent    = { path = "../gen_ui_agent" }
+# Mobile is a native target (iOS/Android via frb) — native-http, never wasm-http.
+gen_ui_client   = { path = "../gen_ui_client", default-features = false, features = ["native-http"] }
+# gen_ui_ffi is mobile-only (Tauri desktop has its own tauri-plugin-gen-ui) —
+# no pglite feature here: mobile's relational store is the embedded SurrealDB
+# instance in gen_ui_db_graph, not pglite-oxide (desktop-only; structurally
+# unsupported on iOS/Android per docs/pglite-oxide-tauri-hybrid.md). Enabling
+# it pulled in wasmer transitively, which fails to cross-compile for
+# i686-linux-android (E0425 UNWIND_DATA_REG, unsupported on 32-bit x86).
+gen_ui_db       = { path = "../gen_ui_db", features = ["sqlite"] }
+gen_ui_db_graph = { path = "../gen_ui_db_graph", features = ["embed-native"] }
+gen_ui_inference = { path = "../gen_ui_inference", features = ["local-llama"] }
+liter-llm.workspace = true
+flutter_rust_bridge = "=2.12.0"
+anyhow.workspace = true
+once_cell.workspace = true
+serde_json.workspace = true
+log = "0.4"
+tracing.workspace = true
+
+[lints.rust]
+# `#[frb(...)]` expands to code guarded by `cfg(frb_expand)`, a cfg name that only
+# codegen defines. Declare it expected so the pre-codegen build is warning-clean
+# under `-D warnings` (the clippy inner loop).
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+android_logger = "0.14"
+[target.'cfg(target_os = "ios")'.dependencies]
+oslog = "0.2"
+
+# gen_ui_audio (Scribe / on-device transcription via whisper-rs) is off on
+# Android: whisper-rs-sys has an unresolved CMake/NDK ABI-detection bug
+# cross-compiling for Android (the NDK toolchain file's compiler-flag
+# generation computes armv7 flags even with CMAKE_ANDROID_ARCH_ABI set for an
+# aarch64 target). See api/scribe.rs's `#[cfg(not(target_os = "android"))]`
+# gate — remove both once the CMake issue is fixed upstream or worked around.
+[target.'cfg(not(target_os = "android"))'.dependencies]
+gen_ui_audio = { path = "../gen_ui_audio", optional = true }

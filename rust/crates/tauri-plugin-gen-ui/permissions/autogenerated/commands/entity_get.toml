@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-entity-get"
+description = "Enables the entity_get command without any pre-configured scope."
+commands.allow = ["entity_get"]
+
+[[permission]]
+identifier = "deny-entity-get"
+description = "Denies the entity_get command without any pre-configured scope."
+commands.deny = ["entity_get"]

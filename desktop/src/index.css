@@ -1,0 +1,248 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Roboto:wght@300;400;500&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+@import "tw-shimmer";
+
+@custom-variant dark (&:is(.dark *));
+
+/* KnowMe brand tokens — sourced from docs/reference-app/*.html (functional
+   spec + moodboard). Dark is the default; body.light overrides for light mode. */
+@theme {
+  --color-bg: #0B0F14;
+  --color-bg-2: #111620;
+  --color-surface: #161D29;
+  --color-card: #1C2535;
+  --color-card-hov: #202B40;
+  --color-border: #1F2D40;
+  --color-border-soft: #233041;
+  --color-muted: #253044;
+  --color-muted-fg: #4B6080;
+  --color-fg: #E8EDF3;
+  --color-fg-sub: #A7B0BC;
+  --color-fg-faint: #6B7280;
+  --color-ember: #FF6A3D;
+  --color-ember-2: #E04E28;
+  --color-ember-soft: #2B1A18;
+  --color-cyan: #00C2DC;
+  --color-green: #22C55E;
+  --color-amber: #F59E0B;
+  --color-red: #EF4444;
+
+  --font-sans: 'Inter', sans-serif;
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-body: 'Roboto', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Navigation breakpoint (C-113). Overrides Tailwind's 640px default so `sm:`
+     means Material 3's compact→medium window-size-class boundary exactly
+     (https://m3.material.io/foundations/layout/applying-layout/window-size-classes):
+     below it a bottom navigation bar, at/above it a rail. Both iOS and Android
+     abandon bottom placement as windows widen — this is the width where our
+     layout follows suit, and it is a real spec value, not a round number. */
+  --breakpoint-sm: 600px;
+}
+
+:root {
+  color-scheme: dark;
+  --background: var(--color-bg);
+  --foreground: var(--color-fg);
+  --card: var(--color-card);
+  --card-foreground: var(--color-fg);
+  --popover: var(--color-card);
+  --popover-foreground: var(--color-fg);
+  --primary: var(--color-ember);
+  --primary-foreground: #0B0F14;
+  --secondary: var(--color-surface);
+  --secondary-foreground: var(--color-fg);
+  --muted: var(--color-muted);
+  --muted-foreground: var(--color-fg-sub);
+  --accent: var(--color-card-hov);
+  --accent-foreground: var(--color-fg);
+  --destructive: var(--color-red);
+  /* Flat 2.0: controls separate by filled surfaces, never strokes. */
+  --border: transparent;
+  --input: var(--color-surface);
+  --ring: var(--color-ember);
+  --chart-1: var(--color-ember);
+  --chart-2: var(--color-cyan);
+  --chart-3: var(--color-green);
+  --chart-4: var(--color-amber);
+  --chart-5: var(--color-fg-sub);
+  --radius: 0.75rem;
+  --sidebar: var(--color-bg-2);
+  --sidebar-foreground: var(--color-fg-sub);
+  --sidebar-primary: var(--color-ember);
+  --sidebar-primary-foreground: #0B0F14;
+  --sidebar-accent: var(--color-card-hov);
+  --sidebar-accent-foreground: var(--color-fg);
+  --sidebar-border: transparent;
+  --sidebar-ring: var(--color-ember);
+}
+
+body.light {
+  --color-bg: #F7F7F8;
+  --color-bg-2: #FFFFFF;
+  --color-surface: #FAFBFC;
+  --color-card: #FFFFFF;
+  --color-card-hov: #F2F4F7;
+  --color-border: #E5E8ED;
+  --color-border-soft: #EEF0F3;
+  --color-muted: #F2F4F7;
+  --color-muted-fg: #9AA3B0;
+  --color-fg: #0B0F14;
+  --color-fg-sub: #4B5563;
+  --color-fg-faint: #6B7280;
+  --color-ember: #E04E28;
+  --color-ember-2: #C13E1E;
+  --color-ember-soft: #FBE8E1;
+  --color-cyan: #0891B2;
+  --color-green: #16A34A;
+  --color-amber: #D97706;
+  --color-red: #DC2626;
+  color-scheme: light;
+
+  /* Rebind Shadcn/Assistant UI semantic aliases in the same scope. Custom
+     properties declared on :root resolve against the root's dark palette;
+     repeating the aliases here makes third-party components consume the
+     active KnowMe light tokens instead of a stale dark snapshot. */
+  --background: var(--color-bg);
+  --foreground: var(--color-fg);
+  --card: var(--color-card);
+  --card-foreground: var(--color-fg);
+  --popover: var(--color-card);
+  --popover-foreground: var(--color-fg);
+  --primary: var(--color-ember);
+  --primary-foreground: #FFFFFF;
+  --secondary: var(--color-surface);
+  --secondary-foreground: var(--color-fg);
+  --muted: var(--color-muted);
+  --muted-foreground: var(--color-fg-sub);
+  --accent: var(--color-card-hov);
+  --accent-foreground: var(--color-fg);
+  --destructive: var(--color-red);
+  --input: var(--color-surface);
+  --ring: var(--color-ember);
+  --sidebar: var(--color-bg-2);
+  --sidebar-foreground: var(--color-fg-sub);
+  --sidebar-primary: var(--color-ember);
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: var(--color-card-hov);
+  --sidebar-accent-foreground: var(--color-fg);
+  --sidebar-ring: var(--color-ember);
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  transition: background 0.3s, color 0.3s;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-ember);
+}
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: 'Geist Variable', sans-serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+  @keyframes collapsible-down {
+  from {
+    height: 0;
+    }
+  to {
+    height: var(--radix-collapsible-content-height, var(--collapsible-panel-height, auto));
+    }
+  }
+  @keyframes collapsible-up {
+  from {
+    height: var(--radix-collapsible-content-height, var(--collapsible-panel-height, auto));
+    }
+  to {
+    height: 0;
+    }
+  }
+}
+
+@layer base {
+  * {
+    @apply border-transparent outline-ring/70;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+@custom-variant data-open (&:where([data-state="open"], [data-open]:not([data-open="false"])));
+
+@custom-variant data-closed (&:where([data-state="closed"], [data-closed]:not([data-closed="false"])));
+
+/* Assistant UI owns the chat interaction/runtime. KnowMe's Flat 2.0 skin
+   removes the registry defaults' elevation; state uses filled surfaces. */
+.aui-root *,
+.aui-root *::before,
+.aui-root *::after {
+  box-shadow: none !important;
+}
+
+.aui-md blockquote,
+.aui-md hr,
+.aui-md td,
+.aui-md tr,
+.aui-md pre {
+  border-color: transparent !important;
+}

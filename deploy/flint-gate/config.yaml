@@ -1,0 +1,69 @@
+server:
+  listen: 0.0.0.0:4456
+  admin_listen: 0.0.0.0:4457
+  admin_auth:
+    provider:
+      type: kratos
+      base_url: http://kratos:4433
+      forward_cookies: true
+      session_cookie: ory_kratos_session
+  strict_agent_governance: true
+  tls:
+    enabled: false
+
+cache:
+  l1:
+    max_capacity: 10000
+    ttl_seconds: 60
+  l2:
+    enabled: false
+  invalidation_channel: flintgate_config_changed
+
+auth_providers:
+  kratos_session:
+    type: kratos
+    base_url: http://kratos:4433
+    forward_cookies: true
+    session_cookie: ory_kratos_session
+  anonymous:
+    type: anonymous
+    default_subject: anonymous
+
+jwt:
+  signing_algorithm: HS256
+  signing_key_secret: local-only-overridden-by-FLINT_GATE_JWT_SECRET
+  issuer: http://flint-gate:4456
+  default_ttl_seconds: 300
+
+sites:
+  - id: knowme
+    domains:
+      - localhost:4456
+      - 127.0.0.1:4456
+    default_auth: kratos_session
+    default_upstream: http://knowme-web:8080
+
+routes:
+  - id: health
+    site: knowme
+    match:
+      path: /api/v1/health
+      methods: [GET]
+    upstream: http://knowme-web:8080/api/v1/health
+    auth: anonymous
+    priority: 100
+  - id: ready
+    site: knowme
+    match:
+      path: /api/v1/ready
+      methods: [GET]
+    upstream: http://knowme-web:8080/api/v1/ready
+    auth: anonymous
+    priority: 100
+  - id: knowme-all
+    site: knowme
+    match:
+      path: /**
+      methods: []
+    auth: kratos_session
+    priority: -1
