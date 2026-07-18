@@ -5,7 +5,7 @@ web, desktop (macOS/Windows/Linux), and mobile (iOS/Android) — including first
 onboarding, per-environment hardware detection, distribution (Hugging Face vs. a
 KnowMe-controlled origin), and post-download validation.
 
-**Status:** v1.1 strategy, 2026-07-18 (v1.1 adds §10 per-machine reference picks and §11 embeddings). Companion to `docs/knowme-functional-spec.html`
+**Status:** v1.2 strategy, 2026-07-18 (v1.1 added §10 per-machine picks and §11 embeddings; v1.2 adds §12 Model Library UX). Companion to `docs/knowme-functional-spec.html`
 (§04 Models tile, §10 Tiers) and `docs/knowme-builder-extensibility-spec.md` (§7
 packaging). Implements against `rust/crates/gen_ui_inference` (llama-cpp-2 +
 reqwest/sha2, mistral.rs optional) and the `versions.toml` `[inference]` matrix
@@ -410,7 +410,96 @@ Sources: [BentoML open-source embedding guide](https://www.bentoml.com/blog/a-gu
 [Milvus 2026 comparison](https://milvus.io/blog/choose-embedding-model-rag-2026.md),
 [Ollama embedding benchmark](https://www.morphllm.com/ollama-embedding-models).
 
-## 12. References
+## 12. The Model Library UX — choose anything, recommend the best
+
+The §10 picks are *defaults*, not walls. The product stance (moodboard Screen 08:
+"a library, not an offering") is that the user may run **any** model they can name —
+curated, community, or sideloaded — and the UI's job is to make the consequences
+legible before the download, not to gatekeep. This section specifies that surface.
+
+### 12.1 Two shelves, one treatment
+
+- **Curated shelf** — the signed KnowMe catalog (§4/§5): the small artifact set from
+  §10, each entry carrying verified hashes, license metadata, and requirement blocks.
+  Trust pill: green `curated` (same visual grammar as the plugin installer's
+  `Ed25519 verified` pill — one trust language across the app).
+- **Open shelf** — live search of the Hugging Face GGUF universe (LM Studio's Discover
+  pattern: query HF directly, list every quant "sized for your machine" —
+  [LM Studio guide](https://codersera.com/blog/lm-studio-complete-guide-2026/)). We
+  read the GGUF metadata HF exposes per file (arch, params, quant) *remotely*, so the
+  fit-check (§3.2) runs **before** any bytes move. Trust pill: amber `community`
+  (unverified hash source; we compute and pin the SHA-256 ourselves on first fetch),
+  plus the gated-model token flow from §5.1 when applicable.
+- **Sideload** — drop a `.gguf` anywhere (drag onto the Models tile, or the watched
+  models folder): registered through the same gates (§7), badge `sideloaded`, no
+  network at all. This is the sovereignty proof point and it must never feel
+  second-class.
+
+Every shelf renders the same `model-row` component from the moodboard (status dot ·
+name · size · backend/speed pill · action), extended with two new pill classes:
+**fit** and **trust**. No separate "advanced" browser — one library, filterable.
+
+### 12.2 Fit badges — the traffic light, with reasons
+
+Computed per artifact × this device's `DeviceProfile`, in the moodboard's existing
+color vocabulary (green/amber/red pills, ember for active):
+
+| Badge | Meaning | Row behavior |
+|---|---|---|
+| `recommended` (ember) | Top pick for a declared use (§12.3) on this hardware | Sorted first; reason string shown inline |
+| `fits` (green) | Passes §3.2 with headroom | One-click download |
+| `tight` (amber) | Fits only with reduced ctx / partial offload / swap risk (LM Studio's yellow-badge case: "spills to swap, which murders throughput") | Download allowed; the *mitigation is stated*: "runs at ctx 4k" / "CPU-offloads 12 layers, est. ~9 t/s" |
+| `won't fit` (red) | Fails even minimal config | Not hidden, not disabled: explicit override with a double-confirm ("needs ~21 GB; this device budgets 10.5 GB — it will not load") — the user owns the machine |
+
+Numbers beat adjectives everywhere: each badge expands (tap/hover) to the actual
+arithmetic — weights + KV(ctx) + buffers vs. budget — in the cyan annotation style the
+moodboard uses for design-intent callouts.
+
+### 12.3 Recommendation chips — per use, with visible reasons
+
+Recommendations are *per task*, not global — small chips on the library header filter
+and re-rank: **Daily driver · Agents/Hands · Vision · Coding · Embeddings**. Selecting
+"Agents/Hands" surfaces the §10 tool-calling floor as UX: models under the reliability
+floor for this device get a one-line caution ("under ~7B, multi-step tool calls become
+unreliable — fine for chat and drafting"), and the recommended agent-tier model for
+this hardware wears the ember pill. Every `recommended` pill carries its reason string
+("best quality within your 16 GB unified-memory budget at ≥30 t/s") — the
+recommendation is an argument, never an oracle.
+
+### 12.4 Estimated vs. measured performance
+
+For any model we haven't run here — including every open-shelf model — show
+**estimated** decode speed with an explicit tilde ("est. ~25 t/s"), derived from the
+device's measured memory bandwidth (calibrated once by the §7 benchmark gate on a known
+model; decode is bandwidth-bound, so `est ≈ bandwidth / bytes-per-token(active params ×
+quant)`). After first activation, the measured number replaces the estimate everywhere
+(Engine Card, model row, recommendation reasons) and the row is marked `measured`.
+Never display a guess in the same typography as a measurement.
+
+### 12.5 Per-model configuration, defaults from the profile
+
+Each model row opens a detail sheet (engine-card layout: stats grid, license, source,
+hash, run history): ctx length, GPU offload, KV quant, threads — all defaulted by the
+fit-checker, all overridable, with the fit badge **recomputed live** as the user drags
+ctx up ("32k ctx moves this model to *tight*"). Overrides persist per model per device
+(device-scoped settings, per the extensibility spec's settings model). Where an MLX or
+alternative-format build exists for the platform (Apple Silicon), prefer it in the
+default artifact choice and say why — mirroring LM Studio's format preference cue.
+
+### 12.6 What we deliberately do differently from the other tools
+
+LM Studio's compatibility badges and HF-direct search are the right patterns and we
+adopt them; Ollama's one-command simplicity maps to our curated one-click defaults.
+Where we diverge: (1) **reasons everywhere** — no unexplained "should work"; every
+badge expands to arithmetic, every recommendation to an argument; (2) **one trust
+grammar** — model pills and plugin pills use the same verified/community/unsigned
+visual language; (3) **remote models in the same library** — BossFang-hosted models sit
+in the same list with the cyan `remote` pill (moodboard Screen 08), so "choose any
+model" includes *models your other machines can serve*; recommendations may legitimately
+conclude "run this one on your Mac Pro instead" — that's a recommendation, not a
+failure; (4) **task-scoped recommendation chips** rather than a single global ranking.
+
+
 
 - Hugging Face: [gated models](https://huggingface.co/docs/hub/en/models-gated) ·
   [downloading](https://huggingface.co/docs/hub/models-downloading) ·
