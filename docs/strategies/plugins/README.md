@@ -219,10 +219,35 @@ so they land in manifest v2 immediately:
 
 1. **Stable publisher identity** — the signing `did:key:` *is* the merchant identity
    later; key rotation gets a documented procedure now.
-2. **License + entitlement fields** — schema'd, ignored by v1 hosts. When commerce
-   arrives, entitlement verification reuses the license-key → short-lived-URL
-   machinery already specced for Pro models (local-models doc §5.2) — keys gate
-   *download/activation*, never runtime, preserving the sovereignty guarantee.
+2. **License + entitlement fields** — schema'd, ignored by v1 hosts. **The
+   entitlement standard is W3C Verifiable Credentials** (Data Model 2.0, SD-JWT/JOSE
+   securing): the trust plane is already DID-native on both ends — publishers sign
+   manifests with `did:key` (issuer), users hold `did:key` identity keys (holder) —
+   so a paid entitlement is a VC: issuer = author DID, subject = user DID, claims =
+   `{plugin_id, tier, version_range, type: perpetual|subscription|trial|seat,
+   expiry}`. Properties this buys:
+   - **Offline, sovereign verification** — pure signature-chain checking in the
+     container; no license server, works air-gapped (stronger than the license-key →
+     presigned-URL sketch in local-models §5.2, which remains the *download*-gating
+     transport; the VC is the *rights* object).
+   - **Wallet sync for free** — a VC is a small signed document; it syncs over OFP as
+     a user-scoped entity, so every instance's identity keystore is the wallet and
+     rights are presentable on any device without re-authentication.
+   - **Enforcement at install/update/activation, never runtime** — Cedar evaluates
+     the entitlement claim in the activation policy; a lapsed subscription blocks
+     updates, never bricks installed software.
+   - **Revocation by lifetime, not lists** — perpetual = long-lived VC, no
+     revocation (sold stays sold); subscription = short-lived VC (30–90 d) reissued
+     on renewal; Bitstring Status List available as an issuer-optional online
+     freshness check. Transfer/resale = reissuance under author policy, never bearer
+     passing. Teams = issue to org DID; members present membership + org entitlement
+     as a delegation chain through the existing org/personal Cedar layering.
+   - **Honesty clause** — client-side verification is friction-for-honesty, not DRM;
+     the paid value is signed authenticity, updates, support, and convenience. No
+     arms race.
+   - **One credential shape for everything** — Pro-tier licensed models, team
+     memberships, and future feature entitlements are the same VC with different
+     claim types: one wallet, one verifier, one Cedar integration.
 3. **Review-ready metadata** — SBOM, permission declarations, and capability cards
    are exactly what a curated storefront needs to render listings and diff permission
    changes across versions. No extra work later; it's the same artifact.
@@ -331,6 +356,11 @@ freely under their declared sync classes.
    model.
 7. **Org-over-personal policy layering** (§10) — restrictive-only merge is the
    default; confirm no legitimate case requires an org grant exceeding personal policy.
+8. **Entitlement-VC issuance topology** — author-issued directly, marketplace as
+   co-issuer/broker (revenue split needs the marketplace in the flow), or both?
+   Default: schema supports either issuer; topology decided with the marketplace.
+   Related: author key rotation/compromise procedure for the issuer DID must be
+   documented before any paid issuance begins.
 
 ## 13. Implementation map (this repo)
 
