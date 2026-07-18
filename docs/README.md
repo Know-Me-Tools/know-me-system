@@ -8,6 +8,7 @@
 | `knowme-moodboard-user-journeys.html` | **UX-MOOD v1.0** — moodboard & user-journey atlas: 8 screens across desktop/tablet/phone with per-surface narratives, plus three end-to-end persona journeys |
 | `implementation-roadmap.md` | Spec → module map for this monorepo and the M1–M7 gap-closure plan |
 | `strategies/local-models/README.md` | **Local model acquisition & management** — onboarding flow, per-platform hardware detection (unified memory, VRAM, jetsam, WebGPU), KnowMe-controlled origin (R2/CDN + IPFS + OFP peer) vs. Hugging Face fallback, license/auth model, resumable downloads per tier, five-gate post-download validation |
+| `strategies/model-configuration/README.md` | **Provider & model configuration** — Cherry-Studio-informed three-level resolution (global role slots → agent/Hand pin with deployment-target scoping → conversation override + @mention), `provider::model` registry with capability precedence, multi-device placement walk, per-index embedding bindings with re-embed migrations, local-only usage-based suggestions |
 | `knowme-builder-extensibility-spec.md` | **DRAFT v0.1** — KnowMe Builder local-first × realtime × WASM extensibility: triad sync topology (Electric/FRF read path · intent log · Loro CRDT), unified `prometheus:component/*` WIT family, settings-as-schema model, `.pxt` packaging (IPFS+OCI, DID+cosign), W1–W8 plan, open questions for the deep-research report |
 
 ## Engineering standards & references (carried from the reference repo)
