@@ -198,6 +198,12 @@ plus the core imports every component gets (log, kv, emit-event, uar-invoke).
 
 ### 4.3 Two agent kinds, one lifecycle (the synthesis)
 
+> **Framing update (see `docs/strategies/plugins/README.md`):** a native agent is not
+> a distinct package type — it is a plugin declaring the `knowme:agent` **capability**.
+> Everything below about the component kind is the agent-capability view of that
+> capability-centric model; the Hands wizard is the product surface that binds an
+> agent-capability plugin into a Hand.
+
 ```
 Hand ─┬─ declarative (text): prompt/skill/schedule metadata — the 90% case,
       │    portable to every placement including web
