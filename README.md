@@ -18,6 +18,8 @@ know-me-system/
 │   └── crates/
 │       ├── gen_ui_*            ← working core: types, runtime, protocol, mcp, db(+graph/SurrealDB),
 │       │                          inference, audio (whisper), agent (UAR), ffi, tauri plugin, wasm, servers
+│   └── vendor/librefang/       ← submodule: BossFang Agent OS (sidecar base — hands, channels,
+│                                  skills, uar-spec, ACP, extensions, memory-wiki; see docs/strategies/bossfang)
 │       ├── knowme_hands        ← Hands system skeleton (FUNC-SPEC §06)
 │       ├── knowme_ofp          ← OFP peer-sync skeleton (FUNC-SPEC §07)
 │       └── knowme_plugin_host  ← WASM plugin host skeleton + knowme:plugin@0.1.0 WIT (FUNC-SPEC §08)

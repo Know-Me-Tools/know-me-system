@@ -28,6 +28,34 @@ roles that complete it:
 Both arrive as **capability plugins** (`knowme:channel`, `knowme:harness`) — no new
 subsystem kinds, the §1-inversion of the plugins doc doing its job.
 
+### 1.1 The vendored base (2026-07-18)
+
+The [`GQAdonis/librefang`](https://github.com/GQAdonis/librefang) fork (BossFang —
+"Libre Agent Operating System", community fork of openfang; 24 crates, 2,100+ tests)
+is vendored as a submodule at **`rust/vendor/librefang`**. It is not a blank canvas —
+large parts of this document already exist there and this strategy becomes a
+*customization and integration* plan rather than a build plan:
+
+| Strategy concern | librefang crate(s) already providing it |
+|---|---|
+| Channel gateway (§3) | `librefang-channels` — "pluggable messaging integrations" |
+| Hands (§1, agents doc) | `librefang-hands` — "curated autonomous capability packages" |
+| Skills + marketplace + claw compat (skill-support doc) | `librefang-skills` — "registry, loader, marketplace, and OpenClaw compatibility" |
+| UAR agent metadata | `librefang-uar-spec` — UAR-AGENT-MD parser + AgentManifest translator |
+| Harness/IDE embedding | `librefang-acp` — Agent Client Protocol adapter (Zed/VSCode/JetBrains over stdio JSON-RPC); `librefang-subprocess` + `librefang-runtime-sandbox-docker` for driving external CLIs sandboxed |
+| Extensions + credentials | `librefang-extensions` — one-click MCP setup, credential vault, OAuth2 PKCE |
+| Memory/karpathy wiki | `librefang-memory`, `librefang-memory-wiki` — durable markdown vault with provenance frontmatter |
+| Governance/audit hooks | `librefang-runtime-audit`, `librefang-kernel-metering`, `librefang-kernel-router` |
+| Model drivers | `librefang-llm-driver(s)` |
+
+Integration posture: KnowMe-specific behavior (Cedar dual-identity per plugins doc §9,
+OFP profile, the capability-card vocabulary, settings substrate) lands as **adapters
+and upstreamable patches around these crates**, keeping the submodule tracking its
+upstream; the ACP adapter also opens a *fourth* harness direction — BossFang agents
+embedded into Zed/VSCode/JetBrains, not just external harnesses embedded into
+BossFang. The gap analysis between `librefang-skills`' OpenClaw-compat model and this
+stack's structural-boundary claims (§2) is the first integration task.
+
 ## 2. Positioning: the claw with a real boundary
 
 The claw category ([OpenClaw](https://github.com/openclaw/openclaw)) proved enormous
