@@ -5,7 +5,7 @@ web, desktop (macOS/Windows/Linux), and mobile (iOS/Android) — including first
 onboarding, per-environment hardware detection, distribution (Hugging Face vs. a
 KnowMe-controlled origin), and post-download validation.
 
-**Status:** v1.0 strategy, 2026-07-18. Companion to `docs/knowme-functional-spec.html`
+**Status:** v1.1 strategy, 2026-07-18 (v1.1 adds §10 per-machine reference picks and §11 embeddings). Companion to `docs/knowme-functional-spec.html`
 (§04 Models tile, §10 Tiers) and `docs/knowme-builder-extensibility-spec.md` (§7
 packaging). Implements against `rust/crates/gen_ui_inference` (llama-cpp-2 +
 reqwest/sha2, mistral.rs optional) and the `versions.toml` `[inference]` matrix
@@ -336,7 +336,81 @@ means "fetch the digest again", not "figure out what broke").
 - `knowme_ofp`: "peer-has-digest" query + LAN fetch (§5.3 source 1) — additive to the
   M2 sync milestone.
 
-## 10. References
+## 10. Reference picks by machine (July 2026)
+
+Concrete catalog seeds for the situations we care about. Sizes are Q4_K_M GGUF unless
+noted; tok/s are decode-phase, *indicative* — the §7 benchmark gate always decides
+(figures from [llmcheck.net Apple-Silicon benchmarks](https://llmcheck.net/benchmarks),
+[modelfit iPhone guide](https://modelfit.io/guides/best-llm-for-iphone/),
+[klymentiev hardware guide](https://klymentiev.com/blog/best-local-llm), and the
+[PromptQuorum tool-calling benchmark](https://www.promptquorum.com/power-local-llm/best-local-models-tool-calling-2026)).
+RAM figures below are GB. Two rules of thumb frame every row:
+
+- **Tool calling has a size floor.** Multi-step agentic tool use gets reliable at
+  ~14B+ dense or ~30B-A3B MoE (≥93 % well-formed calls); 7–8B is fine for single-shot
+  structured calls; below 7B, models emit malformed calls on multi-step chains — a 95 %
+  per-call rate compounds to ~66 % over 8 steps. Sub-4B models are for
+  triage/classification and drafting, with **grammar-constrained JSON**
+  (llama.cpp [function-calling support](https://github.com/ggml-org/llama.cpp/blob/master/docs/function-calling.md)
+  handles Qwen/Hermes-style templates and can force valid JSON) as the mitigation.
+  Consequence for KnowMe: on small-tier devices, Hands should run *fewer, simpler*
+  tool steps locally and route complex chains to a BossFang peer.
+- **MoE is the CPU/unified-memory cheat code.** Qwen3-30B-A3B (30B total / 3B active)
+  gives ~14B-class quality at small-model decode cost wherever *memory* is abundant and
+  *compute* is not (Intel CPU boxes, 32 GB+ Macs).
+
+| Machine | Daily driver (why) | Agent/Hands tier | Vision | Indicative speed |
+|---|---|---|---|---|
+| **MacBook Pro M1 2021, 16 GB** | Qwen3 8B (~5.0 GB) — best quality that leaves headroom for app+DB; Qwen3 4B (~2.5 GB) when multitasking | Single-shot tools OK (8B); multi-step → peer | Gemma 3 4B-IT (~3 GB, 128k ctx, vision) | 4B ≈ 50 t/s · 8B ≈ 35–40 t/s |
+| **M1 Pro/Max 2021, 32 GB** | Qwen3 14B (~9 GB) — first tier where local multi-step tool calling is respectable | Qwen3-30B-A3B (~18 GB) fits, memory-bandwidth-friendly (3B active) | Gemma 3 12B (~7.6 GB) | 14B ≈ 25–30 t/s · 30B-A3B ≈ 30–40 t/s (Max) |
+| **M1 Max 2021, 64 GB** | Qwen3-30B-A3B comfortable + room for KV/ctx | Gemma 4 27B (~16 GB, ~95 % tool-call rate) or Qwen3 32B (~93 %); Llama 3.3 70B Q4 (~40 GB) possible but ~7–9 t/s — quality ceiling, not a daily driver | Gemma 3 27B | 27–32B dense ≈ 12–18 t/s |
+| **Mac mini M4, 16 GB** | Qwen3 4B — M4 makes small models feel instant; Qwen3 8B (~5 GB) for quality | 8B single-shot; multi-step → peer | Gemma 3 4B | 4B ≈ 80–118 t/s · 8B ≈ 60–80 t/s |
+| **Mac mini M4, 32 GB** | Qwen3 14B (~9 GB) | **Qwen3-30B-A3B (~18 GB) — the recommended always-on BossFang/Hands node config** | Gemma 3 12B | 14B ≈ 35–40 t/s · 30B-A3B ≈ 40+ t/s |
+| **Mac Intel desktop, 96 GB, no GPU** | **Qwen3-30B-A3B** — the MoE showcase: 96 GB swallows the 18 GB file; only 3B active params per token keeps CPU decode usable (~10–15 t/s AVX2); Phi-4-mini 3.8B (~2.3 GB) as the snappy lane (~15–20 t/s) | 30B-A3B (good calls, slow chains — cap steps) | Skip local vision; route to peer | Dense 8B ≈ 8–12 t/s — prefer the MoE |
+| **Standard Windows laptop, no GPU (8–16 GB)** | Qwen3 4B or Phi-4-mini 3.8B (~2.3–2.5 GB), ctx capped 4–8k; Gemma 3n E2B where its per-layer-embedding footprint helps | Triage/single-tool only, grammar-constrained; chains → peer/cloud | Gemma 3 4B if 16 GB | ≈ 8–15 t/s CPU (AVX2) |
+| **Linux, 32 GB RAM, RTX 4070 Ti 12 GB** | Qwen3 14B (~9 GB) fully offloaded — the 12 GB-VRAM sweet spot | Qwen3-Coder-30B-A3B with MoE expert-offload to system RAM (llama.cpp `--n-cpu-moe`): ~96 % on code-shaped tool work at ~20–30 t/s | Gemma 3 12B (~7.6 GB, fits VRAM) | 14B ≈ 45–60 t/s CUDA · 12B ≈ 40–50 t/s |
+| **Chrome (WebLLM lane), any of the above** | Qwen3 1.7B q4f16 (~1.1 GB) as the universal default; Qwen3 4B (~2.5 GB) on machines with a real GPU and granted persistent storage | Structured single calls only (grammar via WebLLM JSON mode); Hands don't run in the browser tier | — | dGPU ≈ 25–40 t/s · iGPU ≈ 8–20 t/s |
+| **iPhone 17 (8 GB — the 128/256/512 GB storage tiers don't change RAM, only how many models fit on disk)** | Gemma 4 E2B (~25 t/s) or Qwen3.5 2B — both under ~4 GB resident, inside the jetsam budget (§3.1); 4B-class Q4 works but at 8–15 t/s and thermal cost | Single-tool max; Hands execute on peers, phone renders results | Gemma 4 E2B (multimodal) | 2B ≈ 20–25 t/s · 4B ≈ 8–15 t/s |
+| **iPhone 17 Pro (12 GB)** | Gemma 4 E4B (~30 t/s measured); Qwen3.5 4B for text-heavy | Single-shot tools locally; short chains viable but battery/thermal-gated | Gemma 4 E4B | ≈ 30 t/s |
+| **Galaxy S24 (8 GB; Ultra 12 GB)** | Qwen3 1.7B / Qwen3.5 2B Q4; Gemma 3n E2B (its PLE design targets exactly this class) | Triage/single-tool, grammar-constrained | Gemma 3n E2B | ≈ 10–18 t/s (NEON; Vulkan on Adreno where stable) |
+| **Galaxy S26 (12 GB+)** | Gemma 4 E4B or Qwen3.5 4B | Single-shot tools locally | Gemma 4 E4B | ≈ 15–25 t/s |
+| **Standard Android (6–8 GB midrange)** | Qwen3 0.6B–1.7B Q4 (0.4–1.1 GB) — summarize/draft/triage lane; be honest that this tier is an *assistant*, not an agent | None locally — always peer/cloud | — | ≈ 5–12 t/s CPU |
+
+Catalog implications: the matrix reduces to a small artifact set — Qwen3
+{0.6B, 1.7B, 4B, 8B, 14B, 30B-A3B, Coder-30B-A3B}, Qwen3.5 {2B, 4B}, Gemma 3
+{4B, 12B, 27B} + Gemma 3n/4 {E2B, E4B}, Phi-4-mini, and (Pro tier) Gemma 4 27B /
+Qwen3 32B-class — all Apache-2.0/Gemma-terms redistributable through the §5 origin.
+Every row is a *default*, surfaced with its reason string in the §2 recommendation card.
+
+## 11. Embedding models for RAG (all tiers)
+
+The memory/RAG layer (SurrealDB graph + sqlite-vec on mobile, PGlite/pgvector on
+web/desktop, Postgres+pgvector on flint-forge) needs embeddings everywhere the LLM
+runs — and unlike chat models, **the embedding model must be consistent per index**:
+vectors from different models (or different truncation dims) don't compare. The catalog
+therefore stamps `{embedding_model_id, dim}` into every index/KB it creates, and OFP
+sync treats a mismatch as a re-embed job, not a merge.
+
+| Model | Size | Dims | Why / where |
+|---|---|---|---|
+| **EmbeddingGemma-300M** — the default everywhere | ~300 MB (Q8; <200 MB quantized) | 768, Matryoshka-truncatable to 512/256/128 | 100+ languages, 2k ctx, built for on-device; runs on every tier including midrange Android and the browser (ONNX/transformers.js). Truncate to 256 on mobile (sqlite-vec size/speed), keep 768 on desktop/server — same model, so re-embedding on upgrade is optional, but *dims must match within one index* |
+| **Qwen3-Embedding-0.6B** — quality upgrade | ~600 MB | flexible 32–1024 (MRL) | Instruction-aware (task prefixes buy 1–5 %), 100+ languages; the desktop/BossFang default when quality beats footprint |
+| **BGE-M3** — server-side heavy hitter | ~1.2 GB (fp16) | dense + sparse + multi-vector | 8k ctx, hybrid retrieval; runs on flint-forge/BossFang (optionally in-DB via Flint Ember), not on devices |
+| **Nomic Embed Text v2 (MoE)** | 475M total / 305M active | 768 → 256 | Alternative default if MoE efficiency matters; ~100 languages |
+| Reranker: **Qwen3-Reranker-0.6B** (or bge-reranker-v2) | ~600 MB | — | Optional second stage on desktop/server only; skip on mobile |
+
+Tiering that falls out: **phones and web** embed with EmbeddingGemma@256 locally (queries
+always embeddable offline); **desktop** embeds with Qwen3-Embedding-0.6B@768 or
+EmbeddingGemma@768; **BossFang/flint-forge** can maintain a BGE-M3 hybrid index for the
+heavy corpus and serve it to devices via the read path — devices keep a local
+EmbeddingGemma index over their own hot subset. Embedding artifacts flow through the
+same §5 origin, §6 downloader, and §7 gates (smoke test: embed a fixed sentence, assert
+dim + finite norm + cosine-similarity sanity against a stored reference vector).
+Sources: [BentoML open-source embedding guide](https://www.bentoml.com/blog/a-guide-to-open-source-embedding-models),
+[Milvus 2026 comparison](https://milvus.io/blog/choose-embedding-model-rag-2026.md),
+[Ollama embedding benchmark](https://www.morphllm.com/ollama-embedding-models).
+
+## 12. References
 
 - Hugging Face: [gated models](https://huggingface.co/docs/hub/en/models-gated) ·
   [downloading](https://huggingface.co/docs/hub/models-downloading) ·
@@ -363,3 +437,13 @@ means "fetch the digest again", not "figure out what broke").
 - Integrity/validation: [llama.cpp #15250 (no built-in verification)](https://github.com/ggml-org/llama.cpp/issues/15250) ·
   [GGUF corruption & compatibility](https://ritridata.com/ai-tool-recovery/gguf-corruption-llama-cpp-compatibility-model-versioning) ·
   [load-failure taxonomy](https://markaicode.com/errors/llamacpp-model-load-failed-fix/)
+- Model selection & performance (§10): [Apple-Silicon tok/s benchmarks](https://llmcheck.net/benchmarks) ·
+  [hardware-tier model guide](https://klymentiev.com/blog/best-local-llm) ·
+  [iPhone on-device LLM guide](https://modelfit.io/guides/best-llm-for-iphone/) ·
+  [tool-calling benchmark 2026](https://www.promptquorum.com/power-local-llm/best-local-models-tool-calling-2026) ·
+  [llama.cpp function-calling docs](https://github.com/ggml-org/llama.cpp/blob/master/docs/function-calling.md) ·
+  [Unsloth tool-calling guide](https://unsloth.ai/docs/basics/tool-calling-guide-for-local-llms) ·
+  [SLM rankings 2026](https://localaimaster.com/blog/small-language-models-guide-2026)
+- Embeddings (§11): [BentoML open-source embedding models](https://www.bentoml.com/blog/a-guide-to-open-source-embedding-models) ·
+  [Milvus embedding comparison 2026](https://milvus.io/blog/choose-embedding-model-rag-2026.md) ·
+  [Ollama embedding benchmark](https://www.morphllm.com/ollama-embedding-models)
