@@ -88,8 +88,9 @@ evidence, per the same restraint the WIT contract already practices:
 
 | Capability | What declaring it means |
 |---|---|
-| `knowme:agent` | A2A-shaped task lifecycle (agents doc §4); bindable into Hands |
-| `knowme:skill` | UAR-invocable tool(s); appears in the Skills tab and allow-lists |
+| `knowme:agent` | A2A-shaped task lifecycle (agents doc §4); bindable into Hands; carries its own identity (§9) |
+| `knowme:tool` | A single MCP-compatible callable: name, description, JSON-Schema input/output, annotations — the atomic spec-first unit (see `strategies/skill-support`) |
+| `knowme:skill` | A packaged practice: one or more tools + instructions + policy defaults + settings, with a scope (`global` / `agent-private` / `agent-exposed`) — see `strategies/skill-support` |
 | `knowme:hook` | Declared participation in named pipeline stages (agents doc §3) |
 | `knowme:provider` | An LLM/embedding provider kind + settings schema (model-config doc §2.2) |
 | `knowme:ui-library` | A2UI component library (§4), no behavior of its own |
@@ -176,7 +177,85 @@ so they land in manifest v2 immediately:
 
 Revenue split, curation policy, refunds: out of scope until traction.
 
-## 9. Open questions (defaults taken, flagged for decision)
+## 9. Governance and identity
+
+Governance is **part of the specification**, not an afterthought bolted on at install:
+
+- **Every capability card may carry a `governance` block**: Cedar policy templates
+  (the plugin's proposed defaults, rendered and reviewed at install exactly like
+  permissions), resource budgets (tokens, invocations/hour, network destinations),
+  and the data classes touched. The host merges these *proposals* with the user's
+  policies; the plugin never grants itself anything.
+- **Agents are principals.** Each agent *instance* — a deployed Hand, whether
+  declarative or component-backed — is minted its own `did:key:` at creation and
+  registered with the container (and, when server-connected, with the identity plane:
+  Ory/flint-gate). Identity is **per-instance, never per-definition**: two
+  installations of the same shared agent are two principals.
+- **Dual-identity resolution.** Every governed action carries *user as subject* and
+  *agent as actor* — the RFC 8693 token-exchange pattern. Server-side, flint-gate
+  issues short-lived JWTs with `sub` = user, `act` = agent DID, plus claims:
+  capability set, hand id, placement, policy version. Because `flint_auth` (Anvil)
+  already injects JWT claims into Postgres GUCs, **RLS can natively distinguish "the
+  user directly" from "the user via agent X"** — no new database machinery. Locally,
+  Cedar evaluates with the agent as principal and the user in context; policies may
+  require either or both ("Inbox Triage may read mail *for Travis*; nothing may send
+  mail").
+- **Audit keys on the pair.** Every audit-trail entry records `(user, agent, capability,
+  action)` — the question "what did this agent do on my behalf" becomes a query, and
+  revoking one agent's access never touches the user's own.
+
+## 10. Sharing
+
+Plugins, agents, Hands, and skills are **sharable artifacts** — they are signed text
+and WASM, so sharing is distribution, not replication of authority:
+
+- **Channels**: OFP peers (personal mesh, team instances), signed export bundles, or
+  published `.pxt` CIDs — same trust pipeline regardless of channel.
+- **Definitions travel; identity and grants do not.** A received agent is installed
+  like any plugin: fresh agent DID, permission review, first-use consent, its
+  proposed Cedar policy shown as a *proposal*. A shared artifact can never carry its
+  author's authority into your system.
+- **Team semantics** ride the team instance: an org publishes governed agents/skills
+  to its BossFang; members install with org Cedar policies layered over personal ones
+  (org policy can forbid what personal policy would allow, never the reverse).
+
+## 11. The settings substrate
+
+Everything in this ecosystem has settings — plugins, capabilities, agents, skills,
+tools, indexes — and **all of it stores in one metadata-driven substrate** (aligned
+with the prometheus-entity-management metadata base-schema approach): two tables,
+JSON columns, schema-as-data.
+
+```sql
+-- identical shape in SurrealDB (client) and Postgres/flint-forge (server)
+settings_definition(
+  id, owner_kind,            -- capability | plugin | agent | index | container
+  owner_id, key,
+  schema JSONB,              -- JSON Schema 2020-12
+  scope,                     -- device | user | tenant | agent
+  sensitivity,               -- normal | secret (secret ⇒ keychain/Vault ref, never value)
+  sync_class, version, ui_hints JSONB )
+
+settings_value(
+  definition_id,
+  scope_key,                 -- e.g. user:did:… | device:… | tenant:… | agent:did:…
+  value JSONB,               -- validated against schema at write
+  clock JSONB,               -- CRDT/Lamport metadata for synced scopes
+  updated_at, updated_by )   -- updated_by is a (user, agent) pair — §9 audit rule
+```
+
+Consequences: **one generic settings engine** validates, stores, syncs (per scope and
+sync class), and audits every setting in the system regardless of complexity; **A2UI
+settings components are generated from `schema` + `ui_hints`** — every plugin gets a
+settings page on every platform for free, and a plugin may *optionally* ship custom
+A2UI components for richer settings UX, bound to the same definitions; the **`agent`
+scope** is the fourth scope — agent instances have their own settings resolved through
+the same tables; migrations are additive schema-version bumps on the definition row,
+with old values migrated lazily by the engine. Secrets are references into
+keychain/Flint Vault — the substrate never holds secret material, so the tables sync
+freely under their declared sync classes.
+
+## 12. Open questions (defaults taken, flagged for decision)
 
 1. **Card embedding ownership** — default: registry ships text, devices embed locally
    (taken in §7). Alternative rejected: registry-shipped vectors.
@@ -191,7 +270,14 @@ Revenue split, curation policy, refunds: out of scope until traction.
 5. **`knowme:theme` envelope** — how much may a theme deviate from the brand system?
    Needs a constraint schema (single-accent restraint as a validator, not a vibe).
 
-## 10. Implementation map (this repo)
+6. **Agent JWT lifetime & refresh** — default: short-lived (≤15 min) actor tokens
+   issued per run by the placement's gateway; long-running tasks refresh via the
+   placement, never hold long-lived credentials. Confirm against flint-gate's token
+   model.
+7. **Org-over-personal policy layering** (§10) — restrictive-only merge is the
+   default; confirm no legitimate case requires an org grant exceeding personal policy.
+
+## 13. Implementation map (this repo)
 
 - `rust/crates/knowme_plugin_host`: `CapabilityCard` types + manifest v2 parsing;
   capability registry fetch/verify; per-capability WIT world binding (agent world per
@@ -203,5 +289,13 @@ Revenue split, curation policy, refunds: out of scope until traction.
   cards; `a2ui-patch` chunk handling in the stream renderer.
 - Registry publishing job: capability registry as a second signed document beside the
   model catalog, same origin (local-models doc §5.2).
-- Docs cross-updates: agents doc §4.3 notes agents-are-plugins (done); extensibility
+- Identity: agent-DID minting in `knowme_hands` (creation flow); actor-token issuance
+  in the sidecar/BossFang gateway (flint-gate RFC 8693 exchange); `flint_auth` claim
+  mapping for the `act` claim; Cedar entity schema gains the agent principal type.
+- Settings substrate: `settings_definition`/`settings_value` repositories in
+  `gen_ui_db` (SurrealDB) and a matching flint-forge migration; generic validation +
+  scope resolution in one Rust module shared via FFI/WASM; A2UI settings-form
+  generator in the gen_ui renderers.
+- Docs cross-updates: agents doc §4.3 notes agents-are-plugins (done); skills/tools
+  split defined in `docs/strategies/skill-support/README.md`; extensibility
   spec §5 re-scoped as transport under this vocabulary at next revision.
