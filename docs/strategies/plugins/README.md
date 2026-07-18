@@ -109,10 +109,62 @@ desktop/web, Flutter on mobile — the POC's `gen_ui` protocol crates and the AG
 event stream are exactly this machinery). Wiring is declarative: a component binds to
 the capability's **actions** (user gesture → A2A task) and **events** (task status →
 component state), so interactivity round-trips through the same audited bus as
-everything else. The HTMX-fragment path from the extensibility spec remains as the
-escape hatch for web-only surfaces, but A2UI is the normalization story: **one
-component library per plugin, identical on every platform.** Chunk type `a2ui-patch`
-is how streaming operations update live components mid-generation.
+everything else. A2UI is the normalization story: **one component library per plugin,
+identical on every platform.** Chunk type `a2ui-patch` is how streaming operations
+update live components mid-generation.
+
+### 4.1 Why this is structurally correct (not just convenient)
+
+The WASM sandbox already forbids platform code, so UI must cross the boundary as
+data; A2UI makes that constraint a feature. Compared to the iframe/webview model
+(Figma plugins, VS Code webviews): no per-plugin web runtime, no style divergence
+(plugins inherit design tokens and accessibility from the renderer and **cannot go
+off-brand — the theme envelope is enforced by construction, not by review**), and the
+security model collapses to "the component vocabulary *is* the sandbox" — no DOM
+access, no script injection surface. The deeper win: agent-generated UI and plugin UI
+are **one pipeline** — one renderer pair, three producers (app, agents, plugins) —
+which no webview approach can offer.
+
+### 4.2 The four disciplines this stands on
+
+A2UI succeeds or fails on execution of exactly four things:
+
+1. **Vocabulary governance with an honest ceiling.** The component vocabulary is
+   versioned registry data, like capabilities: additions ship as schema + renderer
+   updates on evidence of demand, never ad hoc. The expressiveness wall is planned
+   for, not denied: a rich standard library first; *declarative* escape hatches next
+   (e.g. a chart component that takes a spec, not a drawing surface); and the
+   webview/HTMX path retained **only** as an audited exception (§4.3). Unknown
+   components degrade gracefully: renderers below a plugin's declared vocabulary
+   minimum render a labeled fallback, never a crash or a blank.
+2. **Renderer parity as a tested contract.** One schema source of truth generates
+   both renderers' types; a conformance suite of golden renderings runs on *both*
+   platforms per vocabulary version (the `flutter-golden-ui` harness skill covers
+   half of this today); divergence is a bug class with an owner, not a known
+   quirk. If parity is an intention rather than a gate, Flutter becomes the
+   second-class citizen within a year.
+3. **Local interaction semantics.** Components are deliberately *stateful* where
+   interaction demands it: inputs with local echo, declarative validation,
+   optimistic toggles. The bus sees debounced **semantic** events ("field
+   committed", "form submitted"), never raw keystrokes. This is the difference
+   between SDUI that feels native and SDUI that feels like a survey iframe — and it
+   also keeps the audited bus signal-dense instead of noise-flooded.
+4. **Authoring experience, or no ecosystem.** Ships *with* the vocabulary, not
+   after it: a hot-reloading A2UI playground fed by a running plugin, side-by-side
+   React/Flutter preview, and a `pxt-ui-surface` Builder skill that scaffolds
+   components and screenshots both renderers into the plugin's docs. Nobody builds
+   for a UI system they can't see.
+
+### 4.3 The HTMX/webview path is an exception, not an alternative
+
+Demoted explicitly: two first-class UI systems would fork the ecosystem and double
+the conformance budget. A capability may declare a webview/HTMX surface only with a
+`ui-escape-hatch` permission — amber at install, listed in the posture audit, and
+carrying its own sandbox terms (isolated webview, no host bridge beyond the standard
+`invoke`/`subscribe`). The expectation named in the card's review UI: escape-hatch
+surfaces are web/desktop-only and second-class on mobile. Every escape-hatch grant is
+a data point for what the A2UI vocabulary is missing — reviewed when considering
+vocabulary additions (§4.2.1).
 
 ## 5. Headless plugins and the open vocabulary
 
@@ -267,8 +319,11 @@ freely under their declared sync classes.
 4. **Chunk-type governance** — custom chunk kinds are namespaced and schema'd, but who
    renders an unknown chunk? Default: hosts drop unknown chunks silently *except* into
    consumers that declared them. Confirm.
-5. **`knowme:theme` envelope** — how much may a theme deviate from the brand system?
-   Needs a constraint schema (single-accent restraint as a validator, not a vibe).
+5. **`knowme:theme` envelope** — *resolved (v1.1)*: the envelope is enforced by
+   construction (§4.1) — plugin UI renders only through the token-bound A2UI
+   renderers, so a theme capability can only rebind tokens within the design
+   system's constraint schema (single-accent restraint encoded as a validator on the
+   token set); it can never inject styling past the renderer.
 
 6. **Agent JWT lifetime & refresh** — default: short-lived (≤15 min) actor tokens
    issued per run by the placement's gateway; long-running tasks refresh via the
