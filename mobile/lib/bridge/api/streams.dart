@@ -10,10 +10,6 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 /// ContentBlock-bearing events; the transport layer (`@flint/react`, flint_genui)
 /// is bypassed by contract.
 ///
-/// The broadcast is process-wide, not per-run (only `RunStarted`/`RunFinished`
-/// carry a `run_id`; `Block` does not) — correct for this PoC's single-turn-at-
-/// a-time chat, since only one run is ever in flight. Multiplexing by run_id is
-/// a real gap for concurrent turns, deferred until that's an actual requirement.
 Stream<String> chatEvents({required String runId}) =>
     GenUiCore.instance.api.crateApiStreamsChatEvents(runId: runId);
 

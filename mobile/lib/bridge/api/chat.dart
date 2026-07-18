@@ -11,16 +11,43 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 /// Start a chat turn; returns the run_id whose events arrive on chat_events(run_id).
 /// `messages` is the selected conversation's role/text history. The thread id
 /// remains transport metadata; persistence is owned by the entity repository.
-Future<String> chatSend(
-        {required String threadId,
-        required String message,
-        required List<String> messages,
-        required List<String> attachmentPaths}) =>
-    GenUiCore.instance.api.crateApiChatChatSend(
-        threadId: threadId,
-        message: message,
-        messages: messages,
-        attachmentPaths: attachmentPaths);
+Future<String> chatSend({
+  required String threadId,
+  required String message,
+  required List<String> messages,
+  required List<String> attachmentPaths,
+}) => GenUiCore.instance.api.crateApiChatChatSend(
+  threadId: threadId,
+  message: message,
+  messages: messages,
+  attachmentPaths: attachmentPaths,
+);
+
+/// Submit a typed A2UI/AG-UI user interaction and start the agent's response.
+/// The JSON envelope is preserved verbatim so Rust remains the sole transport
+/// boundary and the agent can correlate surface, component, and context IDs.
+Future<String> chatAction({
+  required String threadId,
+  required String interactionJson,
+  required List<String> messages,
+}) => GenUiCore.instance.api.crateApiChatChatAction(
+  threadId: threadId,
+  interactionJson: interactionJson,
+  messages: messages,
+);
+
+Future<String> themeMode() => GenUiCore.instance.api.crateApiChatThemeMode();
+
+Future<void> setThemeMode({required String mode}) =>
+    GenUiCore.instance.api.crateApiChatSetThemeMode(mode: mode);
+
+Future<String> resolveRemoteContent({
+  required String url,
+  required String kind,
+}) => GenUiCore.instance.api.crateApiChatResolveRemoteContent(
+  url: url,
+  kind: kind,
+);
 
 /// Ingest a note into memory (embeds on-device via fastembed, upserts into
 /// SurrealDB). Returns the assigned record id.
@@ -32,7 +59,10 @@ Future<List<MemoryHit>> memorySearch({required String query, required int k}) =>
     GenUiCore.instance.api.crateApiChatMemorySearch(query: query, k: k);
 
 /// Expand the entity graph around a node to a given depth.
-Future<List<RelatedEntity>> graphExpand(
-        {required String entityId, required int depth}) =>
-    GenUiCore.instance.api
-        .crateApiChatGraphExpand(entityId: entityId, depth: depth);
+Future<List<RelatedEntity>> graphExpand({
+  required String entityId,
+  required int depth,
+}) => GenUiCore.instance.api.crateApiChatGraphExpand(
+  entityId: entityId,
+  depth: depth,
+);

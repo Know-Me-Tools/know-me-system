@@ -63,6 +63,7 @@ abstract class CargoKitBuildTask extends DefaultTask {
         def manifestDir = Paths.get(project.buildscript.sourceFile.parent, project.cargokit.manifestDir)
 
         def rootProjectDir = project.rootProject.projectDir
+        def ndkDirectory = Paths.get(sdkDirectory, "ndk", ndkVersion).toString()
 
         if (!Os.isFamily(Os.FAMILY_WINDOWS)) {
             execOperations.exec {
@@ -81,6 +82,11 @@ abstract class CargoKitBuildTask extends DefaultTask {
             environment "CARGOKIT_OUTPUT_DIR", outputDir
             environment "CARGOKIT_NDK_VERSION", ndkVersion
             environment "CARGOKIT_SDK_DIR", sdkDirectory
+            // Native dependencies such as llama.cpp inspect the conventional
+            // NDK variables directly instead of CargoKit's private variables.
+            environment "ANDROID_NDK", ndkDirectory
+            environment "ANDROID_NDK_ROOT", ndkDirectory
+            environment "NDK_ROOT", ndkDirectory
             environment "CARGOKIT_COMPILE_SDK_VERSION", compileSdkVersion
             environment "CARGOKIT_MIN_SDK_VERSION", minSdkVersion
             environment "CARGOKIT_TARGET_PLATFORMS", targetPlatforms.join(",")

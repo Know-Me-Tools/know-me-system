@@ -19,7 +19,9 @@ android {
         applicationId = "ai.prometheusags.mobile"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // KnowMe targets current-generation phones. Android 10+ lets the app
+        // rely on modern storage, media, security, and accessibility behavior.
+        minSdk = 29
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

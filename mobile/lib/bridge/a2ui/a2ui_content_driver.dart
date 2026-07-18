@@ -17,7 +17,7 @@ class A2uiContentDriver {
 
   final String messageId;
   final void Function({required String messageId, required ContentBlock block})
-      onBlock;
+  onBlock;
   final void Function(String messageId) onFinalize;
   final void Function(String messageId, String message)? onError;
 

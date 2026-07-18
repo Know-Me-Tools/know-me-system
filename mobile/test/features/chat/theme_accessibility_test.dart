@@ -32,8 +32,9 @@ void main() {
     }
   });
 
-  testWidgets('rich block actions are labeled and at least 44 pixels',
-      (tester) async {
+  testWidgets('rich block actions are labeled and at least 48 pixels', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       MaterialApp(
         home: shad.Theme(
@@ -59,8 +60,10 @@ void main() {
     final copy = find.byTooltip('Copy code');
     expect(copy, findsOneWidget);
     final size = tester.getSize(copy);
-    expect(size.width, greaterThanOrEqualTo(44));
-    expect(size.height, greaterThanOrEqualTo(44));
+    expect(size.width, greaterThanOrEqualTo(48));
+    expect(size.height, greaterThanOrEqualTo(48));
+    await expectLater(tester, meetsGuideline(textContrastGuideline));
+    await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
   });
 }
 

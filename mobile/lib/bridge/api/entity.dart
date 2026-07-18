@@ -16,10 +16,13 @@ Future<ListResult> entityList({required ViewDescriptor view}) =>
     GenUiCore.instance.api.crateApiEntityEntityList(view: view);
 
 /// Fetch one entity by type + id.
-Future<EntityRecord?> entityGet(
-        {required String entityType, required String id}) =>
-    GenUiCore.instance.api
-        .crateApiEntityEntityGet(entityType: entityType, id: id);
+Future<EntityRecord?> entityGet({
+  required String entityType,
+  required String id,
+}) => GenUiCore.instance.api.crateApiEntityEntityGet(
+  entityType: entityType,
+  id: id,
+);
 
 /// Create an entity. Emits a ChangeEvent::Upsert on the entity_changes stream.
 Future<EntityRecord> entityCreate({required EntityRecord record}) =>
@@ -31,5 +34,7 @@ Future<EntityRecord> entityUpdate({required EntityRecord record}) =>
 
 /// Delete an entity. Emits a ChangeEvent::Delete.
 Future<void> entityDelete({required String entityType, required String id}) =>
-    GenUiCore.instance.api
-        .crateApiEntityEntityDelete(entityType: entityType, id: id);
+    GenUiCore.instance.api.crateApiEntityEntityDelete(
+      entityType: entityType,
+      id: id,
+    );

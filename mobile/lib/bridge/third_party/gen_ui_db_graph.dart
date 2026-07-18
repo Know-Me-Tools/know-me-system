@@ -13,32 +13,42 @@ abstract class GraphError implements RustOpaqueInterface {}
 abstract class GraphStore implements RustOpaqueInterface {
   /// INTENT: create (or upsert) a graph entity node. `id` is the record key
   /// (e.g. `project_x`); `label`/`entity_type` are indexed graph metadata.
-  Future<String> createEntity(
-      {required String id, required String entityType, required String label});
+  Future<String> createEntity({
+    required String id,
+    required String entityType,
+    required String label,
+  });
 
   /// Test-only inspection of stored relation endpoint IDs.
   Future<List<(String, String)>> edgeEndpointsForTest();
 
   /// INTENT: expand the graph outward from `entity_id` up to `depth` RELATE hops,
   /// fusing per-depth neighbour lists with Rust RRF (nearer hops rank higher).
-  Future<List<RelatedEntity>> graphExpand(
-      {required String entityId, required int depth});
+  Future<List<RelatedEntity>> graphExpand({
+    required String entityId,
+    required int depth,
+  });
 
   /// INTENT: ingest a memory. Embeds `text`, stores row + vector, returns the id.
   Future<String> memoryIngest({required MemoryRecord record});
 
   /// INTENT: hybrid semantic + lexical search. Embeds `query`, runs the vector
   /// and BM25 lanes, fuses them with native `search::rrf`, returns top-`k`.
-  Future<List<MemoryHit>> memorySearch(
-      {required String query, required BigInt k});
+  Future<List<MemoryHit>> memorySearch({
+    required String query,
+    required BigInt k,
+  });
 
   /// `memory_search`, choosing the retrieval lane (C-111 T3).
   ///
   /// `SearchMode::Vector` skips the BM25 lane and RRF entirely — a diagnostic for
   /// showing what fusion actually buys, not a product path. Scores are comparable
   /// only within a mode; see `MemoryHit::score`.
-  Future<List<MemoryHit>> memorySearchWith(
-      {required String query, required BigInt k, required SearchMode mode});
+  Future<List<MemoryHit>> memorySearchWith({
+    required String query,
+    required BigInt k,
+    required SearchMode mode,
+  });
 
   /// Open (or return/await the already-opening) singleton embedded store for
   /// this process, selecting ns/db and applying the schema on first open.
@@ -50,12 +60,18 @@ abstract class GraphStore implements RustOpaqueInterface {
 
   /// INTENT: create a directed RELATE edge `from -> to` with a relation label.
   /// Edges are what `graph_expand` traverses.
-  Future<void> relate(
-      {required String from, required String to, required String rel});
+  Future<void> relate({
+    required String from,
+    required String to,
+    required String rel,
+  });
 
   /// Test-only boundary for a relation whose source table violates schema.
-  Future<void> relateRawForTest(
-      {required String fromTable, required String from, required String to});
+  Future<void> relateRawForTest({
+    required String fromTable,
+    required String from,
+    required String to,
+  });
 }
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<GraphStoreConfig>>
@@ -165,8 +181,7 @@ enum SearchMode {
   hybrid,
 
   /// HNSW vector recall alone — no lexical lane, no fusion. Diagnostic only.
-  vector,
-  ;
+  vector;
 
   static Future<SearchMode> default_() =>
       GenUiCore.instance.api.genUiDbGraphSearchModeDefault();

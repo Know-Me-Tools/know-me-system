@@ -31,6 +31,7 @@ use flutter_rust_bridge::for_generated::{transform_result_dco, Lifetimeable, Loc
 use flutter_rust_bridge::{Handler, IntoIntoDart};
 use gen_ui_db_graph::*;
 use gen_ui_types::error::*;
+use gen_ui_types::events::*;
 use gen_ui_types::sync::*;
 use gen_ui_types::transport::*;
 
@@ -42,7 +43,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -364862252;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 899685981;
 
 // Section: executor
 
@@ -50,6 +51,57 @@ flutter_rust_bridge::frb_generated_default_handler!();
 
 // Section: wire_funcs
 
+fn wire__gen_ui_types__events__A2UiEvent_run_id_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "A2UiEvent_run_id",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<A2uiEvent>,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let mut api_that_guard = None;
+                    let decode_indices_ =
+                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_that, 0, false,
+                            ),
+                        ]);
+                    for i in decode_indices_ {
+                        match i {
+                            0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                            _ => unreachable!(),
+                        }
+                    }
+                    let api_that_guard = api_that_guard.unwrap();
+                    let output_ok = Result::<_, ()>::Ok({
+                        gen_ui_types::events::A2uiEvent::run_id(&*api_that_guard);
+                    })?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__gen_ui_db_graph__GraphStore_create_entity_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -618,6 +670,49 @@ fn wire__crate__api__boot__attach_sync_shapes_impl(
         },
     )
 }
+fn wire__crate__api__chat__chat_action_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "chat_action",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_thread_id = <String>::sse_decode(&mut deserializer);
+            let api_interaction_json = <String>::sse_decode(&mut deserializer);
+            let api_messages = <Vec<String>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, CoreError>(
+                    (move || async move {
+                        let output_ok = crate::api::chat::chat_action(
+                            api_thread_id,
+                            api_interaction_json,
+                            api_messages,
+                        )
+                        .await?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__streams__chat_events_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -1105,6 +1200,44 @@ fn wire__crate__api__chat__memory_search_impl(
         },
     )
 }
+fn wire__crate__api__chat__resolve_remote_content_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "resolve_remote_content",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_url = <String>::sse_decode(&mut deserializer);
+            let api_kind = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, CoreError>(
+                    (move || async move {
+                        let output_ok =
+                            crate::api::chat::resolve_remote_content(api_url, api_kind).await?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__boot__run_migrations_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -1173,6 +1306,42 @@ fn wire__gen_ui_db_graph__search_mode_default_impl(
         },
     )
 }
+fn wire__crate__api__chat__set_theme_mode_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "set_theme_mode",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_mode = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, CoreError>(
+                    (move || async move {
+                        let output_ok = crate::api::chat::set_theme_mode(api_mode).await?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__streams__sync_status_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -1207,6 +1376,41 @@ fn wire__crate__api__streams__sync_status_impl(
                     })?;
                     Ok(output_ok)
                 })())
+            }
+        },
+    )
+}
+fn wire__crate__api__chat__theme_mode_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "theme_mode",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, CoreError>(
+                    (move || async move {
+                        let output_ok = crate::api::chat::theme_mode().await?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
             }
         },
     )
@@ -1272,6 +1476,9 @@ const _: fn() = || {
 // Section: related_funcs
 
 flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
+    flutter_rust_bridge::for_generated::RustAutoOpaqueInner<A2uiEvent>
+);
+flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
     flutter_rust_bridge::for_generated::RustAutoOpaqueInner<ChangeEvent>
 );
 flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
@@ -1297,6 +1504,16 @@ impl SseDecode for flutter_rust_bridge::for_generated::anyhow::Error {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut inner = <String>::sse_decode(deserializer);
         return flutter_rust_bridge::for_generated::anyhow::anyhow!("{}", inner);
+    }
+}
+
+impl SseDecode for A2uiEvent {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <RustOpaqueMoi<
+            flutter_rust_bridge::for_generated::RustAutoOpaqueInner<A2uiEvent>,
+        >>::sse_decode(deserializer);
+        return flutter_rust_bridge::for_generated::rust_auto_opaque_decode_owned(inner);
     }
 }
 
@@ -1357,6 +1574,16 @@ impl SseDecode for SyncStatus {
             flutter_rust_bridge::for_generated::RustAutoOpaqueInner<SyncStatus>,
         >>::sse_decode(deserializer);
         return flutter_rust_bridge::for_generated::rust_auto_opaque_decode_owned(inner);
+    }
+}
+
+impl SseDecode
+    for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<A2uiEvent>>
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <usize>::sse_decode(deserializer);
+        return decode_rust_opaque_moi(inner);
     }
 }
 
@@ -1793,53 +2020,60 @@ fn pde_ffi_dispatcher_primary_impl(
 ) {
     // Codec=Pde (Serialization + dispatch), see doc to use other codecs
     match func_id {
-        1 => {
+        1 => wire__gen_ui_types__events__A2UiEvent_run_id_impl(port, ptr, rust_vec_len, data_len),
+        2 => {
             wire__gen_ui_db_graph__GraphStore_create_entity_impl(port, ptr, rust_vec_len, data_len)
         }
-        2 => wire__gen_ui_db_graph__GraphStore_edge_endpoints_for_test_impl(
+        3 => wire__gen_ui_db_graph__GraphStore_edge_endpoints_for_test_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        3 => wire__gen_ui_db_graph__GraphStore_graph_expand_impl(port, ptr, rust_vec_len, data_len),
-        4 => {
+        4 => wire__gen_ui_db_graph__GraphStore_graph_expand_impl(port, ptr, rust_vec_len, data_len),
+        5 => {
             wire__gen_ui_db_graph__GraphStore_memory_ingest_impl(port, ptr, rust_vec_len, data_len)
         }
-        5 => {
+        6 => {
             wire__gen_ui_db_graph__GraphStore_memory_search_impl(port, ptr, rust_vec_len, data_len)
         }
-        6 => wire__gen_ui_db_graph__GraphStore_memory_search_with_impl(
+        7 => wire__gen_ui_db_graph__GraphStore_memory_search_with_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        7 => wire__gen_ui_db_graph__GraphStore_open_impl(port, ptr, rust_vec_len, data_len),
-        8 => wire__gen_ui_db_graph__GraphStore_relate_impl(port, ptr, rust_vec_len, data_len),
-        9 => wire__gen_ui_db_graph__GraphStore_relate_raw_for_test_impl(
+        8 => wire__gen_ui_db_graph__GraphStore_open_impl(port, ptr, rust_vec_len, data_len),
+        9 => wire__gen_ui_db_graph__GraphStore_relate_impl(port, ptr, rust_vec_len, data_len),
+        10 => wire__gen_ui_db_graph__GraphStore_relate_raw_for_test_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        11 => wire__crate__api__boot__attach_sync_shapes_impl(port, ptr, rust_vec_len, data_len),
-        12 => wire__crate__api__streams__chat_events_impl(port, ptr, rust_vec_len, data_len),
-        13 => wire__crate__api__chat__chat_send_impl(port, ptr, rust_vec_len, data_len),
-        14 => wire__crate__api__streams__entity_changes_impl(port, ptr, rust_vec_len, data_len),
-        15 => wire__crate__api__entity__entity_create_impl(port, ptr, rust_vec_len, data_len),
-        16 => wire__crate__api__entity__entity_delete_impl(port, ptr, rust_vec_len, data_len),
-        17 => wire__crate__api__entity__entity_get_impl(port, ptr, rust_vec_len, data_len),
-        18 => wire__crate__api__entity__entity_list_impl(port, ptr, rust_vec_len, data_len),
-        19 => wire__crate__api__entity__entity_update_impl(port, ptr, rust_vec_len, data_len),
-        20 => wire__crate__api__chat__graph_expand_impl(port, ptr, rust_vec_len, data_len),
-        21 => wire__crate__api__init_core_impl(port, ptr, rust_vec_len, data_len),
-        22 => wire__crate__api__boot__load_seeds_impl(port, ptr, rust_vec_len, data_len),
-        23 => wire__crate__api__chat__memory_ingest_impl(port, ptr, rust_vec_len, data_len),
-        24 => wire__crate__api__chat__memory_search_impl(port, ptr, rust_vec_len, data_len),
-        25 => wire__crate__api__boot__run_migrations_impl(port, ptr, rust_vec_len, data_len),
-        26 => wire__gen_ui_db_graph__search_mode_default_impl(port, ptr, rust_vec_len, data_len),
-        27 => wire__crate__api__streams__sync_status_impl(port, ptr, rust_vec_len, data_len),
+        12 => wire__crate__api__boot__attach_sync_shapes_impl(port, ptr, rust_vec_len, data_len),
+        13 => wire__crate__api__chat__chat_action_impl(port, ptr, rust_vec_len, data_len),
+        14 => wire__crate__api__streams__chat_events_impl(port, ptr, rust_vec_len, data_len),
+        15 => wire__crate__api__chat__chat_send_impl(port, ptr, rust_vec_len, data_len),
+        16 => wire__crate__api__streams__entity_changes_impl(port, ptr, rust_vec_len, data_len),
+        17 => wire__crate__api__entity__entity_create_impl(port, ptr, rust_vec_len, data_len),
+        18 => wire__crate__api__entity__entity_delete_impl(port, ptr, rust_vec_len, data_len),
+        19 => wire__crate__api__entity__entity_get_impl(port, ptr, rust_vec_len, data_len),
+        20 => wire__crate__api__entity__entity_list_impl(port, ptr, rust_vec_len, data_len),
+        21 => wire__crate__api__entity__entity_update_impl(port, ptr, rust_vec_len, data_len),
+        22 => wire__crate__api__chat__graph_expand_impl(port, ptr, rust_vec_len, data_len),
+        23 => wire__crate__api__init_core_impl(port, ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__boot__load_seeds_impl(port, ptr, rust_vec_len, data_len),
+        25 => wire__crate__api__chat__memory_ingest_impl(port, ptr, rust_vec_len, data_len),
+        26 => wire__crate__api__chat__memory_search_impl(port, ptr, rust_vec_len, data_len),
+        27 => {
+            wire__crate__api__chat__resolve_remote_content_impl(port, ptr, rust_vec_len, data_len)
+        }
+        28 => wire__crate__api__boot__run_migrations_impl(port, ptr, rust_vec_len, data_len),
+        29 => wire__gen_ui_db_graph__search_mode_default_impl(port, ptr, rust_vec_len, data_len),
+        30 => wire__crate__api__chat__set_theme_mode_impl(port, ptr, rust_vec_len, data_len),
+        31 => wire__crate__api__streams__sync_status_impl(port, ptr, rust_vec_len, data_len),
+        32 => wire__crate__api__chat__theme_mode_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1857,6 +2091,21 @@ fn pde_ffi_dispatcher_sync_impl(
 }
 
 // Section: rust2dart
+
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for FrbWrapper<A2uiEvent> {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self.0)
+            .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for FrbWrapper<A2uiEvent> {}
+
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<A2uiEvent>> for A2uiEvent {
+    fn into_into_dart(self) -> FrbWrapper<A2uiEvent> {
+        self.into()
+    }
+}
 
 // Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for FrbWrapper<ChangeEvent> {
@@ -2183,6 +2432,13 @@ impl SseEncode for flutter_rust_bridge::for_generated::anyhow::Error {
     }
 }
 
+impl SseEncode for A2uiEvent {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<A2uiEvent>>>::sse_encode(flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self), serializer);
+    }
+}
+
 impl SseEncode for ChangeEvent {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -2222,6 +2478,17 @@ impl SseEncode for SyncStatus {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<SyncStatus>>>::sse_encode(flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self), serializer);
+    }
+}
+
+impl SseEncode
+    for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<A2uiEvent>>
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        let (ptr, size) = self.sse_encode_raw();
+        <usize>::sse_encode(ptr, serializer);
+        <i32>::sse_encode(size, serializer);
     }
 }
 
@@ -2611,12 +2878,27 @@ mod io {
     use flutter_rust_bridge::{Handler, IntoIntoDart};
     use gen_ui_db_graph::*;
     use gen_ui_types::error::*;
+    use gen_ui_types::events::*;
     use gen_ui_types::sync::*;
     use gen_ui_types::transport::*;
 
     // Section: boilerplate
 
     flutter_rust_bridge::frb_generated_boilerplate_io!();
+
+    #[unsafe(no_mangle)]
+    pub extern "C" fn frbgen_knowme_poc_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerA2uiEvent(
+        ptr: *const std::ffi::c_void,
+    ) {
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<A2uiEvent>>::increment_strong_count(ptr as _);
+    }
+
+    #[unsafe(no_mangle)]
+    pub extern "C" fn frbgen_knowme_poc_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerA2uiEvent(
+        ptr: *const std::ffi::c_void,
+    ) {
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<A2uiEvent>>::decrement_strong_count(ptr as _);
+    }
 
     #[unsafe(no_mangle)]
     pub extern "C" fn frbgen_knowme_poc_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerChangeEvent(
@@ -2723,12 +3005,27 @@ mod web {
     use flutter_rust_bridge::{Handler, IntoIntoDart};
     use gen_ui_db_graph::*;
     use gen_ui_types::error::*;
+    use gen_ui_types::events::*;
     use gen_ui_types::sync::*;
     use gen_ui_types::transport::*;
 
     // Section: boilerplate
 
     flutter_rust_bridge::frb_generated_boilerplate_web!();
+
+    #[wasm_bindgen]
+    pub fn rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerA2uiEvent(
+        ptr: *const std::ffi::c_void,
+    ) {
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<A2uiEvent>>::increment_strong_count(ptr as _);
+    }
+
+    #[wasm_bindgen]
+    pub fn rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerA2uiEvent(
+        ptr: *const std::ffi::c_void,
+    ) {
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<A2uiEvent>>::decrement_strong_count(ptr as _);
+    }
 
     #[wasm_bindgen]
     pub fn rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerChangeEvent(

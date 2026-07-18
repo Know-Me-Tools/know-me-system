@@ -8,6 +8,8 @@ import 'package:uuid/uuid.dart';
 import '../domain/chat_repository.dart';
 import '../domain/entities/chat_conversation.dart';
 import '../domain/entities/chat_message.dart';
+import '../../../bridge/a2ui/a2ui_event.dart';
+import '../../../bridge/rust_bridge_provider.dart' as bridge;
 
 class PemChatRepository implements ChatRepository {
   const PemChatRepository(this.transport);
@@ -16,6 +18,33 @@ class PemChatRepository implements ChatRepository {
   static const _uuid = Uuid();
   static const _conversationType = 'chat_conversation';
   static const _messageType = 'chat_message';
+
+  @override
+  Future<String> startTurn({
+    required String threadId,
+    required String message,
+    required List<String> history,
+    List<String> attachmentPaths = const [],
+  }) => bridge.chatSend(threadId, message, history, attachmentPaths);
+
+  @override
+  Stream<A2uiEvent> events(String runId) => bridge.chatEvents(runId);
+
+  @override
+  Future<String> submitInteraction({
+    required String threadId,
+    required String interactionJson,
+    required List<String> history,
+  }) => bridge.chatAction(threadId, interactionJson, history);
+
+  @override
+  Future<ResolvedRemoteContent> resolveRemoteContent(
+    String url,
+    RemoteContentKind kind,
+  ) async => ResolvedRemoteContent.fromJson(
+    jsonDecode(await bridge.resolveRemoteContent(url, kind.name))
+        as Map<String, dynamic>,
+  );
 
   @override
   Future<List<ChatConversation>> listConversations() async {
@@ -68,10 +97,7 @@ class PemChatRepository implements ChatRepository {
   }
 
   @override
-  Future<void> saveMessage(
-    String conversationId,
-    ChatMessage message,
-  ) async {
+  Future<void> saveMessage(String conversationId, ChatMessage message) async {
     await transport.update(
       EntityRecord(
         id: message.id,
@@ -124,54 +150,53 @@ class PemChatRepository implements ChatRepository {
   }
 
   Map<String, Object?> _encodeBlock(ContentBlock block) => switch (block) {
-        TextBlock(:final text) => {'type': 'text', 'text': text},
-        ThinkingBlock(:final text) => {'type': 'thinking', 'text': text},
-        CodeBlock(:final language, :final code) => {
-            'type': 'code',
-            'language': language,
-            'code': code,
-          },
-        CitationBlock(:final source, :final quote) => {
-            'type': 'citation',
-            'source': source,
-            'quote': quote,
-          },
-        MemoryBlock(:final operation, :final key, :final value) => {
-            'type': 'memory',
-            'operation': operation,
-            'key': key,
-            'value': value,
-          },
-        ToolUseBlock(:final id, :final name, :final inputJson) => {
-            'type': 'toolUse',
-            'id': id,
-            'name': name,
-            'inputJson': inputJson,
-          },
-        ToolResultBlock(:final toolUseId, :final outputJson, :final isError) =>
-          {
-            'type': 'toolResult',
-            'toolUseId': toolUseId,
-            'outputJson': outputJson,
-            'isError': isError,
-          },
-        SkillBlock(:final name, :final status) => {
-            'type': 'skill',
-            'name': name,
-            'status': status,
-          },
-        ArtifactBlock(:final id, :final kind, :final content) => {
-            'type': 'artifact',
-            'id': id,
-            'kind': kind,
-            'content': content,
-          },
-        ImageBlock(:final url, :final dataBase64, :final mime) => {
-            'type': 'image',
-            'url': url,
-            'dataBase64': dataBase64,
-            'mime': mime,
-          },
-        DividerBlock() => {'type': 'divider'},
-      };
+    TextBlock(:final text) => {'type': 'text', 'text': text},
+    ThinkingBlock(:final text) => {'type': 'thinking', 'text': text},
+    CodeBlock(:final language, :final code) => {
+      'type': 'code',
+      'language': language,
+      'code': code,
+    },
+    CitationBlock(:final source, :final quote) => {
+      'type': 'citation',
+      'source': source,
+      'quote': quote,
+    },
+    MemoryBlock(:final operation, :final key, :final value) => {
+      'type': 'memory',
+      'operation': operation,
+      'key': key,
+      'value': value,
+    },
+    ToolUseBlock(:final id, :final name, :final inputJson) => {
+      'type': 'toolUse',
+      'id': id,
+      'name': name,
+      'inputJson': inputJson,
+    },
+    ToolResultBlock(:final toolUseId, :final outputJson, :final isError) => {
+      'type': 'toolResult',
+      'toolUseId': toolUseId,
+      'outputJson': outputJson,
+      'isError': isError,
+    },
+    SkillBlock(:final name, :final status) => {
+      'type': 'skill',
+      'name': name,
+      'status': status,
+    },
+    ArtifactBlock(:final id, :final kind, :final content) => {
+      'type': 'artifact',
+      'id': id,
+      'kind': kind,
+      'content': content,
+    },
+    ImageBlock(:final url, :final dataBase64, :final mime) => {
+      'type': 'image',
+      'url': url,
+      'dataBase64': dataBase64,
+      'mime': mime,
+    },
+    DividerBlock() => {'type': 'divider'},
+  };
 }

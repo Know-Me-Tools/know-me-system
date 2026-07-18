@@ -13,6 +13,49 @@ import 'package:video_player/video_player.dart';
 import 'a2ui_surface_view.dart';
 import 'content_block.dart';
 
+typedef AgentInteractionCallback =
+    FutureOr<void> Function(Map<String, Object?> interaction);
+
+enum RemoteContentKind { image, video, audio, opengraph }
+
+@immutable
+class ResolvedRemoteContent {
+  const ResolvedRemoteContent({
+    required this.url,
+    required this.mime,
+    this.dataBase64,
+    this.localPath,
+    this.title,
+    this.description,
+    this.siteName,
+    this.imageUrl,
+  });
+
+  factory ResolvedRemoteContent.fromJson(Map<String, dynamic> json) =>
+      ResolvedRemoteContent(
+        url: json['url'] as String,
+        mime: json['mime'] as String,
+        dataBase64: json['dataBase64'] as String?,
+        localPath: json['localPath'] as String?,
+        title: json['title'] as String?,
+        description: json['description'] as String?,
+        siteName: json['siteName'] as String?,
+        imageUrl: json['imageUrl'] as String?,
+      );
+
+  final String url;
+  final String mime;
+  final String? dataBase64;
+  final String? localPath;
+  final String? title;
+  final String? description;
+  final String? siteName;
+  final String? imageUrl;
+}
+
+typedef RemoteContentResolver =
+    Future<ResolvedRemoteContent> Function(String url, RemoteContentKind kind);
+
 /// Exhaustive dispatcher for KnowMe's 11-variant A2UI projection.
 ///
 /// Each branch delegates to a dedicated presentational widget. There is no
@@ -22,17 +65,22 @@ class ContentBlockView extends StatelessWidget {
   const ContentBlockView({
     required this.block,
     this.isStreaming = false,
+    this.onInteraction,
+    this.remoteResolver,
     super.key,
   });
 
   final ContentBlock block;
   final bool isStreaming;
+  final AgentInteractionCallback? onInteraction;
+  final RemoteContentResolver? remoteResolver;
 
   @override
   Widget build(BuildContext context) => switch (block) {
     TextBlock(:final text) => ContentBlockText(
       text: text,
       isStreaming: isStreaming,
+      remoteResolver: remoteResolver,
     ),
     ThinkingBlock(:final text) => ContentBlockThinking(
       text: text,
@@ -61,11 +109,18 @@ class ContentBlockView extends StatelessWidget {
       status: status,
     ),
     ArtifactBlock(:final id, :final kind, :final content) =>
-      ContentBlockArtifact(id: id, kind: kind, content: content),
+      ContentBlockArtifact(
+        id: id,
+        kind: kind,
+        content: content,
+        onInteraction: onInteraction,
+        remoteResolver: remoteResolver,
+      ),
     ImageBlock(:final url, :final dataBase64, :final mime) => ContentBlockImage(
       url: url,
       dataBase64: dataBase64,
       mime: mime,
+      remoteResolver: remoteResolver,
     ),
     DividerBlock() => const ContentBlockDivider(),
   };
@@ -75,17 +130,19 @@ class ContentBlockText extends StatelessWidget {
   const ContentBlockText({
     required this.text,
     this.isStreaming = false,
+    this.remoteResolver,
     super.key,
   });
 
   final String text;
   final bool isStreaming;
+  final RemoteContentResolver? remoteResolver;
 
   @override
   Widget build(BuildContext context) => Semantics(
     liveRegion: isStreaming,
     label: isStreaming ? 'Assistant response updating' : null,
-    child: GenUiMarkdown(data: text),
+    child: GenUiMarkdown(data: text, remoteResolver: remoteResolver),
   );
 }
 
@@ -339,28 +396,43 @@ class ContentBlockArtifact extends StatelessWidget {
     required this.id,
     required this.kind,
     required this.content,
+    this.onInteraction,
+    this.remoteResolver,
     super.key,
   });
 
   final String id;
   final String kind;
   final String content;
+  final AgentInteractionCallback? onInteraction;
+  final RemoteContentResolver? remoteResolver;
 
   @override
   Widget build(BuildContext context) {
     final normalized = kind.toLowerCase().trim();
     final child = normalized.startsWith('agui_')
-        ? _AguiStructuredEvent(kind: normalized, content: content)
+        ? _AguiStructuredEvent(
+            kind: normalized,
+            content: content,
+            onInteraction: onInteraction,
+          )
         : switch (normalized) {
-            'markdown' || 'md' || 'document' => GenUiMarkdown(data: content),
+            'markdown' || 'md' || 'document' => GenUiMarkdown(
+              data: content,
+              remoteResolver: remoteResolver,
+            ),
             'mermaid' => ContentBlockMermaid(source: content),
             'svg' || 'image/svg+xml' => ContentBlockSvg(source: content),
-            'video' ||
-            'mp4' ||
-            'webm' => ContentBlockVideo(source: _mediaUrl(content)),
+            'video' || 'mp4' || 'webm' => ContentBlockVideo(
+              source: _mediaUrl(content),
+              remoteResolver: remoteResolver,
+            ),
             'opengraph' ||
             'open_graph' ||
-            'link' => ContentBlockLinkPreview.fromJson(content),
+            'link' => ContentBlockLinkPreview.fromJson(
+              content,
+              remoteResolver: remoteResolver,
+            ),
             'code' => _CodeSurface(language: 'text', code: content),
             'pdf' || 'doc' || 'docx' => ContentBlockDocumentPreview(
               kind: normalized,
@@ -370,8 +442,14 @@ class ContentBlockArtifact extends StatelessWidget {
               kind: 'attachment',
               content: content,
             ),
-            'a2ui' ||
-            'application/a2ui+json' => A2uiSurfaceView(source: content),
+            'a2ui' || 'application/a2ui+json' => A2uiSurfaceView(
+              source: content,
+              remoteResolver: remoteResolver,
+              onAction: (action) => onInteraction?.call({
+                'kind': 'a2ui',
+                'payload': action.toJson(),
+              }),
+            ),
             _ => SelectableText(content),
           };
     return _BlockSurface(
@@ -388,16 +466,21 @@ class ContentBlockArtifact extends StatelessWidget {
 }
 
 class _AguiStructuredEvent extends StatelessWidget {
-  const _AguiStructuredEvent({required this.kind, required this.content});
+  const _AguiStructuredEvent({
+    required this.kind,
+    required this.content,
+    this.onInteraction,
+  });
 
   final String kind;
   final String content;
+  final AgentInteractionCallback? onInteraction;
 
   @override
   Widget build(BuildContext context) {
     final decoded = _tryJson(content);
     if (kind == 'agui_confirmation') {
-      return _ConfirmationRequest(value: decoded);
+      return _ConfirmationRequest(value: decoded, onInteraction: onInteraction);
     }
     final (title, summary) = switch (kind) {
       'agui_state_snapshot' => (
@@ -427,8 +510,9 @@ class _AguiStructuredEvent extends StatelessWidget {
 }
 
 class _ConfirmationRequest extends StatelessWidget {
-  const _ConfirmationRequest({required this.value});
+  const _ConfirmationRequest({required this.value, this.onInteraction});
   final dynamic value;
+  final AgentInteractionCallback? onInteraction;
 
   @override
   Widget build(BuildContext context) {
@@ -458,9 +542,13 @@ class _ConfirmationRequest extends StatelessWidget {
             children: [
               for (final choice in choices)
                 shad.OutlineButton(
-                  // Response transport is intentionally disabled until a typed
-                  // Rust confirmation command is connected by the host app.
-                  onPressed: null,
+                  onPressed: onInteraction == null
+                      ? null
+                      : () => onInteraction!({
+                          'kind': 'confirmation',
+                          'request': map,
+                          'choice': choice,
+                        }),
                   child: Text(
                     choice is Map
                         ? (choice['label'] as String? ?? 'Choose')
@@ -511,12 +599,13 @@ String _activityTitle(String kind) {
   return '${name.isEmpty ? 'Agent' : name[0].toUpperCase() + name.substring(1)} activity';
 }
 
-class ContentBlockImage extends StatelessWidget {
+class ContentBlockImage extends StatefulWidget {
   const ContentBlockImage({
     required this.url,
     required this.dataBase64,
     required this.mime,
     this.alt = 'Generated image',
+    this.remoteResolver,
     super.key,
   });
 
@@ -524,37 +613,69 @@ class ContentBlockImage extends StatelessWidget {
   final String? dataBase64;
   final String mime;
   final String alt;
+  final RemoteContentResolver? remoteResolver;
+
+  @override
+  State<ContentBlockImage> createState() => _ContentBlockImageState();
+}
+
+class _ContentBlockImageState extends State<ContentBlockImage> {
+  ResolvedRemoteContent? _resolved;
+  Object? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final url = widget.url;
+    final resolver = widget.remoteResolver;
+    if (widget.dataBase64 == null && url != null && resolver != null) {
+      unawaited(
+        resolver(url, RemoteContentKind.image)
+            .then((value) {
+              if (mounted) setState(() => _resolved = value);
+            })
+            .catchError((Object error) {
+              if (mounted) setState(() => _error = error);
+            }),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     Widget image;
-    if (mime == 'image/svg+xml' && dataBase64 != null) {
-      final source = utf8.decode(base64Decode(dataBase64!));
-      image = SvgPicture.string(_sanitizeSvg(source), semanticsLabel: alt);
+    final dataBase64 = widget.dataBase64 ?? _resolved?.dataBase64;
+    final mime = _resolved?.mime ?? widget.mime;
+    if (_error != null) {
+      image = const _MediaError(label: 'Image');
+    } else if (mime == 'image/svg+xml' && dataBase64 != null) {
+      final source = utf8.decode(base64Decode(dataBase64));
+      image = SvgPicture.string(
+        _sanitizeSvg(source),
+        semanticsLabel: widget.alt,
+      );
     } else if (dataBase64 != null) {
       image = Image.memory(
-        base64Decode(dataBase64!),
+        base64Decode(dataBase64),
         fit: BoxFit.contain,
-        semanticLabel: alt,
+        semanticLabel: widget.alt,
         errorBuilder: (_, __, ___) => const _MediaError(label: 'Image'),
       );
-    } else if (url != null) {
-      image = Image.network(
-        url!,
-        fit: BoxFit.contain,
-        semanticLabel: alt,
-        errorBuilder: (_, __, ___) => const _MediaError(label: 'Image'),
+    } else if (widget.url != null && widget.remoteResolver != null) {
+      image = const SizedBox(
+        height: 120,
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
       );
     } else {
       image = const _MediaError(label: 'Image');
     }
     return _BlockSurface(
-      semanticLabel: alt,
+      semanticLabel: widget.alt,
       background: shad.Theme.of(context).colorScheme.secondary,
       header: _BlockHeader(
         icon: Icons.image_outlined,
         label: mime,
-        copyValue: url ?? dataBase64 ?? '',
+        copyValue: widget.url ?? dataBase64 ?? '',
       ),
       child: Padding(
         padding: const EdgeInsets.only(top: 8),
@@ -576,9 +697,10 @@ class ContentBlockDivider extends StatelessWidget {
 }
 
 class GenUiMarkdown extends StatelessWidget {
-  const GenUiMarkdown({required this.data, super.key});
+  const GenUiMarkdown({required this.data, this.remoteResolver, super.key});
 
   final String data;
+  final RemoteContentResolver? remoteResolver;
 
   @override
   Widget build(BuildContext context) {
@@ -640,6 +762,7 @@ class GenUiMarkdown extends StatelessWidget {
           builder: (url, attributes) => _MarkdownImage(
             url: url,
             alt: attributes['alt'] ?? 'Generated image',
+            remoteResolver: remoteResolver,
           ),
           errorBuilder: (_, alt, __) => _MediaError(label: alt),
         ),
@@ -729,9 +852,14 @@ class ContentBlockSvg extends StatelessWidget {
 }
 
 class ContentBlockVideo extends StatefulWidget {
-  const ContentBlockVideo({required this.source, super.key});
+  const ContentBlockVideo({
+    required this.source,
+    this.remoteResolver,
+    super.key,
+  });
 
   final String source;
+  final RemoteContentResolver? remoteResolver;
 
   @override
   State<ContentBlockVideo> createState() => _ContentBlockVideoState();
@@ -744,23 +872,36 @@ class _ContentBlockVideoState extends State<ContentBlockVideo> {
   @override
   void initState() {
     super.initState();
-    final uri = Uri.tryParse(widget.source);
-    if (uri == null || !uri.hasScheme) {
-      _error = FormatException('Video source is unavailable');
-      return;
+    unawaited(_initialize());
+  }
+
+  Future<void> _initialize() async {
+    try {
+      final source = Uri.tryParse(widget.source);
+      if (source == null || !source.hasScheme) {
+        throw const FormatException('Video source is unavailable');
+      }
+      Uri playable = source;
+      if (source.scheme == 'http' || source.scheme == 'https') {
+        final resolver = widget.remoteResolver;
+        if (resolver == null) {
+          throw const FormatException('Remote video resolver is unavailable');
+        }
+        final resolved = await resolver(widget.source, RemoteContentKind.video);
+        final localPath = resolved.localPath;
+        if (localPath == null) {
+          throw const FormatException('Video cache path is unavailable');
+        }
+        playable = Uri.file(localPath);
+      }
+      if (!mounted) return;
+      final controller = VideoPlayerController.networkUrl(playable);
+      _controller = controller;
+      await controller.initialize();
+      if (mounted) setState(() {});
+    } on Object catch (error) {
+      if (mounted) setState(() => _error = error);
     }
-    final controller = VideoPlayerController.networkUrl(uri);
-    _controller = controller;
-    unawaited(
-      controller
-          .initialize()
-          .then((_) {
-            if (mounted) setState(() {});
-          })
-          .catchError((Object error) {
-            if (mounted) setState(() => _error = error);
-          }),
-    );
   }
 
   @override
@@ -875,25 +1016,35 @@ class ContentBlockDocumentPreview extends StatelessWidget {
   }
 }
 
-class ContentBlockLinkPreview extends StatelessWidget {
+class ContentBlockLinkPreview extends StatefulWidget {
   const ContentBlockLinkPreview({
     required this.url,
     this.title,
     this.description,
     this.siteName,
     this.imageUrl,
+    this.remoteResolver,
     super.key,
   });
 
-  factory ContentBlockLinkPreview.fromJson(String content) {
+  factory ContentBlockLinkPreview.fromJson(
+    String content, {
+    RemoteContentResolver? remoteResolver,
+  }) {
     final json = _jsonMap(content);
-    if (json == null) return ContentBlockLinkPreview(url: content);
+    if (json == null) {
+      return ContentBlockLinkPreview(
+        url: content,
+        remoteResolver: remoteResolver,
+      );
+    }
     return ContentBlockLinkPreview(
       url: json['url']?.toString() ?? content,
       title: json['title']?.toString(),
       description: json['description']?.toString(),
       siteName: json['siteName']?.toString() ?? json['site_name']?.toString(),
       imageUrl: json['image']?.toString() ?? json['imageUrl']?.toString(),
+      remoteResolver: remoteResolver,
     );
   }
 
@@ -902,10 +1053,40 @@ class ContentBlockLinkPreview extends StatelessWidget {
   final String? description;
   final String? siteName;
   final String? imageUrl;
+  final RemoteContentResolver? remoteResolver;
+
+  @override
+  State<ContentBlockLinkPreview> createState() =>
+      _ContentBlockLinkPreviewState();
+}
+
+class _ContentBlockLinkPreviewState extends State<ContentBlockLinkPreview> {
+  ResolvedRemoteContent? _resolved;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.title == null && widget.remoteResolver != null) {
+      unawaited(
+        widget.remoteResolver!(widget.url, RemoteContentKind.opengraph)
+            .then((value) {
+              if (mounted) setState(() => _resolved = value);
+            })
+            .catchError((Object _) {
+              // A URL-only card remains useful when a site blocks previews.
+            }),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final colors = shad.Theme.of(context).colorScheme;
+    final url = _resolved?.url ?? widget.url;
+    final title = _resolved?.title ?? widget.title;
+    final description = _resolved?.description ?? widget.description;
+    final siteName = _resolved?.siteName ?? widget.siteName;
+    final imageUrl = _resolved?.imageUrl ?? widget.imageUrl;
     final host = Uri.tryParse(url)?.host;
     return Semantics(
       link: true,
@@ -916,11 +1097,12 @@ class ContentBlockLinkPreview extends StatelessWidget {
           if (imageUrl != null)
             ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 220),
-              child: Image.network(
-                imageUrl!,
-                fit: BoxFit.cover,
-                semanticLabel: 'Preview image for ${title ?? url}',
-                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              child: ContentBlockImage(
+                url: imageUrl,
+                dataBase64: null,
+                mime: 'image/unknown',
+                alt: 'Preview image for ${title ?? url}',
+                remoteResolver: widget.remoteResolver,
               ),
             ),
           Padding(
@@ -947,7 +1129,7 @@ class ContentBlockLinkPreview extends StatelessWidget {
                 if (description != null) ...[
                   const SizedBox(height: 4),
                   Text(
-                    description!,
+                    description,
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -1204,10 +1386,15 @@ class _CodeFrame extends StatelessWidget {
 }
 
 class _MarkdownImage extends StatelessWidget {
-  const _MarkdownImage({required this.url, required this.alt});
+  const _MarkdownImage({
+    required this.url,
+    required this.alt,
+    this.remoteResolver,
+  });
 
   final String url;
   final String alt;
+  final RemoteContentResolver? remoteResolver;
 
   @override
   Widget build(BuildContext context) => _BlockSurface(
@@ -1222,11 +1409,12 @@ class _MarkdownImage extends StatelessWidget {
       padding: const EdgeInsets.only(top: 8),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxHeight: 420, minHeight: 120),
-        child: Image.network(
-          url,
-          fit: BoxFit.contain,
-          semanticLabel: alt,
-          errorBuilder: (_, __, ___) => _MediaError(label: alt),
+        child: ContentBlockImage(
+          url: url,
+          dataBase64: null,
+          mime: 'image/unknown',
+          alt: alt,
+          remoteResolver: remoteResolver,
         ),
       ),
     ),
@@ -1261,7 +1449,7 @@ class _CopyButtonState extends State<_CopyButton> {
       label: _copied ? 'Copied' : widget.label,
       child: IconButton(
         tooltip: _copied ? 'Copied' : widget.label,
-        constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+        constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
         onPressed: widget.value.isEmpty
             ? null
             : () async {

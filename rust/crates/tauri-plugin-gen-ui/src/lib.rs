@@ -87,11 +87,12 @@ fn spawn_chat_event_forwarder<R: Runtime>(app: tauri::AppHandle<R>) {
             match &event {
                 gen_ui_types::events::A2uiEvent::Block {
                     block: gen_ui_types::ContentBlock::Text { text },
+                    ..
                 } => tracing::info!(characters = text.chars().count(), "desktop chat text block"),
                 gen_ui_types::events::A2uiEvent::RunFinished { run_id } => {
                     tracing::info!(run_id = %run_id, "desktop chat run finished")
                 }
-                gen_ui_types::events::A2uiEvent::RunError { message } => {
+                gen_ui_types::events::A2uiEvent::RunError { message, .. } => {
                     tracing::error!(error = %message, "desktop chat run failed")
                 }
                 _ => {}

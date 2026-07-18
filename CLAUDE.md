@@ -26,3 +26,11 @@ React:   Component → Hook → Store → invoke()/API (stores are the ONLY invo
 - Assistant UI owns the React chat thread, composer, thread list, streaming lifecycle, attachments, and message actions.
 - Persist conversations as Prometheus Entity Management 3.x entities: PGlite on web and pglite-oxide through typed Rust commands on Tauri. Keep only transient interaction state in Zustand.
 - Flat 2.0 is mandatory: no visible borders, divider lines, decorative outlines, or layout shadows. Regions differ only by background color in light and dark themes.
+
+## Platform support policy
+
+- Optimize for current-generation phones and high-impact capabilities. Legacy-device
+  compatibility is not a product constraint. Raise the minimum supported Dart, Flutter,
+  Android, and iOS versions whenever a modern dependency, security improvement, native
+  capability, or materially better UX requires it; document each increase and verify the
+  resulting production build on a current physical device.

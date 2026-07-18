@@ -38,6 +38,7 @@ pub struct AgentState {
     /// "no registry" are the same thing to every caller.
     pub mcp: McpRegistry,
     events: broadcast::Sender<A2uiEvent>,
+    event_history: parking_lot::Mutex<std::collections::BTreeMap<String, Vec<A2uiEvent>>>,
 }
 
 static STATE: OnceCell<AgentState> = OnceCell::new();
@@ -77,6 +78,7 @@ pub fn init_with_inference(
         inference,
         mcp: McpRegistry::new(),
         events: tx,
+        event_history: parking_lot::Mutex::new(Default::default()),
     };
     if STATE.set(state).is_err() {
         tracing::warn!(
@@ -97,8 +99,35 @@ pub fn subscribe() -> Result<broadcast::Receiver<A2uiEvent>, AgentError> {
     Ok(get()?.events.subscribe())
 }
 
+/// Atomically subscribe to future events and snapshot any events already
+/// published for a run. This closes the send-then-subscribe race at FFI/HTTP
+/// boundaries without making producers wait for a UI listener.
+pub fn subscribe_run(
+    run_id: &str,
+) -> Result<(Vec<A2uiEvent>, broadcast::Receiver<A2uiEvent>), AgentError> {
+    let state = get()?;
+    let history = state.event_history.lock();
+    let receiver = state.events.subscribe();
+    let backlog = history.get(run_id).cloned().unwrap_or_default();
+    drop(history);
+    Ok((backlog, receiver))
+}
+
 pub(crate) fn publish(event: A2uiEvent) {
     if let Ok(state) = get() {
+        {
+            let mut history = state.event_history.lock();
+            let events = history.entry(event.run_id().to_owned()).or_default();
+            if events.len() == EVENT_CHANNEL_CAPACITY {
+                events.remove(0);
+            }
+            events.push(event.clone());
+            while history.len() > 32 {
+                if let Some(key) = history.keys().next().cloned() {
+                    history.remove(&key);
+                }
+            }
+        }
         // No subscribers is not an error — a run started before any UI attached
         // (or with devtools closed) still completes; it just has no listener.
         let _ = state.events.send(event);

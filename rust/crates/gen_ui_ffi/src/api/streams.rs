@@ -33,22 +33,43 @@ use crate::frb_generated::StreamSink;
 /// ContentBlock-bearing events; the transport layer (`@flint/react`, flint_genui)
 /// is bypassed by contract.
 ///
-/// The broadcast is process-wide, not per-run (only `RunStarted`/`RunFinished`
-/// carry a `run_id`; `Block` does not) — correct for this PoC's single-turn-at-
-/// a-time chat, since only one run is ever in flight. Multiplexing by run_id is
-/// a real gap for concurrent turns, deferred until that's an actual requirement.
 pub fn chat_events(run_id: String, sink: StreamSink<String>) {
-    let _ = run_id;
-    let Ok(mut rx) = gen_ui_agent::state::subscribe() else {
+    let Ok((backlog, mut rx)) = gen_ui_agent::state::subscribe_run(&run_id) else {
         return;
     };
     gen_ui_runtime::spawn(async move {
+        for event in backlog {
+            let terminal = matches!(
+                &event,
+                gen_ui_types::events::A2uiEvent::RunFinished { .. }
+                    | gen_ui_types::events::A2uiEvent::RunError { .. }
+            );
+            let Ok(json) = serde_json::to_string(&event) else {
+                continue;
+            };
+            if sink.add(json).is_err() {
+                return;
+            }
+            if terminal {
+                return;
+            }
+        }
         while let Ok(event) = rx.recv().await {
+            if event.run_id() != run_id {
+                continue;
+            }
             let Ok(json) = serde_json::to_string(&event) else {
                 continue;
             };
             if sink.add(json).is_err() {
                 break; // Dart side dropped the stream — stop forwarding.
+            }
+            if matches!(
+                event,
+                gen_ui_types::events::A2uiEvent::RunFinished { .. }
+                    | gen_ui_types::events::A2uiEvent::RunError { .. }
+            ) {
+                break;
             }
         }
     });

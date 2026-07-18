@@ -40,6 +40,7 @@ impl A2uiAdapter {
                 run_id: self.run_id.clone(),
             }],
             StreamEvent::TextDelta { delta, .. } => vec![A2uiEvent::Block {
+                run_id: self.run_id.clone(),
                 block: ContentBlock::Text {
                     text: delta.clone(),
                 },
@@ -70,6 +71,7 @@ impl A2uiAdapter {
                     Some(i) => {
                         let t = self.pending_tools.remove(i);
                         vec![A2uiEvent::Block {
+                            run_id: self.run_id.clone(),
                             block: ContentBlock::ToolUse {
                                 id: t.id,
                                 name: t.name,
@@ -85,6 +87,7 @@ impl A2uiAdapter {
                 run_id: self.run_id.clone(),
             }],
             StreamEvent::Error { message } => vec![A2uiEvent::RunError {
+                run_id: self.run_id.clone(),
                 message: message.clone(),
             }],
             _ => vec![],
@@ -113,6 +116,7 @@ impl AguiAdapter {
                 run_id: run_id.clone(),
             }],
             A2uiEvent::Block {
+                run_id: _,
                 block: ContentBlock::Text { text },
             } => vec![AguiEvent::TextMessageContent {
                 delta: text.clone(),
@@ -166,6 +170,7 @@ mod tests {
                         name,
                         input_json,
                     },
+                ..
             } => {
                 assert_eq!(id, "c1");
                 assert_eq!(name, "forge__read");
@@ -214,6 +219,7 @@ mod tests {
             match &out[0] {
                 A2uiEvent::Block {
                     block: ContentBlock::ToolUse { id, input_json, .. },
+                    ..
                 } => {
                     assert_eq!(id, want_id);
                     assert_eq!(input_json, want_args, "calls must not share a buffer");
@@ -249,7 +255,7 @@ mod tests {
         });
         assert!(matches!(
             &out[0],
-            A2uiEvent::Block { block: ContentBlock::Text { text } } if text == "hi"
+            A2uiEvent::Block { block: ContentBlock::Text { text }, .. } if text == "hi"
         ));
     }
 }

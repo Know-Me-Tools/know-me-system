@@ -25,14 +25,27 @@ pub enum A2uiEvent {
         run_id: String,
     },
     Block {
+        run_id: String,
         block: crate::content_block::ContentBlock,
     },
     RunFinished {
         run_id: String,
     },
     RunError {
+        run_id: String,
         message: String,
     },
+}
+
+impl A2uiEvent {
+    pub fn run_id(&self) -> &str {
+        match self {
+            Self::RunStarted { run_id }
+            | Self::Block { run_id, .. }
+            | Self::RunFinished { run_id }
+            | Self::RunError { run_id, .. } => run_id,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

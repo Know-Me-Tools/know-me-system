@@ -8,17 +8,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`
 
-enum FilterOp {
-  eq,
-  ne,
-  lt,
-  lte,
-  gt,
-  gte,
-  in_,
-  like,
-  ;
-}
+enum FilterOp { eq, ne, lt, lte, gt, gte, in_, like }
 
 class FilterSpec {
   final String field;
@@ -48,10 +38,7 @@ class SortSpec {
   final String field;
   final bool descending;
 
-  const SortSpec({
-    required this.field,
-    required this.descending,
-  });
+  const SortSpec({required this.field, required this.descending});
 
   @override
   int get hashCode => field.hashCode ^ descending.hashCode;

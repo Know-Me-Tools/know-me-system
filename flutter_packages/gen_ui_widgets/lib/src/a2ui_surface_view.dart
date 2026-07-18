@@ -1,491 +1,489 @@
 // TJ-ARCH-MOB-001 compliant
-// Safe native renderer for Google A2UI v0.9 JSONL. The server supplies data,
-// never executable UI code. Only this explicit catalog can materialize widgets.
+// Safe native renderer for Google A2UI v0.9 JSONL. Protocol parsing, surface
+// lifecycle, schema validation, reactive data binding, client functions, and
+// action construction are delegated to Flutter's official GenUI SDK.
+import 'dart:async';
 import 'dart:convert';
 
+import 'package:audioplayers/audioplayers.dart' as audio;
 import 'package:flutter/material.dart';
-import 'package:markdown_widget/markdown_widget.dart';
+import 'package:flutter/services.dart';
+import 'package:genui/genui.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
 
-typedef A2uiActionCallback =
-    void Function(
-      String surfaceId,
-      String actionName,
-      Map<String, dynamic> context,
-    );
+import 'content_block_view.dart';
+
+/// A typed, transport-ready A2UI v0.9 user action.
+@immutable
+class A2uiAction {
+  const A2uiAction({
+    required this.surfaceId,
+    required this.name,
+    required this.sourceComponentId,
+    required this.timestamp,
+    required this.context,
+    this.clientDataModel,
+  });
+
+  final String surfaceId;
+  final String name;
+  final String sourceComponentId;
+  final DateTime timestamp;
+  final Map<String, Object?> context;
+
+  /// Present only when the surface opted into `sendDataModel`.
+  final Map<String, Object?>? clientDataModel;
+
+  Map<String, Object?> toJson() => {
+    'version': 'v0.9',
+    'action': {
+      'surfaceId': surfaceId,
+      'name': name,
+      'sourceComponentId': sourceComponentId,
+      'timestamp': timestamp.toUtc().toIso8601String(),
+      'context': context,
+    },
+    if (clientDataModel != null) 'a2uiClientDataModel': clientDataModel,
+  };
+}
+
+typedef A2uiActionCallback = FutureOr<void> Function(A2uiAction action);
 
 /// Renders an A2UI v0.9 message stream embedded in an artifact block.
 ///
-/// Supported envelopes are createSurface, updateComponents, updateDataModel,
-/// and deleteSurface. Components are resolved from the protocol's flat
-/// adjacency list and unknown catalog entries fail closed as visible notices.
+/// The official GenUI engine owns the protocol state machine. This widget owns
+/// only its rendering lifecycle and forwards typed user intent to the host. The
+/// host must send actions through Riverpod -> Repository -> Rust FFI.
 class A2uiSurfaceView extends StatefulWidget {
-  const A2uiSurfaceView({required this.source, this.onAction, super.key});
+  const A2uiSurfaceView({
+    required this.source,
+    this.onAction,
+    this.remoteResolver,
+    super.key,
+  });
 
   final String source;
   final A2uiActionCallback? onAction;
+  final RemoteContentResolver? remoteResolver;
 
   @override
   State<A2uiSurfaceView> createState() => _A2uiSurfaceViewState();
 }
 
 class _A2uiSurfaceViewState extends State<A2uiSurfaceView> {
-  late Map<String, _Surface> _surfaces;
+  late SurfaceController _controller;
+  late A2uiTransportAdapter _transport;
+  StreamSubscription<Object?>? _messageSubscription;
+  StreamSubscription<Object?>? _surfaceSubscription;
+  StreamSubscription<ChatMessage>? _submitSubscription;
+  List<String> _surfaceIds = const [];
+  final Map<String, bool> _sendDataModelBySurface = {};
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _decode();
+    _start();
   }
 
   @override
   void didUpdateWidget(covariant A2uiSurfaceView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.source != widget.source) _decode();
+    if (oldWidget.source != widget.source) {
+      _stop();
+      _start();
+    }
   }
 
-  void _decode() {
-    _surfaces = {};
+  void _start() {
     _error = null;
+    _surfaceIds = const [];
+    _indexSurfacePrivacyFlags(widget.source);
+    final basicCatalog = BasicCatalogItems.asNoAssetCatalog().copyWith(
+      newItems: [_safeImageItem(), _safeVideoItem(), _safeAudioItem()],
+    );
+    _controller = SurfaceController(
+      // Image/audio/video are supplied by the Rust media resolver in a custom
+      // catalog later in the pipeline. Excluding the stock network-backed
+      // widgets here preserves the Rust-owned networking invariant.
+      catalogs: [
+        basicCatalog,
+        // Kept for compatibility with early v0.9 examples and persisted agent
+        // output. Both IDs use the same official, schema-validated catalog.
+        basicCatalog.copyWith(
+          catalogId:
+              'https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json',
+        ),
+      ],
+    );
+    _transport = A2uiTransportAdapter();
+    _messageSubscription = _transport.incomingMessages.listen(
+      _controller.handleMessage,
+      onError: _showError,
+    );
+    _surfaceSubscription = _controller.surfaceUpdates.listen(
+      (_) => _refreshSurfaces(),
+      onError: _showError,
+    );
+    _submitSubscription = _controller.onSubmit.listen(
+      _forwardInteraction,
+      onError: _showError,
+    );
+
     try {
-      for (final message in _messages(widget.source)) {
-        _apply(message);
-      }
-    } on Object catch (error) {
-      _error = 'This A2UI surface could not be rendered: $error';
+      // A final newline gives the JSONL parser an unambiguous frame boundary.
+      _transport.addChunk('${widget.source.trim()}\n');
+    } on Object catch (error, stackTrace) {
+      _showError(error, stackTrace);
     }
   }
 
-  Iterable<Map<String, dynamic>> _messages(String source) sync* {
-    final trimmed = source.trim();
-    if (trimmed.isEmpty) return;
-    if (trimmed.startsWith('[')) {
-      for (final item in jsonDecode(trimmed) as List<dynamic>) {
-        yield Map<String, dynamic>.from(item as Map);
-      }
-      return;
-    }
-    for (final line in const LineSplitter().convert(trimmed)) {
-      if (line.trim().isNotEmpty) {
-        yield Map<String, dynamic>.from(jsonDecode(line) as Map);
-      }
-    }
-  }
-
-  void _apply(Map<String, dynamic> message) {
-    if (message['createSurface'] case final Map<dynamic, dynamic> raw) {
-      final body = Map<String, dynamic>.from(raw);
-      final id = body['surfaceId'] as String;
-      _surfaces[id] = _Surface(
-        id: id,
-        catalogId: body['catalogId'] as String? ?? 'basic',
+  CatalogItem _safeImageItem() => CatalogItem(
+    name: 'Image',
+    dataSchema: BasicCatalogItems.image.dataSchema,
+    widgetBuilder: (itemContext) {
+      final data = Map<String, Object?>.from(itemContext.data as Map);
+      return BoundString(
+        dataContext: itemContext.dataContext,
+        value: data['url'],
+        builder: (_, value) => ContentBlockImage(
+          url: value,
+          dataBase64: null,
+          mime: 'image/unknown',
+          alt: 'Interactive surface image',
+          remoteResolver: widget.remoteResolver,
+        ),
       );
-      return;
-    }
-    if (message['updateComponents'] case final Map<dynamic, dynamic> raw) {
-      final body = Map<String, dynamic>.from(raw);
-      final surface = _requireSurface(body['surfaceId'] as String);
-      for (final item in body['components'] as List<dynamic>? ?? const []) {
-        final component = Map<String, dynamic>.from(item as Map);
-        surface.components[component['id'] as String] = component;
-      }
-      return;
-    }
-    if (message['updateDataModel'] case final Map<dynamic, dynamic> raw) {
-      final body = Map<String, dynamic>.from(raw);
-      final surface = _requireSurface(body['surfaceId'] as String);
-      _writePointer(
-        surface.data,
-        body['path'] as String? ?? '/',
-        body['value'],
-      );
-      return;
-    }
-    if (message['deleteSurface'] case final Map<dynamic, dynamic> raw) {
-      _surfaces.remove(raw['surfaceId'] as String);
-      return;
-    }
-    throw const FormatException('unknown A2UI message envelope');
-  }
-
-  _Surface _requireSurface(String id) => _surfaces[id] ??= _Surface(
-    id: id,
-    catalogId: 'https://a2ui.org/catalogs/basic',
+    },
   );
 
-  @override
-  Widget build(BuildContext context) {
-    if (_error case final error?) {
-      return Semantics(
-        liveRegion: true,
-        child: Text(
-          error,
-          style: TextStyle(
-            color: shad.Theme.of(context).colorScheme.destructive,
+  CatalogItem _safeVideoItem() => CatalogItem(
+    name: 'Video',
+    dataSchema: BasicCatalogItems.video.dataSchema,
+    widgetBuilder: (itemContext) {
+      final data = Map<String, Object?>.from(itemContext.data as Map);
+      return BoundString(
+        dataContext: itemContext.dataContext,
+        value: data['url'],
+        builder: (_, value) => value == null || value.isEmpty
+            ? const SizedBox.shrink()
+            : ContentBlockVideo(
+                source: value,
+                remoteResolver: widget.remoteResolver,
+              ),
+      );
+    },
+  );
+
+  CatalogItem _safeAudioItem() => CatalogItem(
+    name: 'AudioPlayer',
+    dataSchema: BasicCatalogItems.audioPlayer.dataSchema,
+    widgetBuilder: (itemContext) {
+      final data = Map<String, Object?>.from(itemContext.data as Map);
+      return BoundString(
+        dataContext: itemContext.dataContext,
+        value: data['url'],
+        builder: (_, url) => BoundString(
+          dataContext: itemContext.dataContext,
+          value: data['description'],
+          builder: (_, description) => _SafeAudioPlayer(
+            url: url,
+            description: description,
+            remoteResolver: widget.remoteResolver,
           ),
         ),
       );
+    },
+  );
+
+  void _refreshSurfaces() {
+    if (!mounted) return;
+    setState(() {
+      _surfaceIds = List.unmodifiable(_controller.activeSurfaceIds);
+    });
+  }
+
+  void _forwardInteraction(ChatMessage message) {
+    for (final part in message.parts.uiInteractionParts) {
+      try {
+        final envelope = Map<String, Object?>.from(
+          jsonDecode(part.interaction) as Map,
+        );
+        final rawAction = envelope['action'];
+        if (rawAction is! Map) continue;
+        final action = Map<String, Object?>.from(rawAction);
+        final surfaceId = action['surfaceId']?.toString() ?? '';
+        if (surfaceId.isEmpty) continue;
+        final Object? dataModel = _sendDataModelBySurface[surfaceId] == true
+            ? _controller
+                  .contextFor(surfaceId)
+                  .dataModel
+                  .getValue<Object?>(DataPath.root)
+            : null;
+        final timestamp =
+            DateTime.tryParse(action['timestamp']?.toString() ?? '') ??
+            DateTime.now().toUtc();
+        final context = action['context'] is Map
+            ? Map<String, Object?>.from(action['context'] as Map)
+            : <String, Object?>{};
+        final callback = widget.onAction;
+        if (callback != null) {
+          unawaited(
+            Future.sync(
+              () => callback(
+                A2uiAction(
+                  surfaceId: surfaceId,
+                  name: action['name']?.toString() ?? 'action',
+                  sourceComponentId:
+                      action['sourceComponentId']?.toString() ?? 'unknown',
+                  timestamp: timestamp,
+                  context: context,
+                  clientDataModel: dataModel == null
+                      ? null
+                      : {
+                          'version': 'v0.9',
+                          'surfaces': {surfaceId: dataModel},
+                        },
+                ),
+              ),
+            ).catchError((Object error, StackTrace stackTrace) {
+              _showError(error, stackTrace);
+            }),
+          );
+        }
+      } on Object catch (error, stackTrace) {
+        _showError(error, stackTrace);
+      }
     }
-    if (_surfaces.isEmpty) {
-      return const Text('This A2UI surface is empty.');
+  }
+
+  void _indexSurfacePrivacyFlags(String source) {
+    _sendDataModelBySurface.clear();
+    for (final line in const LineSplitter().convert(source)) {
+      try {
+        final envelope = jsonDecode(line);
+        if (envelope is! Map) continue;
+        final create = envelope['createSurface'];
+        if (create is Map) {
+          final surfaceId = create['surfaceId'];
+          if (surfaceId is String && surfaceId.isNotEmpty) {
+            _sendDataModelBySurface[surfaceId] =
+                create['sendDataModel'] == true;
+          }
+        }
+        final delete = envelope['deleteSurface'];
+        if (delete is Map && delete['surfaceId'] is String) {
+          _sendDataModelBySurface.remove(delete['surfaceId']);
+        }
+      } on FormatException {
+        // The official transport reports malformed frames. This pass only
+        // indexes the opt-in privacy flag and never accepts invalid UI.
+      }
+    }
+  }
+
+  void _showError(Object error, [StackTrace? stackTrace]) {
+    if (!mounted) return;
+    setState(() {
+      _error = 'This A2UI surface could not be rendered safely.';
+    });
+  }
+
+  void _stop() {
+    unawaited(_messageSubscription?.cancel());
+    unawaited(_surfaceSubscription?.cancel());
+    unawaited(_submitSubscription?.cancel());
+    _transport.dispose();
+    _controller.dispose();
+  }
+
+  @override
+  void dispose() {
+    _stop();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = shad.Theme.of(context).colorScheme;
+    final brightness = colors.background.computeLuminance() < 0.5
+        ? Brightness.dark
+        : Brightness.light;
+    final materialTheme = ThemeData(
+      brightness: brightness,
+      colorScheme:
+          ColorScheme.fromSeed(
+            seedColor: colors.primary,
+            brightness: brightness,
+          ).copyWith(
+            primary: colors.primary,
+            onPrimary: colors.primaryForeground,
+            surface: colors.card,
+            onSurface: colors.foreground,
+            error: colors.destructive,
+          ),
+      scaffoldBackgroundColor: colors.background,
+      dividerColor: Colors.transparent,
+      cardTheme: CardThemeData(
+        color: colors.card,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide.none,
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          elevation: 0,
+          shadowColor: Colors.transparent,
+          minimumSize: const Size(48, 48),
+        ),
+      ),
+      inputDecorationTheme: const InputDecorationTheme(
+        border: InputBorder.none,
+        enabledBorder: InputBorder.none,
+        focusedBorder: InputBorder.none,
+      ),
+    );
+    if (_error case final error?) {
+      return Semantics(
+        liveRegion: true,
+        child: Text(error, style: TextStyle(color: colors.destructive)),
+      );
+    }
+    if (_surfaceIds.isEmpty) {
+      return Semantics(
+        liveRegion: true,
+        label: 'Interactive agent interface is loading',
+        child: const Padding(
+          padding: EdgeInsets.all(16),
+          child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+        ),
+      );
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final surface in _surfaces.values)
+        for (final surfaceId in _surfaceIds)
           Semantics(
             container: true,
             label: 'Interactive agent interface',
-            child: _component(surface, 'root', <String>{}, 0),
+            child: Theme(
+              data: materialTheme,
+              child: Surface(
+                surfaceContext: _controller.contextFor(surfaceId),
+                defaultBuilder: (_) => const SizedBox.shrink(),
+              ),
+            ),
           ),
       ],
     );
   }
-
-  Widget _component(
-    _Surface surface,
-    String id,
-    Set<String> ancestors,
-    int depth,
-  ) {
-    if (depth > 32 || ancestors.contains(id)) {
-      return const _Unsupported(label: 'Invalid recursive A2UI component');
-    }
-    final node = surface.components[id];
-    if (node == null) {
-      return _Unsupported(label: 'Waiting for component “$id”…');
-    }
-    final next = {...ancestors, id};
-    Widget child(String childId) =>
-        _component(surface, childId, next, depth + 1);
-    List<Widget> children() => [
-      for (final childId in node['children'] as List<dynamic>? ?? const [])
-        child(childId as String),
-    ];
-    final type = node['component'] as String? ?? '';
-    return KeyedSubtree(
-      key: ValueKey('${surface.id}:$id'),
-      child: switch (type) {
-        'Text' => MarkdownBlock(
-          data: _stringValue(surface, node['text']),
-          config: _a2uiMarkdownConfig(context),
-        ),
-        'Column' => Column(
-          crossAxisAlignment: _crossAxis(node['align'] as String?),
-          mainAxisSize: MainAxisSize.min,
-          children: _spaced(children()),
-        ),
-        'Row' => Wrap(
-          spacing: 12,
-          runSpacing: 8,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: children(),
-        ),
-        'List' => Column(
-          mainAxisSize: MainAxisSize.min,
-          children: _spaced(children()),
-        ),
-        'Card' => Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: shad.Theme.of(context).colorScheme.card,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: child(node['child'] as String),
-        ),
-        'Icon' => Icon(_icon(node['name'] as String?)),
-        'Image' => _A2uiMediaPlaceholder(
-          icon: Icons.image_outlined,
-          label: node['alt'] as String? ?? 'A2UI image',
-          source: _stringValue(surface, node['url']),
-        ),
-        'Video' || 'AudioPlayer' => _A2uiMediaPlaceholder(
-          icon: type == 'Video'
-              ? Icons.movie_outlined
-              : Icons.audio_file_outlined,
-          label: type,
-          source: _stringValue(surface, node['url']),
-        ),
-        'Button' => shad.PrimaryButton(
-          onPressed: widget.onAction == null
-              ? null
-              : () => _dispatch(surface, node['action']),
-          child: switch (node['child']) {
-            final String childId => child(childId),
-            _ => Text(node['text'] as String? ?? 'Continue'),
-          },
-        ),
-        'TextField' => shad.TextField(
-          placeholder: Text(node['label'] as String? ?? ''),
-          onChanged: (value) => _updateBinding(surface, node['value'], value),
-        ),
-        'CheckBox' => _A2uiCheckBox(
-          label: node['label'] as String? ?? '',
-          value: _boolValue(surface, node['value']),
-          onChanged: (value) =>
-              setState(() => _updateBinding(surface, node['value'], value)),
-        ),
-        'ChoicePicker' => _A2uiChoicePicker(
-          label: node['label'] as String? ?? 'Choose an option',
-          options: [
-            for (final option in node['options'] as List<dynamic>? ?? const [])
-              Map<String, dynamic>.from(option as Map),
-          ],
-        ),
-        'Divider' => const SizedBox(height: 16),
-        'Tabs' || 'Modal' => Column(
-          mainAxisSize: MainAxisSize.min,
-          children: _spaced(children()),
-        ),
-        _ => _Unsupported(label: 'Unsupported A2UI component: $type'),
-      },
-    );
-  }
-
-  void _dispatch(_Surface surface, dynamic rawAction) {
-    if (rawAction is! Map) return;
-    final action = Map<String, dynamic>.from(rawAction);
-    final event = action['event'] is Map
-        ? Map<String, dynamic>.from(action['event'] as Map)
-        : action;
-    widget.onAction?.call(
-      surface.id,
-      event['name'] as String? ?? 'action',
-      Map<String, dynamic>.from(event['context'] as Map? ?? const {}),
-    );
-  }
-
-  void _updateBinding(_Surface surface, dynamic binding, dynamic value) {
-    if (binding is Map && binding['path'] is String) {
-      _writePointer(surface.data, binding['path'] as String, value);
-    }
-  }
-
-  String _stringValue(_Surface surface, dynamic value) {
-    final resolved = _resolve(surface, value);
-    return resolved?.toString() ?? '';
-  }
-
-  bool _boolValue(_Surface surface, dynamic value) =>
-      _resolve(surface, value) == true;
-
-  dynamic _resolve(_Surface surface, dynamic value) {
-    if (value is Map && value['path'] is String) {
-      return _readPointer(surface.data, value['path'] as String);
-    }
-    return value;
-  }
 }
 
-class _Surface {
-  _Surface({required this.id, required this.catalogId});
-  final String id;
-  final String catalogId;
-  final Map<String, Map<String, dynamic>> components = {};
-  final Map<String, dynamic> data = {};
-}
-
-class _Unsupported extends StatelessWidget {
-  const _Unsupported({required this.label});
-  final String label;
-  @override
-  Widget build(BuildContext context) => Text(
-    label,
-    style: TextStyle(color: shad.Theme.of(context).colorScheme.mutedForeground),
-  );
-}
-
-class _A2uiCheckBox extends StatelessWidget {
-  const _A2uiCheckBox({
-    required this.label,
-    required this.value,
-    required this.onChanged,
+class _SafeAudioPlayer extends StatefulWidget {
+  const _SafeAudioPlayer({
+    required this.url,
+    required this.description,
+    required this.remoteResolver,
   });
-  final String label;
-  final bool value;
-  final ValueChanged<bool> onChanged;
+
+  final String? url;
+  final String? description;
+  final RemoteContentResolver? remoteResolver;
+
   @override
-  Widget build(BuildContext context) => Semantics(
-    checked: value,
-    child: InkWell(
-      onTap: () => onChanged(!value),
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Row(
-          children: [
-            Icon(value ? Icons.check_box : Icons.check_box_outline_blank),
-            const SizedBox(width: 8),
-            Expanded(child: Text(label)),
-          ],
-        ),
-      ),
-    ),
-  );
+  State<_SafeAudioPlayer> createState() => _SafeAudioPlayerState();
 }
 
-class _A2uiChoicePicker extends StatelessWidget {
-  const _A2uiChoicePicker({required this.label, required this.options});
-  final String label;
-  final List<Map<String, dynamic>> options;
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(label),
-      const SizedBox(height: 8),
-      Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          for (final option in options)
-            shad.OutlineButton(
-              onPressed: null,
-              child: Text(
-                option['label'] as String? ?? option['value'].toString(),
-              ),
-            ),
-        ],
-      ),
-    ],
-  );
-}
+class _SafeAudioPlayerState extends State<_SafeAudioPlayer> {
+  final audio.AudioPlayer _player = audio.AudioPlayer();
+  StreamSubscription<audio.PlayerState>? _stateSubscription;
+  bool _ready = false;
+  bool _playing = false;
+  Object? _error;
 
-class _A2uiMediaPlaceholder extends StatelessWidget {
-  const _A2uiMediaPlaceholder({
-    required this.icon,
-    required this.label,
-    required this.source,
-  });
-  final IconData icon;
-  final String label;
-  final String source;
   @override
-  Widget build(BuildContext context) => Semantics(
-    image: true,
-    label: label,
-    child: Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: shad.Theme.of(context).colorScheme.secondary,
-        borderRadius: BorderRadius.circular(12),
-      ),
+  void initState() {
+    super.initState();
+    _stateSubscription = _player.onPlayerStateChanged.listen((state) {
+      if (mounted) {
+        setState(() => _playing = state == audio.PlayerState.playing);
+      }
+    });
+    unawaited(_initialize());
+  }
+
+  Future<void> _initialize() async {
+    try {
+      final url = widget.url;
+      final resolver = widget.remoteResolver;
+      if (url == null || url.isEmpty || resolver == null) {
+        throw const FormatException('Audio source is unavailable');
+      }
+      final resolved = await resolver(url, RemoteContentKind.audio);
+      final path = resolved.localPath;
+      if (path == null) {
+        throw const FormatException('Audio cache path is unavailable');
+      }
+      await _player.setSource(audio.DeviceFileSource(path));
+      if (mounted) setState(() => _ready = true);
+    } on Object catch (error) {
+      if (mounted) setState(() => _error = error);
+    }
+  }
+
+  @override
+  void dispose() {
+    unawaited(_stateSubscription?.cancel());
+    unawaited(_player.dispose());
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    if (_error != null) {
+      return Semantics(
+        label: 'Audio unavailable',
+        child: const Icon(Icons.audio_file_outlined),
+      );
+    }
+    return Semantics(
+      container: true,
+      label: widget.description ?? 'Audio player',
       child: Row(
         children: [
-          Icon(icon),
-          const SizedBox(width: 10),
+          IconButton(
+            tooltip: _playing ? 'Pause audio' : 'Play audio',
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+            onPressed: !_ready
+                ? null
+                : () => _playing ? _player.pause() : _player.resume(),
+            icon: _ready
+                ? Icon(_playing ? Icons.pause : Icons.play_arrow)
+                : const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+          ),
           Expanded(
-            child: Text(source, maxLines: 2, overflow: TextOverflow.ellipsis),
+            child: Text(
+              widget.description ?? 'Audio',
+              style: TextStyle(color: colors.onSurface),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Copy audio URL',
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+            onPressed: widget.url == null
+                ? null
+                : () => Clipboard.setData(ClipboardData(text: widget.url!)),
+            icon: const Icon(Icons.copy_outlined, size: 18),
           ),
         ],
       ),
-    ),
-  );
-}
-
-List<Widget> _spaced(List<Widget> widgets) => [
-  for (var index = 0; index < widgets.length; index++) ...[
-    if (index > 0) const SizedBox(height: 10),
-    widgets[index],
-  ],
-];
-
-CrossAxisAlignment _crossAxis(String? value) => switch (value) {
-  'center' => CrossAxisAlignment.center,
-  'end' => CrossAxisAlignment.end,
-  'stretch' => CrossAxisAlignment.stretch,
-  _ => CrossAxisAlignment.start,
-};
-
-IconData _icon(String? name) => switch (name) {
-  'mail' => Icons.mail_outline,
-  'calendar' => Icons.calendar_today_outlined,
-  'person' => Icons.person_outline,
-  'location' => Icons.location_on_outlined,
-  'check' => Icons.check,
-  'warning' => Icons.warning_amber_outlined,
-  _ => Icons.widgets_outlined,
-};
-
-MarkdownConfig _a2uiMarkdownConfig(BuildContext context) {
-  final colors = shad.Theme.of(context).colorScheme;
-  final dark = colors.background.computeLuminance() < 0.5;
-  return (dark ? MarkdownConfig.darkConfig : MarkdownConfig.defaultConfig).copy(
-    configs: [
-      PConfig(
-        textStyle: TextStyle(
-          color: colors.foreground,
-          fontSize: 16,
-          height: 1.5,
-        ),
-      ),
-      for (final heading in const [
-        (MarkdownTag.h1, 30.0),
-        (MarkdownTag.h2, 25.0),
-        (MarkdownTag.h3, 22.0),
-        (MarkdownTag.h4, 19.0),
-        (MarkdownTag.h5, 17.0),
-        (MarkdownTag.h6, 16.0),
-      ])
-        _A2uiHeadingConfig(
-          tag: heading.$1.name,
-          style: TextStyle(
-            color: colors.foreground,
-            fontSize: heading.$2,
-            height: 1.25,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-    ],
-  );
-}
-
-class _A2uiHeadingConfig extends HeadingConfig {
-  const _A2uiHeadingConfig({required this.tag, required this.style});
-  @override
-  final String tag;
-  @override
-  final TextStyle style;
-}
-
-dynamic _readPointer(Map<String, dynamic> root, String pointer) {
-  dynamic current = root;
-  for (final segment in _segments(pointer)) {
-    if (current is! Map<String, dynamic>) return null;
-    current = current[segment];
-  }
-  return current;
-}
-
-void _writePointer(Map<String, dynamic> root, String pointer, dynamic value) {
-  final segments = _segments(pointer);
-  if (segments.isEmpty) {
-    root
-      ..clear()
-      ..addAll(
-        value is Map ? Map<String, dynamic>.from(value) : {'value': value},
-      );
-    return;
-  }
-  var current = root;
-  for (final segment in segments.take(segments.length - 1)) {
-    current =
-        current.putIfAbsent(segment, () => <String, dynamic>{})
-            as Map<String, dynamic>;
-  }
-  final leaf = segments.last;
-  if (value == null) {
-    current.remove(leaf);
-  } else {
-    current[leaf] = value;
+    );
   }
 }
-
-List<String> _segments(String pointer) => pointer == '/' || pointer.isEmpty
-    ? const []
-    : pointer
-          .split('/')
-          .skip(1)
-          .map((part) => part.replaceAll('~1', '/').replaceAll('~0', '~'))
-          .toList();

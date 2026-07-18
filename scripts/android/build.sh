@@ -1,16 +1,28 @@
 #!/usr/bin/env bash
-# Build gen_ui_core for all Android ABIs, then regenerate the Dart bridge.
+# Validate gen_ui_ffi for current-generation 64-bit Android phones, then
+# regenerate the Dart bridge. Gradle/CargoKit owns APK packaging; copying a
+# second library into app/src/main/jniLibs would shadow fresh CargoKit output.
 set -euo pipefail
 PROFILE="${1:-release}"
 ROOT="$(dirname "$(dirname "$(dirname "$0")")")"
 RUST_DIR="$ROOT/rust"
-OUT="$ROOT/mobile/android/app/src/main/jniLibs"
-declare -A ABIS=(["arm64-v8a"]="aarch64-linux-android" ["armeabi-v7a"]="armv7-linux-androideabi" ["x86_64"]="x86_64-linux-android")
+ANDROID_SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-$HOME/Library/Android/sdk}}"
+if [[ -z "${ANDROID_NDK:-}" ]]; then
+  ANDROID_NDK="$(find "$ANDROID_SDK/ndk" -mindepth 1 -maxdepth 1 -type d | sort | tail -n 1)"
+fi
+if [[ ! -d "$ANDROID_NDK" ]]; then
+  echo "Android NDK not found. Set ANDROID_NDK or install it in $ANDROID_SDK/ndk." >&2
+  exit 1
+fi
+export ANDROID_NDK
+export NDK_ROOT="$ANDROID_NDK"
+declare -A ABIS=(["arm64-v8a"]="aarch64-linux-android")
 for ABI in "${!ABIS[@]}"; do
   TARGET="${ABIS[$ABI]}"
-  cargo ndk --target "$ABI" --platform 24 -- build --manifest-path "$RUST_DIR/Cargo.toml" --target "$TARGET" $([[ "$PROFILE" == "release" ]] && echo "--release")
-  mkdir -p "$OUT/$ABI"
-  cp "$RUST_DIR/target/$TARGET/$PROFILE/libgen_ui_core.so" "$OUT/$ABI/"
+  (
+    cd "$RUST_DIR"
+    cargo ndk --target "$ABI" --platform 29 -- build -p gen_ui_ffi --target "$TARGET" $([[ "$PROFILE" == "release" ]] && echo "--release")
+  )
   echo "✓ $ABI"
 done
 if command -v flutter_rust_bridge_codegen &>/dev/null; then

@@ -4,6 +4,7 @@
 // A2uiContentDriver. Riverpod 3: guard ref.mounted after awaits; the send flow
 // is driven by the Mutations API in the screen. No FFI-driven provider retries.
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:collection/collection.dart';
 import 'package:gen_ui_widgets/gen_ui_widgets.dart';
@@ -12,7 +13,6 @@ import 'package:uuid/uuid.dart';
 
 import '../../../../bridge/a2ui/a2ui_content_driver.dart';
 import '../../../../bridge/a2ui/a2ui_event.dart';
-import '../../../../bridge/rust_bridge_provider.dart' as bridge;
 import '../../domain/entities/chat_message.dart';
 import '../../domain/chat_repository.dart';
 import 'chat_repository_provider.dart';
@@ -63,8 +63,9 @@ class ChatNotifier extends _$ChatNotifier {
   }
 
   Future<void> createConversation() async {
-    final conversation =
-        await _repository.createConversation('New conversation');
+    final conversation = await _repository.createConversation(
+      'New conversation',
+    );
     state = state.copyWith(
       conversations: [conversation, ...state.conversations],
       threadId: conversation.id,
@@ -82,15 +83,17 @@ class ChatNotifier extends _$ChatNotifier {
 
   Future<void> deleteConversation(String id) async {
     await _repository.deleteConversation(id);
-    var conversations =
-        state.conversations.where((item) => item.id != id).toList();
+    var conversations = state.conversations
+        .where((item) => item.id != id)
+        .toList();
     if (conversations.isEmpty) {
       conversations = [
         await _repository.createConversation('New conversation'),
       ];
     }
-    final threadId =
-        id == state.threadId ? conversations.first.id : state.threadId;
+    final threadId = id == state.threadId
+        ? conversations.first.id
+        : state.threadId;
     final messages = id == state.threadId
         ? await _repository.listMessages(threadId)
         : state.messages;
@@ -118,33 +121,31 @@ class ChatNotifier extends _$ChatNotifier {
   List<ContentBlock> _appendOrMerge(
     List<ContentBlock> content,
     ContentBlock block,
-  ) =>
-      switch (block) {
-        TextBlock(:final text) => switch (content.lastOrNull) {
-            TextBlock(text: final previous) => [
-                ...content.sublist(0, content.length - 1),
-                TextBlock('$previous$text'),
-              ],
-            _ => [...content, block],
-          },
-        ThinkingBlock(:final text) => switch (content.lastOrNull) {
-            ThinkingBlock(text: final previous) => [
-                ...content.sublist(0, content.length - 1),
-                ThinkingBlock('$previous$text'),
-              ],
-            _ => [...content, block],
-          },
-        CodeBlock() ||
-        CitationBlock() ||
-        MemoryBlock() ||
-        ToolUseBlock() ||
-        ToolResultBlock() ||
-        SkillBlock() ||
-        ArtifactBlock() ||
-        ImageBlock() ||
-        DividerBlock() =>
-          [...content, block],
-      };
+  ) => switch (block) {
+    TextBlock(:final text) => switch (content.lastOrNull) {
+      TextBlock(text: final previous) => [
+        ...content.sublist(0, content.length - 1),
+        TextBlock('$previous$text'),
+      ],
+      _ => [...content, block],
+    },
+    ThinkingBlock(:final text) => switch (content.lastOrNull) {
+      ThinkingBlock(text: final previous) => [
+        ...content.sublist(0, content.length - 1),
+        ThinkingBlock('$previous$text'),
+      ],
+      _ => [...content, block],
+    },
+    CodeBlock() ||
+    CitationBlock() ||
+    MemoryBlock() ||
+    ToolUseBlock() ||
+    ToolResultBlock() ||
+    SkillBlock() ||
+    ArtifactBlock() ||
+    ImageBlock() ||
+    DividerBlock() => [...content, block],
+  };
 
   void finalizeMessage(String messageId) {
     state = state.copyWith(
@@ -189,16 +190,17 @@ class ChatNotifier extends _$ChatNotifier {
       createdAt: DateTime.now().toUtc(),
       isStreaming: true,
     );
-    state =
-        state.copyWith(messages: [...state.messages, userMsg, assistantMsg]);
+    state = state.copyWith(
+      messages: [...state.messages, userMsg, assistantMsg],
+    );
     await _repository.saveMessage(state.threadId, userMsg);
     await _touchConversation(text);
 
-    final runId = await bridge.chatSend(
-      state.threadId,
-      text,
-      history,
-      attachmentPaths,
+    final runId = await _repository.startTurn(
+      threadId: state.threadId,
+      message: text,
+      history: history,
+      attachmentPaths: attachmentPaths,
     );
     if (!ref.mounted) return; // provider paused/disposed while awaiting
 
@@ -208,33 +210,80 @@ class ChatNotifier extends _$ChatNotifier {
       onFinalize: finalizeMessage,
       onError: (id, msg) =>
           streamBlock(messageId: id, block: TextBlock('⚠️ $msg')),
-    )..connect(bridge.chatEvents(runId));
+    )..connect(_repository.events(runId));
     _drivers[assistantId] = driver;
     ref.onDispose(() => driver.dispose());
   }
 
+  /// Submit an A2UI or AG-UI confirmation interaction through the same typed
+  /// Repository -> Rust path as a normal turn and stream the agent's response.
+  Future<void> submitInteraction(Map<String, Object?> interaction) async {
+    await load();
+    if (!ref.mounted || state.threadId.isEmpty) return;
+    final payload = jsonEncode(interaction);
+    final userMsg = ChatMessage(
+      id: _uuid.v4(),
+      role: 'user',
+      content: [ArtifactBlock(_uuid.v4(), 'client_interaction', payload)],
+      createdAt: DateTime.now().toUtc(),
+    );
+    final assistantId = _uuid.v4();
+    final assistantMsg = ChatMessage(
+      id: assistantId,
+      role: 'assistant',
+      content: const [],
+      createdAt: DateTime.now().toUtc(),
+      isStreaming: true,
+    );
+    final history = _historyForRust(state.messages);
+    state = state.copyWith(
+      messages: [...state.messages, userMsg, assistantMsg],
+    );
+    await _repository.saveMessage(state.threadId, userMsg);
+    final runId = await _repository.submitInteraction(
+      threadId: state.threadId,
+      interactionJson: payload,
+      history: history,
+    );
+    if (!ref.mounted) return;
+    final driver = A2uiContentDriver(
+      messageId: assistantId,
+      onBlock: streamBlock,
+      onFinalize: finalizeMessage,
+      onError: (id, message) =>
+          streamBlock(messageId: id, block: TextBlock('⚠️ $message')),
+    )..connect(_repository.events(runId));
+    _drivers[assistantId] = driver;
+    ref.onDispose(driver.dispose);
+  }
+
+  Future<ResolvedRemoteContent> resolveRemoteContent(
+    String url,
+    RemoteContentKind kind,
+  ) => _repository.resolveRemoteContent(url, kind);
+
   List<String> _historyForRust(List<ChatMessage> messages) => [
-        for (final message in messages) ...[
-          message.role,
-          message.content
-              .whereType<TextBlock>()
-              .map((block) => block.text)
-              .join(),
-        ],
-      ];
+    for (final message in messages) ...[
+      message.role,
+      message.content.whereType<TextBlock>().map((block) => block.text).join(),
+    ],
+  ];
 
   Future<void> _touchConversation(String firstMessage) async {
-    final index =
-        state.conversations.indexWhere((item) => item.id == state.threadId);
+    final index = state.conversations.indexWhere(
+      (item) => item.id == state.threadId,
+    );
     if (index < 0) return;
     final current = state.conversations[index];
     final title = current.title == 'New conversation'
         ? firstMessage.length > 42
-            ? '${firstMessage.substring(0, 42)}…'
-            : firstMessage
+              ? '${firstMessage.substring(0, 42)}…'
+              : firstMessage
         : current.title;
-    final updated =
-        current.copyWith(title: title, updatedAt: DateTime.now().toUtc());
+    final updated = current.copyWith(
+      title: title,
+      updatedAt: DateTime.now().toUtc(),
+    );
     await _repository.saveConversation(updated);
     if (!ref.mounted) return;
     state = state.copyWith(

@@ -102,6 +102,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     separatorBuilder: (_, __) => const SizedBox(height: 16),
                     itemBuilder: (context, i) => _MessageBubble(
                       message: state.messages[i],
+                      onInteraction: (interaction) => ref
+                          .read(chatProvider.notifier)
+                          .submitInteraction(interaction),
+                      remoteResolver: (url, kind) => ref
+                          .read(chatProvider.notifier)
+                          .resolveRemoteContent(url, kind),
                     ),
                   ),
                 if (!_isNearBottom && state.messages.isNotEmpty)
@@ -187,8 +193,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               ? const SizedBox(
                                   width: 18,
                                   height: 18,
-                                  child:
-                                      CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 )
                               : Semantics(
                                   button: true,
@@ -213,9 +220,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       context: context,
       position: shad.OverlayPosition.left,
       constraints: const BoxConstraints(maxWidth: 360),
-      builder: (sheetContext) => _ConversationSheet(
-        close: () => shad.closeSheet(sheetContext),
-      ),
+      builder: (sheetContext) =>
+          _ConversationSheet(close: () => shad.closeSheet(sheetContext)),
     );
   }
 
@@ -246,7 +252,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       _isNearBottom = true;
     });
     try {
-      await ref.read(chatProvider.notifier).sendMessage(
+      await ref
+          .read(chatProvider.notifier)
+          .sendMessage(
             text.isEmpty ? 'Please review the attached files.' : text,
             attachments: attachmentBlocks,
             attachmentPaths: attachmentPaths,
@@ -278,18 +286,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
     if (!mounted || result == null) return;
     const maxBytes = 25 * 1024 * 1024;
-    final tooLarge =
-        result.files.where((file) => file.size > maxBytes).toList();
-    final unavailable =
-        result.files.where((file) => file.path == null).toList();
+    final tooLarge = result.files
+        .where((file) => file.size > maxBytes)
+        .toList();
+    final unavailable = result.files
+        .where((file) => file.path == null)
+        .toList();
     setState(() {
       _attachments.addAll(
         result.files
             .where((file) => file.size <= maxBytes && file.path != null)
             .take(6 - _attachments.length),
       );
-      _attachmentError =
-          switch ((tooLarge.isNotEmpty, unavailable.isNotEmpty)) {
+      _attachmentError = switch ((
+        tooLarge.isNotEmpty,
+        unavailable.isNotEmpty,
+      )) {
         (true, true) => 'Some files were too large or unavailable to the app.',
         (true, false) => 'Files larger than 25 MB were not attached.',
         (false, true) => 'Some files were unavailable to the app.',
@@ -300,7 +312,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   void _trackScrollPosition() {
     if (!_scrollController.hasClients) return;
-    final distance = _scrollController.position.maxScrollExtent -
+    final distance =
+        _scrollController.position.maxScrollExtent -
         _scrollController.position.pixels;
     final nearBottom = distance < 120;
     if (nearBottom != _isNearBottom && mounted) {
@@ -327,9 +340,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 }
 
 class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({required this.message});
+  const _MessageBubble({
+    required this.message,
+    this.onInteraction,
+    this.remoteResolver,
+  });
 
   final ChatMessage message;
+  final AgentInteractionCallback? onInteraction;
+  final RemoteContentResolver? remoteResolver;
 
   @override
   Widget build(BuildContext context) {
@@ -363,6 +382,8 @@ class _MessageBubble extends StatelessWidget {
                 ContentBlockView(
                   block: blocks[i],
                   isStreaming: message.isStreaming && i == blocks.length - 1,
+                  onInteraction: onInteraction,
+                  remoteResolver: remoteResolver,
                 ),
               if (message.isStreaming && message.content.isEmpty)
                 Semantics(
@@ -385,11 +406,12 @@ class _MessageBubble extends StatelessWidget {
                 child: Tooltip(
                   message: 'Copy entire message',
                   child: IconButton(
-                    constraints:
-                        const BoxConstraints(minWidth: 44, minHeight: 44),
-                    onPressed: () => Clipboard.setData(
-                      ClipboardData(text: copyValue),
+                    constraints: const BoxConstraints(
+                      minWidth: 48,
+                      minHeight: 48,
                     ),
+                    onPressed: () =>
+                        Clipboard.setData(ClipboardData(text: copyValue)),
                     icon: Icon(
                       Icons.copy_outlined,
                       size: 18,
@@ -445,14 +467,18 @@ class _AttachmentStrip extends StatelessWidget {
                           file.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style:
-                              TextStyle(color: colors.foreground, fontSize: 13),
+                          style: TextStyle(
+                            color: colors.foreground,
+                            fontSize: 13,
+                          ),
                         ),
                       ),
                       IconButton(
                         tooltip: 'Remove ${file.name}',
-                        constraints:
-                            const BoxConstraints(minWidth: 44, minHeight: 44),
+                        constraints: const BoxConstraints(
+                          minWidth: 48,
+                          minHeight: 48,
+                        ),
                         onPressed: () => onRemove(file),
                         icon: Icon(
                           Icons.close,
@@ -480,18 +506,18 @@ String _formatBytes(int bytes) {
 }
 
 String _mimeFor(String? extension) => switch (extension?.toLowerCase()) {
-      'png' => 'image/png',
-      'jpg' || 'jpeg' => 'image/jpeg',
-      'gif' => 'image/gif',
-      'webp' => 'image/webp',
-      'svg' => 'image/svg+xml',
-      'pdf' => 'application/pdf',
-      'md' => 'text/markdown',
-      'txt' => 'text/plain',
-      'mp4' => 'video/mp4',
-      'webm' => 'video/webm',
-      _ => 'application/octet-stream',
-    };
+  'png' => 'image/png',
+  'jpg' || 'jpeg' => 'image/jpeg',
+  'gif' => 'image/gif',
+  'webp' => 'image/webp',
+  'svg' => 'image/svg+xml',
+  'pdf' => 'application/pdf',
+  'md' => 'text/markdown',
+  'txt' => 'text/plain',
+  'mp4' => 'video/mp4',
+  'webm' => 'video/webm',
+  _ => 'application/octet-stream',
+};
 
 class _ConversationSheet extends ConsumerWidget {
   const _ConversationSheet({required this.close});
@@ -515,8 +541,10 @@ class _ConversationSheet extends ConsumerWidget {
                   const Expanded(
                     child: Text(
                       'Conversations',
-                      style:
-                          TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                   shad.PrimaryButton(
@@ -586,43 +614,42 @@ class _ChatWelcome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(32),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    color: colors.accent,
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child:
-                      Icon(Icons.auto_awesome, color: colors.primary, size: 30),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'KnowMe',
-                  style: TextStyle(fontSize: 30, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'What would you like to understand?',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  'Think out loud, revisit what matters, or connect the details you have shared—privately, on your device.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: colors.mutedForeground, height: 1.45),
-                ),
-              ],
+    child: SingleChildScrollView(
+      padding: const EdgeInsets.all(32),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: colors.accent,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Icon(Icons.auto_awesome, color: colors.primary, size: 30),
             ),
-          ),
+            const SizedBox(height: 20),
+            const Text(
+              'KnowMe',
+              style: TextStyle(fontSize: 30, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'What would you like to understand?',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Think out loud, revisit what matters, or connect the details you have shared—privately, on your device.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: colors.mutedForeground, height: 1.45),
+            ),
+          ],
         ),
-      );
+      ),
+    ),
+  );
 }

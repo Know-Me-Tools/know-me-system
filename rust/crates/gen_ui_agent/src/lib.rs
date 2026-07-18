@@ -6,6 +6,7 @@
 pub mod chat;
 pub mod config;
 pub mod error;
+pub mod media;
 pub mod memory;
 pub mod provider_admin;
 pub mod secrets;

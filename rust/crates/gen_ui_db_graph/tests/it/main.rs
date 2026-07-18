@@ -41,6 +41,24 @@ async fn open_store() -> GraphStore {
     .expect("store opens and applies schema")
 }
 
+#[test]
+fn app_settings_round_trip_json_values() {
+    run_test(async {
+        let store = open_store().await;
+        store
+            .set_setting("theme_mode", serde_json::json!("light"))
+            .await
+            .expect("setting write succeeds");
+        assert_eq!(
+            store
+                .get_setting("theme_mode")
+                .await
+                .expect("setting read succeeds"),
+            Some(serde_json::json!("light"))
+        );
+    });
+}
+
 /// Ingest → hybrid search returns the ingested memory ranked first for its own text.
 #[test]
 fn ingest_then_search_finds_the_memory() {

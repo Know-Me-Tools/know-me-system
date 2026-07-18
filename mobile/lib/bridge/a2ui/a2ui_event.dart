@@ -11,10 +11,14 @@ sealed class A2uiEvent {
       switch (json['type'] as String) {
         'run_started' => RunStarted(json['run_id'] as String),
         'block' => BlockEvent(
-            ContentBlock.fromJson(json['block'] as Map<String, dynamic>),
-          ),
+          json['run_id'] as String,
+          ContentBlock.fromJson(json['block'] as Map<String, dynamic>),
+        ),
         'run_finished' => RunFinished(json['run_id'] as String),
-        'run_error' => RunError(json['message'] as String),
+        'run_error' => RunError(
+          json['run_id'] as String,
+          json['message'] as String,
+        ),
         final type => throw FormatException('Unknown A2uiEvent type: $type'),
       };
 }
@@ -25,8 +29,9 @@ class RunStarted extends A2uiEvent {
 }
 
 class BlockEvent extends A2uiEvent {
+  final String runId;
   final ContentBlock block;
-  const BlockEvent(this.block);
+  const BlockEvent(this.runId, this.block);
 }
 
 class RunFinished extends A2uiEvent {
@@ -35,6 +40,7 @@ class RunFinished extends A2uiEvent {
 }
 
 class RunError extends A2uiEvent {
+  final String runId;
   final String message;
-  const RunError(this.message);
+  const RunError(this.runId, this.message);
 }

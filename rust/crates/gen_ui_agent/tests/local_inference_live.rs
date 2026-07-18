@@ -149,7 +149,7 @@ async fn chat_send_streams_a_real_local_response() {
                 assert_eq!(id, run_id, "events must be scoped to this run");
                 saw_started = true;
             }
-            A2uiEvent::Block { block } => {
+            A2uiEvent::Block { block, .. } => {
                 if let gen_ui_types::ContentBlock::Text { text: delta } = block {
                     text.push_str(&delta);
                 }
@@ -158,7 +158,7 @@ async fn chat_send_streams_a_real_local_response() {
                 assert_eq!(id, run_id);
                 break;
             }
-            A2uiEvent::RunError { message } => panic!("local generation failed: {message}"),
+            A2uiEvent::RunError { message, .. } => panic!("local generation failed: {message}"),
         }
     }
 

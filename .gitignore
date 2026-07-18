@@ -63,6 +63,7 @@ mobile/build/
 **/.pub-cache/
 **/.pub/
 **/coverage/
+**/test/**/failures/
 mobile/android/app/src/main/jniLibs/
 mobile/ios/Frameworks/
 

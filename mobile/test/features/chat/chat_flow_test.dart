@@ -10,24 +10,26 @@ import 'package:knowme_poc/features/chat/presentation/providers/chat_notifier.da
 // A fake ONLY at the FFI edge: Rust-shaped A2uiEvents. Nothing internal mocked.
 Stream<A2uiEvent> _cannedRun() async* {
   yield const RunStarted('run-1');
-  yield const BlockEvent(TextBlock('Hello '));
-  yield const BlockEvent(TextBlock('world'));
+  yield const BlockEvent('run-1', TextBlock('Hello '));
+  yield const BlockEvent('run-1', TextBlock('world'));
   yield const RunFinished('run-1');
 }
 
 void main() {
-  test('legacy persisted stream deltas coalesce without crossing rich blocks',
-      () {
-    final blocks = coalesceContentBlocks(const [
-      TextBlock('Hello '),
-      TextBlock('world'),
-      DividerBlock(),
-      TextBlock('Next'),
-    ]);
-    expect(blocks, hasLength(3));
-    expect((blocks.first as TextBlock).text, 'Hello world');
-    expect(blocks[1], isA<DividerBlock>());
-  });
+  test(
+    'legacy persisted stream deltas coalesce without crossing rich blocks',
+    () {
+      final blocks = coalesceContentBlocks(const [
+        TextBlock('Hello '),
+        TextBlock('world'),
+        DividerBlock(),
+        TextBlock('Next'),
+      ]);
+      expect(blocks, hasLength(3));
+      expect((blocks.first as TextBlock).text, 'Hello world');
+      expect(blocks[1], isA<DividerBlock>());
+    },
+  );
 
   test('ChatNotifier folds an A2uiEvent stream into ContentBlocks', () async {
     final container = ProviderContainer();

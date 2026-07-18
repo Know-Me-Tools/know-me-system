@@ -135,20 +135,13 @@ async fn chat_send_streams_a_real_ollama_response() {
     while let Ok(Ok(event)) =
         tokio::time::timeout(std::time::Duration::from_secs(30), rx.recv()).await
     {
-        let is_this_run = match &event {
-            A2uiEvent::RunStarted { run_id: id, .. }
-            | A2uiEvent::RunFinished { run_id: id, .. } => *id == run_id,
-            // Block/RunError carry no run_id in this PoC's single-turn-at-a-time
-            // design (see gen_ui_ffi::api::streams's doc comment) — accept them
-            // since no other run can be concurrently in flight in this test.
-            _ => true,
-        };
+        let is_this_run = event.run_id() == run_id;
         if !is_this_run {
             continue;
         }
         match event {
             A2uiEvent::RunStarted { .. } => saw_run_started = true,
-            A2uiEvent::Block { block } => {
+            A2uiEvent::Block { block, .. } => {
                 if let gen_ui_types::content_block::ContentBlock::Text { text } = block {
                     saw_text = true;
                     collected_text.push_str(&text);
@@ -158,7 +151,7 @@ async fn chat_send_streams_a_real_ollama_response() {
                 saw_terminal = true;
                 break;
             }
-            A2uiEvent::RunError { message } => {
+            A2uiEvent::RunError { message, .. } => {
                 panic!("chat run errored: {message}");
             }
         }

@@ -21,6 +21,10 @@ pub enum AgentError {
     LocalInference(#[from] CoreError),
     #[error("attachment: {0}")]
     Attachment(String),
+    #[error("interaction: {0}")]
+    Interaction(String),
+    #[error("remote media: {0}")]
+    Media(String),
 }
 
 impl From<AgentError> for CoreError {
@@ -37,6 +41,8 @@ impl From<AgentError> for CoreError {
             // flattening the distinction the engine worked to establish.
             AgentError::LocalInference(inner) => inner,
             AgentError::Attachment(m) => CoreError::Terminal(m),
+            AgentError::Interaction(m) => CoreError::Terminal(m),
+            AgentError::Media(m) => CoreError::Terminal(m),
         }
     }
 }

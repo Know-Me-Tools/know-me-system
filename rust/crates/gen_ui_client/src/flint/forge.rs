@@ -380,6 +380,139 @@ pub enum AgUiEvent {
     Other,
 }
 
+/// Stateful AG-UI stream fold. Tool arguments, RFC 6902 state deltas, and
+/// activity deltas are ordered stream protocols and must never be interpreted
+/// one frame at a time.
+#[derive(Default)]
+pub struct AguiStreamAdapter {
+    run_id: String,
+    pending_tools: std::collections::BTreeMap<String, (String, String)>,
+    state: serde_json::Value,
+    activities: std::collections::BTreeMap<String, serde_json::Value>,
+}
+
+impl AguiStreamAdapter {
+    pub fn ingest(&mut self, event: &AgUiEvent) -> Vec<A2uiEvent> {
+        match event {
+            AgUiEvent::RunStarted { run_id } => {
+                self.run_id.clone_from(run_id);
+                agui_to_a2ui(event)
+            }
+            AgUiEvent::ToolCallStart {
+                tool_call_id,
+                tool_name,
+            } => {
+                self.pending_tools
+                    .insert(tool_call_id.clone(), (tool_name.clone(), String::new()));
+                vec![]
+            }
+            AgUiEvent::ToolCallArgs {
+                tool_call_id,
+                delta,
+            } => {
+                if let Some((_, arguments)) = self.pending_tools.get_mut(tool_call_id) {
+                    arguments.push_str(delta);
+                }
+                vec![]
+            }
+            AgUiEvent::ToolCallEnd { tool_call_id } => {
+                let Some((name, arguments)) = self.pending_tools.remove(tool_call_id) else {
+                    return vec![];
+                };
+                vec![A2uiEvent::Block {
+                    run_id: self.run_id.clone(),
+                    block: ContentBlock::ToolUse {
+                        id: tool_call_id.clone(),
+                        name,
+                        input_json: arguments,
+                    },
+                }]
+            }
+            AgUiEvent::StateSnapshot { snapshot } => {
+                self.state = snapshot.clone();
+                self.scoped(agui_to_a2ui(event))
+            }
+            AgUiEvent::StateDelta { delta } => {
+                let Ok(patch) = serde_json::from_value::<json_patch::Patch>(delta.clone()) else {
+                    return vec![self.protocol_error("Invalid AG-UI state patch")];
+                };
+                if json_patch::patch(&mut self.state, &patch).is_err() {
+                    return vec![self.protocol_error("AG-UI state patch could not be applied")];
+                }
+                vec![artifact_block_for_run(
+                    &self.run_id,
+                    "agui-state",
+                    "agui_state_snapshot",
+                    &self.state,
+                )]
+            }
+            AgUiEvent::ActivitySnapshot {
+                message_id,
+                content,
+                ..
+            } => {
+                self.activities.insert(message_id.clone(), content.clone());
+                self.scoped(agui_to_a2ui(event))
+            }
+            AgUiEvent::ActivityDelta {
+                message_id,
+                activity_type,
+                patch,
+            } => {
+                let activity = self
+                    .activities
+                    .entry(message_id.clone())
+                    .or_insert(serde_json::Value::Null);
+                let Ok(patch_value) = serde_json::from_value::<json_patch::Patch>(patch.clone())
+                else {
+                    return vec![self.protocol_error("Invalid AG-UI activity patch")];
+                };
+                if json_patch::patch(activity, &patch_value).is_err() {
+                    return vec![self.protocol_error("AG-UI activity patch could not be applied")];
+                }
+                vec![artifact_block_for_run(
+                    &self.run_id,
+                    message_id,
+                    &format!("agui_activity_{}", activity_type.to_lowercase()),
+                    activity,
+                )]
+            }
+            _ => self.scoped(agui_to_a2ui(event)),
+        }
+    }
+
+    pub fn parse_frame(&mut self, data: &str) -> Vec<A2uiEvent> {
+        serde_json::from_str::<AgUiEvent>(data)
+            .map(|event| self.ingest(&event))
+            .unwrap_or_default()
+    }
+
+    fn scoped(&self, events: Vec<A2uiEvent>) -> Vec<A2uiEvent> {
+        events
+            .into_iter()
+            .map(|event| match event {
+                A2uiEvent::RunStarted { run_id } => A2uiEvent::RunStarted { run_id },
+                A2uiEvent::Block { block, .. } => A2uiEvent::Block {
+                    run_id: self.run_id.clone(),
+                    block,
+                },
+                A2uiEvent::RunFinished { run_id } => A2uiEvent::RunFinished { run_id },
+                A2uiEvent::RunError { message, .. } => A2uiEvent::RunError {
+                    run_id: self.run_id.clone(),
+                    message,
+                },
+            })
+            .collect()
+    }
+
+    fn protocol_error(&self, message: &str) -> A2uiEvent {
+        A2uiEvent::RunError {
+            run_id: self.run_id.clone(),
+            message: message.into(),
+        }
+    }
+}
+
 /// Map a forge AG-UI event to zero or more of our A2UI events. Unhandled variants
 /// (state deltas, custom surfaces) yield nothing here and are handled by the A2UI
 /// surface layer directly — this path only feeds the streaming ContentBlock fold.
@@ -390,6 +523,7 @@ pub fn agui_to_a2ui(ev: &AgUiEvent) -> Vec<A2uiEvent> {
         }],
         AgUiEvent::TextMessageContent { delta } => {
             vec![A2uiEvent::Block {
+                run_id: String::new(),
                 block: ContentBlock::Text {
                     text: delta.clone(),
                 },
@@ -399,6 +533,7 @@ pub fn agui_to_a2ui(ev: &AgUiEvent) -> Vec<A2uiEvent> {
             tool_call_id,
             tool_name,
         } => vec![A2uiEvent::Block {
+            run_id: String::new(),
             block: ContentBlock::ToolUse {
                 id: tool_call_id.clone(),
                 name: tool_name.clone(),
@@ -409,6 +544,7 @@ pub fn agui_to_a2ui(ev: &AgUiEvent) -> Vec<A2uiEvent> {
             tool_call_id,
             content,
         } => vec![A2uiEvent::Block {
+            run_id: String::new(),
             block: ContentBlock::ToolResult {
                 tool_use_id: tool_call_id.clone(),
                 output_json: content.clone(),
@@ -417,6 +553,7 @@ pub fn agui_to_a2ui(ev: &AgUiEvent) -> Vec<A2uiEvent> {
         }],
         AgUiEvent::ReasoningMessageContent { delta }
         | AgUiEvent::ReasoningMessageChunk { delta } => vec![A2uiEvent::Block {
+            run_id: String::new(),
             block: ContentBlock::Thinking {
                 text: delta.clone(),
             },
@@ -455,12 +592,14 @@ pub fn agui_to_a2ui(ev: &AgUiEvent) -> Vec<A2uiEvent> {
             patch,
         )],
         AgUiEvent::StepStarted { step_name } => vec![A2uiEvent::Block {
+            run_id: String::new(),
             block: ContentBlock::Skill {
                 name: step_name.clone(),
                 status: "running".into(),
             },
         }],
         AgUiEvent::StepFinished { step_name } => vec![A2uiEvent::Block {
+            run_id: String::new(),
             block: ContentBlock::Skill {
                 name: step_name.clone(),
                 status: "completed".into(),
@@ -476,20 +615,50 @@ pub fn agui_to_a2ui(ev: &AgUiEvent) -> Vec<A2uiEvent> {
             run_id: run_id.clone(),
         }],
         AgUiEvent::RunError { message } => vec![A2uiEvent::RunError {
+            run_id: String::new(),
             message: message.clone(),
         }],
         AgUiEvent::TextMessageStart
         | AgUiEvent::TextMessageEnd
-        | AgUiEvent::ToolCallArgs { .. }
         | AgUiEvent::ToolCallEnd { .. }
-        | AgUiEvent::ReasoningStart
-        | AgUiEvent::ReasoningEnd
         | AgUiEvent::Other => vec![],
+        AgUiEvent::ToolCallArgs {
+            tool_call_id,
+            delta,
+        } => vec![artifact_block(
+            tool_call_id,
+            "agui_tool_call_args_delta",
+            &serde_json::Value::String(delta.clone()),
+        )],
+        AgUiEvent::ReasoningStart => vec![A2uiEvent::Block {
+            run_id: String::new(),
+            block: ContentBlock::Skill {
+                name: "Reasoning".into(),
+                status: "running".into(),
+            },
+        }],
+        AgUiEvent::ReasoningEnd => vec![A2uiEvent::Block {
+            run_id: String::new(),
+            block: ContentBlock::Skill {
+                name: "Reasoning".into(),
+                status: "completed".into(),
+            },
+        }],
     }
 }
 
 fn artifact_block(id: &str, kind: &str, value: &serde_json::Value) -> A2uiEvent {
+    artifact_block_for_run("", id, kind, value)
+}
+
+fn artifact_block_for_run(
+    run_id: &str,
+    id: &str,
+    kind: &str,
+    value: &serde_json::Value,
+) -> A2uiEvent {
     A2uiEvent::Block {
+        run_id: run_id.into(),
         block: ContentBlock::Artifact {
             id: id.into(),
             kind: kind.into(),
@@ -539,7 +708,10 @@ fn custom_to_a2ui(name: &str, value: &serde_json::Value) -> Vec<A2uiEvent> {
             content: serde_json::to_string(value).unwrap_or_default(),
         },
     };
-    vec![A2uiEvent::Block { block }]
+    vec![A2uiEvent::Block {
+        run_id: String::new(),
+        block,
+    }]
 }
 
 /// Parse one SSE `data:` payload (a JSON AgUiEvent) into A2UI events. Returns an empty

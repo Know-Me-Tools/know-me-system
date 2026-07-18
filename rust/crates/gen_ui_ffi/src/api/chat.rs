@@ -33,6 +33,41 @@ pub async fn chat_send(
         .map_err(Into::into)
 }
 
+/// Submit a typed A2UI/AG-UI user interaction and start the agent's response.
+/// The JSON envelope is preserved verbatim so Rust remains the sole transport
+/// boundary and the agent can correlate surface, component, and context IDs.
+pub async fn chat_action(
+    thread_id: String,
+    interaction_json: String,
+    messages: Vec<String>,
+) -> Result<String, CoreError> {
+    let _ = thread_id;
+    gen_ui_agent::chat::send_interaction(interaction_json, messages)
+        .await
+        .map_err(Into::into)
+}
+
+pub async fn theme_mode() -> Result<String, CoreError> {
+    gen_ui_agent::chat::theme_mode().await.map_err(|error| {
+        tracing::error!(%error, "theme preference read failed");
+        error.into()
+    })
+}
+
+pub async fn set_theme_mode(mode: String) -> Result<(), CoreError> {
+    gen_ui_agent::chat::set_theme_mode(&mode)
+        .await
+        .map_err(|error| {
+            tracing::error!(%error, %mode, "theme preference write failed");
+            error.into()
+        })
+}
+
+pub async fn resolve_remote_content(url: String, kind: String) -> Result<String, CoreError> {
+    let resolved = gen_ui_agent::media::resolve(&url, &kind).await?;
+    serde_json::to_string(&resolved).map_err(|error| CoreError::Serde(error.to_string()))
+}
+
 /// Ingest a note into memory (embeds on-device via fastembed, upserts into
 /// SurrealDB). Returns the assigned record id.
 pub async fn memory_ingest(text: String) -> Result<String, CoreError> {

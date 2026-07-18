@@ -177,14 +177,14 @@ async fn run_events(
                     active = true;
                     yield Ok(Event::default().event("a2ui").json_data(event).unwrap_or_else(|_| Event::default().event("serialization_error")));
                 }
-                Ok(event @ A2uiEvent::Block { .. }) if active => {
+                Ok(ref event @ A2uiEvent::Block { ref run_id, .. }) if active && run_id == &event_run_id => {
                     yield Ok(Event::default().event("a2ui").json_data(event).unwrap_or_else(|_| Event::default().event("serialization_error")));
                 }
                 Ok(ref event @ A2uiEvent::RunFinished { ref run_id }) if active && run_id == &event_run_id => {
                     yield Ok(Event::default().event("a2ui").json_data(event).unwrap_or_else(|_| Event::default().event("serialization_error")));
                     break;
                 }
-                Ok(event @ A2uiEvent::RunError { .. }) if active => {
+                Ok(ref event @ A2uiEvent::RunError { ref run_id, .. }) if active && run_id == &event_run_id => {
                     yield Ok(Event::default().event("a2ui").json_data(event).unwrap_or_else(|_| Event::default().event("serialization_error")));
                     break;
                 }

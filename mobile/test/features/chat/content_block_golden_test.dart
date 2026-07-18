@@ -8,7 +8,7 @@ import 'package:knowme_poc/core/theme/tokens.dart';
 
 const _a2ui = '''
 {"version":"v0.9","createSurface":{"surfaceId":"welcome","catalogId":"https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}
-{"version":"v0.9","updateComponents":{"surfaceId":"welcome","components":[{"id":"root","component":"Card","child":"body"},{"id":"body","component":"Column","children":["title","summary","action"],"align":"stretch"},{"id":"title","component":"Text","text":"## Your day"},{"id":"summary","component":"Text","text":"Two memories are ready to review."},{"id":"action","component":"Button","text":"Review memories"}]}}
+{"version":"v0.9","updateComponents":{"surfaceId":"welcome","components":[{"id":"root","component":"Card","child":"body"},{"id":"body","component":"Column","children":["title","summary","action"],"align":"stretch"},{"id":"title","component":"Text","text":"## Your day"},{"id":"summary","component":"Text","text":"Two memories are ready to review."},{"id":"action","component":"Button","child":"actionText","action":{"event":{"name":"reviewMemories"}}},{"id":"actionText","component":"Text","text":"Review memories"}]}}
 ''';
 
 const _blocks = <ContentBlock>[

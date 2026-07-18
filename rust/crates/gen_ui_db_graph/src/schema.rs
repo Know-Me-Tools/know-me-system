@@ -64,9 +64,11 @@ DEFINE FIELD IF NOT EXISTS provider_id ON model_pref TYPE option<string>;
 DEFINE FIELD IF NOT EXISTS model_id    ON model_pref TYPE string;
 DEFINE FIELD IF NOT EXISTS params      ON model_pref TYPE option<object> FLEXIBLE;
 
--- SCHEMAFULL: see entity's comment above — FLEXIBLE on `value` requires it.
+-- Settings are JSON values, not only objects: theme mode and active lane are
+-- strings today, while future preferences may be booleans, numbers, or maps.
+-- OVERWRITE is the migration from the original option<object> declaration.
 DEFINE TABLE IF NOT EXISTS app_setting SCHEMAFULL;
-DEFINE FIELD IF NOT EXISTS value ON app_setting TYPE option<object> FLEXIBLE;
+DEFINE FIELD OVERWRITE value ON app_setting TYPE any;
 "#;
 
 /// Hybrid recall: vector lane + BM25 lane, fused by native `search::rrf`.

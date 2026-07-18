@@ -20,6 +20,7 @@ reqwest.workspace     = true
 reqwest-eventsource.workspace = true
 jsonwebtoken.workspace = true
 liter-llm.workspace   = true
+json-patch.workspace  = true
 
 [features]
 # Default to native-http: this crate's flint gate/forge module already needs

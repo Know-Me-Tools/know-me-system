@@ -4,7 +4,7 @@
 //! AuthState machine; (2) forge AG-UI SSE frames fold into the ContentBlock contract.
 #![cfg(not(target_arch = "wasm32"))]
 
-use gen_ui_client::flint::forge::{agui_to_a2ui, parse_agui_frame, AgUiEvent};
+use gen_ui_client::flint::forge::{agui_to_a2ui, parse_agui_frame, AgUiEvent, AguiStreamAdapter};
 use gen_ui_client::flint::token::{AuthState, Role, Token};
 use gen_ui_types::content_block::ContentBlock;
 use gen_ui_types::events::A2uiEvent;
@@ -69,6 +69,7 @@ fn agui_text_delta_folds_to_content_block_text() {
     match &events[0] {
         A2uiEvent::Block {
             block: ContentBlock::Text { text },
+            ..
         } => assert_eq!(text, "hello"),
         other => panic!("expected Text block, got {other:?}"),
     }
@@ -88,6 +89,7 @@ fn agui_run_lifecycle_and_toolcall_map_to_a2ui() {
     match tool.as_slice() {
         [A2uiEvent::Block {
             block: ContentBlock::ToolUse { id, name, .. },
+            ..
         }] => {
             assert_eq!(id, "t9");
             assert_eq!(name, "search");
@@ -106,7 +108,8 @@ fn standard_agui_reasoning_state_and_custom_chunks_are_renderable() {
     assert!(matches!(
         reasoning.as_slice(),
         [A2uiEvent::Block {
-            block: ContentBlock::Thinking { text }
+            block: ContentBlock::Thinking { text },
+            ..
         }] if text == "Checking memory"
     ));
 
@@ -116,7 +119,8 @@ fn standard_agui_reasoning_state_and_custom_chunks_are_renderable() {
     assert!(matches!(
         state.as_slice(),
         [A2uiEvent::Block {
-            block: ContentBlock::Artifact { kind, .. }
+            block: ContentBlock::Artifact { kind, .. },
+            ..
         }] if kind == "agui_state_delta"
     ));
 
@@ -126,7 +130,8 @@ fn standard_agui_reasoning_state_and_custom_chunks_are_renderable() {
     assert!(matches!(
         citation.as_slice(),
         [A2uiEvent::Block {
-            block: ContentBlock::Citation { source, quote }
+            block: ContentBlock::Citation { source, quote },
+            ..
         }] if source == "memory:42" && quote == "A useful fact"
     ));
 
@@ -136,7 +141,45 @@ fn standard_agui_reasoning_state_and_custom_chunks_are_renderable() {
     assert!(matches!(
         surface.as_slice(),
         [A2uiEvent::Block {
-            block: ContentBlock::Artifact { kind, .. }
+            block: ContentBlock::Artifact { kind, .. },
+            ..
         }] if kind == "a2ui"
+    ));
+}
+
+#[test]
+fn stateful_agui_chunks_accumulate_tools_and_apply_state_patches() {
+    let mut adapter = AguiStreamAdapter::default();
+    adapter.parse_frame(r#"{"type":"RUN_STARTED","runId":"run-42"}"#);
+    assert!(adapter
+        .parse_frame(r#"{"type":"TOOL_CALL_START","toolCallId":"t1","toolCallName":"search"}"#,)
+        .is_empty());
+    for delta in [r#"{"q":"we"#, r#"ather"}"#] {
+        let frame = serde_json::json!({
+            "type": "TOOL_CALL_ARGS",
+            "toolCallId": "t1",
+            "delta": delta,
+        });
+        assert!(adapter.parse_frame(&frame.to_string()).is_empty());
+    }
+    let tool = adapter.parse_frame(r#"{"type":"TOOL_CALL_END","toolCallId":"t1"}"#);
+    assert!(matches!(
+        tool.as_slice(),
+        [A2uiEvent::Block {
+            run_id,
+            block: ContentBlock::ToolUse { input_json, .. }
+        }] if run_id == "run-42" && input_json == r#"{"q":"weather"}"#
+    ));
+
+    adapter.parse_frame(r#"{"type":"STATE_SNAPSHOT","snapshot":{"status":"working"}}"#);
+    let state = adapter.parse_frame(
+        r#"{"type":"STATE_DELTA","delta":[{"op":"replace","path":"/status","value":"ready"}]}"#,
+    );
+    assert!(matches!(
+        state.as_slice(),
+        [A2uiEvent::Block {
+            run_id,
+            block: ContentBlock::Artifact { content, .. }
+        }] if run_id == "run-42" && content.contains("ready")
     ));
 }
