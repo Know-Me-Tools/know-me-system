@@ -1,5 +1,28 @@
+# Operating systems and editors
+.DS_Store
+Thumbs.db
+.idea/
+*.iml
+*.ipr
+*.iws
+*.swp
+*.swo
+*~
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.pid
+*.seed
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
 # Rust
 target/
+*.rs.bk
 
 # Build-tool scratch locks (Gradle daemon, build_runner) — machine-local, never
 # shared. Formerly a blanket `*.lock`, which also swallowed the dependency
@@ -20,33 +43,62 @@ target/
 
 # Local application data and browser-verification output
 .knowme-data/
+.pglite/
+*.sqlite-journal
+*.sqlite-shm
+*.sqlite-wal
 .playwright-mcp/
 **/__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
 
 # Flutter
-mobile/.dart_tool/
+**/.dart_tool/
 mobile/build/
-mobile/.flutter-plugins
-mobile/.flutter-plugins-dependencies
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.pub-cache/
+**/.pub/
+**/coverage/
 mobile/android/app/src/main/jniLibs/
 mobile/ios/Frameworks/
 
 # Tauri/Node
-desktop/node_modules/
+**/node_modules/
 desktop/src-tauri/target/
 desktop/dist/
+**/.vite/
+**/.eslintcache
+**/*.tsbuildinfo
 
 # Publishable packages (C-007)
-packages/*/node_modules/
 packages/*/dist/
 packages/gen-ui-wasm/pkg/
-rust/crates/tauri-plugin-gen-ui/guest-js/node_modules/
 rust/crates/tauri-plugin-gen-ui/guest-js/dist/
-flutter_packages/*/.dart_tool/
 flutter_packages/*/build/
 
-# Environment
+# Native mobile toolchains and signing material
+**/.gradle/
+**/.cxx/
+**/local.properties
+**/key.properties
+**/*.jks
+**/*.keystore
+**/Pods/
+**/DerivedData/
+**/xcuserdata/
+**/.symlinks/
+**/Flutter/ephemeral/
+
+# Environment and local overrides
 .env
 .env.*
 !.env.example
+!.env.*.example
+.dev.vars
+
+# Local disposal area
 _to_delete/
