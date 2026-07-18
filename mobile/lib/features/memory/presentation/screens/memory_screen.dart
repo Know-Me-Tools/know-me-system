@@ -49,7 +49,10 @@ class _MemoryScreenState extends ConsumerState<MemoryScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Ingest', style: T.uiMd.copyWith(color: T.textSecondary)),
+                Text(
+                  'Ingest',
+                  style: TextStyle(color: colors.mutedForeground),
+                ),
                 const SizedBox(height: 6),
                 Row(
                   children: [
@@ -74,7 +77,10 @@ class _MemoryScreenState extends ConsumerState<MemoryScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                Text('Search', style: T.uiMd.copyWith(color: T.textSecondary)),
+                Text(
+                  'Search',
+                  style: TextStyle(color: colors.mutedForeground),
+                ),
                 const SizedBox(height: 6),
                 Row(
                   children: [
@@ -110,7 +116,8 @@ class _MemoryScreenState extends ConsumerState<MemoryScreen> {
                       result.query.isEmpty
                           ? 'No search yet'
                           : 'No hits for "${result.query}"',
-                      style: T.uiMd.copyWith(color: T.textTertiary),
+                      style:
+                          TextStyle(color: KnowMePalette.of(context).faintText),
                     ),
                   )
                 : ListView.separated(
@@ -147,7 +154,9 @@ class _MemoryScreenState extends ConsumerState<MemoryScreen> {
                             ),
                             Text(
                               hit.score.toStringAsFixed(3),
-                              style: T.uiMd.copyWith(color: T.textTertiary),
+                              style: TextStyle(
+                                color: KnowMePalette.of(context).faintText,
+                              ),
                             ),
                           ],
                         ),

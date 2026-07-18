@@ -255,29 +255,123 @@ fn map_status(status: reqwest::StatusCode) -> CoreError {
 
 // ── AG-UI event mapping ─────────────────────────────────────────────────────
 // forge emits internally-tagged `AgUiEvent` (`{"type":"TextMessageContent",...}`).
-// We translate the subset the ContentBlock contract needs into our A2uiEvent surface
-// so the ProtocolPipeline (gen_ui_protocol) folds them into ContentBlocks unchanged.
+// We project the standard lifecycle, text, tool, state, activity, reasoning, raw,
+// and custom families into our A2uiEvent/ContentBlock surface.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "type")]
 pub enum AgUiEvent {
+    #[serde(alias = "RUN_STARTED")]
     RunStarted {
-        #[serde(default)]
+        #[serde(default, alias = "runId")]
         run_id: String,
     },
+    #[serde(alias = "TEXT_MESSAGE_START")]
+    TextMessageStart,
+    #[serde(alias = "TEXT_MESSAGE_CONTENT")]
     TextMessageContent {
         #[serde(default)]
         delta: String,
     },
+    #[serde(alias = "TEXT_MESSAGE_END")]
+    TextMessageEnd,
+    #[serde(alias = "TOOL_CALL_START")]
     ToolCallStart {
-        #[serde(default)]
+        #[serde(default, alias = "toolCallId")]
         tool_call_id: String,
-        #[serde(default)]
+        #[serde(default, alias = "toolCallName", alias = "toolName")]
         tool_name: String,
     },
-    RunFinished {
+    #[serde(alias = "TOOL_CALL_ARGS")]
+    ToolCallArgs {
+        #[serde(default, alias = "toolCallId")]
+        tool_call_id: String,
         #[serde(default)]
+        delta: String,
+    },
+    #[serde(alias = "TOOL_CALL_END")]
+    ToolCallEnd {
+        #[serde(default, alias = "toolCallId")]
+        tool_call_id: String,
+    },
+    #[serde(alias = "TOOL_CALL_RESULT")]
+    ToolCallResult {
+        #[serde(default, alias = "toolCallId")]
+        tool_call_id: String,
+        #[serde(default)]
+        content: String,
+    },
+    #[serde(
+        alias = "REASONING_MESSAGE_CONTENT",
+        alias = "THINKING_TEXT_MESSAGE_CONTENT"
+    )]
+    ReasoningMessageContent {
+        #[serde(default)]
+        delta: String,
+    },
+    #[serde(alias = "REASONING_MESSAGE_CHUNK")]
+    ReasoningMessageChunk {
+        #[serde(default)]
+        delta: String,
+    },
+    #[serde(alias = "REASONING_START", alias = "REASONING_MESSAGE_START")]
+    ReasoningStart,
+    #[serde(
+        alias = "REASONING_END",
+        alias = "REASONING_MESSAGE_END",
+        alias = "THINKING_END",
+        alias = "THINKING_TEXT_MESSAGE_END"
+    )]
+    ReasoningEnd,
+    #[serde(alias = "STATE_SNAPSHOT")]
+    StateSnapshot { snapshot: serde_json::Value },
+    #[serde(alias = "STATE_DELTA")]
+    StateDelta { delta: serde_json::Value },
+    #[serde(alias = "MESSAGES_SNAPSHOT")]
+    MessagesSnapshot { messages: serde_json::Value },
+    #[serde(alias = "ACTIVITY_SNAPSHOT")]
+    ActivitySnapshot {
+        #[serde(default, alias = "messageId")]
+        message_id: String,
+        #[serde(default, alias = "activityType")]
+        activity_type: String,
+        content: serde_json::Value,
+    },
+    #[serde(alias = "ACTIVITY_DELTA")]
+    ActivityDelta {
+        #[serde(default, alias = "messageId")]
+        message_id: String,
+        #[serde(default, alias = "activityType")]
+        activity_type: String,
+        patch: serde_json::Value,
+    },
+    #[serde(alias = "STEP_STARTED")]
+    StepStarted {
+        #[serde(default, alias = "stepName")]
+        step_name: String,
+    },
+    #[serde(alias = "STEP_FINISHED")]
+    StepFinished {
+        #[serde(default, alias = "stepName")]
+        step_name: String,
+    },
+    #[serde(alias = "CUSTOM")]
+    Custom {
+        #[serde(default)]
+        name: String,
+        value: serde_json::Value,
+    },
+    #[serde(alias = "RAW")]
+    Raw {
+        event: serde_json::Value,
+        #[serde(default)]
+        source: Option<String>,
+    },
+    #[serde(alias = "RUN_FINISHED")]
+    RunFinished {
+        #[serde(default, alias = "runId")]
         run_id: String,
     },
+    #[serde(alias = "RUN_ERROR")]
     RunError {
         #[serde(default)]
         message: String,
@@ -311,14 +405,141 @@ pub fn agui_to_a2ui(ev: &AgUiEvent) -> Vec<A2uiEvent> {
                 input_json: "{}".into(),
             },
         }],
+        AgUiEvent::ToolCallResult {
+            tool_call_id,
+            content,
+        } => vec![A2uiEvent::Block {
+            block: ContentBlock::ToolResult {
+                tool_use_id: tool_call_id.clone(),
+                output_json: content.clone(),
+                is_error: false,
+            },
+        }],
+        AgUiEvent::ReasoningMessageContent { delta }
+        | AgUiEvent::ReasoningMessageChunk { delta } => vec![A2uiEvent::Block {
+            block: ContentBlock::Thinking {
+                text: delta.clone(),
+            },
+        }],
+        AgUiEvent::StateSnapshot { snapshot } => vec![artifact_block(
+            "agui-state",
+            "agui_state_snapshot",
+            snapshot,
+        )],
+        AgUiEvent::StateDelta { delta } => vec![artifact_block(
+            "agui-state-delta",
+            "agui_state_delta",
+            delta,
+        )],
+        AgUiEvent::MessagesSnapshot { messages } => vec![artifact_block(
+            "agui-messages",
+            "agui_messages_snapshot",
+            messages,
+        )],
+        AgUiEvent::ActivitySnapshot {
+            message_id,
+            activity_type,
+            content,
+        } => vec![artifact_block(
+            message_id,
+            &format!("agui_activity_{}", activity_type.to_lowercase()),
+            content,
+        )],
+        AgUiEvent::ActivityDelta {
+            message_id,
+            activity_type,
+            patch,
+        } => vec![artifact_block(
+            message_id,
+            &format!("agui_activity_{}_delta", activity_type.to_lowercase()),
+            patch,
+        )],
+        AgUiEvent::StepStarted { step_name } => vec![A2uiEvent::Block {
+            block: ContentBlock::Skill {
+                name: step_name.clone(),
+                status: "running".into(),
+            },
+        }],
+        AgUiEvent::StepFinished { step_name } => vec![A2uiEvent::Block {
+            block: ContentBlock::Skill {
+                name: step_name.clone(),
+                status: "completed".into(),
+            },
+        }],
+        AgUiEvent::Custom { name, value } => custom_to_a2ui(name, value),
+        AgUiEvent::Raw { event, source } => vec![artifact_block(
+            source.as_deref().unwrap_or("agui-raw"),
+            "agui_raw",
+            event,
+        )],
         AgUiEvent::RunFinished { run_id } => vec![A2uiEvent::RunFinished {
             run_id: run_id.clone(),
         }],
         AgUiEvent::RunError { message } => vec![A2uiEvent::RunError {
             message: message.clone(),
         }],
-        AgUiEvent::Other => vec![],
+        AgUiEvent::TextMessageStart
+        | AgUiEvent::TextMessageEnd
+        | AgUiEvent::ToolCallArgs { .. }
+        | AgUiEvent::ToolCallEnd { .. }
+        | AgUiEvent::ReasoningStart
+        | AgUiEvent::ReasoningEnd
+        | AgUiEvent::Other => vec![],
     }
+}
+
+fn artifact_block(id: &str, kind: &str, value: &serde_json::Value) -> A2uiEvent {
+    A2uiEvent::Block {
+        block: ContentBlock::Artifact {
+            id: id.into(),
+            kind: kind.into(),
+            content: serde_json::to_string(value).unwrap_or_else(|_| "null".into()),
+        },
+    }
+}
+
+fn custom_to_a2ui(name: &str, value: &serde_json::Value) -> Vec<A2uiEvent> {
+    let string = |key: &str| {
+        value
+            .get(key)
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or_default()
+            .to_owned()
+    };
+    let block = match name.to_ascii_lowercase().as_str() {
+        "citation" => ContentBlock::Citation {
+            source: string("source"),
+            quote: string("quote"),
+        },
+        "memory" => ContentBlock::Memory {
+            operation: string("operation"),
+            key: string("key"),
+            value: value
+                .get("value")
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned),
+        },
+        "a2ui" | "a2ui_surface" => ContentBlock::Artifact {
+            id: string("surfaceId"),
+            kind: "a2ui".into(),
+            content: value
+                .get("messages")
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned)
+                .unwrap_or_else(|| serde_json::to_string(value).unwrap_or_default()),
+        },
+        "confirmation" | "confirmation_request" => ContentBlock::Artifact {
+            id: string("id"),
+            kind: "agui_confirmation".into(),
+            content: serde_json::to_string(value).unwrap_or_default(),
+        },
+        other => ContentBlock::Artifact {
+            id: name.into(),
+            kind: format!("agui_custom_{other}"),
+            content: serde_json::to_string(value).unwrap_or_default(),
+        },
+    };
+    vec![A2uiEvent::Block { block }]
 }
 
 /// Parse one SSE `data:` payload (a JSON AgUiEvent) into A2UI events. Returns an empty

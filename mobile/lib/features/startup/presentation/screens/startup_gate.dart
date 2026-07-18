@@ -30,21 +30,24 @@ class _BootScreen extends StatelessWidget {
   final StartupPhase phase;
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                width: 200,
-                child: LinearProgressIndicator(value: phase.progress),
-              ),
-              const SizedBox(height: 16),
-              Text(phase.label, style: T.uiMd.copyWith(color: T.textSecondary)),
-            ],
-          ),
+  Widget build(BuildContext context) {
+    final colors = KnowMePalette.of(context);
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 200,
+              child: LinearProgressIndicator(value: phase.progress),
+            ),
+            const SizedBox(height: 16),
+            Text(phase.label, style: TextStyle(color: colors.subtleText)),
+          ],
         ),
-      );
+      ),
+    );
+  }
 }
 
 class _BootError extends StatelessWidget {
@@ -52,25 +55,31 @@ class _BootError extends StatelessWidget {
   final String message;
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.error_outline, color: T.red, size: 40),
-                const SizedBox(height: 12),
-                Text('Startup failed', style: T.uiMd.copyWith(color: T.red)),
-                const SizedBox(height: 8),
-                Text(
-                  message,
-                  textAlign: TextAlign.center,
-                  style: T.uiMd.copyWith(color: T.textTertiary),
-                ),
-              ],
-            ),
+  Widget build(BuildContext context) {
+    final colors = KnowMePalette.of(context);
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.error_outline, color: colors.destructive, size: 40),
+              const SizedBox(height: 12),
+              Text(
+                'Startup failed',
+                style: TextStyle(color: colors.destructive),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: colors.faintText),
+              ),
+            ],
           ),
         ),
-      );
+      ),
+    );
+  }
 }

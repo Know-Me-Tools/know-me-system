@@ -682,13 +682,18 @@ fn wire__crate__api__chat__chat_send_impl(
             let api_thread_id = <String>::sse_decode(&mut deserializer);
             let api_message = <String>::sse_decode(&mut deserializer);
             let api_messages = <Vec<String>>::sse_decode(&mut deserializer);
+            let api_attachment_paths = <Vec<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, CoreError>(
                     (move || async move {
-                        let output_ok =
-                            crate::api::chat::chat_send(api_thread_id, api_message, api_messages)
-                                .await?;
+                        let output_ok = crate::api::chat::chat_send(
+                            api_thread_id,
+                            api_message,
+                            api_messages,
+                            api_attachment_paths,
+                        )
+                        .await?;
                         Ok(output_ok)
                     })()
                     .await,

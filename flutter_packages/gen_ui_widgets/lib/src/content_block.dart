@@ -9,7 +9,7 @@
 /// (`#[serde(tag = "type", rename_all = "camelCase")]`, applied to both
 /// variant and field names) — needed because the FFI stream carrying this
 /// type sends JSON, not a frb-mirrored class (see gen_ui_ffi::api::streams's
-/// doc comment on why enums nested only inside a StreamSink<T> stay opaque).
+/// doc comment on why enums nested only inside a `StreamSink<T>` stay opaque).
 sealed class ContentBlock {
   const ContentBlock();
 
@@ -17,43 +17,37 @@ sealed class ContentBlock {
       switch (json['type'] as String) {
         'text' => TextBlock(json['text'] as String),
         'thinking' => ThinkingBlock(json['text'] as String),
-        'code' => CodeBlock(
-            json['language'] as String,
-            json['code'] as String,
-          ),
+        'code' => CodeBlock(json['language'] as String, json['code'] as String),
         'citation' => CitationBlock(
-            json['source'] as String,
-            json['quote'] as String,
-          ),
+          json['source'] as String,
+          json['quote'] as String,
+        ),
         'memory' => MemoryBlock(
-            json['operation'] as String,
-            json['key'] as String,
-            json['value'] as String?,
-          ),
+          json['operation'] as String,
+          json['key'] as String,
+          json['value'] as String?,
+        ),
         'toolUse' => ToolUseBlock(
-            json['id'] as String,
-            json['name'] as String,
-            json['inputJson'] as String,
-          ),
+          json['id'] as String,
+          json['name'] as String,
+          json['inputJson'] as String,
+        ),
         'toolResult' => ToolResultBlock(
-            json['toolUseId'] as String,
-            json['outputJson'] as String,
-            json['isError'] as bool,
-          ),
-        'skill' => SkillBlock(
-            json['name'] as String,
-            json['status'] as String,
-          ),
+          json['toolUseId'] as String,
+          json['outputJson'] as String,
+          json['isError'] as bool,
+        ),
+        'skill' => SkillBlock(json['name'] as String, json['status'] as String),
         'artifact' => ArtifactBlock(
-            json['id'] as String,
-            json['kind'] as String,
-            json['content'] as String,
-          ),
+          json['id'] as String,
+          json['kind'] as String,
+          json['content'] as String,
+        ),
         'image' => ImageBlock(
-            json['url'] as String?,
-            json['dataBase64'] as String?,
-            json['mime'] as String,
-          ),
+          json['url'] as String?,
+          json['dataBase64'] as String?,
+          json['mime'] as String,
+        ),
         'divider' => const DividerBlock(),
         final type => throw FormatException('Unknown ContentBlock type: $type'),
       };
@@ -124,4 +118,47 @@ class ImageBlock extends ContentBlock {
 
 class DividerBlock extends ContentBlock {
   const DividerBlock();
+}
+
+/// Stable plain-text projection used by message-level copy/export actions.
+/// Exhaustive by design so new A2UI block variants cannot silently disappear.
+String contentBlockCopyText(ContentBlock block) => switch (block) {
+  TextBlock(:final text) || ThinkingBlock(:final text) => text,
+  CodeBlock(:final language, :final code) => '```$language\n$code\n```',
+  CitationBlock(:final source, :final quote) => '$quote\n— $source',
+  MemoryBlock(:final operation, :final key, :final value) => [
+    'Memory · $operation · $key',
+    if (value != null) value,
+  ].join('\n'),
+  ToolUseBlock(:final name, :final inputJson) => 'Tool · $name\n$inputJson',
+  ToolResultBlock(:final outputJson) => outputJson,
+  SkillBlock(:final name, :final status) => 'Skill · $name · $status',
+  ArtifactBlock(:final kind, :final content) => 'Artifact · $kind\n$content',
+  ImageBlock(:final url, :final dataBase64, :final mime) =>
+    url ?? dataBase64 ?? 'Image · $mime',
+  DividerBlock() => '---',
+};
+
+/// Coalesces transport deltas that were persisted as adjacent text blocks by
+/// older clients. Semantic block boundaries (code, citation, tools, etc.) are
+/// always preserved.
+List<ContentBlock> coalesceContentBlocks(Iterable<ContentBlock> blocks) {
+  final result = <ContentBlock>[];
+  for (final block in blocks) {
+    final previous = result.isEmpty ? null : result.last;
+    if (block case TextBlock(:final text)) {
+      if (previous case TextBlock(text: final existing)) {
+        result[result.length - 1] = TextBlock('$existing$text');
+        continue;
+      }
+    }
+    if (block case ThinkingBlock(:final text)) {
+      if (previous case ThinkingBlock(text: final existing)) {
+        result[result.length - 1] = ThinkingBlock('$existing$text');
+        continue;
+      }
+    }
+    result.add(block);
+  }
+  return result;
 }

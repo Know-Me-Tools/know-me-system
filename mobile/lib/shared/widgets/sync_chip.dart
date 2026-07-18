@@ -14,14 +14,15 @@ class SyncChip extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final status = ref.watch(syncStatusProvider);
+    final colors = KnowMePalette.of(context);
     final (label, color) = switch (status.value) {
-      SyncOffline() || null => ('offline', T.textTertiary),
+      SyncOffline() || null => ('offline', colors.faintText),
       SyncSyncing(:final pendingWrites) => (
           'syncing · $pendingWrites',
-          T.amber
+          colors.warning
         ),
-      SyncLive() => ('live', T.green),
-      SyncError() => ('error', T.red),
+      SyncLive() => ('live', colors.success),
+      SyncError() => ('error', colors.destructive),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -38,7 +39,7 @@ class SyncChip extends ConsumerWidget {
             decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
           const SizedBox(width: 6),
-          Text(label, style: T.uiMd.copyWith(color: color)),
+          Text(label, style: TextStyle(color: color)),
         ],
       ),
     );

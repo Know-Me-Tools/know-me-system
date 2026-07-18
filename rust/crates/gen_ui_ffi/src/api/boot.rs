@@ -25,6 +25,12 @@ pub async fn run_migrations(data_dir: String) -> Result<(), CoreError> {
     }
 
     tracing::info!(%data_dir, "mobile migrations starting");
+    // Android does not define HOME for app processes. hf-hub constructs its
+    // default cache before fastembed applies our explicit cache path, so give
+    // that constructor a valid app-private home directory.
+    if std::env::var_os("HOME").is_none() {
+        std::env::set_var("HOME", &data_dir);
+    }
     crate::api::entity::init_store(
         std::path::PathBuf::from(&data_dir).join("entity-records.sqlite3"),
     )

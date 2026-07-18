@@ -30,8 +30,14 @@ Future<String> chatSend(
   String threadId,
   String message,
   List<String> messages,
+  List<String> attachmentPaths,
 ) =>
-    ffi.chatSend(threadId: threadId, message: message, messages: messages);
+    ffi.chatSend(
+      threadId: threadId,
+      message: message,
+      messages: messages,
+      attachmentPaths: attachmentPaths,
+    );
 
 /// chat_events(run_id) -> Stream<A2uiEvent>. Fold into ContentBlocks.
 /// The FFI stream carries JSON (see gen_ui_ffi::api::streams's doc comment on

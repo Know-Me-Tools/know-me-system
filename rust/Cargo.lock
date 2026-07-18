@@ -5454,6 +5454,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "knowme_hands"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "workspace-hack",
+]
+
+[[package]]
+name = "knowme_ofp"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "workspace-hack",
+]
+
+[[package]]
+name = "knowme_plugin_host"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "workspace-hack",
+]
+
+[[package]]
 name = "landlock"
 version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"

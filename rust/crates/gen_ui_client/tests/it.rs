@@ -95,7 +95,48 @@ fn agui_run_lifecycle_and_toolcall_map_to_a2ui() {
         other => panic!("expected ToolUse block, got {other:?}"),
     }
 
-    // Unknown/keepalive frames yield nothing rather than erroring the stream.
+    // Keepalive frames yield nothing rather than erroring the stream.
     assert!(parse_agui_frame(":keep-alive").is_empty());
-    assert!(parse_agui_frame(r#"{"type":"StateDelta","delta":[]}"#).is_empty());
+}
+
+#[test]
+fn standard_agui_reasoning_state_and_custom_chunks_are_renderable() {
+    let reasoning =
+        parse_agui_frame(r#"{"type":"REASONING_MESSAGE_CONTENT","delta":"Checking memory"}"#);
+    assert!(matches!(
+        reasoning.as_slice(),
+        [A2uiEvent::Block {
+            block: ContentBlock::Thinking { text }
+        }] if text == "Checking memory"
+    ));
+
+    let state = parse_agui_frame(
+        r#"{"type":"STATE_DELTA","delta":[{"op":"replace","path":"/status","value":"ready"}]}"#,
+    );
+    assert!(matches!(
+        state.as_slice(),
+        [A2uiEvent::Block {
+            block: ContentBlock::Artifact { kind, .. }
+        }] if kind == "agui_state_delta"
+    ));
+
+    let citation = parse_agui_frame(
+        r#"{"type":"CUSTOM","name":"citation","value":{"source":"memory:42","quote":"A useful fact"}}"#,
+    );
+    assert!(matches!(
+        citation.as_slice(),
+        [A2uiEvent::Block {
+            block: ContentBlock::Citation { source, quote }
+        }] if source == "memory:42" && quote == "A useful fact"
+    ));
+
+    let surface = parse_agui_frame(
+        r#"{"type":"CUSTOM","name":"a2ui","value":{"surfaceId":"profile","messages":"{\"version\":\"v0.9\",\"createSurface\":{\"surfaceId\":\"profile\",\"catalogId\":\"basic\"}}"}}"#,
+    );
+    assert!(matches!(
+        surface.as_slice(),
+        [A2uiEvent::Block {
+            block: ContentBlock::Artifact { kind, .. }
+        }] if kind == "a2ui"
+    ));
 }

@@ -19,6 +19,8 @@ pub enum AgentError {
     NoLocalEngine,
     #[error("local inference: {0}")]
     LocalInference(#[from] CoreError),
+    #[error("attachment: {0}")]
+    Attachment(String),
 }
 
 impl From<AgentError> for CoreError {
@@ -34,6 +36,7 @@ impl From<AgentError> for CoreError {
             // model id → Terminal); pass its verdict through rather than
             // flattening the distinction the engine worked to establish.
             AgentError::LocalInference(inner) => inner,
+            AgentError::Attachment(m) => CoreError::Terminal(m),
         }
     }
 }

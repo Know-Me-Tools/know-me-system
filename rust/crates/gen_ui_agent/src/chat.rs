@@ -92,6 +92,53 @@ pub async fn send(user_message: String, history: Vec<String>) -> Result<String, 
     )
 }
 
+/// Validate user-selected files in Rust and enrich a turn with bounded local
+/// attachment context. Text-like documents are included directly; binary
+/// formats are represented by trusted metadata for a later multimodal adapter.
+pub async fn send_with_attachments(
+    user_message: String,
+    history: Vec<String>,
+    attachment_paths: Vec<String>,
+) -> Result<String, AgentError> {
+    if attachment_paths.is_empty() {
+        return send(user_message, history).await;
+    }
+    let mut enriched = user_message;
+    enriched.push_str("\n\nAttached files:\n");
+    for path in attachment_paths.into_iter().take(6) {
+        let metadata = tokio::fs::metadata(&path).await.map_err(|error| {
+            AgentError::Attachment(format!("cannot open selected file: {error}"))
+        })?;
+        if !metadata.is_file() || metadata.len() > 25 * 1024 * 1024 {
+            return Err(AgentError::Attachment(
+                "selected file is not a regular file or exceeds 25 MB".into(),
+            ));
+        }
+        let file_name = std::path::Path::new(&path)
+            .file_name()
+            .and_then(std::ffi::OsStr::to_str)
+            .unwrap_or("attachment");
+        let extension = std::path::Path::new(&path)
+            .extension()
+            .and_then(std::ffi::OsStr::to_str)
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+        enriched.push_str(&format!("- {file_name} ({} bytes)", metadata.len()));
+        if matches!(extension.as_str(), "txt" | "md" | "json" | "csv") {
+            let bytes = tokio::fs::read(&path).await.map_err(|error| {
+                AgentError::Attachment(format!("cannot read selected file: {error}"))
+            })?;
+            let bounded = &bytes[..bytes.len().min(256 * 1024)];
+            enriched.push_str("\n```text\n");
+            enriched.push_str(&String::from_utf8_lossy(bounded));
+            enriched.push_str("\n```\n");
+        } else {
+            enriched.push_str(" [binary content available to the attachment adapter]\n");
+        }
+    }
+    send(enriched, history).await
+}
+
 /// Start a cloud run from request-scoped hosted-web credentials. This is the
 /// anonymous BYOK path: unlike `send`, it never reads or writes the keychain or
 /// config DB and therefore cannot retain a browser user's secret server-side.

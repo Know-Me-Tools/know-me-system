@@ -14,9 +14,13 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 Future<String> chatSend(
         {required String threadId,
         required String message,
-        required List<String> messages}) =>
+        required List<String> messages,
+        required List<String> attachmentPaths}) =>
     GenUiCore.instance.api.crateApiChatChatSend(
-        threadId: threadId, message: message, messages: messages);
+        threadId: threadId,
+        message: message,
+        messages: messages,
+        attachmentPaths: attachmentPaths);
 
 /// Ingest a note into memory (embeds on-device via fastembed, upserts into
 /// SurrealDB). Returns the assigned record id.

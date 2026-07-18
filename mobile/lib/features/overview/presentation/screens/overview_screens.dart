@@ -1,8 +1,10 @@
 // TJ-ARCH-MOB-001 compliant
 import 'package:flutter/material.dart' show Icons;
 import 'package:flutter/widgets.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
 
+import '../../../../core/theme/theme_mode_provider.dart';
 import '../../../../shared/widgets/knowme_screen.dart';
 import '../../domain/overview_item.dart';
 
@@ -54,20 +56,100 @@ class ModelsScreen extends StatelessWidget {
       );
 }
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) => const _OverviewScreen(
-        item: OverviewItem(
-          title: 'Settings',
-          eyebrow: 'Privacy and appearance',
-          heading: 'Your data. Your choices.',
-          body:
-              'KnowMe follows the system light or dark theme and keeps local conversations in the shared Rust data layer.',
-          icon: Icons.tune,
-        ),
-      );
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colors = shad.Theme.of(context).colorScheme;
+    final selected = ref.watch(themeModeProvider);
+    return KnowMeScreen(
+      title: 'Settings',
+      child: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: colors.card,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Appearance',
+                  style: TextStyle(
+                    color: colors.foreground,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Choose a WCAG AA light or dark palette, or match this device.',
+                  style: TextStyle(color: colors.mutedForeground, height: 1.4),
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final option in const [
+                      (shad.ThemeMode.system, Icons.brightness_auto, 'System'),
+                      (
+                        shad.ThemeMode.light,
+                        Icons.light_mode_outlined,
+                        'Light'
+                      ),
+                      (shad.ThemeMode.dark, Icons.dark_mode_outlined, 'Dark'),
+                    ])
+                      _ThemeModeButton(
+                        icon: option.$2,
+                        label: option.$3,
+                        selected: selected == option.$1,
+                        onPressed: () => ref
+                            .read(themeModeProvider.notifier)
+                            .select(option.$1),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ThemeModeButton extends StatelessWidget {
+  const _ThemeModeButton({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final child = Semantics(
+      selected: selected,
+      label: '$label theme',
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [Icon(icon, size: 18), const SizedBox(width: 8), Text(label)],
+      ),
+    );
+    return selected
+        ? shad.PrimaryButton(onPressed: onPressed, child: child)
+        : shad.GhostButton(onPressed: onPressed, child: child);
+  }
 }
 
 class _OverviewScreen extends StatelessWidget {

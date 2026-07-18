@@ -5,6 +5,7 @@
 // is driven by the Mutations API in the screen. No FFI-driven provider retries.
 import 'dart:async';
 
+import 'package:collection/collection.dart';
 import 'package:gen_ui_widgets/gen_ui_widgets.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:uuid/uuid.dart';
@@ -107,12 +108,43 @@ class ChatNotifier extends _$ChatNotifier {
       messages: [
         for (final m in state.messages)
           if (m.id == messageId)
-            m.copyWith(content: [...m.content, block])
+            m.copyWith(content: _appendOrMerge(m.content, block))
           else
             m,
       ],
     );
   }
+
+  List<ContentBlock> _appendOrMerge(
+    List<ContentBlock> content,
+    ContentBlock block,
+  ) =>
+      switch (block) {
+        TextBlock(:final text) => switch (content.lastOrNull) {
+            TextBlock(text: final previous) => [
+                ...content.sublist(0, content.length - 1),
+                TextBlock('$previous$text'),
+              ],
+            _ => [...content, block],
+          },
+        ThinkingBlock(:final text) => switch (content.lastOrNull) {
+            ThinkingBlock(text: final previous) => [
+                ...content.sublist(0, content.length - 1),
+                ThinkingBlock('$previous$text'),
+              ],
+            _ => [...content, block],
+          },
+        CodeBlock() ||
+        CitationBlock() ||
+        MemoryBlock() ||
+        ToolUseBlock() ||
+        ToolResultBlock() ||
+        SkillBlock() ||
+        ArtifactBlock() ||
+        ImageBlock() ||
+        DividerBlock() =>
+          [...content, block],
+      };
 
   void finalizeMessage(String messageId) {
     state = state.copyWith(
@@ -135,14 +167,18 @@ class ChatNotifier extends _$ChatNotifier {
 
   /// Send a user message, open the assistant message, and fold its event stream.
   /// Terminal on Rust domain error (retry is off). Called from a Mutation.
-  Future<void> sendMessage(String text) async {
+  Future<void> sendMessage(
+    String text, {
+    List<ContentBlock> attachments = const [],
+    List<String> attachmentPaths = const [],
+  }) async {
     await load();
     if (!ref.mounted || state.threadId.isEmpty) return;
     final history = _historyForRust(state.messages);
     final userMsg = ChatMessage(
       id: _uuid.v4(),
       role: 'user',
-      content: [TextBlock(text)],
+      content: [...attachments, TextBlock(text)],
       createdAt: DateTime.now().toUtc(),
     );
     final assistantId = _uuid.v4();
@@ -158,7 +194,12 @@ class ChatNotifier extends _$ChatNotifier {
     await _repository.saveMessage(state.threadId, userMsg);
     await _touchConversation(text);
 
-    final runId = await bridge.chatSend(state.threadId, text, history);
+    final runId = await bridge.chatSend(
+      state.threadId,
+      text,
+      history,
+      attachmentPaths,
+    );
     if (!ref.mounted) return; // provider paused/disposed while awaiting
 
     final driver = A2uiContentDriver(

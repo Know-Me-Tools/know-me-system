@@ -4,3 +4,4 @@ library;
 
 export 'src/content_block.dart';
 export 'src/content_block_view.dart';
+export 'src/a2ui_surface_view.dart';

@@ -16,6 +16,19 @@ Stream<A2uiEvent> _cannedRun() async* {
 }
 
 void main() {
+  test('legacy persisted stream deltas coalesce without crossing rich blocks',
+      () {
+    final blocks = coalesceContentBlocks(const [
+      TextBlock('Hello '),
+      TextBlock('world'),
+      DividerBlock(),
+      TextBlock('Next'),
+    ]);
+    expect(blocks, hasLength(3));
+    expect((blocks.first as TextBlock).text, 'Hello world');
+    expect(blocks[1], isA<DividerBlock>());
+  });
+
   test('ChatNotifier folds an A2uiEvent stream into ContentBlocks', () async {
     final container = ProviderContainer();
     addTearDown(container.dispose);
@@ -30,7 +43,7 @@ void main() {
       isFalse,
       reason: 'RunFinished finalizes the message',
     );
-    expect(msg.content, hasLength(2));
-    expect(msg.content.every((b) => b is TextBlock), isTrue);
+    expect(msg.content, hasLength(1));
+    expect((msg.content.single as TextBlock).text, 'Hello world');
   });
 }

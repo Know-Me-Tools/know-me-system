@@ -10,6 +10,11 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_mermaid: ^0.1.0
+  flutter_svg: 2.2.3
+  markdown_widget: ^2.3.2+6
+  shadcn_flutter: ^0.0.53
+  video_player: 2.10.1
 
 dev_dependencies:
   flutter_lints: ^5.0.0

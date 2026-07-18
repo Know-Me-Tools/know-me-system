@@ -137,7 +137,8 @@ abstract class GenUiCoreApi extends BaseApi {
   Future<String> crateApiChatChatSend(
       {required String threadId,
       required String message,
-      required List<String> messages});
+      required List<String> messages,
+      required List<String> attachmentPaths});
 
   Stream<String> crateApiStreamsEntityChanges();
 
@@ -571,13 +572,15 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
   Future<String> crateApiChatChatSend(
       {required String threadId,
       required String message,
-      required List<String> messages}) {
+      required List<String> messages,
+      required List<String> attachmentPaths}) {
     return handler.executeNormal(NormalTask(
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(threadId, serializer);
         sse_encode_String(message, serializer);
         sse_encode_list_String(messages, serializer);
+        sse_encode_list_String(attachmentPaths, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
             funcId: 13, port: port_);
       },
@@ -587,14 +590,14 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
             sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
       ),
       constMeta: kCrateApiChatChatSendConstMeta,
-      argValues: [threadId, message, messages],
+      argValues: [threadId, message, messages, attachmentPaths],
       apiImpl: this,
     ));
   }
 
   TaskConstMeta get kCrateApiChatChatSendConstMeta => const TaskConstMeta(
         debugName: "chat_send",
-        argNames: ["threadId", "message", "messages"],
+        argNames: ["threadId", "message", "messages", "attachmentPaths"],
       );
 
   @override

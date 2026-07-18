@@ -25,9 +25,10 @@ pub async fn chat_send(
     thread_id: String,
     message: String,
     messages: Vec<String>,
+    attachment_paths: Vec<String>,
 ) -> Result<String, CoreError> {
     let _ = thread_id;
-    gen_ui_agent::chat::send(message, messages)
+    gen_ui_agent::chat::send_with_attachments(message, messages, attachment_paths)
         .await
         .map_err(Into::into)
 }
