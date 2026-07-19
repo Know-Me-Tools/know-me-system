@@ -900,7 +900,13 @@ async fn send_local(
     let active_run = ActiveRun::new(&run_id);
     let history_summary = history
         .iter()
-        .map(|message| format!("{}:{}", message.role.as_str(), message.content.chars().count()))
+        .map(|message| {
+            format!(
+                "{}:{}",
+                message.role.as_str(),
+                message.content.chars().count()
+            )
+        })
         .collect::<Vec<_>>()
         .join(",");
     gen_ui_runtime::spawn(async move {
@@ -1041,12 +1047,16 @@ async fn send_local(
                     status: RunStatus::Preparing,
                     message: format!("Handling local tool call {}", call.name),
                 });
+                let skill_name = skill_name_for_local_tool(&call.name);
+                publish_skill_activation(&mut adapter, &skill_name, "running");
                 let (follow_up, continuation) = tool_gate
                     .execute_or_reject(&run_id_for_task, &mcp_registry, call)
                     .await;
+                let skill_status = skill_status_for_tool_follow_up(&follow_up);
                 for a2ui in adapter.ingest(&follow_up) {
                     state::publish(a2ui);
                 }
+                publish_skill_activation(&mut adapter, &skill_name, skill_status);
                 if let Some(result) = continuation {
                     pending_continuation = Some(result);
                     break;
@@ -1106,12 +1116,16 @@ async fn send_local(
                         status: RunStatus::Preparing,
                         message: format!("Handling local tool call {}", call.name),
                     });
+                    let skill_name = skill_name_for_local_tool(&call.name);
+                    publish_skill_activation(&mut adapter, &skill_name, "running");
                     let (follow_up, continuation) = tool_gate
                         .execute_or_reject(&run_id_for_task, &mcp_registry, call)
                         .await;
+                    let skill_status = skill_status_for_tool_follow_up(&follow_up);
                     for a2ui in adapter.ingest(&follow_up) {
                         state::publish(a2ui);
                     }
+                    publish_skill_activation(&mut adapter, &skill_name, skill_status);
                     pending_continuation = continuation;
                     break;
                 }
@@ -1390,6 +1404,32 @@ struct LocalToolPolicy {
     trusted_server: bool,
     auto_execute: bool,
     confirmation_reasons: Vec<String>,
+}
+
+fn skill_name_for_local_tool(tool_name: &str) -> String {
+    tool_name
+        .split_once("__")
+        .map(|(namespace, _)| namespace)
+        .filter(|namespace| !namespace.is_empty())
+        .unwrap_or("local_tool")
+        .to_owned()
+}
+
+fn skill_status_for_tool_follow_up(event: &StreamEvent) -> &'static str {
+    match event {
+        StreamEvent::ToolResult { is_error, .. } if *is_error => "failed",
+        StreamEvent::Error { .. } => "failed",
+        _ => "complete",
+    }
+}
+
+fn publish_skill_activation(adapter: &mut A2uiAdapter, name: &str, status: &str) {
+    for event in adapter.ingest(&StreamEvent::SkillActivation {
+        name: name.to_owned(),
+        status: status.to_owned(),
+    }) {
+        state::publish(event);
+    }
 }
 
 impl LocalToolCallGate {
@@ -1956,6 +1996,32 @@ mod attachment_tests {
         assert_eq!(attachment_kind("png"), ("image/png", true, false));
         assert_eq!(attachment_kind("pdf"), ("application/pdf", false, true));
         assert_eq!(attachment_kind("mp4"), ("video/mp4", false, false));
+    }
+
+    #[test]
+    fn local_tool_namespace_maps_to_skill_activation_name() {
+        assert_eq!(
+            skill_name_for_local_tool("knowme_diagnostics__local_runtime_status"),
+            "knowme_diagnostics"
+        );
+        assert_eq!(skill_name_for_local_tool("memory__search"), "memory");
+        assert_eq!(skill_name_for_local_tool("unqualified"), "local_tool");
+        assert_eq!(
+            skill_status_for_tool_follow_up(&StreamEvent::ToolResult {
+                tool_use_id: "call-1".into(),
+                output_json: "{}".into(),
+                is_error: false,
+            }),
+            "complete"
+        );
+        assert_eq!(
+            skill_status_for_tool_follow_up(&StreamEvent::ToolResult {
+                tool_use_id: "call-1".into(),
+                output_json: "{}".into(),
+                is_error: true,
+            }),
+            "failed"
+        );
     }
 
     #[tokio::test]

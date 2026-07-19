@@ -169,13 +169,20 @@ attached Samsung `SM S936U` running Android 16/API 36:
   `KMFALLBACK055421`; logcat proved the diagnostic tool call, forced fallback
   acknowledgement, and canonical `tool_result_fallback_applied` event, while
   UIAutomator proved the fallback event artifact rendered.
+- Skill activation now has physical Android proof:
+  `scripts/android/certify-local-skill-activation.sh` runs a clean local-tool
+  turn, requires current `knowme_diagnostics__local_runtime_status` tool-call
+  evidence, and verifies `Skill knowme_diagnostics, running` and
+  `Skill knowme_diagnostics, complete` render as their own ordered
+  `ContentBlock::Skill` regions outside the answer content. It passed on the
+  attached Samsung with marker `KMSKILL060942`.
 
 This proves the CPU smoke lane and code-level tool-call candidate preservation.
 It also proves one complete safe local tool loop and one explicit
 approval-required local tool loop on a physical Android device. True
-token-level streaming callbacks, skill-activation UI proof, stale-card cleanup
-affordances, broader clean session/branch isolation for certification, and
-broader device coverage remain future gates.
+token-level streaming callbacks, stale-card cleanup affordances, broader clean
+session/branch isolation for certification, and broader device coverage remain
+future gates.
 
 ## Roadmap
 
@@ -290,11 +297,11 @@ broader device coverage remain future gates.
 - [x] Certify empty-continuation fallback cases.
 - [x] Add reversible clean chat-state isolation to the fallback certification
   wrapper so stale restored messages cannot contaminate fallback proof.
-- [ ] Generalize clean session/branch isolation across the remaining physical
-  prompt wrappers.
-- [ ] Add physical UI certification for skill activation chunks so a real
+- [x] Add physical UI certification for skill activation chunks so a real
   skill activation is visible as its own ordered `ContentBlock::Skill` region,
   parallel to thinking and citation chunks.
+- [ ] Generalize clean session/branch isolation across the remaining physical
+  prompt wrappers.
 - Certify the SM8750-specific artifact only after the generic CPU path is green.
 - Add at least one non-Qualcomm modern Android phone before claiming broad
   Android support.

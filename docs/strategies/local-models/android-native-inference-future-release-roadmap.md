@@ -46,8 +46,12 @@ vendor library dependency.
   current logcat tool-call evidence, and reject stale UI content. The wrapper
   now uses reversible clean chat-state isolation for this gate and has passed on
   the attached Samsung.
-- Add richer physical model-certification wrappers for skill activation UI proof
-  and generalized clean session/branch isolation. The
+- Use `scripts/android/certify-local-skill-activation.sh` to prove skill
+  activation chunks render as first-class `ContentBlock::Skill` regions outside
+  answer content. The Samsung baseline passed with visible running and complete
+  `knowme_diagnostics` skill blocks around the diagnostic local tool call.
+- Add richer physical model-certification wrappers for generalized clean
+  session/branch isolation. The
   current wrappers prove launch, single-turn prompt quality, restart recovery,
   multi-turn history, cancellation, and explicit safe tool calling; they are
   not the full local agent certification suite.
@@ -103,10 +107,11 @@ vendor library dependency.
 ## Release R+4 — Richer local-agent certification
 
 - Expand prompt certification beyond the embedded diagnostics MCP tool:
-  skill activation UI proof and generalized clean session/branch isolation.
-  Office/personal task following, Mermaid, code, constrained JSON, restart
-  recovery, multi-turn history, cancellation, and explicit safe tool calling now
-  have physical Android wrapper evidence.
+  generalized clean session/branch isolation and additional real-world tool and
+  skill sources. Office/personal task following, Mermaid, code, constrained
+  JSON, restart recovery, multi-turn history, cancellation, explicit safe tool
+  calling, empty-continuation fallback, and diagnostic skill activation now have
+  physical Android wrapper evidence.
 - Certify the confirmation UX/policy for mutating, destructive, and open-world
   tools beyond the embedded diagnostic tool. The baseline physical proof now
   exists for a read-only/open-world diagnostic: approval executes only a
@@ -118,10 +123,9 @@ vendor library dependency.
 - Treat skill activation chunks as first-class ordered semantic blocks, rendered
   outside answer Markdown in the same turn region model as thinking, citation,
   tool, memory, lifecycle, and artifact chunks.
-- Require physical UI evidence for skill activation chunks before marking this
-  lane complete: a real activation must be visible as a `skill` block and must
-  persist/recover with the same ordered block semantics as thinking and
-  citations.
+- Extend skill activation certification beyond the embedded diagnostics source:
+  real AgentSkills/process activations must use the same `skill` block ordering,
+  persistence, copy, and recovery semantics as the diagnostic baseline.
 
 ## Explicit non-goal
 

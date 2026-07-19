@@ -995,10 +995,56 @@ Remaining:
 
 - Generalize clean session/branch isolation across the remaining prompt
   certification wrappers where stale restored messages can contaminate proof.
-- Add physical skill activation UI proof. Skill activations already map to
-  `ContentBlock::Skill`; the remaining gate is physical evidence that a real
-  activation renders and persists as its own ordered block beside thinking and
-  citation chunks.
+- Add physical skill activation UI proof; addressed in the next checkpoint.
+
+## ANDROID SKILL ACTIVATION CHECKPOINT
+
+Date: 2026-07-19
+
+Implemented:
+
+- Local trusted MCP tool execution now emits `SkillActivation` events around the
+  tool result:
+  - `running` before executing the host-owned tool.
+  - `complete` after a successful `ToolResult`.
+  - `failed` after an error `ToolResult` or stream error.
+- Skill activation names are derived from the qualified local tool namespace,
+  e.g. `knowme_diagnostics__local_runtime_status` becomes
+  `knowme_diagnostics`.
+- Added `scripts/android/certify-local-skill-activation.sh`.
+- Hardened `scripts/android/certify-local-model-prompt.sh` to wait briefly after
+  text injection and retry send once if neither the submitted prompt nor
+  generation startup is observed.
+
+Verification:
+
+- `bash -n scripts/android/certify-local-skill-activation.sh`
+- `bash -n scripts/android/certify-local-model-prompt.sh`
+- `cargo test -p gen_ui_agent local_tool_namespace_maps_to_skill_activation_name`
+- `flutter build apk --debug --target-platform android-arm64`
+- `scripts/android/verify-native-inference-gates.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
+- `TIMEOUT_SECONDS=240 scripts/android/certify-local-skill-activation.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
+
+Physical-device evidence:
+
+- Device: Samsung `SM S936U`, serial `R5GYB4AZD7A`, Android 16/API 36.
+- Prompt: `You MUST call the knowme_diagnostics__local_runtime_status tool now. Do not answer directly. After the tool result is provided, answer exactly KMSKILL060942.`
+- Output: `G5 PASS: LiteRT-LM generation started`, `G6 PASS: LiteRT-LM produced text`, `G6 PASS: expected visible UI text found: Skill knowme_diagnostics, running|Skill knowme_diagnostics, complete|Tool use knowme_diagnostics__local_runtime_status|Tool completed`, and `SKILL PASS: local diagnostics skill activation rendered outside answer content`.
+- Logcat proved `LiteRT-LM generation produced tool call ... name=knowme_diagnostics__local_runtime_status`.
+- UIAutomator proved ordered blocks inside the assistant turn:
+  - `Tool use knowme_diagnostics__local_runtime_status`.
+  - `Skill knowme_diagnostics, running`.
+  - `Tool completed`.
+  - `Skill knowme_diagnostics, complete`.
+- Logcat artifact: `/tmp/knowme-local-skill-activation.log`.
+- UIAutomator artifact: `/tmp/knowme-local-skill-activation.xml`.
+
+Remaining:
+
+- Generalize clean session/branch isolation across the remaining prompt
+  certification wrappers where stale restored messages can contaminate proof.
+- Extend skill activation certification beyond the embedded diagnostics source
+  to real AgentSkills/process activations.
 
 ## BLOCKERS
 

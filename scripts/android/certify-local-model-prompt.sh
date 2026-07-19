@@ -201,6 +201,15 @@ ui_contains_expected_substrings() {
   return 0
 }
 
+ui_contains_literal() {
+  local needle="$1"
+  [[ -n "$needle" ]] && rg -F -q "$needle" "$UI_XML_PATH"
+}
+
+generation_started() {
+  rg -q "LiteRT-LM generation starting" "$LOG_PATH"
+}
+
 adb logcat -c
 
 if ! tap_matching_node "Ask KnowMe anything"; then
@@ -218,10 +227,31 @@ fi
 
 escaped_prompt="${PROMPT// /%s}"
 adb shell input text "$escaped_prompt"
+sleep 1
 
 if ! tap_matching_node "Send message"; then
   echo "send semantics not found; using lower-right tap fallback" >&2
   tap_send_fallback
+fi
+
+prompt_probe="${PROMPT:0:48}"
+for _ in 1 2 3 4 5; do
+  adb logcat -d -v time > "$LOG_PATH"
+  dump_ui || true
+  if generation_started || ui_contains_literal "$prompt_probe"; then
+    break
+  fi
+  sleep 1
+done
+
+if ! generation_started && ! ui_contains_literal "$prompt_probe"; then
+  echo "submitted prompt was not observed after first send tap; retrying composer submit" >&2
+  tap_composer_fallback
+  adb shell input text "$escaped_prompt"
+  sleep 1
+  if ! tap_matching_node "Send message"; then
+    tap_send_fallback
+  fi
 fi
 
 deadline=$((SECONDS + TIMEOUT_SECONDS))
