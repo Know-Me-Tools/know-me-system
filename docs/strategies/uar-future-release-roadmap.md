@@ -16,6 +16,18 @@ route to.
 - The same projection path then renders UAR reasoning, skill activation, tool
   lifecycle, text, error, completion, and unknown custom payloads as KnowMe
   A2UI/content blocks.
+- KnowMe can now adapt in both directions at the local-provider seam:
+  - KnowMe structured `InferenceRequest` → UAR `LlmRequest`-compatible payload;
+  - UAR `LlmRequest`-shaped payload → KnowMe structured `InferenceRequest`;
+  - KnowMe local `StreamEvent` → UAR `NormalizedEvent`-shaped payload.
+- The local-to-UAR normalized-event adapter is stateful for tool calls, so the
+  eventual UAR `ExternalLlmDriver` stream can receive complete tool names and
+  accumulated JSON arguments rather than lossy completion markers.
+- UAR's low-level LLM-driver `NormalizedEvent` contract now has native
+  `skill.activation` and `custom` variants. The UAR run manager maps those into
+  existing domain `SkillActivated` and provider-event `Artifact` events, so the
+  external local-provider path does not need to hide semantic chunks inside
+  unrelated runtime-step payloads.
 - `gen_ui_agent::uar::UarServiceRuntime` can create a UAR run through the UAR
   HTTP SDK, consume its SSE stream, and project events into KnowMe A2UI blocks.
 - Desktop/web A2UI action responses can be submitted back to the active UAR run
@@ -61,6 +73,11 @@ configured desktop/web service lane without changing mobile local execution yet.
   - unknown future custom events.
 - Verify every fixture becomes an ordered KnowMe content-block projection and
   unknown events are preserved as artifacts.
+- Verify UAR driver payloads convert into KnowMe local-provider requests without
+  losing structured roles, tool declarations, sampling settings, grammar, or
+  context-plan provenance. **Done at protocol-test level.**
+- Verify local-provider stream events convert into UAR normalized-event payloads
+  with complete tool-call arguments. **Done at protocol-test level.**
 
 Exit gate: protocol/component tests prove UAR event projection across Flutter,
 React/web, and Tauri. Service-mode execution must additionally be proven
@@ -80,6 +97,9 @@ Flutter → Rust FFI boundary.
   - provider registration traits;
   - in-process UAR event stream.
 - Register KnowMe's Android LiteRT-LM/Gemma local lane as a UAR provider.
+  The provider should use UAR's `ExternalLlmDriver` seam with
+  `gen_ui_protocol::uar_llm_payload_to_inference_request` for incoming requests
+  and `UarNormalizedEventAdapter` for outgoing local stream events.
 - Keep Android CPU LiteRT-LM as the universal correctness floor.
 - Keep GPU/NPU delegates optional and selected only after physical-device
   certification.

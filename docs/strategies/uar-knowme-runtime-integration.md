@@ -102,12 +102,16 @@ Provider bridge requirements:
 - Expose local backend diagnostics to UAR so routing can decide whether a run
   should stay local, fall back to cloud, or ask the user.
 
-Implementation status: `gen_ui_protocol` now contains a dependency-free local
-provider bridge that converts KnowMe `InferenceRequest` values into
-UAR-compatible driver payloads and projects local `StreamEvent`s into AG-UI
-events with the same reasoning/tool/skill/error semantics used by the UI path.
-This does not wire embedded mobile UAR yet; it makes the future UAR provider
-registration a mechanical adapter instead of a prompt-flattening rewrite.
+Implementation status: `gen_ui_protocol` now contains a dependency-free
+bidirectional local-provider bridge. It converts KnowMe `InferenceRequest`
+values into UAR-compatible driver payloads, converts UAR `LlmRequest`-shaped
+payloads back into structured KnowMe `InferenceRequest` values, and projects
+local `StreamEvent`s into both AG-UI events and UAR `NormalizedEvent`-shaped
+payloads. Tool-call streaming uses a stateful outbound adapter so final UAR tool
+completion events preserve the exact tool name and accumulated JSON arguments.
+This does not wire embedded mobile UAR yet; it makes the future UAR
+`ExternalLlmDriver` provider registration a mechanical adapter instead of a
+prompt-flattening rewrite.
 
 ## Event and block mapping
 
@@ -216,10 +220,14 @@ non-invasive way:
    and unknown custom events into KnowMe stream/content blocks.
    `gen_ui_agent::uar` also projects UAR SDK SSE stream events through the same
    adapter while preserving order.
-3. Add Android certification report fields for `uarRuntimeMode` and
+3. Add the inverse local-provider driver seam. **Done:** UAR `LlmRequest`-shaped
+   message/tool/settings payloads convert into KnowMe `InferenceRequest`, and
+   local provider `StreamEvent`s convert back into UAR `NormalizedEvent`-shaped
+   payloads with stateful tool-call argument preservation.
+4. Add Android certification report fields for `uarRuntimeMode` and
    `uarSubmoduleCommit`. **Done:** the local certification report records UAR
    authority, target modes, current integration state, and submodule metadata.
-4. Keep physical local-model gates green.
+5. Keep physical local-model gates green.
 
 This preserves current Android progress while moving the architecture toward
 UAR as the real agent runtime authority.

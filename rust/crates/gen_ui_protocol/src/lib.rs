@@ -3,7 +3,10 @@
 //! event enums; wasm-safe (no IO, no runtime dependency).
 use gen_ui_types::content_block::ContentBlock;
 use gen_ui_types::events::{A2uiEvent, AguiEvent, StreamEvent};
-use gen_ui_types::inference::{InferenceRequest, InferenceTool};
+use gen_ui_types::inference::{
+    GrammarConstraint, InferenceMessage, InferenceRequest, InferenceRole, InferenceTool,
+    InferenceToolAnnotations, PromptPlanOrigin, SampleParams,
+};
 use gen_ui_types::lifecycle::{RunError, RunPhase};
 use serde::{Deserialize, Serialize};
 
@@ -20,6 +23,72 @@ pub struct UarLlmRequestPayload {
     pub tools: Vec<serde_json::Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub extra_params: Option<serde_json::Value>,
+}
+
+/// Convert a UAR `LlmRequest`-shaped payload into KnowMe's canonical local
+/// provider request.
+///
+/// This is the inverse of [`inference_request_to_uar_llm_payload`] and exists
+/// so the future mobile embedded UAR kernel can delegate to KnowMe local
+/// providers without flattening roles or silently dropping tool declarations.
+/// It stays JSON-level instead of depending on the UAR crate, which keeps this
+/// protocol crate wasm/mobile-safe.
+pub fn uar_llm_payload_to_inference_request(
+    payload: &UarLlmRequestPayload,
+) -> Result<InferenceRequest, String> {
+    let messages = payload
+        .messages
+        .iter()
+        .map(uar_message_to_inference_message)
+        .collect::<Result<Vec<_>, _>>()?;
+    let tools = payload
+        .tools
+        .iter()
+        .map(uar_tool_to_inference_tool)
+        .collect::<Result<Vec<_>, _>>()?;
+    let generation_settings = payload
+        .extra_params
+        .as_ref()
+        .map(sample_params_from_uar_extra)
+        .transpose()?
+        .unwrap_or_default();
+    let grammar = payload
+        .extra_params
+        .as_ref()
+        .and_then(|extra| extra.get("grammar"))
+        .filter(|value| !value.is_null())
+        .map(|value| {
+            serde_json::from_value::<GrammarConstraint>(value.clone())
+                .map_err(|error| format!("invalid UAR grammar constraint: {error}"))
+        })
+        .transpose()?;
+    let originating_plan = payload
+        .extra_params
+        .as_ref()
+        .and_then(|extra| extra.get("originating_plan"))
+        .filter(|value| !value.is_null())
+        .map(|value| {
+            serde_json::from_value::<PromptPlanOrigin>(value.clone())
+                .map_err(|error| format!("invalid UAR originating plan: {error}"))
+        })
+        .transpose()?;
+
+    let prompt = messages
+        .iter()
+        .rev()
+        .find(|message| message.role == InferenceRole::User)
+        .map(|message| message.content.clone())
+        .unwrap_or_default();
+
+    Ok(InferenceRequest {
+        prompt,
+        messages,
+        tools,
+        images: Vec::new(),
+        generation_settings,
+        grammar,
+        originating_plan,
+    })
 }
 
 /// Convert KnowMe's structured local-provider request into the message/tool
@@ -87,6 +156,201 @@ fn inference_tool_to_uar_tool(tool: &InferenceTool) -> serde_json::Value {
         },
         "annotations": tool.annotations,
     })
+}
+
+fn uar_message_to_inference_message(value: &serde_json::Value) -> Result<InferenceMessage, String> {
+    let role = match json_string(value, &["role"]).unwrap_or("user") {
+        "system" => InferenceRole::System,
+        "user" => InferenceRole::User,
+        "assistant" => InferenceRole::Assistant,
+        "tool" => InferenceRole::Tool,
+        other => {
+            return Err(format!("unsupported UAR message role '{other}'"));
+        }
+    };
+    Ok(InferenceMessage {
+        role,
+        content: flatten_uar_message_content(value.get("content")),
+        name: json_string(value, &["name"]).map(str::to_owned),
+        tool_call_id: first_json_string(value, &[&["tool_call_id"][..], &["toolCallId"][..]])
+            .map(str::to_owned),
+    })
+}
+
+fn flatten_uar_message_content(content: Option<&serde_json::Value>) -> String {
+    match content {
+        Some(serde_json::Value::String(text)) => text.clone(),
+        Some(serde_json::Value::Array(parts)) => parts
+            .iter()
+            .filter_map(flatten_uar_content_part)
+            .collect::<Vec<_>>()
+            .join("\n"),
+        Some(other) => other.to_string(),
+        None => String::new(),
+    }
+}
+
+fn flatten_uar_content_part(part: &serde_json::Value) -> Option<String> {
+    let part_type = json_string(part, &["type"]).unwrap_or("text");
+    match part_type {
+        "text" => json_string(part, &["text"]).map(str::to_owned),
+        "image_url" => {
+            let url = json_string(part, &["image_url", "url"]).unwrap_or("<unknown>");
+            Some(format!(
+                "[image content supplied by UAR but not directly consumable by this text-only local provider: {url}]"
+            ))
+        }
+        other => Some(format!(
+            "[unsupported UAR content part preserved for local provider bridge: {other} {}]",
+            part
+        )),
+    }
+}
+
+fn uar_tool_to_inference_tool(value: &serde_json::Value) -> Result<InferenceTool, String> {
+    let function = value.get("function").unwrap_or(value);
+    let name = json_string(function, &["name"])
+        .ok_or_else(|| format!("UAR tool is missing function.name: {value}"))?
+        .to_owned();
+    let description = first_json_string(function, &[&["description"][..]])
+        .or_else(|| json_string(value, &["description"]))
+        .unwrap_or("")
+        .to_owned();
+    let parameters = function
+        .get("parameters")
+        .or_else(|| value.get("parameters"))
+        .cloned()
+        .unwrap_or_else(|| serde_json::json!({"type": "object", "properties": {}}));
+    let annotations = value
+        .get("annotations")
+        .filter(|value| !value.is_null())
+        .map(|value| {
+            serde_json::from_value::<InferenceToolAnnotations>(value.clone())
+                .map_err(|error| format!("invalid UAR tool annotations for {name}: {error}"))
+        })
+        .transpose()?;
+    Ok(InferenceTool {
+        name,
+        description,
+        parameters,
+        annotations,
+    })
+}
+
+fn sample_params_from_uar_extra(value: &serde_json::Value) -> Result<SampleParams, String> {
+    let mut params = SampleParams::default();
+    if let Some(temperature) = json_f32(value, &["temperature"])? {
+        params.temperature = temperature;
+    }
+    if let Some(top_p) = json_f32(value, &["top_p"])? {
+        params.top_p = top_p;
+    }
+    if let Some(top_k) = json_i32(value, &["top_k"])? {
+        params.top_k = top_k;
+    }
+    if let Some(min_p) = json_f32(value, &["min_p"])? {
+        params.min_p = min_p;
+    }
+    if let Some(presence_penalty) = json_f32(value, &["presence_penalty"])? {
+        params.presence_penalty = presence_penalty;
+    }
+    if let Some(max_tokens) = json_u32(value, &["max_tokens"]) {
+        params.max_tokens = max_tokens;
+    }
+    Ok(params)
+}
+
+/// Convert a local provider stream event into a UAR `NormalizedEvent`-shaped
+/// JSON payload.
+///
+/// The future UAR `ExternalLlmDriver` host callback can deserialize this into
+/// UAR's native `NormalizedEvent` enum. Keeping the transformation here avoids
+/// a mobile dependency on the full runtime while preserving every local semantic
+/// chunk for UAR orchestration.
+pub fn stream_event_to_uar_normalized_payload(event: &StreamEvent) -> serde_json::Value {
+    match event {
+        StreamEvent::MessageStart => serde_json::json!({
+            "type": "stream.start",
+            "data": {"request_id": "knowme-local"}
+        }),
+        StreamEvent::TextDelta { delta, .. } => serde_json::json!({
+            "type": "message.delta",
+            "data": {"text": delta}
+        }),
+        StreamEvent::ThinkingDelta { delta, .. } => serde_json::json!({
+            "type": "thinking.delta",
+            "data": {"text": delta}
+        }),
+        StreamEvent::ToolCallStarted { id, name } => serde_json::json!({
+            "type": "tool_call.delta",
+            "data": {
+                "call_index": 0,
+                "id": id,
+                "name": name,
+                "arguments_delta": null
+            }
+        }),
+        StreamEvent::ToolCallDelta { delta, .. } => serde_json::json!({
+            "type": "tool_call.delta",
+            "data": {
+                "call_index": 0,
+                "id": null,
+                "name": null,
+                "arguments_delta": delta
+            }
+        }),
+        StreamEvent::ToolCallComplete { id } => serde_json::json!({
+            "type": "tool_call.complete",
+            "data": {
+                "call_index": 0,
+                "id": id,
+                "name": "unknown_tool",
+                "arguments_json": ""
+            }
+        }),
+        StreamEvent::ToolResult {
+            tool_use_id,
+            output_json,
+            is_error,
+        } => serde_json::json!({
+            "type": "tool_result",
+            "data": {
+                "id": tool_use_id,
+                "name": "unknown_tool",
+                "content": output_json,
+                "success": !is_error
+            }
+        }),
+        StreamEvent::SkillActivation { name, status } => serde_json::json!({
+            "type": "skill.activation",
+            "data": {
+                "name": name,
+                "status": status
+            }
+        }),
+        StreamEvent::Custom {
+            source,
+            event_name,
+            payload,
+        } => serde_json::json!({
+            "type": "custom",
+            "data": {
+                "source": source,
+                "event_name": event_name,
+                "payload": payload
+            }
+        }),
+        StreamEvent::Error { message } => serde_json::json!({
+            "type": "error",
+            "data": {
+                "message": message,
+                "code": "knowme_local_provider_error"
+            }
+        }),
+        StreamEvent::Done => serde_json::json!({
+            "type": "done"
+        }),
+    }
 }
 
 /// Normalize a UAR `uar.agui/1` JSON event into KnowMe's provider-neutral
@@ -270,10 +534,119 @@ fn json_u32(value: &serde_json::Value, path: &[&str]) -> Option<u32> {
     cursor.as_u64().and_then(|value| u32::try_from(value).ok())
 }
 
+fn json_i32(value: &serde_json::Value, path: &[&str]) -> Result<Option<i32>, String> {
+    let mut cursor = value;
+    for segment in path {
+        let Some(next) = cursor.get(*segment) else {
+            return Ok(None);
+        };
+        cursor = next;
+    }
+    cursor
+        .as_i64()
+        .map(|value| {
+            i32::try_from(value).map_err(|_| format!("integer at {path:?} is outside i32 range"))
+        })
+        .transpose()
+}
+
+fn json_f32(value: &serde_json::Value, path: &[&str]) -> Result<Option<f32>, String> {
+    let mut cursor = value;
+    for segment in path {
+        let Some(next) = cursor.get(*segment) else {
+            return Ok(None);
+        };
+        cursor = next;
+    }
+    cursor
+        .as_f64()
+        .map(|value| {
+            if value.is_finite() && value >= f32::MIN as f64 && value <= f32::MAX as f64 {
+                Ok(value as f32)
+            } else {
+                Err(format!("float at {path:?} is outside f32 range"))
+            }
+        })
+        .transpose()
+}
+
 fn json_payload_to_string(value: &serde_json::Value) -> String {
     match value {
         serde_json::Value::String(value) => value.clone(),
         other => other.to_string(),
+    }
+}
+
+/// Stateful local-provider → UAR normalized-event adapter.
+///
+/// UAR has no distinct `ToolCallStarted` event; it receives deltas and a final
+/// complete event with the full name and arguments. KnowMe's provider stream
+/// separates start/delta/complete, so this adapter must retain pending tool
+/// state to avoid losing the exact executable arguments.
+#[derive(Default)]
+pub struct UarNormalizedEventAdapter {
+    pending_tools: Vec<PendingTool>,
+}
+
+impl UarNormalizedEventAdapter {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn ingest(&mut self, event: &StreamEvent) -> Vec<serde_json::Value> {
+        match event {
+            StreamEvent::ToolCallStarted { id, name } => {
+                self.pending_tools.push(PendingTool {
+                    id: id.clone(),
+                    name: name.clone(),
+                    args: String::new(),
+                });
+                vec![serde_json::json!({
+                    "type": "tool_call.delta",
+                    "data": {
+                        "call_index": self.pending_tools.len().saturating_sub(1),
+                        "id": id,
+                        "name": name,
+                        "arguments_delta": null
+                    }
+                })]
+            }
+            StreamEvent::ToolCallDelta { id, delta } => {
+                let call_index = self
+                    .pending_tools
+                    .iter()
+                    .position(|tool| &tool.id == id)
+                    .unwrap_or(0);
+                if let Some(tool) = self.pending_tools.iter_mut().find(|tool| &tool.id == id) {
+                    tool.args.push_str(delta);
+                }
+                vec![serde_json::json!({
+                    "type": "tool_call.delta",
+                    "data": {
+                        "call_index": call_index,
+                        "id": id,
+                        "name": null,
+                        "arguments_delta": delta
+                    }
+                })]
+            }
+            StreamEvent::ToolCallComplete { id } => {
+                let Some(index) = self.pending_tools.iter().position(|tool| &tool.id == id) else {
+                    return vec![stream_event_to_uar_normalized_payload(event)];
+                };
+                let tool = self.pending_tools.remove(index);
+                vec![serde_json::json!({
+                    "type": "tool_call.complete",
+                    "data": {
+                        "call_index": index,
+                        "id": tool.id,
+                        "name": tool.name,
+                        "arguments_json": tool.args
+                    }
+                })]
+            }
+            other => vec![stream_event_to_uar_normalized_payload(other)],
+        }
     }
 }
 
@@ -724,6 +1097,150 @@ mod tests {
         }
         output.extend(adapter.ingest(&StreamEvent::Done));
         output
+    }
+
+    #[test]
+    fn uar_llm_payload_becomes_structured_inference_request() {
+        let payload = UarLlmRequestPayload {
+            messages: vec![
+                serde_json::json!({"role": "system", "content": "Be precise."}),
+                serde_json::json!({
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Summarize this."},
+                        {"type": "image_url", "image_url": {"url": "file://photo.png"}}
+                    ]
+                }),
+            ],
+            tools: vec![serde_json::json!({
+                "type": "function",
+                "function": {
+                    "name": "knowme_diagnostics__local_runtime_status",
+                    "description": "Return local status.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": false
+                    }
+                },
+                "annotations": {
+                    "readOnlyHint": true,
+                    "destructiveHint": false,
+                    "openWorldHint": false
+                }
+            })],
+            extra_params: Some(serde_json::json!({
+                "temperature": 0.3,
+                "top_p": 0.9,
+                "top_k": 40,
+                "min_p": 0.05,
+                "presence_penalty": 0.1,
+                "max_tokens": 333,
+                "grammar": {"kind": "json_schema", "data": "{}"},
+                "originating_plan": {
+                    "version": "ctx-1",
+                    "estimatedTokens": 123,
+                    "estimator": "exact"
+                }
+            })),
+        };
+
+        let request = uar_llm_payload_to_inference_request(&payload).unwrap();
+        assert_eq!(request.messages[0].role, InferenceRole::System);
+        assert_eq!(request.messages[1].role, InferenceRole::User);
+        assert!(request.messages[1].content.contains("Summarize this."));
+        assert!(request.messages[1].content.contains("file://photo.png"));
+        assert_eq!(request.prompt, request.messages[1].content);
+        assert_eq!(
+            request.tools[0].name,
+            "knowme_diagnostics__local_runtime_status"
+        );
+        assert_eq!(
+            request.tools[0]
+                .annotations
+                .as_ref()
+                .unwrap()
+                .read_only_hint,
+            Some(true)
+        );
+        assert_eq!(request.generation_settings.temperature, 0.3);
+        assert_eq!(request.generation_settings.top_p, 0.9);
+        assert_eq!(request.generation_settings.top_k, 40);
+        assert_eq!(request.generation_settings.max_tokens, 333);
+        assert_eq!(request.grammar.as_ref().unwrap().kind, "json_schema");
+        assert_eq!(request.originating_plan.as_ref().unwrap().version, "ctx-1");
+    }
+
+    #[test]
+    fn uar_normalized_event_adapter_preserves_completed_tool_arguments() {
+        let mut adapter = UarNormalizedEventAdapter::new();
+        let mut output = Vec::new();
+        output.extend(adapter.ingest(&StreamEvent::ToolCallStarted {
+            id: "call-1".into(),
+            name: "docs_search".into(),
+        }));
+        output.extend(adapter.ingest(&StreamEvent::ToolCallDelta {
+            id: "call-1".into(),
+            delta: r#"{"q":"#.into(),
+        }));
+        output.extend(adapter.ingest(&StreamEvent::ToolCallDelta {
+            id: "call-1".into(),
+            delta: r#""uar"}"#.into(),
+        }));
+        output.extend(adapter.ingest(&StreamEvent::ToolCallComplete {
+            id: "call-1".into(),
+        }));
+
+        let complete = output
+            .iter()
+            .find(|event| {
+                event.get("type").and_then(serde_json::Value::as_str) == Some("tool_call.complete")
+            })
+            .expect("complete event exists");
+        assert_eq!(
+            complete
+                .pointer("/data/name")
+                .and_then(serde_json::Value::as_str),
+            Some("docs_search")
+        );
+        assert_eq!(
+            complete
+                .pointer("/data/arguments_json")
+                .and_then(serde_json::Value::as_str),
+            Some(r#"{"q":"uar"}"#)
+        );
+    }
+
+    #[test]
+    fn stream_events_become_uar_normalized_payloads() {
+        let text = stream_event_to_uar_normalized_payload(&StreamEvent::TextDelta {
+            index: 0,
+            delta: "hello".into(),
+        });
+        assert_eq!(
+            text.get("type").and_then(serde_json::Value::as_str),
+            Some("message.delta")
+        );
+        assert_eq!(
+            text.pointer("/data/text")
+                .and_then(serde_json::Value::as_str),
+            Some("hello")
+        );
+
+        let skill = stream_event_to_uar_normalized_payload(&StreamEvent::SkillActivation {
+            name: "meeting_summary".into(),
+            status: "running".into(),
+        });
+        assert_eq!(
+            skill.get("type").and_then(serde_json::Value::as_str),
+            Some("skill.activation")
+        );
+        assert_eq!(
+            skill
+                .pointer("/data/name")
+                .and_then(serde_json::Value::as_str),
+            Some("meeting_summary")
+        );
     }
 
     /// Tool arguments arrive as a stream of fragments that are individually invalid
