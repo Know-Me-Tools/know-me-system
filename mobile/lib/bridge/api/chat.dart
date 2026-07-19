@@ -54,6 +54,14 @@ Future<String> resolveRemoteContent({
 Future<String> memoryIngest({required String text}) =>
     GenUiCore.instance.api.crateApiChatMemoryIngest(text: text);
 
+/// Extract a document with xberg and ingest its normalized content into graph-RAG.
+Future<String> memoryIngestAttachment({required String path}) =>
+    GenUiCore.instance.api.crateApiChatMemoryIngestAttachment(path: path);
+
+/// Extract and ingest up to six documents with xberg, returning record ids in order.
+Future<List<String>> memoryIngestAttachments({required List<String> paths}) =>
+    GenUiCore.instance.api.crateApiChatMemoryIngestAttachments(paths: paths);
+
 /// Hybrid memory search (vector recall + graph expansion + BM25, RRF-fused in Rust).
 Future<List<MemoryHit>> memorySearch({required String query, required int k}) =>
     GenUiCore.instance.api.crateApiChatMemorySearch(query: query, k: k);

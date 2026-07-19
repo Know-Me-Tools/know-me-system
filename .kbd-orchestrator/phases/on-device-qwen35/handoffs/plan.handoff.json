@@ -1,0 +1,11 @@
+{
+  "stage": "plan",
+  "completedAt": "2026-07-18T20:26:17Z",
+  "outputs": [
+    "plan.md"
+  ],
+  "nextStage": "execute",
+  "summaryForNext": "Four ordered changes: establish verified accelerated Qwen3.5 text runtime first; then add vision and local tool execution; finally prove all paths on physical devices. Begin with qwen35-model-runtime and do not download unpinned artifacts.",
+  "skipped": false,
+  "skipReason": null
+}

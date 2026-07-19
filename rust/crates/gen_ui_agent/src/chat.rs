@@ -7,7 +7,7 @@
 //! adapting the response stream into ContentBlocks.
 use gen_ui_protocol::A2uiAdapter;
 use gen_ui_types::events::StreamEvent;
-use gen_ui_types::inference::{LocalModelSpec, SampleParams};
+use gen_ui_types::inference::{ImageInput, InferenceRequest, LocalModelSpec, SampleParams};
 use liter_llm::client::ClientBuilder;
 use liter_llm::types::chat::ChatCompletionRequest;
 use liter_llm::types::common::{
@@ -29,14 +29,14 @@ const LANE_LOCAL: &str = "local";
 /// default. Builds without a local engine still fall back to cloud visibly.
 const SETTING_ACTIVE_LANE: &str = "active_lane";
 const SETTING_THEME_MODE: &str = "theme_mode";
-const DEFAULT_LOCAL_MODEL: &str = "qwen2.5-0.5b-instruct-q4";
+const DEFAULT_LOCAL_MODEL: &str = "qwen3.5-4b-q4-k-m";
 
 /// Sampling defaults for the local lane, used when a model_pref's `params`
 /// object omits them. Mirrors the middle-of-the-road values the cloud providers
 /// apply server-side, so switching lanes doesn't silently change answer style.
 const DEFAULT_TEMPERATURE: f32 = 0.7;
 const DEFAULT_TOP_P: f32 = 0.95;
-const DEFAULT_MAX_TOKENS: u32 = 128;
+const DEFAULT_MAX_TOKENS: u32 = 1024;
 
 /// Request-scoped cloud credentials for anonymous hosted-web BYOK. The Axum
 /// leaf owns the lifetime: this value is never persisted or placed in global
@@ -64,7 +64,7 @@ pub async fn send(user_message: String, history: Vec<String>) -> Result<String, 
         .unwrap_or_else(default_lane);
 
     if lane == LANE_LOCAL {
-        return send_local(user_message, history, run_id).await;
+        return send_local(user_message, history, run_id, Vec::new()).await;
     }
 
     let pref = state::config()?
@@ -108,64 +108,151 @@ pub async fn send_with_attachments(
     }
     use base64::Engine as _;
 
+    let lane = state::config()?
+        .get_setting(SETTING_ACTIVE_LANE)
+        .await?
+        .and_then(|value| value.as_str().map(str::to_owned))
+        .unwrap_or_else(default_lane);
+    if lane == LANE_LOCAL {
+        let mut local_prompt = user_message.clone();
+        local_prompt.push_str("\n\nAttached files (processed by xberg):\n");
+        let mut images = Vec::new();
+        for path in attachment_paths.into_iter().take(6) {
+            let attachment = read_attachment(&path).await?;
+            let processed = gen_ui_document::process_bytes(
+                attachment.file_name.clone(),
+                attachment.bytes.clone(),
+            )
+            .await
+            .map_err(|error| {
+                AgentError::Attachment(format!(
+                    "xberg could not process '{}': {error}",
+                    attachment.file_name
+                ))
+            })?;
+            local_prompt.push_str(&format!(
+                "\n### {} ({})\n{}\n",
+                processed.file_name, processed.mime_type, processed.text
+            ));
+
+            // iOS and desktop retain the existing multimodal image path, but xberg
+            // still runs first so OCR/metadata is available in the text context.
+            // Android's Qwen3 model is text-only and never receives image tensors.
+            if attachment.is_image && attachment.extension != "svg" && !cfg!(target_os = "android")
+            {
+                images.push(ImageInput {
+                    file_name: attachment.file_name,
+                    mime_type: attachment.mime,
+                    bytes: attachment.bytes,
+                });
+            }
+        }
+        return send_local(
+            local_prompt,
+            history,
+            uuid::Uuid::new_v4().to_string(),
+            images,
+        )
+        .await;
+    }
+
     let mut local_fallback = user_message.clone();
-    local_fallback.push_str("\n\nAttached files:\n");
+    local_fallback.push_str("\n\nAttached files (xberg extraction):\n");
     let mut parts = vec![ContentPart::Text { text: user_message }];
     for path in attachment_paths.into_iter().take(6) {
-        let metadata = tokio::fs::metadata(&path).await.map_err(|error| {
-            AgentError::Attachment(format!("cannot open selected file: {error}"))
-        })?;
-        if !metadata.is_file() || metadata.len() > 25 * 1024 * 1024 {
-            return Err(AgentError::Attachment(
-                "selected file is not a regular file or exceeds 25 MB".into(),
-            ));
+        let attachment = read_attachment(&path).await?;
+        local_fallback.push_str(&format!(
+            "\n- {} ({} bytes)\n",
+            attachment.file_name,
+            attachment.bytes.len()
+        ));
+        match gen_ui_document::process_bytes(attachment.file_name.clone(), attachment.bytes.clone())
+            .await
+        {
+            Ok(processed) => {
+                local_fallback.push_str(&format!("```text\n{}\n```\n", processed.text));
+                parts.push(ContentPart::Text {
+                    text: format!(
+                        "\nExtracted content from {}:\n{}",
+                        processed.file_name, processed.text
+                    ),
+                });
+            }
+            Err(error) => {
+                // Cloud vision/document providers may understand a binary even
+                // when the on-device xberg feature set does not. Preserve the
+                // original part and make the degradation visible in the prompt.
+                local_fallback.push_str(&format!("[xberg extraction unavailable: {error}]\n"));
+            }
         }
-        let file_name = std::path::Path::new(&path)
-            .file_name()
-            .and_then(std::ffi::OsStr::to_str)
-            .unwrap_or("attachment");
-        let extension = std::path::Path::new(&path)
-            .extension()
-            .and_then(std::ffi::OsStr::to_str)
-            .unwrap_or_default()
-            .to_ascii_lowercase();
-        let bytes = tokio::fs::read(&path).await.map_err(|error| {
-            AgentError::Attachment(format!("cannot read selected file: {error}"))
-        })?;
-        let (mime, is_image, is_document) = attachment_kind(&extension);
-        local_fallback.push_str(&format!("- {file_name} ({} bytes)", metadata.len()));
-        if matches!(extension.as_str(), "txt" | "md" | "json" | "csv") {
-            let bounded = &bytes[..bytes.len().min(256 * 1024)];
-            local_fallback.push_str("\n```text\n");
-            local_fallback.push_str(&String::from_utf8_lossy(bounded));
-            local_fallback.push_str("\n```\n");
-        } else {
-            local_fallback.push_str(" [binary attachment]\n");
-        }
-        let encoded = base64::engine::general_purpose::STANDARD.encode(&bytes);
-        if is_image {
+        let encoded = base64::engine::general_purpose::STANDARD.encode(&attachment.bytes);
+        if attachment.is_image {
             parts.push(ContentPart::ImageUrl {
                 image_url: ImageUrl {
-                    url: format!("data:{mime};base64,{encoded}"),
+                    url: format!("data:{};base64,{encoded}", attachment.mime),
                     detail: Some(ImageDetail::Auto),
                 },
             });
-        } else if is_document {
+        } else if attachment.is_document {
             parts.push(ContentPart::Document {
                 document: DocumentContent {
                     data: encoded,
-                    media_type: mime.into(),
+                    media_type: attachment.mime.into(),
                 },
             });
         } else {
             parts.push(ContentPart::Text {
                 text: format!(
-                    "\nAttachment {file_name} has MIME type {mime}; the selected model does not accept this binary format directly."
+                    "\nAttachment {} has MIME type {}; the selected model does not accept this binary format directly.",
+                    attachment.file_name, attachment.mime
                 ),
             });
         }
     }
     send_content(UserContent::Parts(parts), local_fallback, history).await
+}
+
+struct AttachmentData {
+    file_name: String,
+    extension: String,
+    mime: String,
+    is_image: bool,
+    is_document: bool,
+    bytes: Vec<u8>,
+}
+
+async fn read_attachment(path: &str) -> Result<AttachmentData, AgentError> {
+    let metadata = tokio::fs::metadata(path)
+        .await
+        .map_err(|error| AgentError::Attachment(format!("cannot open selected file: {error}")))?;
+    if !metadata.is_file() || metadata.len() > gen_ui_document::MAX_INPUT_BYTES {
+        return Err(AgentError::Attachment(
+            "selected file is not a regular file or exceeds 25 MB".into(),
+        ));
+    }
+    let path_ref = std::path::Path::new(path);
+    let file_name = path_ref
+        .file_name()
+        .and_then(std::ffi::OsStr::to_str)
+        .unwrap_or("attachment")
+        .to_owned();
+    let extension = path_ref
+        .extension()
+        .and_then(std::ffi::OsStr::to_str)
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let bytes = tokio::fs::read(path)
+        .await
+        .map_err(|error| AgentError::Attachment(format!("cannot read selected file: {error}")))?;
+    let (mime, is_image, is_document) = attachment_kind(&extension);
+    Ok(AttachmentData {
+        file_name,
+        extension,
+        mime: mime.to_owned(),
+        is_image,
+        is_document,
+        bytes,
+    })
 }
 
 fn attachment_kind(extension: &str) -> (&'static str, bool, bool) {
@@ -186,6 +273,21 @@ fn attachment_kind(extension: &str) -> (&'static str, bool, bool) {
             false,
             true,
         ),
+        "xls" => ("application/vnd.ms-excel", false, true),
+        "xlsx" => (
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            false,
+            true,
+        ),
+        "ppt" => ("application/vnd.ms-powerpoint", false, true),
+        "pptx" => (
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            false,
+            true,
+        ),
+        "html" | "htm" => ("text/html", false, true),
+        "xml" => ("application/xml", false, true),
+        "zip" => ("application/zip", false, true),
         "mp4" => ("video/mp4", false, false),
         "webm" => ("video/webm", false, false),
         _ => ("application/octet-stream", false, false),
@@ -204,7 +306,7 @@ async fn send_content(
         .and_then(|value| value.as_str().map(str::to_owned))
         .unwrap_or_else(default_lane);
     if lane == LANE_LOCAL {
-        return send_local(local_fallback, history, run_id).await;
+        return send_local(local_fallback, history, run_id, Vec::new()).await;
     }
     let pref = state::config()?
         .get_model_pref(SURFACE_CHAT, LANE_CLOUD)
@@ -411,6 +513,7 @@ async fn send_local(
     user_message: String,
     history: Vec<String>,
     run_id: String,
+    images: Vec<ImageInput>,
 ) -> Result<String, AgentError> {
     let engine = state::inference()?;
 
@@ -450,7 +553,10 @@ async fn send_local(
         .await
         .map_err(AgentError::LocalInference)?;
 
-    let prompt = build_local_prompt(&history, &user_message);
+    let request = InferenceRequest {
+        prompt: build_local_prompt(&history, &user_message),
+        images,
+    };
     let engine = engine.clone();
     let run_id_for_task = run_id.clone();
     gen_ui_runtime::spawn(async move {
@@ -459,7 +565,7 @@ async fn send_local(
             state::publish(event);
         }
 
-        let stream = match engine.generate(&prompt, &params).await {
+        let stream = match engine.generate_request(&request, &params).await {
             Ok(s) => s,
             Err(e) => {
                 for event in adapter.ingest(&StreamEvent::Error {

@@ -83,7 +83,9 @@ flutter_packages/*/build/
 
 # Native mobile toolchains and signing material
 **/.gradle/
+**/.kotlin/
 **/.cxx/
+.kbd-orchestrator/**/*.lock
 **/local.properties
 **/key.properties
 **/*.jks

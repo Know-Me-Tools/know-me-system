@@ -74,6 +74,20 @@ pub async fn memory_ingest(text: String) -> Result<String, CoreError> {
     gen_ui_agent::memory::ingest(text).await.map_err(Into::into)
 }
 
+/// Extract a document with xberg and ingest its normalized content into graph-RAG.
+pub async fn memory_ingest_attachment(path: String) -> Result<String, CoreError> {
+    gen_ui_agent::memory::ingest_attachment(path)
+        .await
+        .map_err(Into::into)
+}
+
+/// Extract and ingest up to six documents with xberg, returning record ids in order.
+pub async fn memory_ingest_attachments(paths: Vec<String>) -> Result<Vec<String>, CoreError> {
+    gen_ui_agent::memory::ingest_attachments(paths)
+        .await
+        .map_err(Into::into)
+}
+
 /// Hybrid memory search (vector recall + graph expansion + BM25, RRF-fused in Rust).
 pub async fn memory_search(query: String, k: u32) -> Result<Vec<MemoryHit>, CoreError> {
     gen_ui_agent::memory::search(query, k)

@@ -1,0 +1,12 @@
+{
+  "stage": "execute",
+  "completedAt": "2026-07-18T20:32:54Z",
+  "outputs": [
+    ".kbd-orchestrator/phases/model-runtime-per-device/execution.md",
+    ".kbd-orchestrator/phases/model-runtime-per-device/progress.json"
+  ],
+  "nextStage": "reflect",
+  "summaryForNext": "OpenSpec is selected through the KBD apply driver. qwen35-model-runtime is active first; vision and tools follow in parallel, with physical-device proof last.",
+  "skipped": false,
+  "skipReason": null
+}

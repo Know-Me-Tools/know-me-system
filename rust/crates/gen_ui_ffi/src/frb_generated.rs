@@ -43,7 +43,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 899685981;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -893984489;
 
 // Section: executor
 
@@ -1163,6 +1163,80 @@ fn wire__crate__api__chat__memory_ingest_impl(
         },
     )
 }
+fn wire__crate__api__chat__memory_ingest_attachment_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "memory_ingest_attachment",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_path = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, CoreError>(
+                    (move || async move {
+                        let output_ok =
+                            crate::api::chat::memory_ingest_attachment(api_path).await?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__chat__memory_ingest_attachments_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "memory_ingest_attachments",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_paths = <Vec<String>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, CoreError>(
+                    (move || async move {
+                        let output_ok =
+                            crate::api::chat::memory_ingest_attachments(api_paths).await?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__chat__memory_search_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -2065,15 +2139,24 @@ fn pde_ffi_dispatcher_primary_impl(
         23 => wire__crate__api__init_core_impl(port, ptr, rust_vec_len, data_len),
         24 => wire__crate__api__boot__load_seeds_impl(port, ptr, rust_vec_len, data_len),
         25 => wire__crate__api__chat__memory_ingest_impl(port, ptr, rust_vec_len, data_len),
-        26 => wire__crate__api__chat__memory_search_impl(port, ptr, rust_vec_len, data_len),
-        27 => {
+        26 => {
+            wire__crate__api__chat__memory_ingest_attachment_impl(port, ptr, rust_vec_len, data_len)
+        }
+        27 => wire__crate__api__chat__memory_ingest_attachments_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        28 => wire__crate__api__chat__memory_search_impl(port, ptr, rust_vec_len, data_len),
+        29 => {
             wire__crate__api__chat__resolve_remote_content_impl(port, ptr, rust_vec_len, data_len)
         }
-        28 => wire__crate__api__boot__run_migrations_impl(port, ptr, rust_vec_len, data_len),
-        29 => wire__gen_ui_db_graph__search_mode_default_impl(port, ptr, rust_vec_len, data_len),
-        30 => wire__crate__api__chat__set_theme_mode_impl(port, ptr, rust_vec_len, data_len),
-        31 => wire__crate__api__streams__sync_status_impl(port, ptr, rust_vec_len, data_len),
-        32 => wire__crate__api__chat__theme_mode_impl(port, ptr, rust_vec_len, data_len),
+        30 => wire__crate__api__boot__run_migrations_impl(port, ptr, rust_vec_len, data_len),
+        31 => wire__gen_ui_db_graph__search_mode_default_impl(port, ptr, rust_vec_len, data_len),
+        32 => wire__crate__api__chat__set_theme_mode_impl(port, ptr, rust_vec_len, data_len),
+        33 => wire__crate__api__streams__sync_status_impl(port, ptr, rust_vec_len, data_len),
+        34 => wire__crate__api__chat__theme_mode_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }

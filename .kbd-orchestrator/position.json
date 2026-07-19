@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "1",
+  "updatedAt": "2026-07-18T21:18:36Z",
+  "cursor": [
+    "model-runtime-per-device",
+    "qwen35-mobile-vision"
+  ],
+  "root": {
+    "type": "phase",
+    "id": "model-runtime-per-device",
+    "status": "implementation_ready",
+    "progress": {
+      "done": 1,
+      "total": 4
+    },
+    "children": [
+      {
+        "type": "change",
+        "id": "qwen35-mobile-vision",
+        "status": "PENDING",
+        "progress": {
+          "done": 0,
+          "total": 0
+        }
+      }
+    ],
+    "annotations": []
+  }
+}

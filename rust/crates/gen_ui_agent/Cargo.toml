@@ -9,6 +9,7 @@ license.workspace = true
 gen_ui_types    = { path = "../gen_ui_types" }
 gen_ui_runtime  = { path = "../gen_ui_runtime" }
 gen_ui_protocol = { path = "../gen_ui_protocol" }
+gen_ui_document = { path = "../gen_ui_document" }
 # gen_ui_agent is native-only (consumed by gen_ui_ffi mobile + tauri-plugin-gen-ui
 # desktop, never gen_ui_wasm), so native-http is unconditional here.
 gen_ui_client   = { path = "../gen_ui_client", default-features = false, features = ["native-http"] }

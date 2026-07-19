@@ -1,0 +1,45 @@
+{
+  "phase": "on-device-qwen35",
+  "parentPhase": null,
+  "childPhases": [],
+  "childPointer": null,
+  "assessment_complete": true,
+  "plan_complete": true,
+  "execute_complete": false,
+  "reflect_complete": false,
+  "implementation_total": 4,
+  "implementation_completed": 0,
+  "changes_total": 4,
+  "changes_completed": 0,
+  "completion": {
+    "primaryCounter": "implementation",
+    "implementation": {
+      "completed": 0,
+      "total": 4,
+      "status": "PENDING"
+    },
+    "evidence": {
+      "status": "NOT_TRACKED",
+      "summary": null,
+      "blockers": []
+    },
+    "certification": {
+      "status": "NOT_TRACKED",
+      "summary": null,
+      "blockers": []
+    },
+    "publication": {
+      "status": "NOT_TRACKED",
+      "summary": null,
+      "blockers": []
+    }
+  },
+  "completed_changes": [],
+  "active_change": "qwen35-model-runtime",
+  "blocked_changes": [],
+  "sourceTool": "unknown",
+  "createdBy": "kbd-new-phase",
+  "updatedAt": "2026-07-18T20:23:58Z",
+  "last_updated_by": "codex",
+  "last_updated": "2026-07-18T20:23:58Z"
+}

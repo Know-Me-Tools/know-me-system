@@ -23,6 +23,37 @@ pub async fn ingest(text: String) -> Result<String, AgentError> {
         .map_err(|e| AgentError::Config(e.to_string()))
 }
 
+/// Extract a user-selected document with xberg, then ingest the normalized text
+/// into graph-RAG. Chat and RAG intentionally share the same processor so a file
+/// cannot be readable in one path and opaque in the other.
+pub async fn ingest_attachment(path: String) -> Result<String, AgentError> {
+    let document = gen_ui_document::process_path(&path)
+        .await
+        .map_err(|error| {
+            AgentError::Attachment(format!("xberg could not process document: {error}"))
+        })?;
+    let text = format!("# {}\n\n{}", document.file_name, document.text);
+    let store = state::memory()?;
+    store
+        .memory_ingest(MemoryRecord {
+            id: None,
+            text,
+            kind: "document".to_string(),
+            entity: None,
+        })
+        .await
+        .map_err(|e| AgentError::Config(e.to_string()))
+}
+
+/// Extract and ingest multiple documents in order, returning their record ids.
+pub async fn ingest_attachments(paths: Vec<String>) -> Result<Vec<String>, AgentError> {
+    let mut ids = Vec::with_capacity(paths.len().min(6));
+    for path in paths.into_iter().take(6) {
+        ids.push(ingest_attachment(path).await?);
+    }
+    Ok(ids)
+}
+
 /// Hybrid semantic + lexical search over ingested memory, RRF-fused in the DB.
 pub async fn search(query: String, k: u32) -> Result<Vec<MemoryHit>, AgentError> {
     search_with(query, k, SearchMode::Hybrid).await

@@ -104,6 +104,14 @@ Future<void> entityDelete(String entityType, String id) =>
 /// memory_ingest(text) -> id. Embeds on-device (fastembed) + upserts in Rust.
 Future<String> memoryIngest(String text) => ffi.memoryIngest(text: text);
 
+/// Extract a document with xberg, then embed and store its normalized content.
+Future<String> memoryIngestAttachment(String path) =>
+    ffi.memoryIngestAttachment(path: path);
+
+/// Extract and ingest up to six documents with xberg, returning record ids.
+Future<List<String>> memoryIngestAttachments(List<String> paths) =>
+    ffi.memoryIngestAttachments(paths: paths);
+
 /// memory_search(query, k) -> ranked hits (hybrid vector+graph+BM25 fusion).
 Future<List<MemoryHit>> memorySearch(String query, int k) =>
     ffi.memorySearch(query: query, k: k);

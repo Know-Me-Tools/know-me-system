@@ -1,0 +1,35 @@
+[package]
+name = "gen_ui_document"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+mime_guess.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["fs"] }
+xberg = { version = "1.0.0-rc.17", default-features = false, features = [
+    "pdf",
+    "excel",
+    "office",
+    "email",
+    "html",
+    "xml",
+    "archives",
+    "svg",
+    "analysis",
+    "tree-sitter",
+    "api-types",
+    "tokio-runtime",
+] }
+
+# xberg's bundled Tesseract build does not yet recognize apple-ios and emits
+# macOS objects for that target. Keep the complete OCR feature set on Android
+# and desktop, while the iOS lane uses the same xberg extraction engine for
+# every document format that does not require the incompatible native OCR lib.
+[target.'cfg(not(target_os = "ios"))'.dependencies]
+xberg = { version = "1.0.0-rc.17", default-features = false, features = [
+    "ocr",
+    "bundle-tessdata-eng",
+] }

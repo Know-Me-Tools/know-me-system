@@ -1,0 +1,11 @@
+{
+  "stage": "plan",
+  "completedAt": "2026-07-18T20:32:01Z",
+  "outputs": [
+    ".kbd-orchestrator/phases/model-runtime-per-device/plan.md"
+  ],
+  "nextStage": "execute",
+  "summaryForNext": "Four ordered OpenSpec slices are ready: runtime catalog first, then vision and bounded local tools in parallel, then physical-device proof. The first implementation change is qwen35-model-runtime; Gemma/QNN is explicitly deferred.",
+  "skipped": false,
+  "skipReason": null
+}

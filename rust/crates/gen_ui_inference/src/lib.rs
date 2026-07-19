@@ -23,4 +23,7 @@ pub use mistral::MistralEngine;
 pub mod llama;
 
 #[cfg(feature = "local-llama")]
+pub mod catalog;
+
+#[cfg(feature = "local-llama")]
 pub use llama::LlamaCppEngine;

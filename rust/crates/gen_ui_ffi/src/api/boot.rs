@@ -53,23 +53,30 @@ pub async fn run_migrations(data_dir: String) -> Result<(), CoreError> {
     .map_err(|e| boot_fail("graph store open", e))?;
     let store = Arc::new(store);
 
-    // The mobile engine ships the smaller Qwen catalog entry. Persist an
-    // explicit preference so the agent never guesses the desktop model id.
-    if store
+    // Resolve the default entirely in Rust so Flutter never contains device
+    // or model-selection logic. Existing user-selected preferences are kept;
+    // only the old bundled Qwen2.5 default is migrated.
+    let default_model = gen_ui_inference::catalog::current_mobile_platform()
+        .map(|platform| platform.default_model().model_id)
+        .unwrap_or(gen_ui_inference::catalog::ANDROID_QWEN35_4B_ID)
+        .to_string();
+    let existing_pref = store
         .get_model_pref("chat", "local")
         .await
-        .map_err(|e| boot_fail("local model preference read", e))?
-        .is_none()
-    {
+        .map_err(|e| boot_fail("local model preference read", e))?;
+    let migrate_legacy = existing_pref
+        .as_ref()
+        .is_none_or(|pref| pref.model_id == "qwen2.5-0.5b-instruct-q4");
+    if migrate_legacy {
         store
             .upsert_model_pref(&gen_ui_db_graph::ModelPref {
                 surface: "chat".to_string(),
                 lane: "local".to_string(),
                 provider_id: None,
-                model_id: "qwen2.5-0.5b-instruct-q4".to_string(),
+                model_id: default_model,
                 params: serde_json::json!({
-                    "context_len": 2048,
-                    "max_tokens": 128,
+                    "context_len": 8192,
+                    "max_tokens": 1024,
                     "temperature": 0.7,
                     "top_p": 0.95
                 }),

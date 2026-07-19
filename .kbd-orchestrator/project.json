@@ -124,5 +124,7 @@
         "write_access": true
       }
     ]
-  }
+  },
+  "activePhase": "model-runtime-per-device",
+  "updatedAt": "2026-07-18T20:28:11Z"
 }

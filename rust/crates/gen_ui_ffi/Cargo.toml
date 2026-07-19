@@ -32,7 +32,6 @@ gen_ui_client   = { path = "../gen_ui_client", default-features = false, feature
 # i686-linux-android (E0425 UNWIND_DATA_REG, unsupported on 32-bit x86).
 gen_ui_db       = { path = "../gen_ui_db", features = ["sqlite"] }
 gen_ui_db_graph = { path = "../gen_ui_db_graph", features = ["embed-native"] }
-gen_ui_inference = { path = "../gen_ui_inference", features = ["local-llama"] }
 liter-llm.workspace = true
 flutter_rust_bridge = "=2.12.0"
 anyhow.workspace = true
@@ -49,8 +48,13 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }
 
 [target.'cfg(target_os = "android")'.dependencies]
 android_logger = "0.14"
+gen_ui_inference = { path = "../gen_ui_inference", features = ["local-llama-vulkan", "local-llama-mtmd"] }
 [target.'cfg(target_os = "ios")'.dependencies]
 oslog = "0.2"
+gen_ui_inference = { path = "../gen_ui_inference", features = ["local-llama-metal", "local-llama-mtmd"] }
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+gen_ui_inference = { path = "../gen_ui_inference", features = ["local-llama"] }
 
 # gen_ui_audio (Scribe / on-device transcription via whisper-rs) is off on
 # Android: whisper-rs-sys has an unresolved CMake/NDK ABI-detection bug

@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "ai.prometheusags.mobile"
+    namespace = "tools.knowme.knowme"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -15,8 +15,7 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "ai.prometheusags.mobile"
+        applicationId = "tools.knowme.knowme"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         // KnowMe targets current-generation phones. Android 10+ lets the app

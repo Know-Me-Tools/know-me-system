@@ -1,0 +1,11 @@
+{
+  "stage": "assess",
+  "completedAt": "2026-07-18T20:23:24Z",
+  "outputs": [
+    "assessment.md"
+  ],
+  "nextStage": "analyze",
+  "summaryForNext": "The current Rust llama.cpp lane is healthy but limited to CPU/text Qwen2.5-0.5B, while per-platform acceleration, Qwen3.5 artifacts, resumable downloads, multimodal contracts, and local tool execution are missing. Plan should deliver verified text inference first, then projector/image support and the tool loop, with device gates and CPU fallback.",
+  "skipped": false,
+  "skipReason": null
+}

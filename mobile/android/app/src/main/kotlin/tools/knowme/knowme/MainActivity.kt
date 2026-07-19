@@ -1,4 +1,4 @@
-package ai.prometheusags.mobile
+package tools.knowme.knowme
 
 import io.flutter.embedding.android.FlutterActivity
 
