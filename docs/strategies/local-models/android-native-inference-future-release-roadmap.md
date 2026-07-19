@@ -85,10 +85,16 @@ vendor library dependency.
 ## Release R+2 — AgentSkills/process hardening
 
 - Treat real AgentSkills/process activation as a future release until the mobile
-  UAR registry exists behind the Rust FFI boundary. The current Android
-  LiteRT-LM recovery certifies the `SkillActivation → ContentBlock::Skill → UI
-  persistence` contract through the trusted-local MCP diagnostics namespace; it
-  does not certify the not-yet-wired UAR registry.
+  UAR embedded runtime/kernel is wired behind the Rust FFI boundary. The current
+  Android LiteRT-LM recovery certifies the `SkillActivation →
+  ContentBlock::Skill → UI persistence` contract through the trusted-local MCP
+  diagnostics namespace; it does not certify a UAR-routed AgentSkill yet.
+- Treat UAR as the owner of real agent definitions/execution, skill
+  definitions/storage/routing, A2UI component registry management, and general
+  LLM/provider access. KnowMe's Android local model work becomes a UAR local
+  provider/backend, not a separate agent runtime.
+- Mobile uses UAR as an embedded library/kernel. Web and desktop use UAR over
+  HTTP/service when it runs as a sidecar or cloud service.
 - Author an `android-native-inference` skill that forces agents to apply the
   six-gate model before editing Android native runtime code.
 - Author a `device-verified-completion` skill whose script owns install,

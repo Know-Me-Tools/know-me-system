@@ -5,6 +5,194 @@ use gen_ui_types::content_block::ContentBlock;
 use gen_ui_types::events::{A2uiEvent, AguiEvent, StreamEvent};
 use gen_ui_types::lifecycle::{RunError, RunPhase};
 
+/// Normalize a UAR `uar.agui/1` JSON event into KnowMe's provider-neutral
+/// `StreamEvent` contract.
+///
+/// This is intentionally narrow and side-effect free: runtime execution still
+/// belongs behind the future UAR facade, but the projection seam can be tested
+/// offline now. Unknown UAR payloads are preserved as `StreamEvent::Custom`
+/// rather than dropped.
+pub fn normalize_uar_agui_event(payload: &serde_json::Value) -> StreamEvent {
+    let event_type = json_string(payload, &["type"]).unwrap_or("CUSTOM");
+    match event_type {
+        "RUN_STARTED" => StreamEvent::MessageStart,
+        "TEXT_MESSAGE_CONTENT" => StreamEvent::TextDelta {
+            index: json_u32(payload, &["index"]).unwrap_or(0),
+            delta: first_json_string(
+                payload,
+                &[
+                    &["delta"][..],
+                    &["content"][..],
+                    &["text"][..],
+                    &["message", "content"][..],
+                ],
+            )
+            .unwrap_or_default()
+            .to_owned(),
+        },
+        "REASONING_MESSAGE_CONTENT" => StreamEvent::ThinkingDelta {
+            index: json_u32(payload, &["index"]).unwrap_or(0),
+            delta: first_json_string(
+                payload,
+                &[
+                    &["delta"][..],
+                    &["content"][..],
+                    &["text"][..],
+                    &["reasoning"][..],
+                ],
+            )
+            .unwrap_or_default()
+            .to_owned(),
+        },
+        "TOOL_CALL_START" => StreamEvent::ToolCallStarted {
+            id: first_json_string(
+                payload,
+                &[&["toolCallId"][..], &["id"][..], &["tool_call_id"][..]],
+            )
+            .unwrap_or("unknown-tool-call")
+            .to_owned(),
+            name: first_json_string(
+                payload,
+                &[&["name"][..], &["toolName"][..], &["tool", "name"][..]],
+            )
+            .unwrap_or("unknown_tool")
+            .to_owned(),
+        },
+        "TOOL_CALL_ARGS" => StreamEvent::ToolCallDelta {
+            id: first_json_string(
+                payload,
+                &[&["toolCallId"][..], &["id"][..], &["tool_call_id"][..]],
+            )
+            .unwrap_or("unknown-tool-call")
+            .to_owned(),
+            delta: first_json_string(
+                payload,
+                &[
+                    &["delta"][..],
+                    &["args"][..],
+                    &["arguments"][..],
+                    &["argumentsDelta"][..],
+                ],
+            )
+            .map(str::to_owned)
+            .unwrap_or_else(|| {
+                payload
+                    .get("arguments")
+                    .map(json_payload_to_string)
+                    .unwrap_or_default()
+            }),
+        },
+        "TOOL_CALL_END" => StreamEvent::ToolCallComplete {
+            id: first_json_string(
+                payload,
+                &[&["toolCallId"][..], &["id"][..], &["tool_call_id"][..]],
+            )
+            .unwrap_or("unknown-tool-call")
+            .to_owned(),
+        },
+        "TOOL_CALL_RESULT" => StreamEvent::ToolResult {
+            tool_use_id: first_json_string(
+                payload,
+                &[&["toolCallId"][..], &["id"][..], &["tool_call_id"][..]],
+            )
+            .unwrap_or("unknown-tool-call")
+            .to_owned(),
+            output_json: payload
+                .get("result")
+                .or_else(|| payload.get("output"))
+                .or_else(|| payload.get("content"))
+                .map(json_payload_to_string)
+                .unwrap_or_else(|| "{}".to_owned()),
+            is_error: json_bool(payload, &["isError"])
+                .or_else(|| json_bool(payload, &["is_error"]))
+                .unwrap_or(false),
+        },
+        "CUSTOM" => normalize_uar_custom_event(payload),
+        "RUN_FINISHED" => StreamEvent::Done,
+        "RUN_ERROR" => StreamEvent::Error {
+            message: first_json_string(
+                payload,
+                &[
+                    &["message"][..],
+                    &["error", "message"][..],
+                    &["value", "message"][..],
+                ],
+            )
+            .unwrap_or("UAR run failed")
+            .to_owned(),
+        },
+        _ => StreamEvent::Custom {
+            source: "uar".into(),
+            event_name: event_type.to_owned(),
+            payload: payload.clone(),
+        },
+    }
+}
+
+fn normalize_uar_custom_event(payload: &serde_json::Value) -> StreamEvent {
+    let name = json_string(payload, &["name"]).unwrap_or("CUSTOM");
+    if name == "uar.skill.activated" {
+        let value = payload.get("value").unwrap_or(payload);
+        return StreamEvent::SkillActivation {
+            name: first_json_string(
+                value,
+                &[
+                    &["skill", "id"][..],
+                    &["skill", "name"][..],
+                    &["skill"][..],
+                    &["name"][..],
+                ],
+            )
+            .unwrap_or("unknown_skill")
+            .to_owned(),
+            status: first_json_string(value, &[&["status"][..], &["phase"][..]])
+                .unwrap_or("activated")
+                .to_owned(),
+        };
+    }
+
+    StreamEvent::Custom {
+        source: "uar".into(),
+        event_name: name.to_owned(),
+        payload: payload.clone(),
+    }
+}
+
+fn json_string<'a>(value: &'a serde_json::Value, path: &[&str]) -> Option<&'a str> {
+    let mut cursor = value;
+    for segment in path {
+        cursor = cursor.get(*segment)?;
+    }
+    cursor.as_str()
+}
+
+fn first_json_string<'a>(value: &'a serde_json::Value, paths: &[&[&str]]) -> Option<&'a str> {
+    paths.iter().find_map(|path| json_string(value, path))
+}
+
+fn json_bool(value: &serde_json::Value, path: &[&str]) -> Option<bool> {
+    let mut cursor = value;
+    for segment in path {
+        cursor = cursor.get(*segment)?;
+    }
+    cursor.as_bool()
+}
+
+fn json_u32(value: &serde_json::Value, path: &[&str]) -> Option<u32> {
+    let mut cursor = value;
+    for segment in path {
+        cursor = cursor.get(*segment)?;
+    }
+    cursor.as_u64().and_then(|value| u32::try_from(value).ok())
+}
+
+fn json_payload_to_string(value: &serde_json::Value) -> String {
+    match value {
+        serde_json::Value::String(value) => value.clone(),
+        other => other.to_string(),
+    }
+}
+
 /// StreamEvent -> A2uiEvent(s). Feature-complete adapter to be filled per the
 /// ContentBlock contract; C-001 lands the seam + a working text path.
 #[derive(Default)]
@@ -548,6 +736,97 @@ mod tests {
             A2uiEvent::Block {
                 block: ContentBlock::Artifact { kind, content, .. }, ..
             } if kind == "provider_event" && content.contains("new_chunk")
+        ));
+    }
+
+    #[test]
+    fn uar_agui_reasoning_maps_to_thinking_block() {
+        let event = normalize_uar_agui_event(&serde_json::json!({
+            "type": "REASONING_MESSAGE_CONTENT",
+            "profile": "uar.agui/1",
+            "runId": "run-1",
+            "sequence": 2,
+            "delta": "visible reasoning"
+        }));
+        let mut adapter = A2uiAdapter::new("run-1");
+        let output = adapter.ingest(&event);
+        assert!(matches!(
+            &output[0],
+            A2uiEvent::Block { block: ContentBlock::Thinking { text }, .. }
+                if text == "visible reasoning"
+        ));
+    }
+
+    #[test]
+    fn uar_skill_activation_maps_to_skill_block() {
+        let event = normalize_uar_agui_event(&serde_json::json!({
+            "type": "CUSTOM",
+            "profile": "uar.agui/1",
+            "name": "uar.skill.activated",
+            "value": {
+                "skill": {"id": "office_writer", "name": "Office Writer"},
+                "selectionMethod": "routing"
+            },
+            "runId": "run-1",
+            "sequence": 4
+        }));
+        let mut adapter = A2uiAdapter::new("run-1");
+        let output = adapter.ingest(&event);
+        assert!(matches!(
+            &output[0],
+            A2uiEvent::Block { block: ContentBlock::Skill { name, status }, .. }
+                if name == "office_writer" && status == "activated"
+        ));
+    }
+
+    #[test]
+    fn uar_tool_lifecycle_maps_to_tool_use_block() {
+        let events = [
+            normalize_uar_agui_event(&serde_json::json!({
+                "type": "TOOL_CALL_START",
+                "toolCallId": "call-1",
+                "name": "calendar.find"
+            })),
+            normalize_uar_agui_event(&serde_json::json!({
+                "type": "TOOL_CALL_ARGS",
+                "toolCallId": "call-1",
+                "delta": "{\"query\":\"tomorrow\"}"
+            })),
+            normalize_uar_agui_event(&serde_json::json!({
+                "type": "TOOL_CALL_END",
+                "toolCallId": "call-1"
+            })),
+        ];
+        let mut adapter = A2uiAdapter::new("run-1");
+        let mut output = Vec::new();
+        for event in events {
+            output.extend(adapter.ingest(&event));
+        }
+        assert!(matches!(
+            &output[0],
+            A2uiEvent::Block {
+                block: ContentBlock::ToolUse { id, name, input_json }, ..
+            } if id == "call-1" && name == "calendar.find" && input_json == "{\"query\":\"tomorrow\"}"
+        ));
+    }
+
+    #[test]
+    fn unknown_uar_custom_events_are_preserved_as_artifacts() {
+        let event = normalize_uar_agui_event(&serde_json::json!({
+            "type": "CUSTOM",
+            "profile": "uar.agui/1",
+            "name": "uar.future.event",
+            "value": {"still": "kept"}
+        }));
+        let mut adapter = A2uiAdapter::new("run-1");
+        let output = adapter.ingest(&event);
+        assert!(matches!(
+            &output[0],
+            A2uiEvent::Block {
+                block: ContentBlock::Artifact { kind, content, .. }, ..
+            } if kind == "provider_event"
+                && content.contains("uar.future.event")
+                && content.contains("still")
         ));
     }
 }

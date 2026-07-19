@@ -4,10 +4,11 @@ Date: 2026-07-19
 
 This roadmap exists because the current Android LiteRT-LM recovery path can
 certify `SkillActivation` rendering and persistence for trusted-local MCP tool
-namespaces, but the mobile product does not yet contain a UAR-backed
-AgentSkills/process runtime. The mobile skills feature README places that
-registry integration in M5/M6. Until that runtime exists, claiming physical
-Android proof for real AgentSkills/process activations would be false.
+namespaces, but real agent/skill definition and execution must come from
+Universal Agent Runtime (UAR). UAR has now been added as a pinned submodule so
+KnowMe can integrate and modify it as needed. Until the mobile app actually
+routes through UAR's embedded runtime/kernel, claiming physical Android proof
+for real AgentSkills/process activations would be false.
 
 ## Current certified baseline
 
@@ -20,12 +21,19 @@ Android proof for real AgentSkills/process activations would be false.
   - `Skill knowme_diagnostics, running`
   - `Skill knowme_diagnostics, complete`
 - This proves the cross-platform event/block/UI contract, not the future UAR
-  skill registry.
+  skill registry path.
+- The UAR submodule provides the real runtime authority for agent definitions,
+  skill storage/routing, A2UI catalog management, and LLM provider access.
+  KnowMe's existing Android LiteRT-LM work should become a UAR local-provider
+  backend, not a parallel agent runtime.
 
-## Release A — UAR registry behind the existing Rust boundary
+## Release A — UAR runtime behind the existing Rust boundary
 
-- Add a mobile-safe UAR skill registry adapter behind `gen_ui_agent`, not in
-  Flutter.
+- Add a mobile-safe UAR runtime facade behind `gen_ui_agent`, not in Flutter.
+- Use embedded-library mode on Flutter mobile; BossFang/LibreFang cannot be a
+  local sidecar on phones.
+- Use HTTP/service mode for web and desktop when UAR runs as a sidecar or cloud
+  service.
 - Register skill cards with:
   - stable skill id and display name;
   - instruction source/version;
@@ -33,11 +41,25 @@ Android proof for real AgentSkills/process activations would be false.
   - scope (`global`, `agent-private`, `agent-exposed`);
   - governance metadata;
   - eval fixture references.
+- Route real skill selection/execution through UAR and emit UAR stream events
+  into KnowMe's existing content-block projection.
 - Keep the Flutter skills feature as UI only:
   `Widget → Riverpod → Repository → FFI → Rust/UAR`.
 - Keep skill activation events provider-neutral:
   UAR process activations and MCP-derived skill wrappers both emit the same
   `SkillActivation` stream event.
+
+## Release A.1 — Local model provider bridge
+
+- Expose Android LiteRT-LM/Gemma 4 E2B as a UAR provider/backend.
+- Translate UAR structured messages, tool declarations, tool results, sampling
+  settings, cancellation, and lifecycle into the existing
+  `gen_ui_inference::LiteRtLmProvider`.
+- Translate LiteRT-LM deltas/tool calls/errors back into UAR-compatible events.
+- Preserve the certified KnowMe lifecycle UI:
+  download, verify, loading, ready, cancelling, cancelled, failed.
+- Keep CPU as the universal Android correctness floor; GPU/NPU become optional
+  UAR provider variants only after physical device proof.
 
 ## Release B — Process lifecycle normalization
 
@@ -96,5 +118,5 @@ real installed AgentSkill:
 Do not fake AgentSkills certification by adding another embedded diagnostics
 tool and naming it “AgentSkills.” The current release can certify the semantic
 block contract and Android local inference/tool path. Real AgentSkills/process
-certification starts only after the UAR mobile registry exists behind the Rust
-core boundary.
+certification starts only after KnowMe routes mobile agent/skill execution
+through UAR's embedded runtime/kernel behind the Rust core boundary.

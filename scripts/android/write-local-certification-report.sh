@@ -182,6 +182,36 @@ def known_artifacts():
     return records
 
 
+def uar_metadata():
+    git_root, _, root_code = run(["git", "rev-parse", "--show-toplevel"])
+    if root_code != 0 or not git_root:
+        git_root = os.getcwd()
+
+    submodule_path = Path(git_root) / "rust" / "vendor" / "universal-agent-runtime"
+    commit = None
+    remote = None
+    if submodule_path.exists():
+        commit_out, _, commit_code = run(["git", "-C", str(submodule_path), "rev-parse", "HEAD"])
+        remote_out, _, remote_code = run(["git", "-C", str(submodule_path), "remote", "get-url", "origin"])
+        if commit_code == 0 and commit_out:
+            commit = commit_out
+        if remote_code == 0 and remote_out:
+            remote = remote_out
+
+    return {
+        "runtimeAuthority": "universal-agent-runtime",
+        "mobileModeTarget": "embedded_library",
+        "currentMobileIntegration": "not_wired",
+        "desktopWebModeTarget": "http_service_or_sidecar",
+        "cloudModeTarget": "http_service",
+        "localModelProviderRole": "knowme_local_provider_backend",
+        "bossfangLibreFangMobileSidecar": False,
+        "submodulePath": "rust/vendor/universal-agent-runtime",
+        "submoduleCommit": commit,
+        "submoduleRemote": remote,
+    }
+
+
 with zipfile.ZipFile(apk) as archive:
     native_libs = sorted(
         item.filename
@@ -225,6 +255,7 @@ report = {
             ]
         ),
     },
+    "uar": uar_metadata(),
     "memory": parse_meminfo(meminfo_raw),
     "thermal": parse_thermal(thermal_raw),
     "artifacts": known_artifacts(),

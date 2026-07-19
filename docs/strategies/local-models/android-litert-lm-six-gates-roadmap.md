@@ -38,6 +38,13 @@ The app may expose optional GPU/NPU acceleration only after gate 6 passes and
 benchmarks show a real user-visible win. If any optional acceleration gate fails,
 the app must fall back visibly to CPU.
 
+Architectural update: UAR is the real runtime authority for agents, skills,
+A2UI catalog management, and general LLM access. The Android LiteRT-LM lane is
+therefore a certified local provider/backend that UAR will call, not a parallel
+agent runtime. Flutter mobile uses UAR as an embedded library/kernel behind the
+Rust FFI boundary; desktop and web use UAR over HTTP/service when it runs as a
+sidecar or cloud service.
+
 ## Current checkpoint — 2026-07-19
 
 The Android CPU baseline now passes the first physical-device smoke test on the
