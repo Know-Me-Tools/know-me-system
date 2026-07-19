@@ -145,6 +145,10 @@ export interface UarRuntimeStatus {
   currentState: UarIntegrationState;
   localProviderRole: string;
   mobileSidecarAllowed: boolean;
+  serviceRuntimeAvailable: boolean;
+  serviceArtifactResponseAvailable: boolean;
+  embeddedKernelAvailable: boolean;
+  embeddedKernelBlocker: string | null;
   submodulePath: string;
   submoduleCommit: string | null;
 }

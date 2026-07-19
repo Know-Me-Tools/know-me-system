@@ -51,6 +51,10 @@ pub struct UarRuntimeStatus {
     pub current_state: UarIntegrationState,
     pub local_provider_role: String,
     pub mobile_sidecar_allowed: bool,
+    pub service_runtime_available: bool,
+    pub service_artifact_response_available: bool,
+    pub embedded_kernel_available: bool,
+    pub embedded_kernel_blocker: Option<String>,
     pub submodule_path: String,
     pub submodule_commit: Option<String>,
 }
@@ -87,6 +91,13 @@ impl UarRuntimeStatus {
             current_state: UarIntegrationState::ProjectionOnly,
             local_provider_role: "knowme_local_provider_backend".into(),
             mobile_sidecar_allowed: false,
+            service_runtime_available: service_runtime_available(),
+            service_artifact_response_available: service_artifact_response_available(),
+            embedded_kernel_available: false,
+            embedded_kernel_blocker: Some(
+                "The current UAR SDK embedded feature links the broad server runtime and does not yet expose a populated mobile-safe in-process kernel/AppState."
+                    .into(),
+            ),
             submodule_path: "rust/vendor/universal-agent-runtime".into(),
             submodule_commit: option_env!("KNOWME_UAR_SUBMODULE_COMMIT").map(str::to_owned),
         }
@@ -266,6 +277,26 @@ const fn default_target_mode() -> UarDeploymentMode {
     UarDeploymentMode::HttpService
 }
 
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+const fn service_runtime_available() -> bool {
+    true
+}
+
+#[cfg(any(target_os = "ios", target_os = "android"))]
+const fn service_runtime_available() -> bool {
+    false
+}
+
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+const fn service_artifact_response_available() -> bool {
+    true
+}
+
+#[cfg(any(target_os = "ios", target_os = "android"))]
+const fn service_artifact_response_available() -> bool {
+    false
+}
+
 /// Stateful projector from UAR AG-UI payloads into KnowMe A2UI events.
 ///
 /// Keep one projector per run so streamed tool-call argument chunks share the
@@ -305,6 +336,8 @@ mod tests {
         assert_eq!(status.authority, "universal-agent-runtime");
         assert_eq!(status.current_state, UarIntegrationState::ProjectionOnly);
         assert!(!status.mobile_sidecar_allowed);
+        assert!(!status.embedded_kernel_available);
+        assert!(status.embedded_kernel_blocker.is_some());
     }
 
     #[test]
