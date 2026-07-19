@@ -12,6 +12,7 @@ use gen_ui_types::error::{CoreError, CoreResult};
 use gen_ui_types::inference::InferenceRequest;
 use jni::objects::{GlobalRef, JClass, JObject, JString, JValue};
 use jni::{JNIEnv, JavaVM};
+use serde::Deserialize;
 
 static JAVA_VM: OnceLock<JavaVM> = OnceLock::new();
 static BRIDGE_CLASS: OnceLock<GlobalRef> = OnceLock::new();
@@ -22,6 +23,22 @@ pub fn set_java_vm(vm: JavaVM) {
 
 pub fn java_vm_available() -> bool {
     JAVA_VM.get().is_some()
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NativeLiteRtLmResponse {
+    #[serde(default)]
+    pub text: String,
+    #[serde(default)]
+    pub tool_calls: Vec<NativeLiteRtLmToolCall>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct NativeLiteRtLmToolCall {
+    pub name: String,
+    #[serde(default)]
+    pub arguments: serde_json::Value,
 }
 
 pub struct NativeLiteRtLmAdapter;
@@ -47,7 +64,7 @@ impl NativeLiteRtLmAdapter {
         Ok(Self)
     }
 
-    pub fn generate_text(&self, request: &InferenceRequest) -> CoreResult<String> {
+    pub fn generate_text(&self, request: &InferenceRequest) -> CoreResult<NativeLiteRtLmResponse> {
         let mut env = attach_env("LiteRT-LM JavaVM")?;
         let request_json = serde_json::to_string(request)
             .map_err(|error| CoreError::Serde(format!("LiteRT-LM request JSON: {error}")))?;
@@ -60,13 +77,8 @@ impl NativeLiteRtLmAdapter {
             "(Ljava/lang/String;)Ljava/lang/String;",
             &[JValue::Object(&JObject::from(request_json))],
         )?;
-        let parsed: serde_json::Value = serde_json::from_str(&response)
-            .map_err(|error| CoreError::Serde(format!("LiteRT-LM response JSON: {error}")))?;
-        Ok(parsed
-            .get("text")
-            .and_then(serde_json::Value::as_str)
-            .unwrap_or_default()
-            .to_string())
+        serde_json::from_str(&response)
+            .map_err(|error| CoreError::Serde(format!("LiteRT-LM response JSON: {error}")))
     }
 
     pub fn cancel() {

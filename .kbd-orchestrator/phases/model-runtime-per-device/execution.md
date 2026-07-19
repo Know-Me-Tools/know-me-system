@@ -111,9 +111,34 @@ LiteRT-LM generation produced text chars=2
 Known remaining gaps:
 
 - The adapter currently returns one complete message instead of true token-level streaming callbacks.
-- LiteRT-LM tool declarations/manual tool loop are not yet wired.
+- LiteRT-LM receives Rust-shortlisted tool declarations with automatic execution disabled.
+- Returned LiteRT-LM tool-call candidates are preserved as canonical stream events and covered by Rust unit tests.
+- Host-side tool-call validation, execution, result continuation, and bounded repair remain pending.
 - Cancellation has not been certified during LiteRT-LM generation/load.
 - The visible conversation still contains old error bubbles from earlier failed attempts; those are persisted historical errors, not current-run failures.
+
+## TOOL-CALL PROPAGATION CHECKPOINT
+
+Date: 2026-07-19
+
+Implemented:
+
+- Android `KnowMeLiteRtLmBridge` converts structured Rust `InferenceTool`
+  entries into LiteRT-LM `OpenApiTool` providers.
+- `automaticToolCalling=false` is preserved, so mutating or external tools are
+  never executed inside the Android SDK.
+- Rust parses LiteRT-LM `toolCalls` from the Android SDK response and emits
+  canonical `ToolCallStarted`, `ToolCallDelta`, and `ToolCallComplete` events.
+- `gen_ui_protocol` already converts those events into `ContentBlock::ToolUse`.
+
+Verification:
+
+- `cargo test -p gen_ui_inference --features local-litert-lm`
+- `cargo test -p gen_ui_protocol`
+- `flutter build apk --debug --target-platform android-arm64`
+- `scripts/android/verify-native-inference-gates.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
+- `flutter analyze lib`
+- Physical-device no-regression smoke on `SM S936U`: cached model loaded and prompt `Say%20only%20OK` generated `OK`; logcat reported `tool_calls=0` for that prompt.
 
 ## BLOCKERS
 

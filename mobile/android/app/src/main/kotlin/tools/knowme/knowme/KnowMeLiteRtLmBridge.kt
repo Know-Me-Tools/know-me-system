@@ -8,7 +8,10 @@ import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
 import com.google.ai.edge.litertlm.Message
+import com.google.ai.edge.litertlm.OpenApiTool
 import com.google.ai.edge.litertlm.SamplerConfig
+import com.google.ai.edge.litertlm.ToolProvider
+import com.google.ai.edge.litertlm.tool
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale
@@ -121,12 +124,30 @@ object KnowMeLiteRtLmBridge {
         return ConversationConfig(
             systemInstruction = systemInstruction,
             initialMessages = initialMessages,
-            tools = emptyList(),
+            tools = toolProvidersFromRequest(request),
             samplerConfig = samplerConfig,
             automaticToolCalling = false,
             channels = emptyList(),
             extraContext = mapOf("enable_thinking" to false),
         )
+    }
+
+    private fun toolProvidersFromRequest(request: JSONObject): List<ToolProvider> {
+        val tools = request.optJSONArray("tools") ?: return emptyList()
+        val providers = mutableListOf<ToolProvider>()
+        for (index in 0 until tools.length()) {
+            val item = tools.optJSONObject(index) ?: continue
+            val name = item.optString("name")
+            if (name.isBlank()) continue
+            val description = item.optString("description")
+            val parameters = item.optJSONObject("parameters") ?: JSONObject().put("type", "object")
+            val schema = JSONObject()
+                .put("name", name)
+                .put("description", description)
+                .put("parameters", parameters)
+            providers += tool(RegisteredOpenApiTool(schema.toString()))
+        }
+        return providers
     }
 
     private fun lastUserContent(messages: JSONArray): String? {
@@ -168,4 +189,13 @@ object KnowMeLiteRtLmBridge {
             .put("modelPath", modelPath)
             .put("cacheDir", cacheDir)
             .toString()
+
+    private class RegisteredOpenApiTool(
+        private val schemaJson: String,
+    ) : OpenApiTool {
+        override fun getToolDescriptionJsonString(): String = schemaJson
+
+        override fun execute(paramsJsonString: String): String =
+            """{"error":"tool execution is host-managed by Rust"}"""
+    }
 }

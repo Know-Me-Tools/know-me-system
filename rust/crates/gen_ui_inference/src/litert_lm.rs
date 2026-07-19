@@ -388,6 +388,33 @@ fn litert_lm_gate_report(
     gates
 }
 
+#[cfg_attr(not(any(target_os = "android", test)), allow(dead_code))]
+fn push_litert_lm_response_events(
+    text: String,
+    tool_calls: Vec<(String, serde_json::Value)>,
+    output: &mut Vec<StreamEvent>,
+) {
+    if !text.is_empty() {
+        output.push(StreamEvent::TextDelta {
+            index: 0,
+            delta: text,
+        });
+    }
+    for (index, (name, arguments)) in tool_calls.into_iter().enumerate() {
+        let id = format!("litert-tool-{index}");
+        let args = serde_json::to_string(&arguments).unwrap_or_else(|_| "{}".into());
+        output.push(StreamEvent::ToolCallStarted {
+            id: id.clone(),
+            name,
+        });
+        output.push(StreamEvent::ToolCallDelta {
+            id: id.clone(),
+            delta: args,
+        });
+        output.push(StreamEvent::ToolCallComplete { id });
+    }
+}
+
 #[async_trait]
 impl InferenceProvider for LiteRtLmEngine {
     async fn load(&self, spec: &LocalModelSpec) -> CoreResult<()> {
@@ -568,23 +595,46 @@ impl InferenceProvider for LiteRtLmEngine {
                         "LiteRT-LM generation starting"
                     );
                     match adapter.generate_text(&request) {
-                        Ok(text) => {
-                            if !text.is_empty() {
+                        Ok(response) => {
+                            if !response.text.is_empty() || !response.tool_calls.is_empty() {
                                 backend_self_test_passed.store(true, Ordering::Release);
+                            }
+                            let response_text = response.text;
+                            let response_tool_calls: Vec<_> = response
+                                .tool_calls
+                                .into_iter()
+                                .map(|tool_call| (tool_call.name, tool_call.arguments))
+                                .collect();
+                            if !response_text.is_empty() {
                                 tracing::info!(
                                     target: "knowme_litert_lm",
-                                    chars = text.chars().count(),
+                                    chars = response_text.chars().count(),
+                                    tool_calls = response_tool_calls.len(),
                                     "LiteRT-LM generation produced text"
                                 );
-                                let _ = sender.send(StreamEvent::TextDelta {
-                                    index: 0,
-                                    delta: text,
-                                });
                             } else {
                                 tracing::warn!(
                                     target: "knowme_litert_lm",
+                                    tool_calls = response_tool_calls.len(),
                                     "LiteRT-LM generation returned empty text"
                                 );
+                            }
+                            let mut events = Vec::new();
+                            push_litert_lm_response_events(
+                                response_text,
+                                response_tool_calls,
+                                &mut events,
+                            );
+                            for event in events {
+                                if let StreamEvent::ToolCallStarted { id, name } = &event {
+                                    tracing::info!(
+                                        target: "knowme_litert_lm",
+                                        id = %id,
+                                            name = %name,
+                                        "LiteRT-LM generation produced tool call"
+                                    );
+                                }
+                                let _ = sender.send(event);
                             }
                         }
                         Err(error) => {
@@ -736,6 +786,49 @@ mod tests {
                 .find(|gate| gate.gate == 6)
                 .map(|gate| &gate.status),
             Some(&RuntimeGateStatus::Passed)
+        );
+    }
+
+    #[test]
+    fn litert_lm_response_tool_calls_become_canonical_stream_events() {
+        let mut events = Vec::new();
+        push_litert_lm_response_events(
+            "Use this result.".into(),
+            vec![(
+                "memory_search".into(),
+                serde_json::json!({"query": "project plan", "k": 3}),
+            )],
+            &mut events,
+        );
+
+        assert_eq!(
+            events[0],
+            StreamEvent::TextDelta {
+                index: 0,
+                delta: "Use this result.".into()
+            }
+        );
+        assert_eq!(
+            events[1],
+            StreamEvent::ToolCallStarted {
+                id: "litert-tool-0".into(),
+                name: "memory_search".into(),
+            }
+        );
+        match &events[2] {
+            StreamEvent::ToolCallDelta { id, delta } => {
+                assert_eq!(id, "litert-tool-0");
+                let parsed: serde_json::Value =
+                    serde_json::from_str(delta).expect("tool args are valid JSON");
+                assert_eq!(parsed, serde_json::json!({"query": "project plan", "k": 3}));
+            }
+            other => panic!("expected tool call delta, got {other:?}"),
+        }
+        assert_eq!(
+            events[3],
+            StreamEvent::ToolCallComplete {
+                id: "litert-tool-0".into(),
+            }
         );
     }
 }

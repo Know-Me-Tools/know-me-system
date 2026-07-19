@@ -44,10 +44,15 @@ attached Samsung `SM S936U` running Android 16/API 36:
   running on attached Rust worker threads.
 - LiteRT-LM loaded the CPU baseline and generated a visible `OK` response from a
   local prompt.
+- LiteRT-LM receives Rust-shortlisted tool declarations through the Android
+  SDK's `OpenApiTool` provider path with automatic execution disabled.
+- Returned LiteRT-LM `Message.toolCalls` are normalized into canonical
+  `ToolCallStarted`, `ToolCallDelta`, and `ToolCallComplete` stream events.
 
-This proves the CPU smoke lane only. True streaming callbacks, LiteRT-LM tool
-declarations/manual tool loop, cancellation certification, and broader device
-coverage remain future gates.
+This proves the CPU smoke lane and code-level tool-call candidate preservation.
+It does not yet prove that the model reliably chooses tools for certified
+prompts. True token-level streaming callbacks, host-side tool execution/repair,
+cancellation certification, and broader device coverage remain future gates.
 
 ## Roadmap
 
@@ -80,9 +85,10 @@ coverage remain future gates.
 
 ### R3 — Tool-capable local agent loop
 
-- Shortlist registered tools before prompt assembly.
-- Provide LiteRT-LM with structured tool declarations.
-- Parse model tool-call candidates through schema validation.
+- [x] Shortlist registered tools before prompt assembly.
+- [x] Provide LiteRT-LM with structured tool declarations.
+- [x] Preserve model tool-call candidates as canonical stream events.
+- [ ] Parse model tool-call candidates through schema validation.
 - Enforce permission policy before execution.
 - Allow at most two bounded repair attempts.
 - Persist tool-call and tool-result events with the same AG-UI/A2UI content-block
