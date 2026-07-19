@@ -684,6 +684,40 @@ Physical-device evidence:
   - `G4 PASS: Rust mobile boot reached migrations-ready state`
 - Logcat artifact: `/tmp/knowme-device-runtime-gates.log`.
 
+## ANDROID LOCAL MODEL PROMPT CERTIFICATION CHECKPOINT
+
+Date: 2026-07-19
+
+Implemented:
+
+- Added `scripts/android/certify-local-model-prompt.sh` as the first physical
+  model/prompt certification wrapper on top of the launch gate.
+- The script runs `verify-device-runtime-gates.sh`, navigates to Chat with
+  UIAutomator semantics plus bounded coordinate fallbacks, submits a fresh
+  expected-token prompt through the Flutter composer, keeps the transcript
+  pinned to `Latest`, captures logcat/UI XML, and fails unless LiteRT-LM starts
+  generation, produces text, and the expected token appears in the visible UI.
+- The script intentionally proves one minimum UI → Rust FFI → LiteRT-LM →
+  visible ContentBlock path. It does not replace richer certification for
+  Mermaid, code, tool calling, cancellation, restart recovery, or multi-device
+  coverage.
+
+Verification:
+
+- `bash -n scripts/android/certify-local-model-prompt.sh`
+- `scripts/android/certify-local-model-prompt.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
+
+Physical-device evidence:
+
+- Device: Samsung `SM-S936U`, Android 16/API 36, ABI `arm64-v8a`, SoC `SM8750`.
+- Prompt: `Reply exactly KMOK042738.`
+- Gate output:
+  - `G5 PASS: LiteRT-LM generation started`
+  - `G6 PASS: LiteRT-LM produced text`
+  - `G6 PASS: expected visible UI text found: KMOK042738`
+- Logcat artifact: `/tmp/knowme-local-model-certification.log`.
+- UIAutomator artifact: `/tmp/knowme-local-model-certification.xml`.
+
 ## BLOCKERS
 
 - NONE at dispatch time

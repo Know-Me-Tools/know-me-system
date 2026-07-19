@@ -29,8 +29,10 @@ Static packaging checks start with
 with `scripts/android/verify-device-runtime-gates.sh`, which installs the APK,
 launches the app, captures logcat, proves the process stayed alive, proves
 `libgen_ui_ffi.so` loaded through `System.loadLibrary`, and proves Rust reached
-the mobile migrations-ready state. Model/prompt certification remains a separate
-physical workflow on top of that launch gate.
+the mobile migrations-ready state. Minimum physical model/prompt smoke checks
+start with `scripts/android/certify-local-model-prompt.sh`, which drives the
+Flutter chat UI with a fresh token prompt and requires both LiteRT-LM generation
+logs and visible UI text evidence.
 
 The app may expose optional GPU/NPU acceleration only after gate 6 passes and
 benchmarks show a real user-visible win. If any optional acceleration gate fails,
@@ -123,6 +125,10 @@ attached Samsung `SM S936U` running Android 16/API 36:
   the existing `ContentBlock::Skill` block. Skill activation chunks must be
   surfaced and persisted alongside thinking, citation, tool, memory, lifecycle,
   and artifact chunks instead of being demoted to opaque raw/provider artifacts.
+- A minimum physical prompt smoke now passes through the Flutter UI on the
+  attached Samsung: the script submitted `Reply exactly KMOK042738.`, LiteRT-LM
+  started generation, produced text, and the UI hierarchy contained
+  `KMOK042738`.
 
 This proves the CPU smoke lane and code-level tool-call candidate preservation.
 It also proves one complete safe local tool loop and one explicit
@@ -224,6 +230,8 @@ affordances, and broader device coverage remain future gates.
 - Run prompt certification for English replies, office/personal tasks, Mermaid,
   code, constrained JSON, multi-turn history, tool calling, cancellation, and
   restart recovery.
+- [x] Certify one physical UI prompt smoke where a fresh expected token crosses
+  Flutter → Rust FFI → LiteRT-LM → normalized `ContentBlock` rendering.
 - Certify the SM8750-specific artifact only after the generic CPU path is green.
 - Add at least one non-Qualcomm modern Android phone before claiming broad
   Android support.

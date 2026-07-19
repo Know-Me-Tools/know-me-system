@@ -17,9 +17,15 @@ vendor library dependency.
   process remains alive, prove `libgen_ui_ffi.so` loaded through
   `System.loadLibrary`, and prove Rust reached the mobile migrations-ready
   state.
-- Add a second physical model-certification wrapper that runs the local model
-  smoke prompt and fails unless the expected LiteRT-LM load/generation/tool
-  runtime log lines and UI-visible content blocks appear.
+- Use `scripts/android/certify-local-model-prompt.sh` as the minimum physical
+  model prompt gate: run the launch gate, drive the Flutter chat UI with a
+  fresh expected token prompt, require LiteRT-LM generation logs, keep the
+  transcript pinned to `Latest`, and require the expected token in the visible
+  UIAutomator hierarchy.
+- Add richer physical model-certification wrappers for tool calling,
+  cancellation, restart recovery, and prompt-suite coverage. The current prompt
+  wrapper proves one UI→Rust→LiteRT-LM→ContentBlock path, not the full local
+  agent certification suite.
 - Store device identity, Android API level, ABI, SoC, backend, model artifact,
   load time, first-token latency, throughput, memory pressure, and thermal state
   in a fleet capability record.
