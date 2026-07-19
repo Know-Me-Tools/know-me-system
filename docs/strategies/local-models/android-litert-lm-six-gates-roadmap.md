@@ -154,14 +154,20 @@ attached Samsung `SM S936U` running Android 16/API 36:
   taps the visible Stop control after LiteRT-LM generation starts, and requires
   the cancelled state to render in the UI. It passed on the attached Samsung
   with visible `Cancelled by user` evidence.
+- Explicit safe tool calling now has a physical gate:
+  `scripts/android/certify-local-tool-call.sh` submits a prompt that requests
+  `knowme_diagnostics__local_runtime_status`, requires visible tool-use,
+  tool-result, and final continuation text, and asserts logcat contains the
+  produced tool call plus tool-result continuation. It passed on the attached
+  Samsung with visible `Tool use knowme_diagnostics__local_runtime_status`,
+  `Tool completed`, and `TOOLSTATUSOK` evidence.
 
 This proves the CPU smoke lane and code-level tool-call candidate preservation.
 It also proves one complete safe local tool loop and one explicit
 approval-required local tool loop on a physical Android device. True
-token-level streaming callbacks, explicit tool-calling suite coverage,
-empty-continuation fallback certification, skill-activation UI proof,
-stale-card cleanup affordances, and broader device coverage remain future
-gates.
+token-level streaming callbacks, empty-continuation fallback certification,
+skill-activation UI proof, stale-card cleanup affordances, and broader device
+coverage remain future gates.
 
 ## Roadmap
 
@@ -268,7 +274,9 @@ gates.
   full marker and must recover it from the previous assistant message.
 - [x] Certify cancellation through the visible Stop control and persisted
   cancelled bubble.
-- [ ] Certify explicit tool-calling and empty-continuation fallback cases.
+- [x] Certify explicit safe local tool-calling with visible tool-use/tool-result
+  blocks and final continuation text.
+- [ ] Certify empty-continuation fallback cases.
 - [ ] Add physical UI certification for skill activation chunks so a real
   skill activation is visible as its own ordered `ContentBlock::Skill` region,
   parallel to thinking and citation chunks.

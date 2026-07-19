@@ -907,10 +907,42 @@ Hardening note:
 
 Remaining:
 
-- Add separate wrappers for explicit tool-calling suites and skill activation
-  UI proof. Skill activations already map to `ContentBlock::Skill`; the
-  remaining gate is physical evidence that a real activation renders and
-  persists as its own ordered block beside thinking and citation chunks.
+- Add separate wrappers for empty-continuation fallback and skill activation UI
+  proof. Skill activations already map to `ContentBlock::Skill`; the remaining
+  gate is physical evidence that a real activation renders and persists as its
+  own ordered block beside thinking and citation chunks.
+
+## ANDROID EXPLICIT TOOL-CALLING CHECKPOINT
+
+Date: 2026-07-19
+
+Implemented:
+
+- Added `scripts/android/certify-local-tool-call.sh`.
+- The script submits a prompt that explicitly requests
+  `knowme_diagnostics__local_runtime_status`, requires visible `Tool use`,
+  `Tool completed`, and `TOOLSTATUSOK` evidence, and asserts logcat contains
+  the produced tool call plus the tool-result continuation.
+
+Verification:
+
+- `bash -n scripts/android/certify-local-tool-call.sh`
+- `TIMEOUT_SECONDS=300 scripts/android/certify-local-tool-call.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
+
+Physical-device evidence:
+
+- Device: Samsung `SM S936U`, serial `R5GYB4AZD7A`, Android 16/API 36.
+- Prompt: `Use the knowme_diagnostics__local_runtime_status tool to inspect this device runtime. After the tool result, answer TOOLSTATUSOK.`
+- Output: `G5 PASS: LiteRT-LM generation started`, `G6 PASS: LiteRT-LM produced text`, `G6 PASS: expected visible UI text found: Tool use knowme_diagnostics__local_runtime_status|Tool completed|TOOLSTATUSOK`, and `TOOL PASS: local_runtime_status tool call executed and rendered`.
+- Logcat artifact: `/tmp/knowme-local-tool-call.log`.
+- UIAutomator artifact: `/tmp/knowme-local-tool-call.xml`.
+
+Remaining:
+
+- Add separate wrappers for empty-continuation fallback and skill activation UI
+  proof. Skill activations already map to `ContentBlock::Skill`; the remaining
+  gate is physical evidence that a real activation renders and persists as its
+  own ordered block beside thinking and citation chunks.
 
 ## BLOCKERS
 

@@ -36,11 +36,15 @@ vendor library dependency.
   message.
 - Use `scripts/android/certify-local-cancellation.sh` to prove the visible Stop
   control reaches Rust cancellation and renders a cancelled run state.
-- Add richer physical model-certification wrappers for tool calling,
-  skill activation UI proof, and empty-continuation fallback coverage. The
+- Use `scripts/android/certify-local-tool-call.sh` to prove explicit safe local
+  tool calling: the model must emit `knowme_diagnostics__local_runtime_status`,
+  the host must execute it, the UI must render tool-use/tool-result blocks, and
+  the continuation must produce final visible answer text.
+- Add richer physical model-certification wrappers for skill activation UI proof
+  and empty-continuation fallback coverage. The
   current wrappers prove launch, single-turn prompt quality, restart recovery,
-  multi-turn history, and cancellation; they are not the full local agent
-  certification suite.
+  multi-turn history, cancellation, and explicit safe tool calling; they are
+  not the full local agent certification suite.
 - Store device identity, Android API level, ABI, SoC, backend, model artifact,
   load time, first-token latency, throughput, memory pressure, and thermal state
   in a fleet capability record.
@@ -93,10 +97,10 @@ vendor library dependency.
 ## Release R+4 — Richer local-agent certification
 
 - Expand prompt certification beyond the embedded diagnostics MCP tool:
-  explicit tool-calling suites, skill activation UI proof, and
-  empty-continuation fallback behavior. Office/personal task following,
-  Mermaid, code, constrained JSON, restart recovery, multi-turn history, and
-  cancellation now have physical Android wrapper evidence.
+  skill activation UI proof and empty-continuation fallback behavior.
+  Office/personal task following, Mermaid, code, constrained JSON, restart
+  recovery, multi-turn history, cancellation, and explicit safe tool calling now
+  have physical Android wrapper evidence.
 - Certify the confirmation UX/policy for mutating, destructive, and open-world
   tools beyond the embedded diagnostic tool. The baseline physical proof now
   exists for a read-only/open-world diagnostic: approval executes only a
