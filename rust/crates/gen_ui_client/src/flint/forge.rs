@@ -61,7 +61,7 @@ impl ForgeClient {
     pub fn register_a2ui_mcp(&self, registry: &McpRegistry) -> Arc<McpServerHandle> {
         let endpoint = format!("{}/mcp/v1/a2ui", self.config.base.trim_end_matches('/'));
         let transport = SseTransport::new(self.http.clone(), endpoint, self.bearer());
-        registry.register(McpServerHandle::new(
+        registry.register(McpServerHandle::new_trusted_local(
             "flint-a2ui-registry",
             Box::new(transport),
         ))

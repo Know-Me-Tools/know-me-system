@@ -195,13 +195,49 @@ Verification:
 - `flutter build apk --debug --target-platform android-arm64`
 - `scripts/android/verify-native-inference-gates.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
 
+## LOCAL READ-ONLY TOOL EXECUTION CHECKPOINT
+
+Date: 2026-07-19
+
+Implemented:
+
+- Added explicit MCP server trust metadata. Servers default to untrusted for
+  local automatic execution.
+- Registered KnowMe's own Forge/A2UI MCP registry as `TrustedLocal`; this trust
+  is necessary but not sufficient for execution.
+- The local LiteRT-LM host tool gate now executes only tool calls that satisfy
+  all of:
+  - server is trusted-local;
+  - `readOnlyHint == true`;
+  - `destructiveHint == false`;
+  - `openWorldHint == false`;
+  - model arguments pass the current shortlist/schema validation.
+- Tool calls that are untrusted, mutating/destructive, open-world, malformed, or
+  outside the advertised shortlist are rejected with typed `ToolResult` errors.
+- Successful safe tool calls execute through the existing MCP `tools/call`
+  bridge and emit `ToolResult` with the MCP result payload.
+
+Verification:
+
+- `cargo test -p gen_ui_mcp`
+- `cargo test -p gen_ui_agent local_tool_gate -- --nocapture`
+- `cargo test -p gen_ui_agent mcp_tool_annotations_survive_local_inference_mapping -- --nocapture`
+- `cargo check -p gen_ui_agent`
+- `cargo test -p gen_ui_types structured_messages_preserve_roles_and_tools`
+- `cargo test -p gen_ui_inference --features local-litert-lm`
+- `flutter analyze lib`
+- `flutter build apk --debug --target-platform android-arm64`
+- `scripts/android/verify-native-inference-gates.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
+
 Remaining for `litertlm-local-tools`:
 
-- Attach registry permission/mutation metadata to local tool definitions.
-- Execute safe/confirmed tools through the existing MCP bridge.
-- Send tool-result messages back to LiteRT-LM and continue generation.
-- Add bounded repair attempts for invalid arguments.
-- Certify the model actually chooses tools on physical Android prompt suites.
+- Feed safe tool results back into LiteRT-LM and continue generation.
+- Replace shallow JSON checks with full shared JSON-schema validation.
+- Add user confirmation UX/policy for mutating, destructive, or open-world
+  tools.
+- Add bounded repair attempts when validation fails.
+- Certify on physical Android prompts where LiteRT-LM actually chooses and uses
+  an allowed local tool.
 
 ## BLOCKERS
 

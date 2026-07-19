@@ -61,11 +61,31 @@ pub struct McpToolExecution {
     pub task_support: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum McpServerTrust {
+    /// Default for externally registered MCP servers. Tool annotations from
+    /// these servers are still preserved, but they are not enough to permit
+    /// local automatic execution.
+    Untrusted,
+    /// The host registered this server as part of KnowMe's own trusted runtime
+    /// boundary. Individual tools still need read-only/non-destructive/
+    /// closed-world annotations before local automatic execution is allowed.
+    TrustedLocal,
+}
+
+impl Default for McpServerTrust {
+    fn default() -> Self {
+        Self::Untrusted
+    }
+}
+
 /// A connected MCP server: the transport plus its last-known tool inventory.
 pub struct McpServerHandle {
     pub name: String,
     transport: Box<dyn McpTransport>,
     tools: RwLock<Vec<McpTool>>,
+    trust: McpServerTrust,
 }
 
 impl McpServerHandle {
@@ -74,7 +94,21 @@ impl McpServerHandle {
             name: name.into(),
             transport,
             tools: RwLock::new(Vec::new()),
+            trust: McpServerTrust::Untrusted,
         }
+    }
+
+    pub fn new_trusted_local(name: impl Into<String>, transport: Box<dyn McpTransport>) -> Self {
+        Self {
+            name: name.into(),
+            transport,
+            tools: RwLock::new(Vec::new()),
+            trust: McpServerTrust::TrustedLocal,
+        }
+    }
+
+    pub fn trust(&self) -> McpServerTrust {
+        self.trust
     }
 
     /// Refresh the cached tool inventory via `tools/list`.

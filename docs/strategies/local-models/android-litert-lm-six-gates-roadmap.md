@@ -61,12 +61,16 @@ attached Samsung `SM S936U` running Android 16/API 36:
   `idempotentHint`, and `openWorldHint` for the future execution policy. These
   hints are treated as advisory only; local auto-execution still requires a
   trusted registry policy and confirmation handling.
+- The host-side local tool gate now executes only the narrow safe subset:
+  tools from a trusted-local MCP server that are explicitly read-only,
+  non-destructive, and closed-world. Untrusted, mutating, destructive, or
+  open-world tools produce typed `ToolResult` errors instead of running.
 
 This proves the CPU smoke lane and code-level tool-call candidate preservation.
 It does not yet prove that the model reliably chooses tools for certified
-prompts or that a full local tool loop can execute and continue generation. True
-token-level streaming callbacks, host-side tool execution/repair, cancellation
-certification, and broader device coverage remain future gates.
+prompts or that a full local tool loop can continue generation after tool
+results. True token-level streaming callbacks, tool-result continuation/repair,
+cancellation certification, and broader device coverage remain future gates.
 
 ## Roadmap
 
@@ -104,9 +108,13 @@ certification, and broader device coverage remain future gates.
 - [x] Preserve model tool-call candidates as canonical stream events.
 - [x] Parse model tool-call candidates through fail-closed validation.
 - [x] Preserve MCP tool annotations in local inference tool definitions.
+- [x] Execute trusted-local read-only/non-destructive/closed-world tool calls and
+  reject all other local tool calls with typed tool-result errors.
 - [ ] Replace shallow JSON validation with the shared full schema validator used
   by executable tool loops.
-- Enforce permission policy before execution.
+- [ ] Feed tool results back into LiteRT-LM and continue generation.
+- [ ] Enforce user confirmation policy for mutating, destructive, or open-world
+  tools before execution.
 - Allow at most two bounded repair attempts.
 - Persist tool-call and tool-result events with the same AG-UI/A2UI content-block
   contract used by other providers.

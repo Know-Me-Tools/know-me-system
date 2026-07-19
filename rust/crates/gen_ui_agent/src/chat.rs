@@ -26,6 +26,7 @@ use liter_llm::types::common::{
     SystemMessage, ToolMessage, UserContent, UserMessage,
 };
 use liter_llm::LlmClient;
+use std::collections::BTreeMap;
 use std::sync::atomic::Ordering;
 
 use crate::error::AgentError;
@@ -562,8 +563,9 @@ fn start_cloud_run_with_content(
     let client = builder
         .build()
         .map_err(|e| AgentError::Client(e.to_string()))?;
-    let tools = crate::tools::tool_definitions(state::mcp()?);
-    let context_tools = local_tool_definitions()?;
+    let mcp_registry = state::mcp()?;
+    let tools = crate::tools::tool_definitions(mcp_registry);
+    let context_tools = local_tool_definitions(mcp_registry);
     let tools = (!tools.is_empty()).then_some(tools);
     let task_run_id = run_id.clone();
     let active_run = ActiveRun::new(&run_id);
@@ -748,7 +750,9 @@ async fn send_local(
             .map(|v| v as u32),
     };
 
-    let available_tools = local_tool_definitions()?;
+    let mcp_registry = state::mcp()?.clone();
+    let available_tools = local_tool_definitions(&mcp_registry);
+    let tool_policies = local_tool_policies(&mcp_registry);
     let engine = engine.clone();
     let run_id_for_task = run_id.clone();
     let active_run = ActiveRun::new(&run_id);
@@ -865,18 +869,25 @@ async fn send_local(
         // adapter ingests them verbatim — identical handling to the cloud lane.
         use futures::StreamExt;
         let mut stream = std::pin::pin!(stream);
-        let mut tool_gate = LocalToolCallGate::new(request.tools.clone());
+        let mut tool_gate = LocalToolCallGate::new(request.tools.clone(), tool_policies);
         while let Some(event) = stream.next().await {
             if active_run.cancelled() {
                 active_run.publish_cancelled(RunPhase::Generation);
                 return;
             }
             let terminal = matches!(event, StreamEvent::Done | StreamEvent::Error { .. });
-            let follow_up_events = tool_gate.observe(&event);
+            let completed_tool_call = tool_gate.observe(&event);
             for a2ui in adapter.ingest(&event) {
                 state::publish(a2ui);
             }
-            for follow_up in follow_up_events {
+            if let Some(call) = completed_tool_call {
+                state::publish(A2uiEvent::RunPhaseChanged {
+                    run_id: run_id_for_task.clone(),
+                    phase: RunPhase::ToolExecution,
+                    status: RunStatus::Preparing,
+                    message: format!("Handling local tool call {}", call.name),
+                });
+                let follow_up = tool_gate.execute_or_reject(&mcp_registry, call).await;
                 for a2ui in adapter.ingest(&follow_up) {
                     state::publish(a2ui);
                 }
@@ -1067,8 +1078,7 @@ fn param_i32(params: &serde_json::Value, key: &str, default: i32) -> i32 {
         .unwrap_or(default)
 }
 
-fn local_tool_definitions() -> Result<Vec<InferenceTool>, AgentError> {
-    let registry = state::mcp()?;
+fn local_tool_definitions(registry: &gen_ui_mcp::McpRegistry) -> Vec<InferenceTool> {
     let mut definitions = Vec::new();
     for server_name in registry.server_names() {
         let Some(server) = registry.get(&server_name) else {
@@ -1078,7 +1088,33 @@ fn local_tool_definitions() -> Result<Vec<InferenceTool>, AgentError> {
             definitions.push(inference_tool_from_mcp(&server_name, tool));
         }
     }
-    Ok(definitions)
+    definitions
+}
+
+fn local_tool_policies(registry: &gen_ui_mcp::McpRegistry) -> BTreeMap<String, LocalToolPolicy> {
+    let mut policies = BTreeMap::new();
+    for server_name in registry.server_names() {
+        let Some(server) = registry.get(&server_name) else {
+            continue;
+        };
+        let trusted = server.trust() == gen_ui_mcp::McpServerTrust::TrustedLocal;
+        for tool in server.cached_tools() {
+            let name = crate::tools::qualify(&server_name, &tool.name);
+            let annotations = tool.annotations.unwrap_or_default();
+            let auto_execute = trusted
+                && annotations.read_only_hint == Some(true)
+                && annotations.destructive_hint == Some(false)
+                && annotations.open_world_hint == Some(false);
+            policies.insert(
+                name,
+                LocalToolPolicy {
+                    trusted_server: trusted,
+                    auto_execute,
+                },
+            );
+        }
+    }
+    policies
 }
 
 fn inference_tool_from_mcp(server_name: &str, tool: gen_ui_mcp::McpTool) -> InferenceTool {
@@ -1107,22 +1143,30 @@ struct PendingLocalToolCall {
 
 #[derive(Debug)]
 struct LocalToolCallGate {
-    tools: std::collections::BTreeMap<String, InferenceTool>,
-    pending: std::collections::BTreeMap<String, PendingLocalToolCall>,
+    tools: BTreeMap<String, InferenceTool>,
+    policies: BTreeMap<String, LocalToolPolicy>,
+    pending: BTreeMap<String, PendingLocalToolCall>,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct LocalToolPolicy {
+    trusted_server: bool,
+    auto_execute: bool,
 }
 
 impl LocalToolCallGate {
-    fn new(tools: Vec<InferenceTool>) -> Self {
+    fn new(tools: Vec<InferenceTool>, policies: BTreeMap<String, LocalToolPolicy>) -> Self {
         Self {
             tools: tools
                 .into_iter()
                 .map(|tool| (tool.name.clone(), tool))
                 .collect(),
+            policies,
             pending: Default::default(),
         }
     }
 
-    fn observe(&mut self, event: &StreamEvent) -> Vec<StreamEvent> {
+    fn observe(&mut self, event: &StreamEvent) -> Option<PendingLocalToolCall> {
         match event {
             StreamEvent::ToolCallStarted { id, name } => {
                 self.pending.insert(
@@ -1133,43 +1177,98 @@ impl LocalToolCallGate {
                         arguments: String::new(),
                     },
                 );
-                Vec::new()
+                None
             }
             StreamEvent::ToolCallDelta { id, delta } => {
                 if let Some(call) = self.pending.get_mut(id) {
                     call.arguments.push_str(delta);
                 }
-                Vec::new()
+                None
             }
-            StreamEvent::ToolCallComplete { id } => self
-                .pending
-                .remove(id)
-                .map(|call| vec![self.tool_result_for(call)])
-                .unwrap_or_default(),
-            _ => Vec::new(),
+            StreamEvent::ToolCallComplete { id } => self.pending.remove(id),
+            _ => None,
         }
     }
 
-    fn tool_result_for(&self, call: PendingLocalToolCall) -> StreamEvent {
-        let output = match self.validate_call(&call) {
-            Ok(()) => serde_json::json!({
-                "ok": false,
-                "code": "local_tool_execution_requires_policy",
-                "message": "The local model produced a valid tool-call candidate, but KnowMe did not execute it because this build has not attached permission and mutability policy metadata to local MCP tools yet.",
-                "tool": call.name,
-            }),
-            Err(error) => error,
+    async fn execute_or_reject(
+        &mut self,
+        registry: &gen_ui_mcp::McpRegistry,
+        call: PendingLocalToolCall,
+    ) -> StreamEvent {
+        let result = match self.validate_call(&call) {
+            Ok(arguments) => {
+                let policy = self.policies.get(&call.name).copied().unwrap_or_default();
+                if !policy.trusted_server {
+                    Err(serde_json::json!({
+                        "ok": false,
+                        "code": "local_tool_server_not_trusted",
+                        "message": "The local model requested a tool from an MCP server that is not trusted for automatic local execution.",
+                        "tool": call.name,
+                    }))
+                } else if !policy.auto_execute {
+                    Err(serde_json::json!({
+                        "ok": false,
+                        "code": "local_tool_requires_confirmation",
+                        "message": "The local model produced a valid tool-call candidate, but KnowMe did not execute it because the tool is not explicitly read-only, non-destructive, and closed-world.",
+                        "tool": call.name,
+                    }))
+                } else {
+                    Ok(self.call_mcp_tool(registry, &call, &arguments).await)
+                }
+            }
+            Err(error) => Err(error),
         };
-        StreamEvent::ToolResult {
-            tool_use_id: call.id,
-            output_json: serde_json::to_string(&output).unwrap_or_else(|_| {
-                r#"{"ok":false,"code":"tool_result_serialization_failed"}"#.into()
-            }),
-            is_error: true,
+        match result {
+            Ok((output_json, is_error)) => StreamEvent::ToolResult {
+                tool_use_id: call.id,
+                output_json,
+                is_error,
+            },
+            Err(output) => StreamEvent::ToolResult {
+                tool_use_id: call.id,
+                output_json: serde_json::to_string(&output).unwrap_or_else(|_| {
+                    r#"{"ok":false,"code":"tool_result_serialization_failed"}"#.into()
+                }),
+                is_error: true,
+            },
         }
     }
 
-    fn validate_call(&self, call: &PendingLocalToolCall) -> Result<(), serde_json::Value> {
+    async fn call_mcp_tool(
+        &self,
+        registry: &gen_ui_mcp::McpRegistry,
+        call: &PendingLocalToolCall,
+        arguments: &serde_json::Value,
+    ) -> (String, bool) {
+        match crate::tools::call_tool(registry, &call.name, &arguments.to_string()).await {
+            Ok(value) => {
+                let is_error = value
+                    .get("isError")
+                    .and_then(serde_json::Value::as_bool)
+                    .unwrap_or(false);
+                (
+                    serde_json::to_string(&value)
+                        .unwrap_or_else(|_| r#"{"ok":false,"code":"tool_result_invalid"}"#.into()),
+                    is_error,
+                )
+            }
+            Err(error) => (
+                serde_json::json!({
+                    "ok": false,
+                    "code": "local_tool_execution_failed",
+                    "message": error.to_string(),
+                    "tool": call.name,
+                })
+                .to_string(),
+                true,
+            ),
+        }
+    }
+
+    fn validate_call(
+        &self,
+        call: &PendingLocalToolCall,
+    ) -> Result<serde_json::Value, serde_json::Value> {
         let Some(tool) = self.tools.get(&call.name) else {
             return Err(serde_json::json!({
                 "ok": false,
@@ -1195,7 +1294,7 @@ impl LocalToolCallGate {
                 "tool": call.name,
             }));
         }
-        Ok(())
+        Ok(arguments)
     }
 }
 
@@ -1494,58 +1593,215 @@ mod attachment_tests {
         assert_eq!(attachment_kind("mp4"), ("video/mp4", false, false));
     }
 
-    #[test]
-    fn local_tool_gate_validates_and_fails_closed_without_policy() {
-        let mut gate = LocalToolCallGate::new(vec![InferenceTool {
-            name: "memory__search".into(),
-            description: "Search memory".into(),
-            parameters: serde_json::json!({
-                "type": "object",
-                "required": ["query"],
-                "properties": {
-                    "query": {"type": "string"},
-                    "limit": {"type": "integer"}
-                }
-            }),
-            annotations: Some(InferenceToolAnnotations {
-                read_only_hint: Some(true),
-                destructive_hint: Some(false),
-                open_world_hint: Some(false),
-                ..Default::default()
-            }),
-        }]);
+    #[tokio::test]
+    async fn local_tool_gate_rejects_untrusted_server() {
+        let mut gate = LocalToolCallGate::new(
+            vec![InferenceTool {
+                name: "memory__search".into(),
+                description: "Search memory".into(),
+                parameters: serde_json::json!({
+                    "type": "object",
+                    "required": ["query"],
+                    "properties": {
+                        "query": {"type": "string"},
+                        "limit": {"type": "integer"}
+                    }
+                }),
+                annotations: Some(InferenceToolAnnotations {
+                    read_only_hint: Some(true),
+                    destructive_hint: Some(false),
+                    open_world_hint: Some(false),
+                    ..Default::default()
+                }),
+            }],
+            BTreeMap::from([(
+                "memory__search".into(),
+                LocalToolPolicy {
+                    trusted_server: false,
+                    auto_execute: false,
+                },
+            )]),
+        );
 
         assert!(gate
             .observe(&StreamEvent::ToolCallStarted {
                 id: "call-1".into(),
                 name: "memory__search".into(),
             })
-            .is_empty());
+            .is_none());
         assert!(gate
             .observe(&StreamEvent::ToolCallDelta {
                 id: "call-1".into(),
                 delta: r#"{"query":"roadmap","limit":3}"#.into(),
             })
-            .is_empty());
-        let out = gate.observe(&StreamEvent::ToolCallComplete {
-            id: "call-1".into(),
-        });
+            .is_none());
+        let call = gate
+            .observe(&StreamEvent::ToolCallComplete {
+                id: "call-1".into(),
+            })
+            .expect("call completes");
 
-        assert_eq!(out.len(), 1);
-        match &out[0] {
+        let out = gate
+            .execute_or_reject(&gen_ui_mcp::McpRegistry::new(), call)
+            .await;
+        match out {
             StreamEvent::ToolResult {
                 tool_use_id,
                 output_json,
                 is_error,
             } => {
                 assert_eq!(tool_use_id, "call-1");
-                assert!(*is_error);
+                assert!(is_error);
                 let parsed: serde_json::Value =
-                    serde_json::from_str(output_json).expect("tool result is JSON");
-                assert_eq!(
-                    parsed["code"], "local_tool_execution_requires_policy",
-                    "valid local calls must fail closed until execution policy exists"
-                );
+                    serde_json::from_str(&output_json).expect("tool result is JSON");
+                assert_eq!(parsed["code"], "local_tool_server_not_trusted");
+            }
+            other => panic!("expected ToolResult, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn local_tool_gate_executes_trusted_read_only_closed_world_tool() {
+        struct StaticTransport;
+
+        #[async_trait::async_trait]
+        impl gen_ui_mcp::McpTransport for StaticTransport {
+            async fn request(
+                &self,
+                method: &str,
+                params: Option<serde_json::Value>,
+            ) -> gen_ui_types::CoreResult<serde_json::Value> {
+                match method {
+                    "tools/list" => Ok(serde_json::json!({
+                        "tools": [{
+                            "name": "search",
+                            "description": "Search memory",
+                            "inputSchema": {
+                                "type": "object",
+                                "required": ["query"],
+                                "properties": {
+                                    "query": {"type": "string"}
+                                }
+                            },
+                            "annotations": {
+                                "readOnlyHint": true,
+                                "destructiveHint": false,
+                                "openWorldHint": false
+                            }
+                        }]
+                    })),
+                    "tools/call" => {
+                        assert_eq!(
+                            params
+                                .as_ref()
+                                .and_then(|value| value.pointer("/arguments/query"))
+                                .and_then(serde_json::Value::as_str),
+                            Some("roadmap")
+                        );
+                        Ok(serde_json::json!({
+                            "content": [{"type": "text", "text": "roadmap result"}],
+                            "structuredContent": {"hits": 1},
+                            "isError": false
+                        }))
+                    }
+                    other => Err(gen_ui_types::CoreError::Terminal(format!(
+                        "unexpected MCP method {other}"
+                    ))),
+                }
+            }
+        }
+
+        let registry = gen_ui_mcp::McpRegistry::new();
+        let handle = registry.register(gen_ui_mcp::McpServerHandle::new_trusted_local(
+            "memory",
+            Box::new(StaticTransport),
+        ));
+        handle.refresh_tools().await.expect("tools refresh");
+        let tools = local_tool_definitions(&registry);
+        let policies = local_tool_policies(&registry);
+        let mut gate = LocalToolCallGate::new(tools, policies);
+
+        gate.observe(&StreamEvent::ToolCallStarted {
+            id: "call-1".into(),
+            name: "memory__search".into(),
+        });
+        gate.observe(&StreamEvent::ToolCallDelta {
+            id: "call-1".into(),
+            delta: r#"{"query":"roadmap"}"#.into(),
+        });
+        let call = gate
+            .observe(&StreamEvent::ToolCallComplete {
+                id: "call-1".into(),
+            })
+            .expect("call completes");
+        let out = gate.execute_or_reject(&registry, call).await;
+
+        match out {
+            StreamEvent::ToolResult {
+                tool_use_id,
+                output_json,
+                is_error,
+            } => {
+                assert_eq!(tool_use_id, "call-1");
+                assert!(!is_error);
+                let parsed: serde_json::Value =
+                    serde_json::from_str(&output_json).expect("tool result is JSON");
+                assert_eq!(parsed["structuredContent"]["hits"], 1);
+            }
+            other => panic!("expected ToolResult, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn local_tool_gate_requires_confirmation_for_non_closed_world_tool() {
+        let mut gate = LocalToolCallGate::new(
+            vec![InferenceTool {
+                name: "web__search".into(),
+                description: "Search the web".into(),
+                parameters: serde_json::json!({
+                    "type": "object",
+                    "required": ["query"],
+                    "properties": {
+                        "query": {"type": "string"}
+                    }
+                }),
+                annotations: Some(InferenceToolAnnotations {
+                    read_only_hint: Some(true),
+                    destructive_hint: Some(false),
+                    open_world_hint: Some(true),
+                    ..Default::default()
+                }),
+            }],
+            BTreeMap::from([(
+                "web__search".into(),
+                LocalToolPolicy {
+                    trusted_server: true,
+                    auto_execute: false,
+                },
+            )]),
+        );
+        gate.observe(&StreamEvent::ToolCallStarted {
+            id: "call-1".into(),
+            name: "web__search".into(),
+        });
+        gate.observe(&StreamEvent::ToolCallDelta {
+            id: "call-1".into(),
+            delta: r#"{"query":"roadmap"}"#.into(),
+        });
+        let call = gate
+            .observe(&StreamEvent::ToolCallComplete {
+                id: "call-1".into(),
+            })
+            .expect("call completes");
+        let out = gate
+            .execute_or_reject(&gen_ui_mcp::McpRegistry::new(), call)
+            .await;
+
+        match out {
+            StreamEvent::ToolResult { output_json, .. } => {
+                let parsed: serde_json::Value =
+                    serde_json::from_str(&output_json).expect("tool result is JSON");
+                assert_eq!(parsed["code"], "local_tool_requires_confirmation");
             }
             other => panic!("expected ToolResult, got {other:?}"),
         }
@@ -1553,38 +1809,34 @@ mod attachment_tests {
 
     #[test]
     fn local_tool_gate_rejects_schema_mismatch() {
-        let mut gate = LocalToolCallGate::new(vec![InferenceTool {
-            name: "memory__search".into(),
-            description: "Search memory".into(),
-            parameters: serde_json::json!({
-                "type": "object",
-                "required": ["query"],
-                "properties": {
-                    "query": {"type": "string"}
-                }
-            }),
-            annotations: None,
-        }]);
-        gate.observe(&StreamEvent::ToolCallStarted {
+        let gate = LocalToolCallGate::new(
+            vec![InferenceTool {
+                name: "memory__search".into(),
+                description: "Search memory".into(),
+                parameters: serde_json::json!({
+                    "type": "object",
+                    "required": ["query"],
+                    "properties": {
+                        "query": {"type": "string"},
+                        "limit": {"type": "integer"}
+                    }
+                }),
+                annotations: Some(InferenceToolAnnotations {
+                    read_only_hint: Some(true),
+                    destructive_hint: Some(false),
+                    open_world_hint: Some(false),
+                    ..Default::default()
+                }),
+            }],
+            BTreeMap::new(),
+        );
+        let call = PendingLocalToolCall {
             id: "call-1".into(),
             name: "memory__search".into(),
-        });
-        gate.observe(&StreamEvent::ToolCallDelta {
-            id: "call-1".into(),
-            delta: r#"{"query":42}"#.into(),
-        });
-
-        let out = gate.observe(&StreamEvent::ToolCallComplete {
-            id: "call-1".into(),
-        });
-        match &out[0] {
-            StreamEvent::ToolResult { output_json, .. } => {
-                let parsed: serde_json::Value =
-                    serde_json::from_str(output_json).expect("tool result is JSON");
-                assert_eq!(parsed["code"], "tool_arguments_schema_mismatch");
-            }
-            other => panic!("expected ToolResult, got {other:?}"),
-        }
+            arguments: r#"{"query":42}"#.into(),
+        };
+        let error = gate.validate_call(&call).expect_err("schema mismatch");
+        assert_eq!(error["code"], "tool_arguments_schema_mismatch");
     }
 
     #[test]
