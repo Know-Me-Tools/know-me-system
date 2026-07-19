@@ -35,7 +35,10 @@ attached Samsung `SM S936U` running Android 16/API 36:
 
 - The APK is arm64-only and contains the KnowMe FFI library plus LiteRT-LM JNI
   library.
-- The core FFI library has no vendor GPU/OpenCL hard dependency.
+- The APK native libraries have no vendor GPU/OpenCL hard dependency. Public
+  Android graphics/runtime libraries required by the LiteRT-LM SDK, such as
+  `libEGL.so`, `libGLESv2.so`, `libGLESv3.so`, and `libandroid.so`, are allowed;
+  OEM OpenCL/vendor libraries remain forbidden in the startup-critical baseline.
 - The generic `gemma-4-E2B-it.litertlm` artifact downloaded to app-private cache,
   matched the pinned byte length, passed SHA-256 verification, and was published.
 - `MainActivity` loads `libgen_ui_ffi.so` through `System.loadLibrary`, so
@@ -112,7 +115,7 @@ cancellation certification, and broader device coverage remain future gates.
 
 - Probe LiteRT-LM GPU/NPU delegates at runtime.
 - Do not hard-link or require vendor-specific GPU libraries from the core FFI
-  library.
+  library or any other startup-critical APK native library.
 - Run delegate smoke tests on device before activation.
 - Select GPU/NPU only when correctness, thermal safety, and median latency or
   throughput improvement are proven.

@@ -61,13 +61,15 @@ if find "$TMP_DIR/lib" -type f \( \
   exit 1
 fi
 
-if "$READ_ELF" -d "$TMP_DIR/lib/arm64-v8a/libgen_ui_ffi.so" | grep -E 'NEEDED.*(OpenCL|GLES_mali|PVROCL|vndksupport)' >/dev/null; then
-  echo "G1 FAIL: libgen_ui_ffi.so hard-links a vendor GPU/OpenCL library" >&2
-  "$READ_ELF" -d "$TMP_DIR/lib/arm64-v8a/libgen_ui_ffi.so" | grep -E 'NEEDED.*(OpenCL|GLES_mali|PVROCL|vndksupport)' >&2
-  exit 1
-fi
+while IFS= read -r native_library; do
+  if "$READ_ELF" -d "$native_library" | grep -E 'NEEDED.*(OpenCL|GLES_mali|PVROCL|vndksupport)' >/dev/null; then
+    echo "G1 FAIL: $(basename "$native_library") hard-links a vendor GPU/OpenCL library" >&2
+    "$READ_ELF" -d "$native_library" | grep -E 'NEEDED.*(OpenCL|GLES_mali|PVROCL|vndksupport)' >&2
+    exit 1
+  fi
+done < <(find "$TMP_DIR/lib/arm64-v8a" -type f -name '*.so' | sort)
 
-echo "G1 PASS: libgen_ui_ffi.so has no vendor GPU/OpenCL DT_NEEDED entries"
+echo "G1 PASS: APK native libraries have no vendor GPU/OpenCL DT_NEEDED entries"
 echo "G2 PASS: APK is arm64-only and contains required KnowMe/LiteRT-LM native libraries"
 echo "G2 PASS: APK does not bundle vendor GPU/OpenCL libraries"
 echo "G3-G6 require install/launch/logcat/runtime self-test on a physical device"
