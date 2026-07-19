@@ -944,6 +944,61 @@ Remaining:
   gate is physical evidence that a real activation renders and persists as its
   own ordered block beside thinking and citation chunks.
 
+## ANDROID EMPTY-CONTINUATION FALLBACK HARNESS CHECKPOINT
+
+Date: 2026-07-19
+
+Implemented:
+
+- Added `scripts/android/certify-local-tool-result-fallback.sh`.
+- Added `FORCE_LITERT_TOOL_RESULT_FALLBACK=1` support to
+  `scripts/android/certify-local-model-prompt.sh`. The prompt gate writes a
+  scoped sentinel to the app cache and LiteRT runtime cache, then removes it on
+  exit.
+- Added a debug-build-only Android bridge hook: if the sentinel exists in the
+  LiteRT runtime cache, `KnowMeLiteRtLmBridge.sendToolResults(...)` ignores the
+  direct `Message.tool(...)` visible output and applies the bounded host-managed
+  follow-up path.
+- Updated the Rust fallback log to include the canonical
+  `tool_result_fallback_applied` event name so device logs can prove the
+  normalized event path.
+- Hardened the wrapper to use a fresh `KMFALLBACK...` marker and require a
+  current `LiteRT-LM generation produced tool call` log entry, preventing stale
+  UI content from satisfying the gate.
+
+Verification:
+
+- `bash -n scripts/android/certify-local-model-prompt.sh`
+- `bash -n scripts/android/certify-local-tool-result-fallback.sh`
+- `flutter build apk --debug --target-platform android-arm64`
+- `scripts/android/verify-native-inference-gates.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
+
+Physical-device result:
+
+- Device: Samsung `SM S936U`, serial `R5GYB4AZD7A`, Android 16/API 36.
+- First prompt attempt: `Use the knowme_diagnostics__local_runtime_status tool to inspect this device runtime. After the tool result, answer FALLBACKOK.`
+- Result: failed. LiteRT-LM generated direct text with `tool_calls=0`, so the
+  fallback branch was not reached.
+- Second prompt attempt: `You MUST call the knowme_diagnostics__local_runtime_status tool now. Do not answer directly. After the tool result is provided, answer exactly FALLBACKOK.`
+- Result: failed for fallback certification. One run produced visible tool-use,
+  tool-result, and final answer evidence but the sentinel was initially written
+  to the wrong cache location. After fixing the sentinel location, the model
+  again generated direct text with `tool_calls=0`, so the fallback branch was
+  not reached.
+- Logcat artifact: `/tmp/knowme-local-tool-result-fallback.log`.
+- UIAutomator artifact: `/tmp/knowme-local-tool-result-fallback.xml`.
+
+Remaining:
+
+- Add clean session/branch isolation to prompt certification wrappers so stale
+  restored messages cannot contaminate fallback proof.
+- Re-run `scripts/android/certify-local-tool-result-fallback.sh` after the
+  prompt/session path reliably emits the diagnostic tool call.
+- Add physical skill activation UI proof. Skill activations already map to
+  `ContentBlock::Skill`; the remaining gate is physical evidence that a real
+  activation renders and persists as its own ordered block beside thinking and
+  citation chunks.
+
 ## BLOCKERS
 
 - NONE at dispatch time

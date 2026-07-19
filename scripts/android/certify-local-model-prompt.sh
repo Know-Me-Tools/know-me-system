@@ -3,7 +3,7 @@ set -euo pipefail
 
 if [[ $# -lt 1 || $# -gt 3 ]]; then
   echo "usage: $0 /path/to/app.apk [expected-visible-text] [package.name]" >&2
-  echo "env: PROMPT='Reply exactly TOKEN.' TIMEOUT_SECONDS=240" >&2
+  echo "env: PROMPT='Reply exactly TOKEN.' TIMEOUT_SECONDS=240 FORCE_LITERT_TOOL_RESULT_FALLBACK=1" >&2
   exit 64
 fi
 
@@ -20,6 +20,12 @@ TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-240}"
 LOG_PATH="${LOG_PATH:-/tmp/knowme-local-model-certification.log}"
 UI_XML_PATH="${UI_XML_PATH:-/tmp/knowme-local-model-certification.xml}"
 REMOTE_UI_XML="/sdcard/knowme-local-model-certification.xml"
+FORCE_LITERT_TOOL_RESULT_FALLBACK="${FORCE_LITERT_TOOL_RESULT_FALLBACK:-0}"
+FORCE_LITERT_TOOL_RESULT_FALLBACK_FILE="knowme-force-litertlm-tool-result-fallback"
+FORCE_LITERT_TOOL_RESULT_FALLBACK_PATHS=(
+  "cache/$FORCE_LITERT_TOOL_RESULT_FALLBACK_FILE"
+  "app_flutter/model-cache/litert-lm/runtime-cache/$FORCE_LITERT_TOOL_RESULT_FALLBACK_FILE"
+)
 
 if [[ ! -f "$APK" ]]; then
   echo "APK not found: $APK" >&2
@@ -43,6 +49,31 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 "$SCRIPT_DIR/verify-device-runtime-gates.sh" "$APK" "$PACKAGE"
+
+cleanup_force_litert_tool_result_fallback() {
+  if [[ "$FORCE_LITERT_TOOL_RESULT_FALLBACK" == "1" ]]; then
+    for sentinel_path in "${FORCE_LITERT_TOOL_RESULT_FALLBACK_PATHS[@]}"; do
+      adb shell run-as "$PACKAGE" rm -f "$sentinel_path" >/dev/null 2>&1 || true
+    done
+  fi
+}
+trap cleanup_force_litert_tool_result_fallback EXIT
+
+if [[ "$FORCE_LITERT_TOOL_RESULT_FALLBACK" == "1" ]]; then
+  if ! adb shell run-as "$PACKAGE" mkdir -p "app_flutter/model-cache/litert-lm/runtime-cache" >/dev/null 2>&1; then
+    echo "G6 FAIL: could not create LiteRT-LM runtime cache directory with run-as" >&2
+    echo "package must be debuggable for FORCE_LITERT_TOOL_RESULT_FALLBACK=1" >&2
+    exit 1
+  fi
+  for sentinel_path in "${FORCE_LITERT_TOOL_RESULT_FALLBACK_PATHS[@]}"; do
+    if ! adb shell run-as "$PACKAGE" touch "$sentinel_path" >/dev/null 2>&1; then
+      echo "G6 FAIL: could not create debug LiteRT-LM tool-result fallback sentinel with run-as" >&2
+      echo "path: $sentinel_path" >&2
+      echo "package must be debuggable for FORCE_LITERT_TOOL_RESULT_FALLBACK=1" >&2
+      exit 1
+    fi
+  done
+fi
 
 dump_ui() {
   adb shell uiautomator dump "$REMOTE_UI_XML" >/dev/null 2>&1

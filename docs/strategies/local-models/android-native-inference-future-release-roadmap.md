@@ -40,8 +40,14 @@ vendor library dependency.
   tool calling: the model must emit `knowme_diagnostics__local_runtime_status`,
   the host must execute it, the UI must render tool-use/tool-result blocks, and
   the continuation must produce final visible answer text.
+- Use `scripts/android/certify-local-tool-result-fallback.sh` as the
+  deterministic debug-build harness for the empty-continuation fallback branch.
+  It must use fresh markers, force the Android bridge fallback sentinel, require
+  current logcat tool-call evidence, and reject stale UI content. Passing this
+  wrapper still requires a prompt/session path that reliably emits the
+  diagnostic tool call before the forced fallback is applied.
 - Add richer physical model-certification wrappers for skill activation UI proof
-  and empty-continuation fallback coverage. The
+  and clean session/branch isolation. The
   current wrappers prove launch, single-turn prompt quality, restart recovery,
   multi-turn history, cancellation, and explicit safe tool calling; they are
   not the full local agent certification suite.
@@ -97,7 +103,8 @@ vendor library dependency.
 ## Release R+4 — Richer local-agent certification
 
 - Expand prompt certification beyond the embedded diagnostics MCP tool:
-  skill activation UI proof and empty-continuation fallback behavior.
+  skill activation UI proof, clean session/branch isolation, and completed
+  empty-continuation fallback behavior.
   Office/personal task following, Mermaid, code, constrained JSON, restart
   recovery, multi-turn history, cancellation, and explicit safe tool calling now
   have physical Android wrapper evidence.

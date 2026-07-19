@@ -453,7 +453,7 @@ fn send_litert_response_events(
             target: "knowme_litert_lm",
             tool_calls = response_tool_calls.len(),
             context,
-            "LiteRT-LM tool-result fallback follow-up applied"
+            "LiteRT-LM tool-result fallback follow-up applied as tool_result_fallback_applied"
         );
     }
     if !response_text.is_empty() {

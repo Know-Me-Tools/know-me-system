@@ -12,8 +12,12 @@ import com.google.ai.edge.litertlm.OpenApiTool
 import com.google.ai.edge.litertlm.SamplerConfig
 import com.google.ai.edge.litertlm.ToolProvider
 import com.google.ai.edge.litertlm.tool
+import android.util.Log
+import android.app.Application
+import android.content.pm.ApplicationInfo
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 import java.util.Locale
 
 /**
@@ -26,6 +30,9 @@ import java.util.Locale
  * API.
  */
 object KnowMeLiteRtLmBridge {
+    private const val TAG = "KnowMeLiteRtLmBridge"
+    private const val FORCE_TOOL_RESULT_FALLBACK_FILE = "knowme-force-litertlm-tool-result-fallback"
+
     private var engine: Engine? = null
     private var conversation: Conversation? = null
     private var modelPath: String? = null
@@ -90,8 +97,12 @@ object KnowMeLiteRtLmBridge {
             error("tool result continuation requires at least one named tool result")
         }
         val response = activeConversation.sendMessage(Message.tool(Contents.of(responses)))
-        if (messageHasVisibleOutput(response)) {
+        val forceFallback = shouldForceToolResultFallback()
+        if (messageHasVisibleOutput(response) && !forceFallback) {
             return messageToJson(response)
+        }
+        if (forceFallback) {
+            Log.w(TAG, "Forcing LiteRT-LM tool-result fallback for Android certification")
         }
 
         val followUp = activeConversation.sendMessage(
@@ -100,6 +111,24 @@ object KnowMeLiteRtLmBridge {
                 "Do not call another tool unless it is required to answer."
         )
         return messageToJson(followUp, toolResultFallbackApplied = true)
+    }
+
+    private fun shouldForceToolResultFallback(): Boolean {
+        if (!isDebuggableApp()) return false
+        val dir = cacheDir ?: return false
+        return File(dir, FORCE_TOOL_RESULT_FALLBACK_FILE).exists()
+    }
+
+    private fun isDebuggableApp(): Boolean {
+        return try {
+            val activityThread = Class.forName("android.app.ActivityThread")
+            val application = activityThread
+                .getMethod("currentApplication")
+                .invoke(null) as? Application ?: return false
+            (application.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        } catch (_: Throwable) {
+            false
+        }
     }
 
     @JvmStatic

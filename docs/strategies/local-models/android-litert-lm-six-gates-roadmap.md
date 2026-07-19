@@ -161,13 +161,20 @@ attached Samsung `SM S936U` running Android 16/API 36:
   produced tool call plus tool-result continuation. It passed on the attached
   Samsung with visible `Tool use knowme_diagnostics__local_runtime_status`,
   `Tool completed`, and `TOOLSTATUSOK` evidence.
+- Empty-continuation fallback now has a deterministic debug-build harness:
+  `scripts/android/certify-local-tool-result-fallback.sh` writes a scoped
+  sentinel into the app/LiteRT runtime cache, uses a fresh `KMFALLBACK...`
+  marker, requires a current diagnostic tool call in logcat, and rejects stale
+  UI evidence. The harness is intentionally not marked passed yet: current
+  physical attempts generated direct text without a tool call, so the fallback
+  branch was not reached.
 
 This proves the CPU smoke lane and code-level tool-call candidate preservation.
 It also proves one complete safe local tool loop and one explicit
 approval-required local tool loop on a physical Android device. True
 token-level streaming callbacks, empty-continuation fallback certification,
-skill-activation UI proof, stale-card cleanup affordances, and broader device
-coverage remain future gates.
+skill-activation UI proof, stale-card cleanup affordances, clean session/branch
+isolation for certification, and broader device coverage remain future gates.
 
 ## Roadmap
 
@@ -232,6 +239,9 @@ coverage remain future gates.
   direct post-tool continuation produces a useful final assistant answer.
 - [x] Preserve the Android bridge's empty-continuation fallback marker as a
   canonical custom lifecycle event so fallback use is observable and persisted.
+- [x] Add a deterministic debug-build harness for the bounded
+  empty-continuation fallback path that uses a fresh marker and rejects stale UI
+  evidence.
 - [ ] Force and certify the bounded empty-continuation fallback path separately.
 - [x] Persist tool-call and tool-result events with the same AG-UI/A2UI content-block
   contract used by other providers.
@@ -277,6 +287,8 @@ coverage remain future gates.
 - [x] Certify explicit safe local tool-calling with visible tool-use/tool-result
   blocks and final continuation text.
 - [ ] Certify empty-continuation fallback cases.
+- [ ] Add clean session/branch isolation to physical prompt wrappers so stale
+  restored messages cannot contaminate fallback certification.
 - [ ] Add physical UI certification for skill activation chunks so a real
   skill activation is visible as its own ordered `ContentBlock::Skill` region,
   parallel to thinking and citation chunks.
