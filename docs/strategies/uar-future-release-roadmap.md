@@ -20,6 +20,10 @@ route to.
   - KnowMe structured `InferenceRequest` → UAR `LlmRequest`-compatible payload;
   - UAR `LlmRequest`-shaped payload → KnowMe structured `InferenceRequest`;
   - KnowMe local `StreamEvent` → UAR `NormalizedEvent`-shaped payload.
+- `gen_ui_agent::uar::UarLocalInferenceDriverBridge` wraps the adapter around a
+  real platform-selected `InferenceProvider`, including Android LiteRT-LM, so a
+  future embedded UAR `ExternalLlmDriver` can call local inference through a
+  narrow host callback.
 - The local-to-UAR normalized-event adapter is stateful for tool calls, so the
   eventual UAR `ExternalLlmDriver` stream can receive complete tool names and
   accumulated JSON arguments rather than lossy completion markers.
@@ -98,8 +102,7 @@ Flutter → Rust FFI boundary.
   - in-process UAR event stream.
 - Register KnowMe's Android LiteRT-LM/Gemma local lane as a UAR provider.
   The provider should use UAR's `ExternalLlmDriver` seam with
-  `gen_ui_protocol::uar_llm_payload_to_inference_request` for incoming requests
-  and `UarNormalizedEventAdapter` for outgoing local stream events.
+  `gen_ui_agent::uar::UarLocalInferenceDriverBridge` as the host callback.
 - Keep Android CPU LiteRT-LM as the universal correctness floor.
 - Keep GPU/NPU delegates optional and selected only after physical-device
   certification.

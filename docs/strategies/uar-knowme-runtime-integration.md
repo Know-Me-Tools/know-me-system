@@ -109,9 +109,12 @@ payloads back into structured KnowMe `InferenceRequest` values, and projects
 local `StreamEvent`s into both AG-UI events and UAR `NormalizedEvent`-shaped
 payloads. Tool-call streaming uses a stateful outbound adapter so final UAR tool
 completion events preserve the exact tool name and accumulated JSON arguments.
-This does not wire embedded mobile UAR yet; it makes the future UAR
-`ExternalLlmDriver` provider registration a mechanical adapter instead of a
-prompt-flattening rewrite.
+`gen_ui_agent::uar::UarLocalInferenceDriverBridge` now wraps that protocol seam
+around a real `InferenceProvider` trait object: it loads the selected local
+model spec, calls the local provider with the structured request, and streams
+UAR `NormalizedEvent`-shaped payloads back out. This does not wire embedded
+mobile UAR yet; it makes the future UAR `ExternalLlmDriver` provider
+registration a closure-level adapter instead of a prompt-flattening rewrite.
 
 ## Event and block mapping
 
@@ -224,10 +227,14 @@ non-invasive way:
    message/tool/settings payloads convert into KnowMe `InferenceRequest`, and
    local provider `StreamEvent`s convert back into UAR `NormalizedEvent`-shaped
    payloads with stateful tool-call argument preservation.
-4. Add Android certification report fields for `uarRuntimeMode` and
+4. Add the host-side local provider bridge. **Done:**
+   `UarLocalInferenceDriverBridge` can call any platform-selected
+   `InferenceProvider`, including Android LiteRT-LM, from a UAR payload and
+   return UAR normalized-event payloads.
+5. Add Android certification report fields for `uarRuntimeMode` and
    `uarSubmoduleCommit`. **Done:** the local certification report records UAR
    authority, target modes, current integration state, and submodule metadata.
-5. Keep physical local-model gates green.
+6. Keep physical local-model gates green.
 
 This preserves current Android progress while moving the architecture toward
 UAR as the real agent runtime authority.

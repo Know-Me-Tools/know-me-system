@@ -6,13 +6,16 @@
 //! local-device provider adapters, and the local conversation projection. This
 //! module captures that boundary without linking the full UAR runtime yet.
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
 use futures::{stream::BoxStream, StreamExt};
-use gen_ui_protocol::{normalize_uar_agui_event, A2uiAdapter};
+use gen_ui_protocol::{
+    normalize_uar_agui_event, uar_llm_payload_to_inference_request, A2uiAdapter,
+    UarLlmRequestPayload, UarNormalizedEventAdapter,
+};
 use gen_ui_types::events::A2uiEvent;
+use gen_ui_types::inference::{InferenceProvider, LocalModelSpec};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
 use crate::error::AgentError;
 
 /// How this platform should access UAR.
@@ -82,6 +85,58 @@ pub struct UarArtifactResponse {
 pub struct UarProjectedRun {
     pub run_id: String,
     pub events: BoxStream<'static, Result<A2uiEvent, AgentError>>,
+}
+
+/// Host-side bridge that lets a future embedded UAR `ExternalLlmDriver` call
+/// KnowMe's local provider without UAR owning model catalogs or Flutter owning
+/// prompt construction.
+///
+/// This is intentionally not the full embedded UAR kernel. It is the narrow
+/// adapter the kernel will call:
+///
+/// `UAR LlmRequest payload → KnowMe InferenceProvider → UAR NormalizedEvent payloads`.
+#[derive(Clone)]
+pub struct UarLocalInferenceDriverBridge {
+    provider: Arc<dyn InferenceProvider>,
+    model_spec: LocalModelSpec,
+}
+
+impl UarLocalInferenceDriverBridge {
+    pub fn new(provider: Arc<dyn InferenceProvider>, model_spec: LocalModelSpec) -> Self {
+        Self {
+            provider,
+            model_spec,
+        }
+    }
+
+    pub async fn stream_payload(
+        &self,
+        payload: UarLlmRequestPayload,
+    ) -> Result<BoxStream<'static, Result<serde_json::Value, AgentError>>, AgentError> {
+        let request =
+            uar_llm_payload_to_inference_request(&payload).map_err(AgentError::Interaction)?;
+        self.provider.load(&self.model_spec).await?;
+        let stream = self.provider.generate_request(&request).await?;
+        let adapter = UarNormalizedEventAdapter::new();
+        Ok(futures::stream::unfold(
+            (stream, adapter, Vec::<serde_json::Value>::new()),
+            |(mut stream, mut adapter, mut pending)| async move {
+                loop {
+                    if let Some(value) = pending.pop() {
+                        return Some((Ok(value), (stream, adapter, pending)));
+                    }
+                    match stream.next().await {
+                        Some(event) => {
+                            pending = adapter.ingest(&event);
+                            pending.reverse();
+                        }
+                        None => return None,
+                    }
+                }
+            },
+        )
+        .boxed())
+    }
 }
 
 impl UarRuntimeStatus {
@@ -331,6 +386,66 @@ mod tests {
     use super::*;
     use futures::StreamExt;
     use gen_ui_types::content_block::ContentBlock;
+    use gen_ui_types::events::StreamEvent;
+    use gen_ui_types::inference::{InferenceRequest, InferenceToolResult};
+    use gen_ui_types::{CoreError, CoreResult};
+    use parking_lot::Mutex;
+
+    #[derive(Default)]
+    struct RecordingInferenceProvider {
+        loads: Mutex<Vec<LocalModelSpec>>,
+        requests: Mutex<Vec<InferenceRequest>>,
+    }
+
+    #[async_trait::async_trait]
+    impl InferenceProvider for RecordingInferenceProvider {
+        async fn load(&self, spec: &LocalModelSpec) -> CoreResult<()> {
+            self.loads.lock().push(spec.clone());
+            Ok(())
+        }
+
+        async fn generate_request(
+            &self,
+            request: &InferenceRequest,
+        ) -> CoreResult<BoxStream<'static, StreamEvent>> {
+            self.requests.lock().push(request.clone());
+            Ok(futures::stream::iter([
+                StreamEvent::MessageStart,
+                StreamEvent::TextDelta {
+                    index: 0,
+                    delta: "before".into(),
+                },
+                StreamEvent::ToolCallStarted {
+                    id: "tool-1".into(),
+                    name: "knowme_diagnostics__local_runtime_status".into(),
+                },
+                StreamEvent::ToolCallDelta {
+                    id: "tool-1".into(),
+                    delta: r#"{"marker":"#.into(),
+                },
+                StreamEvent::ToolCallDelta {
+                    id: "tool-1".into(),
+                    delta: r#""KMUAR"}"#.into(),
+                },
+                StreamEvent::ToolCallComplete {
+                    id: "tool-1".into(),
+                },
+                StreamEvent::Done,
+            ])
+            .boxed())
+        }
+
+        async fn continue_with_tool_results(
+            &self,
+            _results: &[InferenceToolResult],
+        ) -> CoreResult<BoxStream<'static, StreamEvent>> {
+            Err(CoreError::Terminal("unused in test".into()))
+        }
+
+        async fn unload(&self) -> CoreResult<()> {
+            Ok(())
+        }
+    }
 
     #[test]
     fn mobile_sidecar_is_not_allowed_in_status_contract() {
@@ -341,6 +456,81 @@ mod tests {
         assert!(status.local_provider_bridge_available);
         assert!(!status.embedded_kernel_available);
         assert!(status.embedded_kernel_blocker.is_some());
+    }
+
+    #[tokio::test]
+    async fn local_inference_driver_bridge_calls_provider_and_returns_uar_events() {
+        let provider = Arc::new(RecordingInferenceProvider::default());
+        let bridge = UarLocalInferenceDriverBridge::new(
+            provider.clone(),
+            LocalModelSpec {
+                model: "gemma-4-e2b-it-litertlm".into(),
+                context_len: Some(8192),
+            },
+        );
+
+        let events: Vec<_> = bridge
+            .stream_payload(UarLlmRequestPayload {
+                messages: vec![
+                    serde_json::json!({"role": "system", "content": "Be concise."}),
+                    serde_json::json!({"role": "user", "content": "Check status."}),
+                ],
+                tools: vec![serde_json::json!({
+                    "type": "function",
+                    "function": {
+                        "name": "knowme_diagnostics__local_runtime_status",
+                        "description": "Status.",
+                        "parameters": {"type": "object", "properties": {}}
+                    }
+                })],
+                extra_params: Some(serde_json::json!({
+                    "temperature": 0.2,
+                    "max_tokens": 64
+                })),
+            })
+            .await
+            .unwrap()
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .map(Result::unwrap)
+            .collect();
+
+        assert_eq!(provider.loads.lock()[0].model, "gemma-4-e2b-it-litertlm");
+        let request = provider.requests.lock()[0].clone();
+        assert_eq!(request.messages.len(), 2);
+        assert_eq!(
+            request.tools[0].name,
+            "knowme_diagnostics__local_runtime_status"
+        );
+        assert_eq!(request.generation_settings.temperature, 0.2);
+        assert_eq!(request.generation_settings.max_tokens, 64);
+
+        assert!(events.iter().any(|event| {
+            event.get("type").and_then(serde_json::Value::as_str) == Some("message.delta")
+                && event
+                    .pointer("/data/text")
+                    .and_then(serde_json::Value::as_str)
+                    == Some("before")
+        }));
+        let complete = events
+            .iter()
+            .find(|event| {
+                event.get("type").and_then(serde_json::Value::as_str) == Some("tool_call.complete")
+            })
+            .expect("tool completion exists");
+        assert_eq!(
+            complete
+                .pointer("/data/name")
+                .and_then(serde_json::Value::as_str),
+            Some("knowme_diagnostics__local_runtime_status")
+        );
+        assert_eq!(
+            complete
+                .pointer("/data/arguments_json")
+                .and_then(serde_json::Value::as_str),
+            Some(r#"{"marker":"KMUAR"}"#)
+        );
     }
 
     #[test]
