@@ -103,6 +103,10 @@ attached Samsung `SM S936U` running Android 16/API 36:
   bridge sends the normal `Message.tool(...)` continuation first and only sends
   one host-managed follow-up instruction when that continuation is empty and has
   no additional tool calls.
+- The Android fallback marker is preserved across the JNI/Rust boundary as a
+  canonical custom lifecycle event with source `litert_lm` and event name
+  `tool_result_fallback_applied`, so fallback use is visible in the normalized
+  stream instead of being a hidden bridge behavior.
 - A clean active approval-required run has been physically certified with
   phrase `clean777`: the visible approval action executed the host-stored
   pending call, the direct `Message.tool(...)` continuation produced final text,
@@ -180,6 +184,8 @@ affordances, and broader device coverage remain future gates.
   of pre-subscription FFI failures or opaque `CoreErrorImpl` UI bubbles.
 - [x] Certify a clean active approval-required tool flow where LiteRT-LM's
   direct post-tool continuation produces a useful final assistant answer.
+- [x] Preserve the Android bridge's empty-continuation fallback marker as a
+  canonical custom lifecycle event so fallback use is observable and persisted.
 - [ ] Force and certify the bounded empty-continuation fallback path separately.
 - [x] Persist tool-call and tool-result events with the same AG-UI/A2UI content-block
   contract used by other providers.

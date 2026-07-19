@@ -607,6 +607,50 @@ Physical-device evidence:
   `tools.knowme.knowme E AndroidRuntime`, `UnsatisfiedLinkError`, or
   `dlopen failed`.
 
+## TOOL RESULT FALLBACK OBSERVABILITY CHECKPOINT
+
+Date: 2026-07-19
+
+Implemented:
+
+- The Kotlin LiteRT-LM bridge already applies a bounded fallback when
+  `Message.tool(...)` returns no visible text and no additional tool calls: it
+  sends one host-managed follow-up asking the model to answer from the just
+  provided tool result.
+- Rust now preserves the bridge's `toolResultFallbackApplied` flag across the
+  JNI boundary and emits a canonical `StreamEvent::Custom` lifecycle record
+  with source `litert_lm` and event name `tool_result_fallback_applied` before
+  any fallback answer text.
+- This keeps fallback behavior observable and persistable through the existing
+  AG-UI/A2UI unknown/custom event path rather than hiding it inside Android
+  bridge internals.
+
+Verification:
+
+- `cargo test --manifest-path rust/Cargo.toml -p gen_ui_inference --features local-litert-lm litert_lm -- --nocapture`
+- `cargo test --manifest-path rust/Cargo.toml -p gen_ui_protocol -- --nocapture`
+- `flutter build apk --debug --target-platform android-arm64`
+- `../scripts/android/verify-native-inference-gates.sh build/app/outputs/flutter-apk/app-debug.apk`
+
+Physical-device evidence:
+
+- Installed/launched the rebuilt APK on Samsung `SM S936U`.
+- Logcat showed `libgen_ui_ffi.so` loaded successfully through the app
+  classloader and `Loaded gen_ui_ffi through System.loadLibrary`.
+- Logcat showed `mobile migrations ready`, and `pidof tools.knowme.knowme`
+  confirmed the app process remained alive after launch.
+- No `FATAL EXCEPTION`, `tools.knowme.knowme E AndroidRuntime`, or
+  `UnsatisfiedLinkError` was present. The launch log did contain Samsung's
+  unrelated `libpenguin.so` graphics lookup failure, so this checkpoint does
+  not claim a globally clean `dlopen failed` log.
+
+Remaining:
+
+- Force a physical-device run that actually triggers
+  `tool_result_fallback_applied`; the clean `clean777` approval proof did not
+  trigger it because LiteRT-LM's direct `Message.tool(...)` continuation already
+  produced final text.
+
 ## BLOCKERS
 
 - NONE at dispatch time

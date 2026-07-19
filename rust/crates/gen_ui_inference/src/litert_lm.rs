@@ -394,8 +394,20 @@ fn litert_lm_gate_report(
 fn push_litert_lm_response_events(
     text: String,
     tool_calls: Vec<(String, serde_json::Value)>,
+    tool_result_fallback_applied: bool,
     output: &mut Vec<StreamEvent>,
 ) {
+    if tool_result_fallback_applied {
+        output.push(StreamEvent::Custom {
+            source: "litert_lm".into(),
+            event_name: "tool_result_fallback_applied".into(),
+            payload: serde_json::json!({
+                "kind": "lifecycle",
+                "phase": "generation",
+                "message": "LiteRT-LM returned an empty tool-result continuation, so KnowMe sent one bounded follow-up instruction to produce a visible answer from the tool result.",
+            }),
+        });
+    }
     if !text.is_empty() {
         output.push(StreamEvent::TextDelta {
             index: 0,
@@ -430,11 +442,20 @@ fn send_litert_response_events(
         }
     }
     let response_text = response.text;
+    let tool_result_fallback_applied = response.tool_result_fallback_applied;
     let response_tool_calls: Vec<_> = response
         .tool_calls
         .into_iter()
         .map(|tool_call| (tool_call.name, tool_call.arguments))
         .collect();
+    if tool_result_fallback_applied {
+        tracing::warn!(
+            target: "knowme_litert_lm",
+            tool_calls = response_tool_calls.len(),
+            context,
+            "LiteRT-LM tool-result fallback follow-up applied"
+        );
+    }
     if !response_text.is_empty() {
         tracing::info!(
             target: "knowme_litert_lm",
@@ -452,7 +473,12 @@ fn send_litert_response_events(
         );
     }
     let mut events = Vec::new();
-    push_litert_lm_response_events(response_text, response_tool_calls, &mut events);
+    push_litert_lm_response_events(
+        response_text,
+        response_tool_calls,
+        tool_result_fallback_applied,
+        &mut events,
+    );
     for event in events {
         if let StreamEvent::ToolCallStarted { id, name } = &event {
             tracing::info!(
@@ -863,6 +889,7 @@ mod tests {
                 "memory_search".into(),
                 serde_json::json!({"query": "project plan", "k": 3}),
             )],
+            false,
             &mut events,
         );
 
@@ -893,6 +920,37 @@ mod tests {
             events[3],
             StreamEvent::ToolCallComplete {
                 id: "litert-tool-0".into(),
+            }
+        );
+    }
+
+    #[test]
+    fn litert_lm_tool_result_fallback_is_preserved_as_custom_event() {
+        let mut events = Vec::new();
+        push_litert_lm_response_events(
+            "Approved diagnostic echo: clean777".into(),
+            vec![],
+            true,
+            &mut events,
+        );
+
+        assert_eq!(
+            events[0],
+            StreamEvent::Custom {
+                source: "litert_lm".into(),
+                event_name: "tool_result_fallback_applied".into(),
+                payload: serde_json::json!({
+                    "kind": "lifecycle",
+                    "phase": "generation",
+                    "message": "LiteRT-LM returned an empty tool-result continuation, so KnowMe sent one bounded follow-up instruction to produce a visible answer from the tool result.",
+                }),
+            }
+        );
+        assert_eq!(
+            events[1],
+            StreamEvent::TextDelta {
+                index: 0,
+                delta: "Approved diagnostic echo: clean777".into(),
             }
         );
     }

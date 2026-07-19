@@ -32,6 +32,8 @@ pub struct NativeLiteRtLmResponse {
     pub text: String,
     #[serde(default)]
     pub tool_calls: Vec<NativeLiteRtLmToolCall>,
+    #[serde(default)]
+    pub tool_result_fallback_applied: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
