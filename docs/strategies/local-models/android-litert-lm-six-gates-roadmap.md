@@ -149,14 +149,19 @@ attached Samsung `SM S936U` running Android 16/API 36:
   marker, and requires the second response to recover the marker from the
   immediately previous assistant message. It passed on the attached Samsung
   with marker `KMMULTI051210`.
+- Cancellation now has a physical gate:
+  `scripts/android/certify-local-cancellation.sh` submits a long-running prompt,
+  taps the visible Stop control after LiteRT-LM generation starts, and requires
+  the cancelled state to render in the UI. It passed on the attached Samsung
+  with visible `Cancelled by user` evidence.
 
 This proves the CPU smoke lane and code-level tool-call candidate preservation.
 It also proves one complete safe local tool loop and one explicit
 approval-required local tool loop on a physical Android device. True
-token-level streaming callbacks, cancellation certification, explicit
-tool-calling suite coverage, empty-continuation fallback certification,
-skill-activation UI proof, stale-card cleanup affordances, and broader device
-coverage remain future gates.
+token-level streaming callbacks, explicit tool-calling suite coverage,
+empty-continuation fallback certification, skill-activation UI proof,
+stale-card cleanup affordances, and broader device coverage remain future
+gates.
 
 ## Roadmap
 
@@ -261,8 +266,9 @@ coverage remain future gates.
   generated local-model response and requiring persisted UI restoration.
 - [x] Certify multi-turn history with a second prompt that does not include the
   full marker and must recover it from the previous assistant message.
-- [ ] Certify cancellation, explicit tool-calling, and empty-continuation
-  fallback cases.
+- [x] Certify cancellation through the visible Stop control and persisted
+  cancelled bubble.
+- [ ] Certify explicit tool-calling and empty-continuation fallback cases.
 - [ ] Add physical UI certification for skill activation chunks so a real
   skill activation is visible as its own ordered `ContentBlock::Skill` region,
   parallel to thinking and citation chunks.

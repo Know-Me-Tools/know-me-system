@@ -864,13 +864,53 @@ Physical-device evidence:
 - Seed logcat artifact: `/tmp/knowme-local-multiturn-seed.log`.
 - Seed UIAutomator artifact: `/tmp/knowme-local-multiturn-seed.xml`.
 
+## ANDROID CANCELLATION CHECKPOINT
+
+Date: 2026-07-19
+
+Implemented:
+
+- Added `scripts/android/certify-local-cancellation.sh`.
+- The script submits a long-running local prompt through the Flutter chat UI,
+  waits for LiteRT-LM generation to start, taps the visible Stop control, and
+  requires a visible cancelled run state.
+- The script uses UIAutomator bounds to find the composer action button instead
+  of deriving fallback coordinates from the physical screen height. On the
+  attached Samsung the app viewport sits above the navigation bar, so
+  `height - 220` can tap the bottom navigation instead of the composer.
+
+Verification:
+
+- `bash -n scripts/android/certify-local-cancellation.sh`
+- `scripts/android/verify-native-inference-gates.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
+- `TIMEOUT_SECONDS=240 scripts/android/certify-local-cancellation.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
+
+Physical-device evidence:
+
+- Device: Samsung `SM S936U`, serial `R5GYB4AZD7A`, Android 16/API 36.
+- Prompt: `Write a long numbered field guide with 200 detailed items about
+  local-first personal productivity. Keep going until complete.`
+- Logcat contained `LiteRT-LM generation starting`.
+- Output: `CANCEL PASS: run was cancelled through the visible Stop control`.
+- UIAutomator artifact contained visible `Cancelled by user`.
+- Logcat artifact: `/tmp/knowme-local-cancellation.log`.
+- UIAutomator artifact: `/tmp/knowme-local-cancellation.xml`.
+
+Hardening note:
+
+- A post-pass dump taken before app relaunch still showed an enabled
+  `Stop generating` control alongside the cancelled bubble, likely due to
+  in-memory state left by an earlier failed certification attempt in the same
+  process. Force-stop/relaunch cleared the active-control text from the first
+  UI dump. Keep stale active-run/control cleanup on the future UI hardening
+  list; do not use that stale in-process artifact as cancellation proof.
+
 Remaining:
 
-- Add separate wrappers for cancellation, explicit tool-calling suites, and
-  skill activation UI proof. Skill activations already map to
-  `ContentBlock::Skill`; the remaining gate is physical evidence that a real
-  activation renders and persists as its own ordered block beside thinking and
-  citation chunks.
+- Add separate wrappers for explicit tool-calling suites and skill activation
+  UI proof. Skill activations already map to `ContentBlock::Skill`; the
+  remaining gate is physical evidence that a real activation renders and
+  persists as its own ordered block beside thinking and citation chunks.
 
 ## BLOCKERS
 
