@@ -13,8 +13,8 @@ use gen_ui_context::{
 use gen_ui_protocol::A2uiAdapter;
 use gen_ui_types::events::{A2uiEvent, StreamEvent};
 use gen_ui_types::inference::{
-    ImageInput, InferenceMessage, InferenceRequest, InferenceRole, InferenceTool, LocalModelSpec,
-    PromptPlanOrigin, SampleParams,
+    ImageInput, InferenceMessage, InferenceRequest, InferenceRole, InferenceTool,
+    InferenceToolAnnotations, LocalModelSpec, PromptPlanOrigin, SampleParams,
 };
 use gen_ui_types::lifecycle::{
     ModelOperationState, RunError, RunPhase, RunStatus, RuntimeDiagnostics,
@@ -1068,32 +1068,34 @@ fn param_i32(params: &serde_json::Value, key: &str, default: i32) -> i32 {
 }
 
 fn local_tool_definitions() -> Result<Vec<InferenceTool>, AgentError> {
-    crate::tools::tool_definitions(state::mcp()?)
-        .into_iter()
-        .map(|definition| {
-            let value = serde_json::to_value(definition)
-                .map_err(|error| AgentError::Config(error.to_string()))?;
-            let function = value.get("function").ok_or_else(|| {
-                AgentError::Config("tool definition is missing function metadata".into())
-            })?;
-            let name = function
-                .get("name")
-                .and_then(serde_json::Value::as_str)
-                .ok_or_else(|| AgentError::Config("tool definition has no name".into()))?;
-            Ok(InferenceTool {
-                name: name.to_owned(),
-                description: function
-                    .get("description")
-                    .and_then(serde_json::Value::as_str)
-                    .unwrap_or_default()
-                    .to_owned(),
-                parameters: function
-                    .get("parameters")
-                    .cloned()
-                    .unwrap_or_else(|| serde_json::json!({"type": "object"})),
-            })
-        })
-        .collect()
+    let registry = state::mcp()?;
+    let mut definitions = Vec::new();
+    for server_name in registry.server_names() {
+        let Some(server) = registry.get(&server_name) else {
+            continue;
+        };
+        for tool in server.cached_tools() {
+            definitions.push(inference_tool_from_mcp(&server_name, tool));
+        }
+    }
+    Ok(definitions)
+}
+
+fn inference_tool_from_mcp(server_name: &str, tool: gen_ui_mcp::McpTool) -> InferenceTool {
+    InferenceTool {
+        name: crate::tools::qualify(server_name, &tool.name),
+        description: tool.description.unwrap_or_default(),
+        parameters: tool.input_schema,
+        annotations: tool
+            .annotations
+            .map(|annotations| InferenceToolAnnotations {
+                title: annotations.title,
+                read_only_hint: annotations.read_only_hint,
+                destructive_hint: annotations.destructive_hint,
+                idempotent_hint: annotations.idempotent_hint,
+                open_world_hint: annotations.open_world_hint,
+            }),
+    }
 }
 
 #[derive(Debug)]
@@ -1505,6 +1507,12 @@ mod attachment_tests {
                     "limit": {"type": "integer"}
                 }
             }),
+            annotations: Some(InferenceToolAnnotations {
+                read_only_hint: Some(true),
+                destructive_hint: Some(false),
+                open_world_hint: Some(false),
+                ..Default::default()
+            }),
         }]);
 
         assert!(gate
@@ -1555,6 +1563,7 @@ mod attachment_tests {
                     "query": {"type": "string"}
                 }
             }),
+            annotations: None,
         }]);
         gate.observe(&StreamEvent::ToolCallStarted {
             id: "call-1".into(),
@@ -1576,5 +1585,34 @@ mod attachment_tests {
             }
             other => panic!("expected ToolResult, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn mcp_tool_annotations_survive_local_inference_mapping() {
+        let tool = inference_tool_from_mcp(
+            "memory",
+            gen_ui_mcp::McpTool {
+                name: "search".into(),
+                title: Some("Search".into()),
+                description: Some("Search memory".into()),
+                input_schema: serde_json::json!({"type": "object"}),
+                annotations: Some(gen_ui_mcp::McpToolAnnotations {
+                    title: Some("Search Memory".into()),
+                    read_only_hint: Some(true),
+                    destructive_hint: Some(false),
+                    idempotent_hint: Some(true),
+                    open_world_hint: Some(false),
+                }),
+                execution: None,
+                output_schema: None,
+            },
+        );
+
+        assert_eq!(tool.name, "memory__search");
+        let annotations = tool.annotations.expect("annotations are preserved");
+        assert_eq!(annotations.read_only_hint, Some(true));
+        assert_eq!(annotations.destructive_hint, Some(false));
+        assert_eq!(annotations.idempotent_hint, Some(true));
+        assert_eq!(annotations.open_world_hint, Some(false));
     }
 }

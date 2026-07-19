@@ -56,6 +56,11 @@ attached Samsung `SM S936U` running Android 16/API 36:
   JSON shape, required fields, and shallow property types. It then fails closed
   with a typed tool-result error until permission/mutation policy metadata is
   available for safe host execution.
+- MCP `ToolAnnotations` now round-trip from `tools/list` into the shared
+  `InferenceTool` contract. This preserves `readOnlyHint`, `destructiveHint`,
+  `idempotentHint`, and `openWorldHint` for the future execution policy. These
+  hints are treated as advisory only; local auto-execution still requires a
+  trusted registry policy and confirmation handling.
 
 This proves the CPU smoke lane and code-level tool-call candidate preservation.
 It does not yet prove that the model reliably chooses tools for certified
@@ -98,6 +103,7 @@ certification, and broader device coverage remain future gates.
 - [x] Provide LiteRT-LM with structured tool declarations.
 - [x] Preserve model tool-call candidates as canonical stream events.
 - [x] Parse model tool-call candidates through fail-closed validation.
+- [x] Preserve MCP tool annotations in local inference tool definitions.
 - [ ] Replace shallow JSON validation with the shared full schema validator used
   by executable tool loops.
 - Enforce permission policy before execution.

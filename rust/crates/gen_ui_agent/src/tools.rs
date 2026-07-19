@@ -19,7 +19,7 @@ use crate::error::AgentError;
 const QUALIFIER: &str = "__";
 
 /// Qualify an MCP tool name for the model's flat namespace.
-fn qualify(server: &str, tool: &str) -> String {
+pub(crate) fn qualify(server: &str, tool: &str) -> String {
     format!("{server}{QUALIFIER}{tool}")
 }
 

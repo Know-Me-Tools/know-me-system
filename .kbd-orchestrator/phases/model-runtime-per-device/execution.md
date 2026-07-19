@@ -158,10 +158,37 @@ Implemented:
   permission and mutability policy metadata exists. This deliberately prevents
   automatic MCP execution from a local model without confirmation policy.
 
+## MCP TOOL POLICY METADATA CHECKPOINT
+
+Date: 2026-07-19
+
+Implemented:
+
+- Extended `gen_ui_mcp::McpTool` to preserve MCP `title`, `annotations`,
+  `execution`, and `outputSchema` fields from `tools/list`.
+- Added shared `InferenceToolAnnotations` carrying `title`, `readOnlyHint`,
+  `destructiveHint`, `idempotentHint`, and `openWorldHint`.
+- Local inference tool definitions are now built directly from the MCP registry
+  cache so those annotations survive into the LiteRT-LM/request boundary.
+- Kept execution fail-closed. Per the MCP spec, annotations are hints and must
+  not be treated as trustworthy by themselves; KnowMe still needs registry
+  trust and confirmation policy before local automatic execution.
+
+Source basis:
+
+- MCP 2025-11-25 Tools spec: clients should keep a human in the loop, show tool
+  invocations, and confirm sensitive operations.
+- MCP 2025-11-25 Schema Reference: `ToolAnnotations` includes `readOnlyHint`,
+  `destructiveHint`, `idempotentHint`, and `openWorldHint`; annotations are
+  advisory and not a faithful safety guarantee for untrusted servers.
+
 Verification:
 
 - `cargo test -p gen_ui_protocol`
 - `cargo test -p gen_ui_agent local_tool_gate -- --nocapture`
+- `cargo test -p gen_ui_agent mcp_tool_annotations_survive_local_inference_mapping -- --nocapture`
+- `cargo test -p gen_ui_mcp`
+- `cargo test -p gen_ui_types structured_messages_preserve_roles_and_tools`
 - `cargo check -p gen_ui_agent`
 - `cargo test -p gen_ui_inference --features local-litert-lm`
 - `flutter analyze lib`

@@ -107,6 +107,26 @@ pub struct InferenceTool {
     pub name: String,
     pub description: String,
     pub parameters: serde_json::Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub annotations: Option<InferenceToolAnnotations>,
+}
+
+/// Provider-neutral subset of MCP `ToolAnnotations`. These are advisory hints,
+/// not proof of safety; execution policy still decides whether a local model may
+/// call a tool automatically.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct InferenceToolAnnotations {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub read_only_hint: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub destructive_hint: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub idempotent_hint: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub open_world_hint: Option<bool>,
 }
 
 /// A bounded image supplied to a local multimodal model. The bytes stay in the
@@ -263,6 +283,13 @@ mod tests {
                 name: "weather".into(),
                 description: "Get weather".into(),
                 parameters: serde_json::json!({"type": "object"}),
+                annotations: Some(InferenceToolAnnotations {
+                    title: Some("Weather".into()),
+                    read_only_hint: Some(true),
+                    destructive_hint: Some(false),
+                    idempotent_hint: None,
+                    open_world_hint: Some(true),
+                }),
             }],
             images: Vec::new(),
             generation_settings: SampleParams::default(),

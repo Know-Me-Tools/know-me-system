@@ -17,6 +17,8 @@ pub mod registry;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod sse_transport;
 
-pub use registry::{McpRegistry, McpServerHandle, McpTool, McpTransport};
+pub use registry::{
+    McpRegistry, McpServerHandle, McpTool, McpToolAnnotations, McpToolExecution, McpTransport,
+};
 #[cfg(not(target_arch = "wasm32"))]
 pub use sse_transport::SseTransport;
