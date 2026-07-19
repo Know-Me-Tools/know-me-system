@@ -16,6 +16,9 @@ route to.
 - The same projection path then renders UAR reasoning, skill activation, tool
   lifecycle, text, error, completion, and unknown custom payloads as KnowMe
   A2UI/content blocks.
+- `gen_ui_agent::uar::UarServiceRuntime` can create a UAR run through the UAR
+  HTTP SDK, consume its SSE stream, and project events into KnowMe A2UI blocks.
+- Flutter FFI and the Tauri plugin expose read-only UAR runtime status.
 - Android local inference is still owned by the current LiteRT-LM path. It is
   not yet routed through UAR.
 
@@ -30,7 +33,12 @@ production chat execution yet.
   - target access mode;
   - current integration state;
   - submodule commit;
-  - whether mobile sidecars are allowed.
+  - whether mobile sidecars are allowed. **Done.**
+- Provide a service-mode facade for desktop/web/cloud UAR:
+  - create run;
+  - stream events;
+  - cancel run;
+  - project UAR events into KnowMe A2UI. **Done at Rust seam level.**
 - Add golden fixtures from UAR's `uar.agui/1` profile:
   - reasoning;
   - text;
@@ -44,7 +52,8 @@ production chat execution yet.
   unknown events are preserved as artifacts.
 
 Exit gate: protocol/component tests prove UAR event projection across Flutter,
-React/web, and Tauri without claiming UAR executes chat yet.
+React/web, and Tauri. Service-mode execution must additionally be proven
+against a real UAR service before desktop/web can be called runtime-certified.
 
 ## Release UAR-2 — Mobile embedded kernel
 
@@ -132,4 +141,3 @@ silently swaps local execution for cloud execution.
 - Do not claim UAR mobile runtime certification while only the projection seam
   is implemented.
 - Do not run BossFang/LibreFang as a local mobile sidecar.
-

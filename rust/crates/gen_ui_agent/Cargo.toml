@@ -67,6 +67,7 @@ apple-native-keyring-store.workspace = true
 # features across them.
 [target.'cfg(not(any(target_os = "ios", target_os = "android")))'.dependencies]
 gen_ui_db = { path = "../gen_ui_db", features = ["pglite"] }
+universal-agent-runtime-sdk = { path = "../../vendor/universal-agent-runtime/sdks/rust", default-features = false, features = ["http-client"] }
 [target.'cfg(any(target_os = "ios", target_os = "android"))'.dependencies]
 gen_ui_db = { path = "../gen_ui_db" }
 

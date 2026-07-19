@@ -158,7 +158,8 @@ policy explicitly includes them.
 - Add the UAR submodule as a pinned dependency reference.
 - Define a KnowMe `UarRuntimeFacade` trait with two implementations:
   - embedded/mobile;
-  - HTTP/service.
+  - HTTP/service. **Service facade exists at the Rust seam level through
+    `UarServiceRuntime`; embedded/mobile remains future work.**
 - Define event mapping tests from UAR stream payloads to KnowMe `ContentBlock`
   variants.
 - Keep the existing local LiteRT-LM path active while the facade is introduced.
@@ -200,6 +201,8 @@ non-invasive way:
    UAR stream events into KnowMe content blocks. **Done:** `gen_ui_protocol`
    normalizes UAR `uar.agui/1` reasoning, skill activation, tool lifecycle,
    and unknown custom events into KnowMe stream/content blocks.
+   `gen_ui_agent::uar` also projects UAR SDK SSE stream events through the same
+   adapter while preserving order.
 3. Add Android certification report fields for `uarRuntimeMode` and
    `uarSubmoduleCommit`. **Done:** the local certification report records UAR
    authority, target modes, current integration state, and submodule metadata.

@@ -5,7 +5,9 @@ the hook mechanism that lets plugins participate in prompt processing and contex
 assembly; and native WASM agents with an A2A-shaped WIT contract and host inference
 callbacks.
 
-**Status:** v1.0 strategy, 2026-07-18. Companion to
+**Status:** v1.1 strategy, 2026-07-19 (v1.1 adds §7: grounding in the vendored UAR
+submodule — where this doc's "UAR (`gen_ui_agent`)" references land concretely).
+Companion to
 `docs/knowme-builder-extensibility-spec.md` (§4 agents, §5 component model),
 `docs/strategies/model-configuration/README.md` (§4 resolution, used by every callback
 here), and `docs/knowme-functional-spec.html` (§06 Hands, §08 plugins, §09 privacy).
@@ -249,3 +251,46 @@ observed the same way.
   tables; wizard copy for the three mobile modes (§2.2).
 - Audit: hook invocations and infer-callback records join the existing per-Hand audit
   log (FUNC-SPEC §06).
+
+## 7. UAR grounding (2026-07-19): the submodule is real — map to it
+
+The Universal Agent Runtime is now vendored at **`rust/vendor/universal-agent-runtime`**
+(v1.0.0; a single root crate `universal-agent-runtime` with `[lib]` plus the
+`universal-agent-runtime` and `uar-sidecar` binaries; excluded from the host
+workspace build). Every "UAR" reference above now has a concrete target, and three
+corrections fall out:
+
+1. **Placements map to UAR consumption modes, not to new code.**
+   - `embedded` (mobile, the only phone option) = UAR **as a Rust library**, behind a
+     facade in `gen_ui_agent` (Release A of
+     `docs/strategies/local-models/android-agentskills-process-future-roadmap.md`).
+     UAR's compatibility policy explicitly does **not** guarantee its Rust API during
+     1.x — the supported surface is sidecar HTTP/SSE. Mobile has no sidecar option,
+     so: pin the submodule SHA, keep the facade the *only* touchpoint, and treat
+     every UAR bump as a reviewed migration.
+   - `sidecar` (desktop) = the **`uar-sidecar` binary** — the lifecycle-isolation
+     story of §2.1 is a shipped binary, not a new crate to write.
+   - `peer` = BossFang serving the UAR **`server-full`** bundle (HTTP/SSE — the
+     integration surface UAR actually supports; see the BossFang doc).
+   - `kiln` = unchanged (server-side WASM).
+2. **Agent definition is compiled, and there are two artifacts with one owner.**
+   `HandDefinition` stays KnowMe's authoring/governance surface (identity, schedule,
+   grants, Cedar). The *execution* artifact is UAR's **UAR-AGENT-MD → compiler →
+   `AgentArtifact`** (`src/uar/domain/artifact.rs`, `src/uar/compiler/`, with
+   ed25519 signing and a conformance suite); A2A exposure uses UAR's
+   `AgentCard`/`AgentSkill` (`src/uar/api/a2a/`). The mapping rule: a declarative
+   Hand *compiles to* a UAR-AGENT-MD artifact; a component (WASM) Hand binds to one
+   — §4.3's "two agent kinds, one lifecycle" survives with UAR's artifact as the
+   shared execution form. Execution itself is UAR's `RunManager`
+   (`src/uar/runtime/manager.rs`) over `ractor` agent actors and `AgentGraph`.
+3. **The "one AgentService contract" is realized as protocols, not a proto.** The
+   frf-agentproto framing of §1 is superseded by UAR's actual surface: the
+   **AG-UI event profile `uar.agui/1`** (see `docs/strategies/ag-ui/README.md`),
+   the **A2A task vocabulary**, and OpenAI-compatible endpoints in server mode.
+   "Placement is configuration" still holds — the client speaks the same AG-UI +
+   task contract to an embedded runtime (in-proc) or a peer (HTTP/SSE).
+
+Skill definition/execution grounds the same way (UAR `src/uar/domain/skills.rs` +
+the `prometheus-skill-system` content repo): see `docs/strategies/skill-support/README.md`
+§8. A2UI surfaces declared by agents (UAR-AGENT-MD §06) resolve through
+`docs/strategies/a2ui/README.md`.

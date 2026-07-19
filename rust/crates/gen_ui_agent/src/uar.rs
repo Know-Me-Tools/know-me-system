@@ -6,9 +6,14 @@
 //! local-device provider adapters, and the local conversation projection. This
 //! module captures that boundary without linking the full UAR runtime yet.
 
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+use futures::{stream::BoxStream, StreamExt};
 use gen_ui_protocol::{normalize_uar_agui_event, A2uiAdapter};
 use gen_ui_types::events::A2uiEvent;
 use serde::{Deserialize, Serialize};
+
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+use crate::error::AgentError;
 
 /// How this platform should access UAR.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -50,6 +55,22 @@ pub struct UarRuntimeStatus {
     pub submodule_commit: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct UarRunRequest {
+    /// Compiled UAR agent artifact. UAR owns this schema; KnowMe passes it
+    /// through and persists only the selected ids/provenance it needs.
+    pub artifact: serde_json::Value,
+    pub input: String,
+    pub session_id: Option<String>,
+}
+
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+pub struct UarProjectedRun {
+    pub run_id: String,
+    pub events: BoxStream<'static, Result<A2uiEvent, AgentError>>,
+}
+
 impl UarRuntimeStatus {
     pub fn current() -> Self {
         Self {
@@ -61,6 +82,144 @@ impl UarRuntimeStatus {
             submodule_path: "rust/vendor/universal-agent-runtime".into(),
             submodule_commit: option_env!("KNOWME_UAR_SUBMODULE_COMMIT").map(str::to_owned),
         }
+    }
+}
+
+#[async_trait::async_trait]
+pub trait UarRuntimeFacade: Send + Sync {
+    fn status(&self) -> UarRuntimeStatus;
+    #[cfg(not(any(target_os = "ios", target_os = "android")))]
+    async fn start_run(&self, request: UarRunRequest) -> Result<UarProjectedRun, AgentError>;
+    #[cfg(not(any(target_os = "ios", target_os = "android")))]
+    async fn cancel_run(&self, run_id: &str) -> Result<bool, AgentError>;
+}
+
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+#[derive(Debug, Clone)]
+pub struct UarServiceRuntime {
+    client: universal_agent_runtime_sdk::Client,
+}
+
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+impl UarServiceRuntime {
+    pub fn new(base_url: impl AsRef<str>, api_key: Option<String>) -> Result<Self, AgentError> {
+        let client = universal_agent_runtime_sdk::Client::new(base_url.as_ref())
+            .map_err(|error| AgentError::Client(format!("UAR client: {error}")))?;
+        let client = match api_key {
+            Some(api_key) if !api_key.is_empty() => client.with_api_key(api_key),
+            _ => client,
+        };
+        Ok(Self { client })
+    }
+}
+
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+#[async_trait::async_trait]
+impl UarRuntimeFacade for UarServiceRuntime {
+    fn status(&self) -> UarRuntimeStatus {
+        UarRuntimeStatus {
+            target_mode: UarDeploymentMode::HttpService,
+            current_state: UarIntegrationState::ServiceRuntime,
+            ..UarRuntimeStatus::current()
+        }
+    }
+
+    async fn start_run(&self, request: UarRunRequest) -> Result<UarProjectedRun, AgentError> {
+        let run = self
+            .client
+            .runs()
+            .create(universal_agent_runtime_sdk::CreateRunRequest {
+                artifact: request.artifact,
+                input: request.input,
+                session_id: request.session_id,
+            })
+            .await
+            .map_err(uar_sdk_error)?;
+        let stream = self
+            .client
+            .runs()
+            .stream(&run.run_id, None)
+            .await
+            .map_err(uar_sdk_error)?;
+        Ok(UarProjectedRun {
+            run_id: run.run_id.clone(),
+            events: project_sdk_stream(run.run_id, stream),
+        })
+    }
+
+    async fn cancel_run(&self, run_id: &str) -> Result<bool, AgentError> {
+        self.client
+            .runs()
+            .cancel(run_id)
+            .await
+            .map(|response| response.cancelled)
+            .map_err(uar_sdk_error)
+    }
+}
+
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+fn uar_sdk_error(error: universal_agent_runtime_sdk::Error) -> AgentError {
+    AgentError::Client(format!("UAR runtime: {error}"))
+}
+
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+fn project_sdk_stream(
+    run_id: String,
+    stream: universal_agent_runtime_sdk::EventStream,
+) -> BoxStream<'static, Result<A2uiEvent, AgentError>> {
+    let projector = UarEventProjector::new(run_id);
+    futures::stream::unfold(
+        (stream, projector, Vec::<A2uiEvent>::new()),
+        |(mut stream, mut projector, mut pending)| async move {
+            loop {
+                if let Some(event) = pending.pop() {
+                    return Some((Ok(event), (stream, projector, pending)));
+                }
+                match stream.next().await {
+                    Some(Ok(event)) => {
+                        let payload = sdk_stream_payload_to_agui(event);
+                        pending = projector.ingest_agui_payload(&payload);
+                        pending.reverse();
+                    }
+                    Some(Err(error)) => {
+                        return Some((Err(uar_sdk_error(error)), (stream, projector, pending)));
+                    }
+                    None => return None,
+                }
+            }
+        },
+    )
+    .boxed()
+}
+
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+fn sdk_stream_payload_to_agui(
+    event: universal_agent_runtime_sdk::StreamEvent,
+) -> serde_json::Value {
+    let universal_agent_runtime_sdk::StreamEvent {
+        id,
+        event: event_type,
+        data,
+    } = event;
+    match data {
+        serde_json::Value::Object(mut object) => {
+            if !object.contains_key("type") {
+                if let Some(event_type) = event_type {
+                    object.insert("type".into(), serde_json::Value::String(event_type));
+                }
+            }
+            if !object.contains_key("eventId") {
+                if let Some(id) = id {
+                    object.insert("eventId".into(), serde_json::Value::String(id));
+                }
+            }
+            serde_json::Value::Object(object)
+        }
+        other => serde_json::json!({
+            "type": event_type.unwrap_or_else(|| "RAW".into()),
+            "eventId": id,
+            "value": other,
+        }),
     }
 }
 
@@ -104,6 +263,7 @@ pub fn runtime_status() -> UarRuntimeStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures::StreamExt;
     use gen_ui_types::content_block::ContentBlock;
 
     #[test]
@@ -166,5 +326,62 @@ mod tests {
                 ..
             } if id == "tool-1" && name == "docs.search" && input_json == "{\"q\":\"rag\"}"
         ));
+    }
+
+    #[test]
+    #[cfg(not(any(target_os = "ios", target_os = "android")))]
+    fn sdk_stream_payload_injects_sse_event_type_when_missing() {
+        let payload = sdk_stream_payload_to_agui(universal_agent_runtime_sdk::StreamEvent {
+            id: Some("cursor-1".into()),
+            event: Some("REASONING_MESSAGE_CONTENT".into()),
+            data: serde_json::json!({"delta": "reason"}),
+        });
+        assert_eq!(
+            payload.get("type").and_then(serde_json::Value::as_str),
+            Some("REASONING_MESSAGE_CONTENT")
+        );
+        assert_eq!(
+            payload.get("eventId").and_then(serde_json::Value::as_str),
+            Some("cursor-1")
+        );
+    }
+
+    #[tokio::test]
+    #[cfg(not(any(target_os = "ios", target_os = "android")))]
+    async fn sdk_stream_projection_preserves_uar_order() {
+        let source = futures::stream::iter([
+            Ok(universal_agent_runtime_sdk::StreamEvent {
+                id: Some("1".into()),
+                event: Some("RUN_STARTED".into()),
+                data: serde_json::json!({}),
+            }),
+            Ok(universal_agent_runtime_sdk::StreamEvent {
+                id: Some("2".into()),
+                event: Some("TEXT_MESSAGE_CONTENT".into()),
+                data: serde_json::json!({"delta": "hello"}),
+            }),
+            Ok(universal_agent_runtime_sdk::StreamEvent {
+                id: Some("3".into()),
+                event: Some("RUN_FINISHED".into()),
+                data: serde_json::json!({}),
+            }),
+        ])
+        .boxed();
+
+        let output: Vec<_> = project_sdk_stream("run-1".into(), source)
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .map(Result::unwrap)
+            .collect();
+        assert!(matches!(&output[0], A2uiEvent::RunStarted { .. }));
+        assert!(matches!(
+            &output[1],
+            A2uiEvent::Block {
+                block: ContentBlock::Text { text },
+                ..
+            } if text == "hello"
+        ));
+        assert!(matches!(&output[2], A2uiEvent::RunFinished { .. }));
     }
 }

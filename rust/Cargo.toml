@@ -24,6 +24,10 @@ members = [
     "crates/knowme_plugin_host",
     "crates/workspace-hack",
 ]
+exclude = [
+    "vendor/universal-agent-runtime",
+    "vendor/universal-agent-runtime/sdks/rust",
+]
 
 [workspace.package]
 version = "0.1.0"
