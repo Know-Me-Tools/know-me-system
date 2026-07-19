@@ -129,13 +129,18 @@ attached Samsung `SM S936U` running Android 16/API 36:
   attached Samsung: the script submitted `Reply exactly KMOK042738.`, LiteRT-LM
   started generation, produced text, and the UI hierarchy contained
   `KMOK042738`.
+- The richer prompt-suite wrapper now exists at
+  `scripts/android/certify-local-prompt-suite.sh`. The `exact` case physically
+  passed with `KMEXACT043202`, and the `mermaid` case physically passed by
+  rendering a visible Mermaid diagram for a fully specified Start-to-End graph.
 
 This proves the CPU smoke lane and code-level tool-call candidate preservation.
 It also proves one complete safe local tool loop and one explicit
 approval-required local tool loop on a physical Android device. True
-token-level streaming callbacks, cancellation certification, richer prompt
-certification, empty-continuation fallback certification, stale-card cleanup
-affordances, and broader device coverage remain future gates.
+token-level streaming callbacks, cancellation certification, the remaining
+office/code/JSON prompt-suite cases, empty-continuation fallback certification,
+stale-card cleanup affordances, and broader device coverage remain future
+gates.
 
 ## Roadmap
 
@@ -232,6 +237,13 @@ affordances, and broader device coverage remain future gates.
   restart recovery.
 - [x] Certify one physical UI prompt smoke where a fresh expected token crosses
   Flutter → Rust FFI → LiteRT-LM → normalized `ContentBlock` rendering.
+- [x] Add a repeatable physical prompt-suite wrapper.
+- [x] Certify the Mermaid prompt-suite case on the attached Samsung.
+- [ ] Certify office/personal task, code, constrained JSON, multi-turn history,
+  cancellation, and restart-recovery cases.
+- [ ] Add physical UI certification for skill activation chunks so a real
+  skill activation is visible as its own ordered `ContentBlock::Skill` region,
+  parallel to thinking and citation chunks.
 - Certify the SM8750-specific artifact only after the generic CPU path is green.
 - Add at least one non-Qualcomm modern Android phone before claiming broad
   Android support.

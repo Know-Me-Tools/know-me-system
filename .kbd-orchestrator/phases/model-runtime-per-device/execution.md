@@ -718,6 +718,59 @@ Physical-device evidence:
 - Logcat artifact: `/tmp/knowme-local-model-certification.log`.
 - UIAutomator artifact: `/tmp/knowme-local-model-certification.xml`.
 
+## ANDROID LOCAL PROMPT SUITE CHECKPOINT
+
+Date: 2026-07-19
+
+Implemented:
+
+- Added `scripts/android/certify-local-prompt-suite.sh` as a case-selectable
+  physical prompt-suite wrapper around `certify-local-model-prompt.sh`.
+- The suite currently defines `exact`, `office`, `mermaid`, `code`, and `json`
+  cases. Each case generates a fresh marker, submits a UI prompt, and requires
+  LiteRT-LM generation logs plus case-specific visible UI evidence.
+- Adjusted the single-prompt gate to support multiple required visible
+  substrings through `EXPECTED_SUBSTRINGS`, allowing rendered-block cases to
+  assert structural UI evidence such as `Mermaid diagram` instead of only a raw
+  answer token.
+- Corrected non-tool prompt wording from `token` to `marker` so prompt
+  certification cases do not accidentally trigger the approval-required
+  diagnostics echo tool.
+
+Verification:
+
+- `bash -n scripts/android/certify-local-model-prompt.sh`
+- `bash -n scripts/android/certify-local-prompt-suite.sh`
+- `CASES=exact TIMEOUT_SECONDS=300 scripts/android/certify-local-prompt-suite.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
+- `CASES=mermaid TIMEOUT_SECONDS=300 scripts/android/certify-local-prompt-suite.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
+
+Physical-device evidence:
+
+- Exact case:
+  - Prompt: `Reply exactly KMEXACT043202.`
+  - Output: `G5 PASS: LiteRT-LM generation started`,
+    `G6 PASS: LiteRT-LM produced text`, and
+    `G6 PASS: expected visible UI text found: KMEXACT043202`.
+  - Logcat artifact: `/tmp/knowme-local-model-certification-exact.log`.
+  - UIAutomator artifact: `/tmp/knowme-local-model-certification-exact.xml`.
+- Mermaid case:
+  - Prompt: `Create a Mermaid graph TD from Start to End. Do not ask questions.
+    Include marker KMMERMAID043921.`
+  - Output: `G5 PASS: LiteRT-LM generation started`,
+    `G6 PASS: LiteRT-LM produced text`, and
+    `G6 PASS: expected visible UI text found: Mermaid diagram`.
+  - Logcat artifact: `/tmp/knowme-local-model-certification-mermaid.log`.
+  - UIAutomator artifact: `/tmp/knowme-local-model-certification-mermaid.xml`.
+
+Remaining:
+
+- Run and tune the `office`, `code`, and `json` cases.
+- Add separate wrappers for multi-turn history, cancellation, restart recovery,
+  explicit tool-calling suites, and skill activation UI proof. Skill
+  activations already map to `ContentBlock::Skill`; the remaining gate is
+  physical evidence that a real activation renders and persists as its own
+  ordered block beside thinking and citation chunks.
+
 ## BLOCKERS
 
 - NONE at dispatch time

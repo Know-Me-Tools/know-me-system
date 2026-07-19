@@ -15,6 +15,7 @@ else
 fi
 PACKAGE="${3:-tools.knowme.knowme}"
 PROMPT="${PROMPT:-Reply exactly ${EXPECTED_TEXT}.}"
+EXPECTED_SUBSTRINGS="${EXPECTED_SUBSTRINGS:-$EXPECTED_TEXT}"
 TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-240}"
 LOG_PATH="${LOG_PATH:-/tmp/knowme-local-model-certification.log}"
 UI_XML_PATH="${UI_XML_PATH:-/tmp/knowme-local-model-certification.xml}"
@@ -107,6 +108,20 @@ tap_send_fallback() {
   adb shell input tap "$((width - 72))" "$((height - 220))"
 }
 
+ui_contains_expected_substrings() {
+  local expected
+  IFS='|' read -r -a expected_items <<< "$EXPECTED_SUBSTRINGS"
+  for expected in "${expected_items[@]}"; do
+    if [[ -z "$expected" ]]; then
+      continue
+    fi
+    if ! rg -F -q "$expected" "$UI_XML_PATH"; then
+      return 1
+    fi
+  done
+  return 0
+}
+
 adb logcat -c
 
 if ! tap_matching_node "Ask KnowMe anything"; then
@@ -144,10 +159,10 @@ while (( SECONDS < deadline )); do
   fi
   if rg -q "LiteRT-LM generation starting" "$LOG_PATH" &&
      rg -q "LiteRT-LM generation produced text" "$LOG_PATH" &&
-     rg -F -q "$EXPECTED_TEXT" "$UI_XML_PATH"; then
+     ui_contains_expected_substrings; then
     echo "G5 PASS: LiteRT-LM generation started"
     echo "G6 PASS: LiteRT-LM produced text"
-    echo "G6 PASS: expected visible UI text found: $EXPECTED_TEXT"
+    echo "G6 PASS: expected visible UI text found: $EXPECTED_SUBSTRINGS"
     echo "prompt: $PROMPT"
     echo "logcat: $LOG_PATH"
     echo "ui xml: $UI_XML_PATH"

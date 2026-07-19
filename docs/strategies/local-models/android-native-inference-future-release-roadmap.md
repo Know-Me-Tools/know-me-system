@@ -22,6 +22,11 @@ vendor library dependency.
   fresh expected token prompt, require LiteRT-LM generation logs, keep the
   transcript pinned to `Latest`, and require the expected token in the visible
   UIAutomator hierarchy.
+- Use `scripts/android/certify-local-prompt-suite.sh` to run named physical
+  prompt cases (`exact`, `office`, `mermaid`, `code`, `json`) through the same
+  UI-driven gate. The suite is intentionally case-selectable so long-running
+  model checks can be certified incrementally while still using one automation
+  path.
 - Add richer physical model-certification wrappers for tool calling,
   cancellation, restart recovery, and prompt-suite coverage. The current prompt
   wrapper proves one UI→Rust→LiteRT-LM→ContentBlock path, not the full local
@@ -91,6 +96,10 @@ vendor library dependency.
 - Treat skill activation chunks as first-class ordered semantic blocks, rendered
   outside answer Markdown in the same turn region model as thinking, citation,
   tool, memory, lifecycle, and artifact chunks.
+- Require physical UI evidence for skill activation chunks before marking this
+  lane complete: a real activation must be visible as a `skill` block and must
+  persist/recover with the same ordered block semantics as thinking and
+  citations.
 
 ## Explicit non-goal
 
