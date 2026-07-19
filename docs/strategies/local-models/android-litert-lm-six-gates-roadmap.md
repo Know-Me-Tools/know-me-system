@@ -72,12 +72,16 @@ attached Samsung `SM S936U` running Android 16/API 36:
   validator with external resolvers disabled. Invalid or externally-referenced
   schemas fail closed; nested required fields, enums, ranges, arrays, and
   `additionalProperties` constraints are enforced before any safe tool executes.
+- Validation failures for malformed JSON or schema-mismatched tool arguments
+  are now repairable twice. The host returns a typed error `ToolResult` to the
+  active LiteRT-LM conversation and observes the continuation stream for a
+  corrected tool call. Trust, confirmation, destructive, and open-world failures
+  are not repairable and remain terminal.
 
 This proves the CPU smoke lane and code-level tool-call candidate preservation.
 It does not yet prove that the model reliably chooses tools for certified
-prompts. True token-level streaming callbacks, full schema validation and
-repair, confirmation UX, cancellation certification, and broader device coverage
-remain future gates.
+prompts. True token-level streaming callbacks, confirmation UX, cancellation
+certification, and broader device coverage remain future gates.
 
 ## Roadmap
 
@@ -120,9 +124,10 @@ remain future gates.
 - [x] Feed safe tool results back into LiteRT-LM and continue generation.
 - [x] Replace shallow JSON validation with the shared full schema validator used
   by executable tool loops.
+- [x] Allow at most two bounded repair attempts for malformed JSON or schema
+  mismatches, and observe corrected tool calls emitted during continuation.
 - [ ] Enforce user confirmation policy for mutating, destructive, or open-world
   tools before execution.
-- Allow at most two bounded repair attempts.
 - Persist tool-call and tool-result events with the same AG-UI/A2UI content-block
   contract used by other providers.
 - Require explicit confirmation for mutating tools.

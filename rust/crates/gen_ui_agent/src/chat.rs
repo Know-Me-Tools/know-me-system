@@ -58,6 +58,7 @@ const DEFAULT_TOP_P: f32 = 0.8;
 const DEFAULT_TOP_K: i32 = 20;
 const DEFAULT_MIN_P: f32 = 0.0;
 const DEFAULT_MAX_TOKENS: u32 = 1024;
+const MAX_LOCAL_TOOL_REPAIR_ATTEMPTS: u8 = 2;
 
 /// Request-scoped cloud credentials for anonymous hosted-web BYOK. The Axum
 /// leaf owns the lifetime: this value is never persisted or placed in global
@@ -870,6 +871,7 @@ async fn send_local(
         use futures::StreamExt;
         let mut stream = std::pin::pin!(stream);
         let mut tool_gate = LocalToolCallGate::new(request.tools.clone(), tool_policies);
+        let mut pending_continuation: Option<InferenceToolResult> = None;
         while let Some(event) = stream.next().await {
             if active_run.cancelled() {
                 active_run.publish_cancelled(RunPhase::Generation);
@@ -893,56 +895,78 @@ async fn send_local(
                     state::publish(a2ui);
                 }
                 if let Some(result) = continuation {
-                    if active_run.cancelled() {
-                        active_run.publish_cancelled(RunPhase::ToolExecution);
-                        return;
-                    }
-                    state::publish(A2uiEvent::RunPhaseChanged {
-                        run_id: run_id_for_task.clone(),
-                        phase: RunPhase::Generation,
-                        status: RunStatus::Generating,
-                        message: "Continuing response with tool result".into(),
-                    });
-                    let continuation_stream =
-                        match engine.continue_with_tool_results(&[result]).await {
-                            Ok(stream) => stream,
-                            Err(error) => {
-                                publish_run_error(
-                                    &run_id_for_task,
-                                    "tool_result_continuation_failed",
-                                    RunPhase::Generation,
-                                    error.to_string(),
-                                    true,
-                                );
-                                return;
-                            }
-                        };
-                    let mut continuation_stream = std::pin::pin!(continuation_stream);
-                    while let Some(continuation_event) = continuation_stream.next().await {
-                        if active_run.cancelled() {
-                            active_run.publish_cancelled(RunPhase::Generation);
-                            return;
-                        }
-                        for a2ui in adapter.ingest(&continuation_event) {
-                            state::publish(a2ui);
-                        }
-                        if matches!(
-                            continuation_event,
-                            StreamEvent::Done | StreamEvent::Error { .. }
-                        ) {
-                            return;
-                        }
-                    }
-                    for event in adapter.ingest(&StreamEvent::Done) {
-                        state::publish(event);
-                    }
-                    return;
+                    pending_continuation = Some(result);
+                    break;
                 }
             }
             if terminal {
                 return;
             }
         }
+
+        while let Some(result) = pending_continuation.take() {
+            if active_run.cancelled() {
+                active_run.publish_cancelled(RunPhase::ToolExecution);
+                return;
+            }
+            state::publish(A2uiEvent::RunPhaseChanged {
+                run_id: run_id_for_task.clone(),
+                phase: RunPhase::Generation,
+                status: RunStatus::Generating,
+                message: if result.is_error {
+                    "Requesting corrected local tool arguments".into()
+                } else {
+                    "Continuing response with tool result".into()
+                },
+            });
+            let continuation_stream = match engine.continue_with_tool_results(&[result]).await {
+                Ok(stream) => stream,
+                Err(error) => {
+                    publish_run_error(
+                        &run_id_for_task,
+                        "tool_result_continuation_failed",
+                        RunPhase::Generation,
+                        error.to_string(),
+                        true,
+                    );
+                    return;
+                }
+            };
+            let mut continuation_stream = std::pin::pin!(continuation_stream);
+            while let Some(continuation_event) = continuation_stream.next().await {
+                if active_run.cancelled() {
+                    active_run.publish_cancelled(RunPhase::Generation);
+                    return;
+                }
+                let terminal = matches!(
+                    continuation_event,
+                    StreamEvent::Done | StreamEvent::Error { .. }
+                );
+                let completed_tool_call = tool_gate.observe(&continuation_event);
+                for a2ui in adapter.ingest(&continuation_event) {
+                    state::publish(a2ui);
+                }
+                if let Some(call) = completed_tool_call {
+                    state::publish(A2uiEvent::RunPhaseChanged {
+                        run_id: run_id_for_task.clone(),
+                        phase: RunPhase::ToolExecution,
+                        status: RunStatus::Preparing,
+                        message: format!("Handling local tool call {}", call.name),
+                    });
+                    let (follow_up, continuation) =
+                        tool_gate.execute_or_reject(&mcp_registry, call).await;
+                    for a2ui in adapter.ingest(&follow_up) {
+                        state::publish(a2ui);
+                    }
+                    pending_continuation = continuation;
+                    break;
+                }
+                if terminal {
+                    return;
+                }
+            }
+        }
+
         // Stream ended without Done (engine dropped the sender) — still close the
         // run so the UI stops spinning.
         for event in adapter.ingest(&StreamEvent::Done) {
@@ -1193,6 +1217,7 @@ struct LocalToolCallGate {
     tools: BTreeMap<String, InferenceTool>,
     policies: BTreeMap<String, LocalToolPolicy>,
     pending: BTreeMap<String, PendingLocalToolCall>,
+    repair_attempts: u8,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -1210,6 +1235,7 @@ impl LocalToolCallGate {
                 .collect(),
             policies,
             pending: Default::default(),
+            repair_attempts: 0,
         }
     }
 
@@ -1245,6 +1271,7 @@ impl LocalToolCallGate {
         let tool_name = call.name.clone();
         let result = match self.validate_call(&call) {
             Ok(arguments) => {
+                self.repair_attempts = 0;
                 let policy = self.policies.get(&call.name).copied().unwrap_or_default();
                 if !policy.trusted_server {
                     Err(serde_json::json!({
@@ -1285,17 +1312,48 @@ impl LocalToolCallGate {
                 },
                 continuation,
             ),
-            Err(output) => (
-                StreamEvent::ToolResult {
-                    tool_use_id: call.id,
-                    output_json: serde_json::to_string(&output).unwrap_or_else(|_| {
-                        r#"{"ok":false,"code":"tool_result_serialization_failed"}"#.into()
-                    }),
-                    is_error: true,
-                },
-                None,
-            ),
+            Err(output) => {
+                let output_json = serde_json::to_string(&output).unwrap_or_else(|_| {
+                    r#"{"ok":false,"code":"tool_result_serialization_failed"}"#.into()
+                });
+                let continuation = self.repair_continuation(&call.name, &output, &output_json);
+                (
+                    StreamEvent::ToolResult {
+                        tool_use_id: call.id,
+                        output_json,
+                        is_error: true,
+                    },
+                    continuation,
+                )
+            }
         }
+    }
+
+    fn repair_continuation(
+        &mut self,
+        tool_name: &str,
+        output: &serde_json::Value,
+        output_json: &str,
+    ) -> Option<InferenceToolResult> {
+        let code = output
+            .get("code")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or_default();
+        if !matches!(
+            code,
+            "invalid_tool_arguments_json" | "tool_arguments_schema_mismatch"
+        ) {
+            return None;
+        }
+        if self.repair_attempts >= MAX_LOCAL_TOOL_REPAIR_ATTEMPTS {
+            return None;
+        }
+        self.repair_attempts += 1;
+        Some(InferenceToolResult {
+            tool_name: tool_name.to_owned(),
+            output_json: output_json.to_owned(),
+            is_error: true,
+        })
     }
 
     async fn call_mcp_tool(
@@ -1861,6 +1919,120 @@ mod attachment_tests {
         };
         let error = gate.validate_call(&call).expect_err("schema mismatch");
         assert_eq!(error["code"], "tool_arguments_schema_mismatch");
+    }
+
+    #[tokio::test]
+    async fn local_tool_gate_repairs_validation_errors_at_most_twice() {
+        let mut gate = LocalToolCallGate::new(
+            vec![InferenceTool {
+                name: "memory__search".into(),
+                description: "Search memory".into(),
+                parameters: serde_json::json!({
+                    "type": "object",
+                    "required": ["query"],
+                    "properties": {
+                        "query": {"type": "string"}
+                    }
+                }),
+                annotations: Some(InferenceToolAnnotations {
+                    read_only_hint: Some(true),
+                    destructive_hint: Some(false),
+                    open_world_hint: Some(false),
+                    ..Default::default()
+                }),
+            }],
+            BTreeMap::from([(
+                "memory__search".into(),
+                LocalToolPolicy {
+                    trusted_server: true,
+                    auto_execute: true,
+                },
+            )]),
+        );
+
+        for attempt in 1..=3 {
+            let call = PendingLocalToolCall {
+                id: format!("call-{attempt}"),
+                name: "memory__search".into(),
+                arguments: r#"{"query":42}"#.into(),
+            };
+            let (out, continuation) = gate
+                .execute_or_reject(&gen_ui_mcp::McpRegistry::new(), call)
+                .await;
+            match out {
+                StreamEvent::ToolResult {
+                    output_json,
+                    is_error,
+                    ..
+                } => {
+                    assert!(is_error);
+                    let parsed: serde_json::Value =
+                        serde_json::from_str(&output_json).expect("tool result is JSON");
+                    assert_eq!(parsed["code"], "tool_arguments_schema_mismatch");
+                }
+                other => panic!("expected ToolResult, got {other:?}"),
+            }
+            if attempt <= 2 {
+                let continuation = continuation.expect("validation repair continues the model");
+                assert_eq!(continuation.tool_name, "memory__search");
+                assert!(continuation.is_error);
+                assert!(continuation
+                    .output_json
+                    .contains("tool_arguments_schema_mismatch"));
+            } else {
+                assert!(
+                    continuation.is_none(),
+                    "third validation failure must not keep repairing"
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn local_tool_gate_does_not_repair_confirmation_required_calls() {
+        let mut gate = LocalToolCallGate::new(
+            vec![InferenceTool {
+                name: "files__delete".into(),
+                description: "Delete a file".into(),
+                parameters: serde_json::json!({
+                    "type": "object",
+                    "required": ["path"],
+                    "properties": {
+                        "path": {"type": "string"}
+                    }
+                }),
+                annotations: Some(InferenceToolAnnotations {
+                    read_only_hint: Some(false),
+                    destructive_hint: Some(true),
+                    open_world_hint: Some(false),
+                    ..Default::default()
+                }),
+            }],
+            BTreeMap::from([(
+                "files__delete".into(),
+                LocalToolPolicy {
+                    trusted_server: true,
+                    auto_execute: false,
+                },
+            )]),
+        );
+        let call = PendingLocalToolCall {
+            id: "call-1".into(),
+            name: "files__delete".into(),
+            arguments: r#"{"path":"/tmp/example"}"#.into(),
+        };
+        let (out, continuation) = gate
+            .execute_or_reject(&gen_ui_mcp::McpRegistry::new(), call)
+            .await;
+        assert!(continuation.is_none());
+        match out {
+            StreamEvent::ToolResult { output_json, .. } => {
+                let parsed: serde_json::Value =
+                    serde_json::from_str(&output_json).expect("tool result is JSON");
+                assert_eq!(parsed["code"], "local_tool_requires_confirmation");
+            }
+            other => panic!("expected ToolResult, got {other:?}"),
+        }
     }
 
     #[test]

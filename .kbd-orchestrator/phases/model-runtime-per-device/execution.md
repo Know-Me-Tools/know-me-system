@@ -289,11 +289,43 @@ Verification:
   launched `tools.knowme.knowme`, submitted `Say only OK`, and logcat reported
   `LiteRT-LM generation produced text chars=2 tool_calls=0 context="initial"`.
 
+## BOUNDED TOOL-REPAIR CHECKPOINT
+
+Date: 2026-07-19
+
+Implemented:
+
+- Added a two-attempt repair budget for local LiteRT-LM tool calls whose
+  arguments are malformed JSON or fail the advertised JSON Schema.
+- Validation failures now emit a typed error `ToolResult` and are also sent back
+  to the active LiteRT-LM conversation as an error `InferenceToolResult`, giving
+  the model a bounded chance to correct the call.
+- The continuation stream is now observed for additional tool-call events, so a
+  corrected tool call produced after a validation error can be validated,
+  executed if safe, and continued again with the tool output.
+- The repair path is intentionally narrow. Unknown tools, untrusted servers,
+  confirmation-required tools, destructive tools, and open-world tools do not
+  trigger repair continuation.
+
+Verification:
+
+- `cargo test -p gen_ui_agent local_tool -- --nocapture`
+- `cargo test -p gen_ui_types structured_messages_preserve_roles_and_tools`
+- `cargo check -p gen_ui_agent`
+- `cargo test -p gen_ui_inference --features local-litert-lm`
+- `flutter analyze lib`
+- `flutter build apk --debug --target-platform android-arm64`
+- `scripts/android/verify-native-inference-gates.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
+- Physical-device no-regression smoke on `SM S936U`: installed the debug APK
+  over the current app data, launched `tools.knowme.knowme`, submitted a minimal
+  prompt through adb input, and observed a visible local `OK` response in the
+  chat UI. The adb input command inserted `%20` literally into the prompt, so
+  this remains a runtime smoke test, not a clean prompt-certification artifact.
+
 Remaining for `litertlm-local-tools`:
 
 - Add user confirmation UX/policy for mutating, destructive, or open-world
   tools.
-- Add bounded repair attempts when validation fails.
 - Certify on physical Android prompts where LiteRT-LM actually chooses and uses
   an allowed local tool end-to-end.
 
