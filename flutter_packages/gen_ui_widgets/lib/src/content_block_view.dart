@@ -433,7 +433,7 @@ class _ToolConfirmationRequiredBlock extends StatelessWidget {
                 ),
                 Text(
                   tool,
-                  maxLines: 2,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: colors.mutedForeground, fontSize: 12),
                 ),
@@ -468,6 +468,11 @@ class _ToolConfirmationRequiredBlock extends StatelessWidget {
               approvalId == null || approvalId.isEmpty
                   ? 'Status: not executed. This saved tool policy does not include an approval id, so it cannot be resumed.'
                   : 'Status: not executed. Approval will run this exact stored tool call and resume the model with its result.',
+              style: TextStyle(color: colors.mutedForeground, fontSize: 12),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Approvals are process-local. If this card was restored after an app restart or reinstall, resubmit the prompt to create a fresh approval request.',
               style: TextStyle(color: colors.mutedForeground, fontSize: 12),
             ),
             if (onInteraction != null &&
@@ -1348,6 +1353,8 @@ class _DisclosureBlockState extends State<_DisclosureBlock> {
               children: [
                 Text(
                   widget.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: colors.foreground,
                     fontWeight: FontWeight.w600,

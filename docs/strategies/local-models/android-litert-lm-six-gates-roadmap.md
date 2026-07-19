@@ -116,8 +116,8 @@ This proves the CPU smoke lane and code-level tool-call candidate preservation.
 It also proves one complete safe local tool loop and one explicit
 approval-required local tool loop on a physical Android device. True
 token-level streaming callbacks, cancellation certification, richer prompt
-certification, empty-continuation fallback certification, long tool-name UI
-polish, and broader device coverage remain future gates.
+certification, empty-continuation fallback certification, stale-card cleanup
+affordances, and broader device coverage remain future gates.
 
 ## Roadmap
 
@@ -181,12 +181,25 @@ polish, and broader device coverage remain future gates.
 - [x] Certify a clean active approval-required tool flow where LiteRT-LM's
   direct post-tool continuation produces a useful final assistant answer.
 - [ ] Force and certify the bounded empty-continuation fallback path separately.
-- Persist tool-call and tool-result events with the same AG-UI/A2UI content-block
+- [x] Persist tool-call and tool-result events with the same AG-UI/A2UI content-block
   contract used by other providers.
-- Persist skill activation events with the same AG-UI/A2UI content-block
+- [x] Persist skill activation events with the same AG-UI/A2UI content-block
   contract. A skill activation is a first-class semantic chunk, not assistant
   answer Markdown and not a raw artifact fallback.
 - Require explicit confirmation before any mutating tool can execute.
+
+### R3.1 — Turn-region UI semantics
+
+- [x] Render `SkillActivation` as `ContentBlock::Skill` and keep it outside the
+  answer bubble, parallel to thinking, citation, tool, memory, lifecycle, and
+  artifact chunks.
+- [x] Keep long tool and skill-like operational labels on a single ellipsized
+  header line on narrow mobile screens.
+- [x] Show process-local approval guidance on approval-required cards so stale
+  restored cards are not mistaken for active host approvals.
+- [ ] Add branch-local cleanup for stale persisted approval cards if users need
+  to remove only the stale policy card without deleting the whole assistant
+  branch.
 
 ### R4 — Device certification
 
@@ -250,6 +263,11 @@ fallback. They are not part of the production Android recovery baseline.
   the host validate and execute tool calls before sending tool responses back.
 - Async C++ callbacks deliver partial message chunks and a terminal empty
   message; the adapter must accumulate/normalize chunks into canonical events.
+- Local reference projects for implementation comparison live under
+  `/Users/gqadonis/Projects/references`, including the LiteRT-LM and Google AI
+  Edge Gallery codebases. Use those references when validating API usage,
+  message/tool continuation behavior, cancellation hooks, and Android lifecycle
+  integration.
 
 References:
 

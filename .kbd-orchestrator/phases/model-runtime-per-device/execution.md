@@ -574,8 +574,38 @@ Remaining for `litertlm-local-tools`:
 - Force/certify the bounded empty-continuation fallback branch separately. The
   clean active approval run above did not trigger it because LiteRT-LM's direct
   `Message.tool(...)` continuation produced final text.
-- Add a UI affordance to dismiss/repair stale persisted approval cards after
-  process restart so they cannot be mistaken for active approvals.
+- Add a destructive cleanup affordance specifically for stale persisted approval
+  cards if users should be able to remove only the stale policy card without
+  deleting the whole assistant branch.
+
+## TOOL CARD UI POLISH CHECKPOINT
+
+Date: 2026-07-19
+
+Implemented:
+
+- Long tool names now render on a single ellipsized header line in Flutter tool
+  cards instead of wrapping awkwardly across the card.
+- Approval-required cards now include explicit process-local guidance:
+  approvals can expire after app restart or reinstall, and the user should
+  resubmit the prompt to create a fresh approval request.
+
+Verification:
+
+- `flutter analyze lib ../flutter_packages/gen_ui_widgets/lib test/features/chat/theme_accessibility_test.dart`
+- `flutter test test/features/chat/theme_accessibility_test.dart`
+- `flutter build apk --debug --target-platform android-arm64`
+- `../scripts/android/verify-native-inference-gates.sh build/app/outputs/flutter-apk/app-debug.apk`
+
+Physical-device evidence:
+
+- Installed/launched the rebuilt APK on Samsung `SM S936U`.
+- The rendered tool request card showed the long tool name as an ellipsized
+  single-line `knowme_diagnostic...` label instead of the prior multi-line
+  broken wrapping.
+- Launch/logcat smoke showed no `FATAL EXCEPTION`,
+  `tools.knowme.knowme E AndroidRuntime`, `UnsatisfiedLinkError`, or
+  `dlopen failed`.
 
 ## BLOCKERS
 

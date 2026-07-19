@@ -129,6 +129,10 @@ void main() {
       expect(find.text('files__delete'), findsOneWidget);
       expect(find.text('May be destructive'), findsOneWidget);
       expect(find.textContaining('Status: not executed'), findsOneWidget);
+      expect(
+        find.textContaining('Approvals are process-local'),
+        findsOneWidget,
+      );
       expect(find.byTooltip('Copy tool policy'), findsOneWidget);
       expect(find.text('Approve and run'), findsOneWidget);
       await tester.tap(find.text('Approve and run'));
@@ -137,6 +141,29 @@ void main() {
       expect(interaction?['toolUseId'], 'tool-2');
     },
   );
+
+  testWidgets('long tool names stay on one header line', (tester) async {
+    const longToolName = 'knowme_diagnostics__approval_required_echo';
+    await tester.pumpWidget(
+      MaterialApp(
+        home: shad.Theme(
+          data: KnowMeTheme.dark,
+          child: const Scaffold(
+            body: SizedBox(
+              width: 320,
+              child: ContentBlockView(
+                block: ToolUseBlock(longToolName, longToolName, '{"ok":true}'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final title = tester.widget<Text>(find.text(longToolName));
+    expect(title.maxLines, 1);
+    expect(title.overflow, TextOverflow.ellipsis);
+  });
 }
 
 double _contrast(Color first, Color second) {
