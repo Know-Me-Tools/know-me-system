@@ -63,7 +63,10 @@ vendor library dependency.
   automation through `scripts/android/certify-local-branch-actions.sh`.
 - Store device identity, Android API level, ABI, SoC, backend, model artifact,
   load time, first-token latency, throughput, memory pressure, and thermal state
-  in a fleet capability record.
+  in a fleet capability record. The local report writer now captures device
+  identity, backend/model artifact, memory pressure, thermal state, APK hash,
+  native libraries, and artifact hashes; timing telemetry remains a runtime
+  instrumentation follow-up.
 - Do not allow “built successfully” to satisfy Android native-inference
   completion. Completion requires a device-side gate report.
 - Keep the current static gate strict about vendor dependencies: startup-critical
@@ -81,6 +84,11 @@ vendor library dependency.
 
 ## Release R+2 — AgentSkills/process hardening
 
+- Treat real AgentSkills/process activation as a future release until the mobile
+  UAR registry exists behind the Rust FFI boundary. The current Android
+  LiteRT-LM recovery certifies the `SkillActivation → ContentBlock::Skill → UI
+  persistence` contract through the trusted-local MCP diagnostics namespace; it
+  does not certify the not-yet-wired UAR registry.
 - Author an `android-native-inference` skill that forces agents to apply the
   six-gate model before editing Android native runtime code.
 - Author a `device-verified-completion` skill whose script owns install,
@@ -133,7 +141,9 @@ vendor library dependency.
   tool, memory, lifecycle, and artifact chunks.
 - Extend skill activation certification beyond the embedded diagnostics source:
   real AgentSkills/process activations must use the same `skill` block ordering,
-  persistence, copy, and recovery semantics as the diagnostic baseline.
+  persistence, copy, and recovery semantics as the diagnostic baseline. See
+  `android-agentskills-process-future-roadmap.md` for the staged UAR/mobile
+  registry plan and certification gate.
 
 ## Explicit non-goal
 

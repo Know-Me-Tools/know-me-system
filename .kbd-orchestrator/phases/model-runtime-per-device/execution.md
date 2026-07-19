@@ -1156,6 +1156,54 @@ Remaining:
 - Extend skill activation certification beyond the embedded diagnostics source
   to real AgentSkills/process activations.
 
+## ANDROID CERTIFICATION REPORT CHECKPOINT
+
+Date: 2026-07-19
+
+Implemented:
+
+- Added `scripts/android/write-local-certification-report.sh`.
+- The report captures:
+  - Git commit and APK SHA-256.
+  - Device manufacturer/model/API/release/ABI/SoC/serial.
+  - APK native libraries.
+  - Expected runtime/backend (`litert-lm` / `litert-lm-cpu`).
+  - App-private LiteRT-LM model artifact path, byte length, and SHA-256.
+  - App-private entity/graph storage files.
+  - Process memory snapshot from `dumpsys meminfo`.
+  - Thermal status and temperature snapshots from `dumpsys thermalservice`.
+  - Pointers and hashes for `/tmp/knowme-local-*` certification artifacts.
+- Fixed the script to use `adb exec-out run-as ... sh -c ...` for app-private
+  probes; `adb shell run-as ... sh -c ...` misquoted complex commands and
+  incorrectly traversed the full app sandbox.
+
+Verification:
+
+- `bash -n scripts/android/write-local-certification-report.sh`
+- `CERT_REPORT_HASH_MODEL=1 scripts/android/write-local-certification-report.sh mobile/build/app/outputs/flutter-apk/app-debug.apk tools.knowme.knowme /tmp/knowme-android-certification-report.json`
+
+Physical-device evidence:
+
+- Device: Samsung `SM-S936U`, Android 16/API 36, ABI `arm64-v8a`, SoC `SM8750`.
+- APK SHA-256:
+  `46142b14829a601c96c64638cde475376e4ae09428f72abf6dc1a2ec3b7c816b`.
+- Model artifact:
+  `app_flutter/model-cache/litert-lm/gemma-4-E2B-it.litertlm`.
+- Model byte length: `2,588,147,712`.
+- Model SHA-256:
+  `181938105e0eefd105961417e8da75903eacda102c4fce9ce90f50b97139a63c`.
+- Memory snapshot: `totalPssKb=561315`.
+- Thermal status: `0`.
+- Report artifact: `/tmp/knowme-android-certification-report.json`.
+
+Remaining:
+
+- Fleet certification still requires at least one non-Qualcomm modern Android
+  phone before broad Android support is claimed.
+- Real AgentSkills/process activation certification requires the future UAR
+  mobile registry described in
+  `docs/strategies/local-models/android-agentskills-process-future-roadmap.md`.
+
 ## BLOCKERS
 
 - NONE at dispatch time
