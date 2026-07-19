@@ -38,12 +38,24 @@ const LANE_CLOUD: &str = "cloud";
 /// On-device inference. A `model_pref` row with this lane carries the local
 /// model id in `model_id` and no `provider_id` (there is no remote provider).
 const LANE_LOCAL: &str = "local";
+/// Universal Agent Runtime execution lane. On desktop/web this is HTTP/SSE
+/// service access; mobile must use embedded-library mode once that facade is
+/// implemented, never a local sidecar.
+const LANE_UAR: &str = "uar";
 
 /// Which lane a chat turn should run on. An unconfigured install prefers the
 /// bundled local engine; cloud is BYOK and therefore cannot be the zero-config
 /// default. Builds without a local engine still fall back to cloud visibly.
 const SETTING_ACTIVE_LANE: &str = "active_lane";
 const SETTING_THEME_MODE: &str = "theme_mode";
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+const SETTING_UAR_SERVICE_URL: &str = "uar_service_url";
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+const SETTING_UAR_SERVICE_API_KEY_REF: &str = "uar_service_api_key_ref";
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+const SETTING_UAR_AGENT_ARTIFACT: &str = "uar_agent_artifact";
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+const SETTING_UAR_SESSION_ID: &str = "uar_session_id";
 #[cfg(target_os = "ios")]
 const DEFAULT_LOCAL_MODEL: &str = "qwen3.5-9b-q4-k-m";
 #[cfg(target_os = "android")]
@@ -152,6 +164,9 @@ pub async fn send(
             Vec::new(),
         )
         .await;
+    }
+    if lane == LANE_UAR {
+        return send_uar_service(user_message, conversation_id, run_id).await;
     }
 
     let pref = state::config()?
@@ -437,6 +452,9 @@ async fn send_content(
             Vec::new(),
         )
         .await;
+    }
+    if lane == LANE_UAR {
+        return send_uar_service(local_fallback, conversation_id, run_id).await;
     }
     let pref = state::config()?
         .get_model_pref(SURFACE_CHAT, LANE_CLOUD)
@@ -784,9 +802,12 @@ pub async fn set_active_lane(lane: &str) -> Result<(), AgentError> {
         LANE_LOCAL => {
             state::inference()?;
         }
+        LANE_UAR => {
+            ensure_uar_lane_supported().await?;
+        }
         other => {
             return Err(AgentError::Config(format!(
-                "unknown lane '{other}' — expected '{LANE_CLOUD}' or '{LANE_LOCAL}'"
+                "unknown lane '{other}' — expected '{LANE_CLOUD}', '{LANE_LOCAL}', or '{LANE_UAR}'"
             )))
         }
     }
@@ -796,6 +817,307 @@ pub async fn set_active_lane(lane: &str) -> Result<(), AgentError> {
             serde_json::Value::String(lane.to_string()),
         )
         .await
+}
+
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+async fn ensure_uar_lane_supported() -> Result<(), AgentError> {
+    Ok(())
+}
+
+#[cfg(any(target_os = "ios", target_os = "android"))]
+async fn ensure_uar_lane_supported() -> Result<(), AgentError> {
+    Err(AgentError::Config(
+        "the UAR chat lane on mobile requires embedded-library mode; local sidecars are not allowed"
+            .into(),
+    ))
+}
+
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+struct UarServiceChatConfig {
+    service_url: String,
+    api_key: Option<String>,
+    artifact: serde_json::Value,
+    session_id: Option<String>,
+}
+
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+async fn send_uar_service(
+    user_message: String,
+    conversation_id: String,
+    run_id: String,
+) -> Result<String, AgentError> {
+    let run_id_for_task = run_id.clone();
+    let active_run = ActiveRun::new(&run_id);
+    gen_ui_runtime::spawn(async move {
+        use crate::uar::UarRuntimeFacade;
+        use futures::StreamExt;
+
+        let mut adapter = A2uiAdapter::new(run_id_for_task.clone());
+        for event in adapter.ingest(&StreamEvent::MessageStart) {
+            state::publish(event);
+        }
+        if active_run.cancelled() {
+            active_run.publish_cancelled(RunPhase::Queued);
+            return;
+        }
+
+        state::publish(A2uiEvent::RunPhaseChanged {
+            run_id: run_id_for_task.clone(),
+            phase: RunPhase::ContextAssembly,
+            status: RunStatus::Preparing,
+            message: "Delegating agent definition, skills, tools, and A2UI selection to UAR".into(),
+        });
+
+        let config = match load_uar_service_chat_config().await {
+            Ok(config) => config,
+            Err(error) => {
+                publish_run_error(
+                    &run_id_for_task,
+                    "uar_service_not_configured",
+                    RunPhase::ContextAssembly,
+                    error.to_string(),
+                    true,
+                );
+                return;
+            }
+        };
+        if active_run.cancelled() {
+            active_run.publish_cancelled(RunPhase::ContextAssembly);
+            return;
+        }
+
+        let runtime = match crate::uar::UarServiceRuntime::new(&config.service_url, config.api_key)
+        {
+            Ok(runtime) => runtime,
+            Err(error) => {
+                publish_run_error(
+                    &run_id_for_task,
+                    "uar_service_client_failed",
+                    RunPhase::ContextAssembly,
+                    error.to_string(),
+                    true,
+                );
+                return;
+            }
+        };
+        state::publish(A2uiEvent::RunPhaseChanged {
+            run_id: run_id_for_task.clone(),
+            phase: RunPhase::Generation,
+            status: RunStatus::Preparing,
+            message: "Starting Universal Agent Runtime run".into(),
+        });
+
+        let projected = match runtime
+            .start_run(crate::uar::UarRunRequest {
+                artifact: config.artifact,
+                input: user_message,
+                session_id: config.session_id.or(Some(conversation_id)),
+            })
+            .await
+        {
+            Ok(projected) => projected,
+            Err(error) => {
+                publish_run_error(
+                    &run_id_for_task,
+                    "uar_run_start_failed",
+                    RunPhase::Generation,
+                    error.to_string(),
+                    true,
+                );
+                return;
+            }
+        };
+
+        state::publish(A2uiEvent::ContextTelemetry {
+            run_id: run_id_for_task.clone(),
+            payload: serde_json::json!({
+                "runtime": "universal-agent-runtime",
+                "mode": "http_service",
+                "uarRunId": projected.run_id,
+            }),
+        });
+        let uar_run_id = projected.run_id.clone();
+        let mut events = std::pin::pin!(projected.events);
+        while let Some(event) = events.next().await {
+            if active_run.cancelled() {
+                let _ = runtime.cancel_run(&uar_run_id).await;
+                active_run.publish_cancelled(RunPhase::Generation);
+                return;
+            }
+            match event {
+                Ok(event) => state::publish(event_with_run_id(event, &run_id_for_task)),
+                Err(error) => {
+                    publish_run_error(
+                        &run_id_for_task,
+                        "uar_stream_failed",
+                        RunPhase::Generation,
+                        error.to_string(),
+                        true,
+                    );
+                    return;
+                }
+            }
+        }
+
+        for event in adapter.ingest(&StreamEvent::Done) {
+            state::publish(event);
+        }
+    });
+    Ok(run_id)
+}
+
+#[cfg(any(target_os = "ios", target_os = "android"))]
+async fn send_uar_service(
+    _user_message: String,
+    _conversation_id: String,
+    run_id: String,
+) -> Result<String, AgentError> {
+    let run_id_for_task = run_id.clone();
+    let active_run = ActiveRun::new(&run_id);
+    gen_ui_runtime::spawn(async move {
+        let mut adapter = A2uiAdapter::new(run_id_for_task.clone());
+        for event in adapter.ingest(&StreamEvent::MessageStart) {
+            state::publish(event);
+        }
+        if active_run.cancelled() {
+            active_run.publish_cancelled(RunPhase::Queued);
+            return;
+        }
+        publish_run_error(
+            &run_id_for_task,
+            "uar_embedded_mobile_not_wired",
+            RunPhase::ContextAssembly,
+            "UAR mobile execution must be embedded as a library; local sidecars are not allowed and the embedded facade is not wired yet.",
+            false,
+        );
+    });
+    Ok(run_id)
+}
+
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+async fn load_uar_service_chat_config() -> Result<UarServiceChatConfig, AgentError> {
+    let service_url = string_setting(SETTING_UAR_SERVICE_URL)
+        .await?
+        .or_else(|| std::env::var("KNOWME_UAR_SERVICE_URL").ok())
+        .ok_or_else(|| {
+            AgentError::Config(format!(
+                "missing {SETTING_UAR_SERVICE_URL} setting or KNOWME_UAR_SERVICE_URL env var"
+            ))
+        })?;
+    let api_key = string_setting(SETTING_UAR_SERVICE_API_KEY_REF)
+        .await?
+        .map(|key_ref| secrets::resolve_api_key(&key_ref))
+        .transpose()?
+        .or_else(|| std::env::var("KNOWME_UAR_API_KEY").ok());
+    let session_id = string_setting(SETTING_UAR_SESSION_ID).await?;
+    let artifact = match state::config()?
+        .get_setting(SETTING_UAR_AGENT_ARTIFACT)
+        .await?
+    {
+        Some(value) => artifact_from_setting_value(value).await?,
+        None => load_uar_artifact_from_env().await?,
+    };
+    Ok(UarServiceChatConfig {
+        service_url,
+        api_key,
+        artifact,
+        session_id,
+    })
+}
+
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+async fn string_setting(key: &str) -> Result<Option<String>, AgentError> {
+    Ok(state::config()?
+        .get_setting(key)
+        .await?
+        .and_then(|value| value.as_str().map(str::to_owned))
+        .filter(|value| !value.trim().is_empty()))
+}
+
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+async fn artifact_from_setting_value(
+    value: serde_json::Value,
+) -> Result<serde_json::Value, AgentError> {
+    match value {
+        serde_json::Value::String(value) => artifact_from_string_or_path(&value).await,
+        serde_json::Value::Object(_) => Ok(value),
+        other => Err(AgentError::Config(format!(
+            "{SETTING_UAR_AGENT_ARTIFACT} must be an agent artifact object, JSON string, or file path; got {other}"
+        ))),
+    }
+}
+
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+async fn load_uar_artifact_from_env() -> Result<serde_json::Value, AgentError> {
+    if let Ok(json) = std::env::var("KNOWME_UAR_AGENT_ARTIFACT_JSON") {
+        return artifact_from_string_or_path(&json).await;
+    }
+    if let Ok(path) = std::env::var("KNOWME_UAR_AGENT_ARTIFACT_PATH") {
+        return artifact_from_string_or_path(&path).await;
+    }
+    Err(AgentError::Config(format!(
+        "missing {SETTING_UAR_AGENT_ARTIFACT} setting, KNOWME_UAR_AGENT_ARTIFACT_JSON env var, or KNOWME_UAR_AGENT_ARTIFACT_PATH env var"
+    )))
+}
+
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+async fn artifact_from_string_or_path(value: &str) -> Result<serde_json::Value, AgentError> {
+    let trimmed = value.trim();
+    let json = if trimmed.starts_with('{') {
+        trimmed.to_owned()
+    } else {
+        tokio::fs::read_to_string(trimmed)
+            .await
+            .map_err(|error| AgentError::Config(format!("cannot read UAR artifact: {error}")))?
+    };
+    let artifact: serde_json::Value = serde_json::from_str(&json)
+        .map_err(|error| AgentError::Config(format!("invalid UAR artifact JSON: {error}")))?;
+    if !artifact.is_object() {
+        return Err(AgentError::Config(
+            "UAR artifact JSON must decode to an object".into(),
+        ));
+    }
+    Ok(artifact)
+}
+
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+fn event_with_run_id(event: A2uiEvent, run_id: &str) -> A2uiEvent {
+    match event {
+        A2uiEvent::RunStarted { .. } => A2uiEvent::RunStarted {
+            run_id: run_id.to_owned(),
+        },
+        A2uiEvent::RunPhaseChanged {
+            phase,
+            status,
+            message,
+            ..
+        } => A2uiEvent::RunPhaseChanged {
+            run_id: run_id.to_owned(),
+            phase,
+            status,
+            message,
+        },
+        A2uiEvent::Block { block, .. } => A2uiEvent::Block {
+            run_id: run_id.to_owned(),
+            block,
+        },
+        A2uiEvent::RunFinished { .. } => A2uiEvent::RunFinished {
+            run_id: run_id.to_owned(),
+        },
+        A2uiEvent::RunCancelled { phase, message, .. } => A2uiEvent::RunCancelled {
+            run_id: run_id.to_owned(),
+            phase,
+            message,
+        },
+        A2uiEvent::RunError { error, .. } => A2uiEvent::RunError {
+            run_id: run_id.to_owned(),
+            error,
+        },
+        A2uiEvent::ContextTelemetry { payload, .. } => A2uiEvent::ContextTelemetry {
+            run_id: run_id.to_owned(),
+            payload,
+        },
+    }
 }
 
 /// Whether this build/platform has a local-inference engine at all. The UI uses
@@ -2022,6 +2344,56 @@ mod attachment_tests {
             }),
             "failed"
         );
+    }
+
+    #[cfg(not(any(target_os = "ios", target_os = "android")))]
+    #[tokio::test]
+    async fn uar_artifact_config_accepts_object_or_json_string() {
+        let object = serde_json::json!({
+            "kind": "agent",
+            "id": "knowme-test-agent",
+            "version": "1.0.0"
+        });
+        assert_eq!(
+            artifact_from_setting_value(object.clone())
+                .await
+                .expect("object artifact accepted"),
+            object
+        );
+
+        assert_eq!(
+            artifact_from_setting_value(serde_json::Value::String(object.to_string()))
+                .await
+                .expect("JSON string artifact accepted"),
+            object
+        );
+
+        let error = artifact_from_setting_value(serde_json::json!(["not", "an", "artifact"]))
+            .await
+            .expect_err("non-object artifacts fail closed");
+        assert!(error.to_string().contains(SETTING_UAR_AGENT_ARTIFACT));
+    }
+
+    #[test]
+    fn uar_projected_events_are_remapped_to_knowme_run_id() {
+        let event = event_with_run_id(
+            A2uiEvent::Block {
+                run_id: "uar-run".into(),
+                block: gen_ui_types::content_block::ContentBlock::Skill {
+                    name: "calendar".into(),
+                    status: "running".into(),
+                },
+            },
+            "knowme-run",
+        );
+
+        assert!(matches!(
+            event,
+            A2uiEvent::Block {
+                run_id,
+                block: gen_ui_types::content_block::ContentBlock::Skill { name, status },
+            } if run_id == "knowme-run" && name == "calendar" && status == "running"
+        ));
     }
 
     #[tokio::test]

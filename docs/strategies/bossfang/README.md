@@ -56,6 +56,13 @@ embedded into Zed/VSCode/JetBrains, not just external harnesses embedded into
 BossFang. The gap analysis between `librefang-skills`' OpenClaw-compat model and this
 stack's structural-boundary claims (§2) is the first integration task.
 
+Alongside librefang, the **Universal Agent Runtime is vendored at
+`rust/vendor/universal-agent-runtime`** (v1.0.0): it is the "UAR agent container" in
+this doc's role list — served as the `server-full` bundle on peers, as the
+`uar-sidecar` binary on desktop, and linked embedded on mobile (see
+`docs/strategies/agents/README.md` §7 for the placement mapping). BossFang's job is
+serving and governing that container, not reimplementing it.
+
 ## 2. Positioning: the claw with a real boundary
 
 The claw category ([OpenClaw](https://github.com/openclaw/openclaw)) proved enormous

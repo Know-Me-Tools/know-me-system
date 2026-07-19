@@ -63,13 +63,13 @@ export function entityRuntimeStop(): Promise<void> {
 export function memoryIngest(text: string): Promise<string> {
   return invoke<string>(cmd("memory_ingest"), { text });
 }
-/** Chat inference lane: the liter-llm cloud gateway, or an on-device model. */
-export type ChatLane = "cloud" | "local";
+/** Chat inference lane: UAR service, the liter-llm cloud gateway, or an on-device model. */
+export type ChatLane = "cloud" | "local" | "uar";
 
 /**
  * Start a chat turn on the currently active lane ({@link getActiveLane}).
  * Returns the run_id whose ContentBlock events arrive on {@link onChatEvent} —
- * identical event shape on both lanes, so callers never branch on lane.
+ * identical event shape on every lane, so callers never branch on lane.
  * `messages` is the prior turn history flattened to alternating role/text
  * pairs, oldest first.
  *
@@ -102,9 +102,9 @@ export function getActiveLane(): Promise<ChatLane> {
   return invoke<ChatLane>(cmd("get_active_lane"));
 }
 /**
- * Switch lanes. Rejects if `lane` is "local" on a build with no local engine,
- * rather than silently answering from the cloud on the next turn — check
- * {@link hasLocalEngine} before offering the switch.
+ * Switch lanes. Rejects if `lane` is "local" on a build with no local engine.
+ * `uar` is the desktop/web service lane; mobile UAR must be embedded-library
+ * mode and is not exposed through this Tauri binding.
  */
 export function setActiveLane(lane: ChatLane): Promise<void> {
   return invoke<void>(cmd("set_active_lane"), { lane });

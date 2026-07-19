@@ -25,7 +25,7 @@ fully: there is **one AgentService contract** (the FRF Agent service proto /
 
 | Placement | What it is | Where available |
 |---|---|---|
-| `embedded` | UAR (`gen_ui_agent`) linked into the app process, reached via FFI/IPC | Everywhere — the universal baseline; the only option on mobile |
+| `embedded` | UAR (vendored submodule — §7) linked into the app process, reached via FFI/IPC | Everywhere — the universal baseline; the only option on mobile |
 | `sidecar` | UAR in its own OS process on the same machine, speaking AgentService over localhost | Desktop (macOS/Windows/Linux) |
 | `peer` | A BossFang instance (home server, personal cloud, team) | Anywhere reachable |
 | `kiln` | Flint Kiln edge function (server-side WASM) | flint-forge deployments |
