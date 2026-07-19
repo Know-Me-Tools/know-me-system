@@ -68,6 +68,10 @@ attached Samsung `SM S936U` running Android 16/API 36:
 - Safe MCP tool results are now sent back to the active LiteRT-LM conversation
   using the Android API's `Content.ToolResponse` / `Message.tool` continuation
   path, and the continuation response is normalized into the same stream.
+- Local tool-call argument validation now uses the shared Rust `jsonschema`
+  validator with external resolvers disabled. Invalid or externally-referenced
+  schemas fail closed; nested required fields, enums, ranges, arrays, and
+  `additionalProperties` constraints are enforced before any safe tool executes.
 
 This proves the CPU smoke lane and code-level tool-call candidate preservation.
 It does not yet prove that the model reliably chooses tools for certified
@@ -114,7 +118,7 @@ remain future gates.
 - [x] Execute trusted-local read-only/non-destructive/closed-world tool calls and
   reject all other local tool calls with typed tool-result errors.
 - [x] Feed safe tool results back into LiteRT-LM and continue generation.
-- [ ] Replace shallow JSON validation with the shared full schema validator used
+- [x] Replace shallow JSON validation with the shared full schema validator used
   by executable tool loops.
 - [ ] Enforce user confirmation policy for mutating, destructive, or open-world
   tools before execution.

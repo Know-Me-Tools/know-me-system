@@ -261,9 +261,36 @@ Verification:
 - `flutter build apk --debug --target-platform android-arm64`
 - `scripts/android/verify-native-inference-gates.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
 
+## FULL TOOL-SCHEMA VALIDATION CHECKPOINT
+
+Date: 2026-07-19
+
+Implemented:
+
+- Added `jsonschema 0.48.1` as the shared Rust validator dependency with
+  default external file/HTTP resolvers disabled.
+- Replaced the shallow local tool argument validator with compiled JSON Schema
+  validation.
+- Invalid tool schemas and schemas requiring unsupported external resolution
+  fail closed before local execution.
+- Tests now cover nested required fields, enums, numeric constraints,
+  `additionalProperties: false`, invalid schemas, and basic type mismatches.
+
+Verification:
+
+- `cargo test -p gen_ui_agent local_tool -- --nocapture`
+- `cargo test -p gen_ui_types structured_messages_preserve_roles_and_tools`
+- `cargo check -p gen_ui_agent`
+- `cargo test -p gen_ui_inference --features local-litert-lm`
+- `flutter analyze lib`
+- `flutter build apk --debug --target-platform android-arm64`
+- `scripts/android/verify-native-inference-gates.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
+- Physical-device no-regression smoke on `SM S936U`: installed the debug APK,
+  launched `tools.knowme.knowme`, submitted `Say only OK`, and logcat reported
+  `LiteRT-LM generation produced text chars=2 tool_calls=0 context="initial"`.
+
 Remaining for `litertlm-local-tools`:
 
-- Replace shallow JSON checks with full shared JSON-schema validation.
 - Add user confirmation UX/policy for mutating, destructive, or open-world
   tools.
 - Add bounded repair attempts when validation fails.

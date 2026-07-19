@@ -1350,13 +1350,12 @@ impl LocalToolCallGate {
                     "tool": call.name,
                 })
             })?;
-        if let Some(message) = validate_tool_arguments(&tool.parameters, &arguments) {
-            return Err(serde_json::json!({
-                "ok": false,
-                "code": "tool_arguments_schema_mismatch",
-                "message": message,
-                "tool": call.name,
-            }));
+        if let Err(error) = validate_tool_arguments(&tool.parameters, &arguments) {
+            return Err(error_result(
+                "tool_arguments_schema_mismatch",
+                error,
+                &call.name,
+            ));
         }
         Ok(arguments)
     }
@@ -1365,73 +1364,28 @@ impl LocalToolCallGate {
 fn validate_tool_arguments(
     schema: &serde_json::Value,
     arguments: &serde_json::Value,
-) -> Option<String> {
-    if schema
-        .get("type")
-        .and_then(serde_json::Value::as_str)
-        .is_some_and(|value| value == "object")
-        && !arguments.is_object()
-    {
-        return Some("Tool arguments must be a JSON object.".into());
-    }
-    let object = arguments.as_object()?;
-    if let Some(required) = schema.get("required").and_then(serde_json::Value::as_array) {
-        for field in required.iter().filter_map(serde_json::Value::as_str) {
-            if !object.contains_key(field) {
-                return Some(format!(
-                    "Tool arguments are missing required field '{field}'."
-                ));
-            }
-        }
-    }
-    let Some(properties) = schema
-        .get("properties")
-        .and_then(serde_json::Value::as_object)
-    else {
-        return None;
-    };
-    for (name, property_schema) in properties {
-        let Some(value) = object.get(name) else {
-            continue;
-        };
-        let Some(expected_type) = property_schema
-            .get("type")
-            .and_then(serde_json::Value::as_str)
-        else {
-            continue;
-        };
-        if !json_value_matches_schema_type(value, expected_type) {
-            return Some(format!(
-                "Tool argument '{name}' must be {expected_type}, got {}.",
-                json_value_type_name(value)
-            ));
-        }
-    }
-    None
-}
-
-fn json_value_matches_schema_type(value: &serde_json::Value, expected_type: &str) -> bool {
-    match expected_type {
-        "array" => value.is_array(),
-        "boolean" => value.is_boolean(),
-        "integer" => value.as_i64().is_some() || value.as_u64().is_some(),
-        "number" => value.is_number(),
-        "object" => value.is_object(),
-        "string" => value.is_string(),
-        "null" => value.is_null(),
-        _ => true,
+) -> Result<(), String> {
+    let validator = jsonschema::validator_for(schema)
+        .map_err(|error| format!("Tool argument schema is invalid: {error}"))?;
+    let errors: Vec<String> = validator
+        .iter_errors(arguments)
+        .take(5)
+        .map(|error| error.to_string())
+        .collect();
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors.join("; "))
     }
 }
 
-fn json_value_type_name(value: &serde_json::Value) -> &'static str {
-    match value {
-        serde_json::Value::Array(_) => "array",
-        serde_json::Value::Bool(_) => "boolean",
-        serde_json::Value::Null => "null",
-        serde_json::Value::Number(_) => "number",
-        serde_json::Value::Object(_) => "object",
-        serde_json::Value::String(_) => "string",
-    }
+fn error_result(code: &str, message: impl Into<String>, tool: &str) -> serde_json::Value {
+    serde_json::json!({
+        "ok": false,
+        "code": code,
+        "message": message.into(),
+        "tool": tool,
+    })
 }
 
 /// Provider-neutral planned messages into liter-llm messages. The final user
@@ -1907,6 +1861,60 @@ mod attachment_tests {
         };
         let error = gate.validate_call(&call).expect_err("schema mismatch");
         assert_eq!(error["code"], "tool_arguments_schema_mismatch");
+    }
+
+    #[test]
+    fn local_tool_schema_validation_handles_nested_required_enum_and_extra_fields() {
+        let schema = serde_json::json!({
+            "type": "object",
+            "required": ["query", "filters"],
+            "additionalProperties": false,
+            "properties": {
+                "query": {"type": "string", "minLength": 3},
+                "filters": {
+                    "type": "object",
+                    "required": ["kind"],
+                    "additionalProperties": false,
+                    "properties": {
+                        "kind": {"type": "string", "enum": ["memory", "knowledge"]},
+                        "limit": {"type": "integer", "minimum": 1, "maximum": 10}
+                    }
+                }
+            }
+        });
+
+        validate_tool_arguments(
+            &schema,
+            &serde_json::json!({
+                "query": "roadmap",
+                "filters": {"kind": "memory", "limit": 3}
+            }),
+        )
+        .expect("valid nested schema arguments pass");
+
+        let error = validate_tool_arguments(
+            &schema,
+            &serde_json::json!({
+                "query": "roadmap",
+                "filters": {"kind": "web", "limit": 3},
+                "unexpected": true
+            }),
+        )
+        .expect_err("enum and additionalProperties violations fail");
+        assert!(
+            error.contains("web") || error.contains("unexpected"),
+            "validator should report a real schema violation, got: {error}"
+        );
+    }
+
+    #[test]
+    fn local_tool_schema_validation_fails_closed_for_invalid_schema() {
+        let error = validate_tool_arguments(
+            &serde_json::json!({"type": "definitely-not-a-json-schema-type"}),
+            &serde_json::json!({}),
+        )
+        .expect_err("invalid schemas fail closed");
+        assert!(error.contains("schema is invalid"));
     }
 
     #[test]
