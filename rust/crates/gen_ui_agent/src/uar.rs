@@ -752,6 +752,11 @@ mod tests {
                     "arguments_json": "{\"q\":\"uar\"}"
                 }),
             }),
+            Ok(universal_agent_runtime_sdk::StreamEvent {
+                id: Some("4".into()),
+                event: Some("agui.cancelled".into()),
+                data: serde_json::json!({"message": "User stopped"}),
+            }),
         ])
         .boxed();
 
@@ -782,6 +787,10 @@ mod tests {
                 block: ContentBlock::ToolUse { id, name, input_json },
                 ..
             } if id == "call-1" && name == "docs.search" && input_json == "{\"q\":\"uar\"}"
+        )));
+        assert!(output.iter().any(|event| matches!(
+            event,
+            A2uiEvent::RunCancelled { message, .. } if message == "User stopped"
         )));
     }
 }

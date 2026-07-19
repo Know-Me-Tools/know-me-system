@@ -379,6 +379,12 @@ pub fn stream_event_to_uar_normalized_payload(event: &StreamEvent) -> serde_json
                 "code": "knowme_local_provider_error"
             }
         }),
+        StreamEvent::Cancelled { message } => serde_json::json!({
+            "type": "cancelled",
+            "data": {
+                "message": message
+            }
+        }),
         StreamEvent::Done => serde_json::json!({
             "type": "done"
         }),
@@ -645,6 +651,11 @@ pub fn normalize_uar_agui_event(payload: &serde_json::Value) -> StreamEvent {
         "CUSTOM" => normalize_uar_custom_event(payload),
         "agui.done" => StreamEvent::Done,
         "RUN_FINISHED" => StreamEvent::Done,
+        "agui.cancelled" => StreamEvent::Cancelled {
+            message: first_json_string(payload, &[&["message"][..], &["reason"][..]])
+                .unwrap_or("Run cancelled")
+                .to_owned(),
+        },
         "agui.error" => StreamEvent::Error {
             message: first_json_string(
                 payload,
@@ -1200,6 +1211,16 @@ impl A2uiAdapter {
                 });
                 events
             }
+            StreamEvent::Cancelled { message } => {
+                let pending = self.reasoning.flush();
+                let mut events = self.block_events(pending);
+                events.push(A2uiEvent::RunCancelled {
+                    run_id: self.run_id.clone(),
+                    phase: RunPhase::Generation,
+                    message: message.clone(),
+                });
+                events
+            }
         }
     }
 }
@@ -1217,6 +1238,27 @@ fn artifact_kind_for_custom_event(source: &str, event_name: &str) -> &'static st
         )
     {
         "a2ui"
+    } else if source == "uar"
+        && matches!(
+            event_name,
+            "agui.quality.sycophancy"
+                | "agui.quality.sycophancy_corrected"
+                | "agui.guardrail"
+                | "agui.context.update"
+                | "agui.tool_call.approval_required"
+                | "agui.tool_call.denied"
+                | "agui.memory.mutation"
+                | "agui.budget.alert"
+                | "runtime.step"
+                | "STEP_STARTED"
+                | "STEP_FINISHED"
+                | "uar.quality.sycophancy_flagged"
+                | "uar.quality.sycophancy_corrected"
+                | "uar.guardrail.flagged"
+                | "uar.context.updated"
+        )
+    {
+        "lifecycle"
     } else {
         "provider_event"
     }
@@ -2302,6 +2344,61 @@ mod tests {
                 },
                 ..
             } if tool_use_id == "call-1" && output_json == "{\"ok\":true}" && !is_error
+        )));
+    }
+
+    #[test]
+    fn direct_uar_cancelled_event_maps_to_run_cancelled() {
+        let event = normalize_uar_agui_event(&serde_json::json!({
+            "type": "agui.cancelled",
+            "kind": "cancelled",
+            "request_id": "run-1",
+            "message": "User stopped the run"
+        }));
+        let mut adapter = A2uiAdapter::new("run-1");
+        let output = adapter.ingest(&event);
+        assert!(matches!(
+            &output[0],
+            A2uiEvent::RunCancelled { message, .. } if message == "User stopped the run"
+        ));
+    }
+
+    #[test]
+    fn direct_uar_lifecycle_events_map_to_lifecycle_artifacts() {
+        let events = [
+            normalize_uar_agui_event(&serde_json::json!({
+                "type": "agui.guardrail",
+                "kind": "guardrail",
+                "category": "injection",
+                "reason": "prompt_injection"
+            })),
+            normalize_uar_agui_event(&serde_json::json!({
+                "type": "agui.tool_call.approval_required",
+                "kind": "tool_call",
+                "phase": "approval_required",
+                "id": "call-1",
+                "name": "calendar.create"
+            })),
+            normalize_uar_agui_event(&serde_json::json!({
+                "type": "agui.budget.alert",
+                "kind": "budget",
+                "scope": "run",
+                "exceeded": false
+            })),
+        ];
+        let mut adapter = A2uiAdapter::new("run-1");
+        let output = events
+            .iter()
+            .flat_map(|event| adapter.ingest(event))
+            .collect::<Vec<_>>();
+
+        assert_eq!(output.len(), 3);
+        assert!(output.iter().all(|event| matches!(
+            event,
+            A2uiEvent::Block {
+                block: ContentBlock::Artifact { kind, .. },
+                ..
+            } if kind == "lifecycle"
         )));
     }
 

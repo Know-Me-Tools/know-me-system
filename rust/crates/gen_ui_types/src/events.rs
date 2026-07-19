@@ -58,6 +58,9 @@ pub enum StreamEvent {
     Error {
         message: String,
     },
+    Cancelled {
+        message: String,
+    },
     Done,
 }
 
