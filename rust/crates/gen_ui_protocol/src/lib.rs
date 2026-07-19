@@ -962,7 +962,7 @@ impl A2uiAdapter {
                 run_id: self.run_id.clone(),
                 block: ContentBlock::Artifact {
                     id: format!("{source}:{event_name}"),
-                    kind: "provider_event".into(),
+                    kind: artifact_kind_for_custom_event(source, event_name).into(),
                     content: serde_json::json!({
                         "source": source,
                         "eventName": event_name,
@@ -1005,6 +1005,24 @@ impl A2uiAdapter {
                 events
             }
         }
+    }
+}
+
+fn artifact_kind_for_custom_event(source: &str, event_name: &str) -> &'static str {
+    if source == "uar"
+        && matches!(
+            event_name,
+            "agui.artifact"
+                | "agui.artifact_input_request"
+                | "agui.state.patch"
+                | "STATE_DELTA"
+                | "uar.artifact.available"
+                | "uar.artifact.input_required"
+        )
+    {
+        "a2ui"
+    } else {
+        "provider_event"
     }
 }
 
@@ -1917,6 +1935,62 @@ mod tests {
             } if operation == "retrieved"
                 && key == "travel.preference"
                 && value.as_deref() == Some("aisle seat")
+        ));
+    }
+
+    #[test]
+    fn uar_artifact_custom_event_maps_to_a2ui_artifact_block() {
+        let event = normalize_uar_agui_event(&serde_json::json!({
+            "type": "CUSTOM",
+            "profile": "uar.agui/1",
+            "name": "uar.artifact.input_required",
+            "value": {
+                "artifactId": "artifact-1",
+                "artifactType": "a2ui/confirm",
+                "title": "Approve calendar change",
+                "content": "{\"type\":\"object\"}",
+                "metadata": {"catalogId": "urn:uar:a2ui:catalog:1"}
+            },
+            "runId": "run-1",
+            "sequence": 7
+        }));
+        let mut adapter = A2uiAdapter::new("run-1");
+        let output = adapter.ingest(&event);
+        assert!(matches!(
+            &output[0],
+            A2uiEvent::Block {
+                block: ContentBlock::Artifact { kind, content, .. },
+                ..
+            } if kind == "a2ui"
+                && content.contains("uar.artifact.input_required")
+                && content.contains("artifact-1")
+                && content.contains("a2ui/confirm")
+        ));
+    }
+
+    #[test]
+    fn uar_agui_state_patch_maps_to_a2ui_artifact_block() {
+        let event = normalize_uar_agui_event(&serde_json::json!({
+            "type": "agui.state.patch",
+            "kind": "state",
+            "phase": "patch",
+            "request_id": "run-1",
+            "patch": [{
+                "op": "add",
+                "path": "/a2ui/surfaces/surface-1",
+                "value": {"catalogId": "urn:uar:a2ui:catalog:1"}
+            }]
+        }));
+        let mut adapter = A2uiAdapter::new("run-1");
+        let output = adapter.ingest(&event);
+        assert!(matches!(
+            &output[0],
+            A2uiEvent::Block {
+                block: ContentBlock::Artifact { kind, content, .. },
+                ..
+            } if kind == "a2ui"
+                && content.contains("agui.state.patch")
+                && content.contains("/a2ui/surfaces/surface-1")
         ));
     }
 

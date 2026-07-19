@@ -611,6 +611,31 @@ mod tests {
     }
 
     #[test]
+    fn projector_maps_uar_a2ui_artifact_to_a2ui_block() {
+        let mut projector = UarEventProjector::new("run-1");
+        let output = projector.ingest_agui_payload(&serde_json::json!({
+            "type": "agui.artifact_input_request",
+            "kind": "artifact_input_request",
+            "request_id": "run-1",
+            "artifact_id": "artifact-1",
+            "artifact_type": "a2ui/confirm",
+            "title": "Approve action",
+            "content": "{\"type\":\"object\"}",
+            "metadata": {"catalogId": "urn:uar:a2ui:catalog:1"}
+        }));
+
+        assert!(matches!(
+            &output[0],
+            A2uiEvent::Block {
+                block: ContentBlock::Artifact { kind, content, .. },
+                ..
+            } if kind == "a2ui"
+                && content.contains("agui.artifact_input_request")
+                && content.contains("artifact-1")
+        ));
+    }
+
+    #[test]
     fn projector_keeps_tool_stream_state_across_uar_events() {
         let mut projector = UarEventProjector::new("run-1");
         assert!(projector
