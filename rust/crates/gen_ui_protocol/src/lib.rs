@@ -468,10 +468,114 @@ impl AguiAdapter {
             } => vec![AguiEvent::TextMessageContent {
                 delta: text.clone(),
             }],
+            A2uiEvent::Block {
+                run_id: _,
+                block: ContentBlock::Thinking { text },
+            } => vec![AguiEvent::ReasoningMessageContent {
+                delta: text.clone(),
+            }],
+            A2uiEvent::Block {
+                run_id: _,
+                block:
+                    ContentBlock::ToolUse {
+                        id,
+                        name,
+                        input_json,
+                    },
+            } => vec![
+                AguiEvent::ToolCallStart {
+                    id: id.clone(),
+                    name: name.clone(),
+                },
+                AguiEvent::ToolCallArgs {
+                    id: id.clone(),
+                    delta: input_json.clone(),
+                },
+                AguiEvent::ToolCallEnd { id: id.clone() },
+            ],
+            A2uiEvent::Block {
+                run_id: _,
+                block:
+                    ContentBlock::ToolResult {
+                        tool_use_id,
+                        output_json,
+                        is_error,
+                    },
+            } => vec![AguiEvent::ToolCallResult {
+                id: tool_use_id.clone(),
+                output_json: output_json.clone(),
+                is_error: *is_error,
+            }],
+            A2uiEvent::Block {
+                run_id: _,
+                block: ContentBlock::Skill { name, status },
+            } => vec![AguiEvent::Custom {
+                name: "uar.skill.activated".into(),
+                value: serde_json::json!({
+                    "skill": {"id": name},
+                    "status": status,
+                    "source": "knowme",
+                }),
+            }],
+            A2uiEvent::Block {
+                run_id: _,
+                block: ContentBlock::Artifact { id, kind, content },
+            } => vec![AguiEvent::Custom {
+                name: "knowme.artifact".into(),
+                value: serde_json::json!({
+                    "id": id,
+                    "kind": kind,
+                    "content": content,
+                }),
+            }],
+            A2uiEvent::Block { run_id: _, block } => vec![AguiEvent::Custom {
+                name: "knowme.content_block".into(),
+                value: serde_json::to_value(block).unwrap_or_else(|error| {
+                    serde_json::json!({
+                        "serializationError": error.to_string(),
+                    })
+                }),
+            }],
+            A2uiEvent::RunPhaseChanged {
+                run_id,
+                phase,
+                status,
+                message,
+            } => vec![AguiEvent::Custom {
+                name: "knowme.run_phase_changed".into(),
+                value: serde_json::json!({
+                    "runId": run_id,
+                    "phase": phase,
+                    "status": status,
+                    "message": message,
+                }),
+            }],
+            A2uiEvent::ContextTelemetry { run_id, payload } => vec![AguiEvent::Custom {
+                name: "knowme.context_telemetry".into(),
+                value: serde_json::json!({
+                    "runId": run_id,
+                    "payload": payload,
+                }),
+            }],
             A2uiEvent::RunFinished { run_id } => vec![AguiEvent::RunFinished {
                 run_id: run_id.clone(),
             }],
-            _ => vec![],
+            A2uiEvent::RunCancelled {
+                run_id, message, ..
+            } => vec![AguiEvent::RunCancelled {
+                run_id: run_id.clone(),
+                message: message.clone(),
+            }],
+            A2uiEvent::RunError { run_id, error } => vec![AguiEvent::RunError {
+                run_id: run_id.clone(),
+                error_json: serde_json::to_string(error).unwrap_or_else(|serialization_error| {
+                    serde_json::json!({
+                        "code": "run_error_serialization_failed",
+                        "message": serialization_error.to_string(),
+                    })
+                    .to_string()
+                }),
+            }],
         }
     }
 }
@@ -736,6 +840,126 @@ mod tests {
             A2uiEvent::Block {
                 block: ContentBlock::Artifact { kind, content, .. }, ..
             } if kind == "provider_event" && content.contains("new_chunk")
+        ));
+    }
+
+    #[test]
+    fn agui_adapter_round_trips_reasoning_through_uar_normalizer() {
+        let mut agui = AguiAdapter::new("thread-1", "run-1");
+        let events = agui.translate(&A2uiEvent::Block {
+            run_id: "run-1".into(),
+            block: ContentBlock::Thinking {
+                text: "plain reasoning".into(),
+            },
+        });
+
+        assert_eq!(
+            events,
+            vec![AguiEvent::ReasoningMessageContent {
+                delta: "plain reasoning".into()
+            }]
+        );
+
+        let stream = normalize_uar_agui_event(&serde_json::to_value(&events[0]).unwrap());
+        assert!(matches!(
+            stream,
+            StreamEvent::ThinkingDelta { delta, .. } if delta == "plain reasoning"
+        ));
+    }
+
+    #[test]
+    fn agui_adapter_round_trips_tool_use_lifecycle() {
+        let mut agui = AguiAdapter::new("thread-1", "run-1");
+        let events = agui.translate(&A2uiEvent::Block {
+            run_id: "run-1".into(),
+            block: ContentBlock::ToolUse {
+                id: "tool-1".into(),
+                name: "calendar.find".into(),
+                input_json: r#"{"query":"tomorrow"}"#.into(),
+            },
+        });
+
+        assert_eq!(
+            events,
+            vec![
+                AguiEvent::ToolCallStart {
+                    id: "tool-1".into(),
+                    name: "calendar.find".into(),
+                },
+                AguiEvent::ToolCallArgs {
+                    id: "tool-1".into(),
+                    delta: r#"{"query":"tomorrow"}"#.into(),
+                },
+                AguiEvent::ToolCallEnd {
+                    id: "tool-1".into(),
+                },
+            ]
+        );
+
+        let normalized: Vec<StreamEvent> = events
+            .iter()
+            .map(|event| normalize_uar_agui_event(&serde_json::to_value(event).unwrap()))
+            .collect();
+        assert!(matches!(
+            &normalized[0],
+            StreamEvent::ToolCallStarted { id, name }
+                if id == "tool-1" && name == "calendar.find"
+        ));
+        assert!(matches!(
+            &normalized[1],
+            StreamEvent::ToolCallDelta { id, delta }
+                if id == "tool-1" && delta == r#"{"query":"tomorrow"}"#
+        ));
+        assert!(matches!(
+            &normalized[2],
+            StreamEvent::ToolCallComplete { id } if id == "tool-1"
+        ));
+    }
+
+    #[test]
+    fn agui_adapter_preserves_skill_activation_as_custom_uar_event() {
+        let mut agui = AguiAdapter::new("thread-1", "run-1");
+        let events = agui.translate(&A2uiEvent::Block {
+            run_id: "run-1".into(),
+            block: ContentBlock::Skill {
+                name: "office_writer".into(),
+                status: "activated".into(),
+            },
+        });
+
+        let stream = normalize_uar_agui_event(&serde_json::to_value(&events[0]).unwrap());
+        assert!(matches!(
+            stream,
+            StreamEvent::SkillActivation { name, status }
+                if name == "office_writer" && status == "activated"
+        ));
+    }
+
+    #[test]
+    fn agui_adapter_preserves_errors_and_unknown_blocks() {
+        let mut agui = AguiAdapter::new("thread-1", "run-1");
+        let error_events = agui.translate(&A2uiEvent::RunError {
+            run_id: "run-1".into(),
+            error: RunError::protocol("bad stream"),
+        });
+        assert!(matches!(
+            &error_events[0],
+            AguiEvent::RunError { run_id, error_json }
+                if run_id == "run-1" && error_json.contains("bad stream")
+        ));
+
+        let artifact_events = agui.translate(&A2uiEvent::Block {
+            run_id: "run-1".into(),
+            block: ContentBlock::Artifact {
+                id: "future-1".into(),
+                kind: "provider_event".into(),
+                content: r#"{"opaque":true}"#.into(),
+            },
+        });
+        assert!(matches!(
+            &artifact_events[0],
+            AguiEvent::Custom { name, value }
+                if name == "knowme.artifact" && value["id"] == "future-1"
         ));
     }
 

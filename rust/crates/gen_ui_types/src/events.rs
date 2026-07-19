@@ -100,9 +100,48 @@ impl A2uiEvent {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum AguiEvent {
-    RunStarted { thread_id: String, run_id: String },
-    TextMessageContent { delta: String },
-    ToolCallStart { id: String, name: String },
-    StateSnapshot { snapshot_json: String },
-    RunFinished { run_id: String },
+    RunStarted {
+        thread_id: String,
+        run_id: String,
+    },
+    TextMessageContent {
+        delta: String,
+    },
+    ReasoningMessageContent {
+        delta: String,
+    },
+    ToolCallStart {
+        id: String,
+        name: String,
+    },
+    ToolCallArgs {
+        id: String,
+        delta: String,
+    },
+    ToolCallEnd {
+        id: String,
+    },
+    ToolCallResult {
+        id: String,
+        output_json: String,
+        is_error: bool,
+    },
+    Custom {
+        name: String,
+        value: serde_json::Value,
+    },
+    StateSnapshot {
+        snapshot_json: String,
+    },
+    RunFinished {
+        run_id: String,
+    },
+    RunCancelled {
+        run_id: String,
+        message: String,
+    },
+    RunError {
+        run_id: String,
+        error_json: String,
+    },
 }
