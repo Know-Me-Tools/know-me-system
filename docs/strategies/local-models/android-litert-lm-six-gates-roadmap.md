@@ -103,6 +103,10 @@ attached Samsung `SM S936U` running Android 16/API 36:
   bridge sends the normal `Message.tool(...)` continuation first and only sends
   one host-managed follow-up instruction when that continuation is empty and has
   no additional tool calls.
+- A clean active approval-required run has been physically certified with
+  phrase `clean777`: the visible approval action executed the host-stored
+  pending call, the direct `Message.tool(...)` continuation produced final text,
+  and the UI rendered `Approved diagnostic echo: clean777`.
 - The core stream contract now has a typed `SkillActivation` event that maps to
   the existing `ContentBlock::Skill` block. Skill activation chunks must be
   surfaced and persisted alongside thinking, citation, tool, memory, lifecycle,
@@ -112,8 +116,8 @@ This proves the CPU smoke lane and code-level tool-call candidate preservation.
 It also proves one complete safe local tool loop and one explicit
 approval-required local tool loop on a physical Android device. True
 token-level streaming callbacks, cancellation certification, richer prompt
-certification, final post-tool answer quality, long tool-name UI polish, and
-broader device coverage remain future gates.
+certification, empty-continuation fallback certification, long tool-name UI
+polish, and broader device coverage remain future gates.
 
 ## Roadmap
 
@@ -174,9 +178,9 @@ broader device coverage remain future gates.
   approval ID and renders the resulting tool-use/tool-result blocks.
 - [x] Convert expired/stale approval IDs into typed persisted run errors instead
   of pre-subscription FFI failures or opaque `CoreErrorImpl` UI bubbles.
-- [ ] Certify a clean active approval-required tool flow where LiteRT-LM's
-  post-tool continuation produces a useful final assistant answer, including
-  the bounded empty-continuation fallback path.
+- [x] Certify a clean active approval-required tool flow where LiteRT-LM's
+  direct post-tool continuation produces a useful final assistant answer.
+- [ ] Force and certify the bounded empty-continuation fallback path separately.
 - Persist tool-call and tool-result events with the same AG-UI/A2UI content-block
   contract used by other providers.
 - Persist skill activation events with the same AG-UI/A2UI content-block

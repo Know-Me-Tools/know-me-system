@@ -512,10 +512,7 @@ Physical-device evidence:
 Remaining for `litertlm-local-tools`:
 
 - Expand prompt certification beyond deterministic diagnostics tools.
-- Improve the LiteRT-LM post-tool continuation prompt/handling so approval
-  flows reliably produce a useful final assistant answer when a final answer is
-  required. The approval/tool-result path is certified; final answer quality for
-  tool-result continuations is not.
+- Expand post-tool final-answer certification beyond the diagnostics echo tool.
 - Polish long tool-name layout in Flutter cards; the certified physical UI
   wraps long names awkwardly on narrow screens.
 
@@ -556,17 +553,27 @@ Physical-device evidence:
 - Navigated to Chat and verified persisted opaque approval-start failures no
   longer render `CoreErrorImpl`; the UI dump contained `approval may have
   expired` and `Retry the prompt`.
+- Re-ran a clean active approval-required prompt in the same process:
+  `Use approval_required_echo with phrase clean777. After approval answer clean777.`
+- LiteRT-LM produced the active tool call:
+  `LiteRT-LM generation produced tool call id=litert-tool-0 name=knowme_diagnostics__approval_required_echo context="initial"`.
+- After tapping the visible `Approve and run` button, logcat showed
+  `LiteRT-LM tool-result continuation starting tool_results=1` followed by
+  `LiteRT-LM generation produced text chars=34 tool_calls=0 context="tool_result"`.
+- The Flutter UI showed `Tool completed` and final assistant text
+  `Approved diagnostic echo: clean777`. The UI dump contained `clean777`,
+  `Approved diagnostic echo`, `Tool completed`, and
+  `Tool use knowme_diagnostics__approval_required_echo`, with no
+  `tool_approval_not_found` and no `CoreErrorImpl`.
 - Launch/logcat smoke showed no `FATAL EXCEPTION`,
   `tools.knowme.knowme E AndroidRuntime`, `UnsatisfiedLinkError`, or
   `dlopen failed`.
 
 Remaining for `litertlm-local-tools`:
 
-- Re-run a clean active approval-required prompt on physical Android and prove
-  the new post-tool fallback produces a final assistant answer when LiteRT-LM's
-  direct `Message.tool(...)` continuation is empty. The fallback is built and
-  build-verified, but the active-flow physical pass was blocked by stale
-  persisted approval cards from reinstall attempts.
+- Force/certify the bounded empty-continuation fallback branch separately. The
+  clean active approval run above did not trigger it because LiteRT-LM's direct
+  `Message.tool(...)` continuation produced final text.
 - Add a UI affordance to dismiss/repair stale persisted approval cards after
   process restart so they cannot be mistaken for active approvals.
 
