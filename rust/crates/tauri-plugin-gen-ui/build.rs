@@ -22,6 +22,8 @@ const COMMANDS: &[&str] = &[
     "graph_expand",
     "scribe_start",
     "scribe_stop",
+    "uar_service_config",
+    "uar_service_save",
 ];
 
 fn main() {

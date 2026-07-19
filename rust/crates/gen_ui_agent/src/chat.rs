@@ -83,6 +83,24 @@ pub struct EphemeralCloudConfig {
     pub model: String,
 }
 
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfiguredUarService {
+    pub service_url: Option<String>,
+    pub has_api_key: bool,
+    pub has_agent_artifact: bool,
+    pub session_id: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveUarServiceRequest {
+    pub service_url: String,
+    pub api_key: Option<String>,
+    pub agent_artifact_json: String,
+    pub session_id: Option<String>,
+}
+
 struct ActiveRun {
     run_id: String,
     cancellation: std::sync::Arc<std::sync::atomic::AtomicBool>,
@@ -780,6 +798,88 @@ pub async fn set_theme_mode(mode: &str) -> Result<(), AgentError> {
             serde_json::Value::String(mode.to_owned()),
         )
         .await
+}
+
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+pub async fn uar_service_config() -> Result<ConfiguredUarService, AgentError> {
+    Ok(ConfiguredUarService {
+        service_url: string_setting(SETTING_UAR_SERVICE_URL).await?,
+        has_api_key: string_setting(SETTING_UAR_SERVICE_API_KEY_REF)
+            .await?
+            .is_some(),
+        has_agent_artifact: state::config()?
+            .get_setting(SETTING_UAR_AGENT_ARTIFACT)
+            .await?
+            .is_some(),
+        session_id: string_setting(SETTING_UAR_SESSION_ID).await?,
+    })
+}
+
+#[cfg(any(target_os = "ios", target_os = "android"))]
+pub async fn uar_service_config() -> Result<ConfiguredUarService, AgentError> {
+    Ok(ConfiguredUarService {
+        service_url: None,
+        has_api_key: false,
+        has_agent_artifact: false,
+        session_id: None,
+    })
+}
+
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+pub async fn save_uar_service_config(request: SaveUarServiceRequest) -> Result<(), AgentError> {
+    let service_url = request.service_url.trim();
+    if service_url.is_empty() {
+        return Err(AgentError::Config("UAR service URL is required".into()));
+    }
+    crate::uar::UarServiceRuntime::new(service_url, None)?;
+
+    let artifact = artifact_from_string_or_path(&request.agent_artifact_json).await?;
+    let existing_key_ref = string_setting(SETTING_UAR_SERVICE_API_KEY_REF).await?;
+    let api_key_ref = match request.api_key.as_deref().map(str::trim) {
+        Some(api_key) if !api_key.is_empty() => {
+            let reference = "uar:service";
+            secrets::store_api_key(reference, api_key)?;
+            Some(reference.to_owned())
+        }
+        _ => existing_key_ref,
+    };
+
+    let config = state::config()?;
+    config
+        .set_setting(
+            SETTING_UAR_SERVICE_URL,
+            serde_json::Value::String(service_url.to_owned()),
+        )
+        .await?;
+    config
+        .set_setting(SETTING_UAR_AGENT_ARTIFACT, artifact)
+        .await?;
+    config
+        .set_setting(
+            SETTING_UAR_SESSION_ID,
+            request
+                .session_id
+                .map(|value| value.trim().to_owned())
+                .filter(|value| !value.is_empty())
+                .map(serde_json::Value::String)
+                .unwrap_or(serde_json::Value::Null),
+        )
+        .await?;
+    config
+        .set_setting(
+            SETTING_UAR_SERVICE_API_KEY_REF,
+            api_key_ref
+                .map(serde_json::Value::String)
+                .unwrap_or(serde_json::Value::Null),
+        )
+        .await
+}
+
+#[cfg(any(target_os = "ios", target_os = "android"))]
+pub async fn save_uar_service_config(_request: SaveUarServiceRequest) -> Result<(), AgentError> {
+    Err(AgentError::Config(
+        "UAR mobile configuration must target embedded-library mode, not a local service".into(),
+    ))
 }
 
 fn default_lane() -> String {

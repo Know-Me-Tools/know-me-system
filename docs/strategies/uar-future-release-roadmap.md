@@ -19,13 +19,15 @@ route to.
 - `gen_ui_agent::uar::UarServiceRuntime` can create a UAR run through the UAR
   HTTP SDK, consume its SSE stream, and project events into KnowMe A2UI blocks.
 - Flutter FFI and the Tauri plugin expose read-only UAR runtime status.
+- Desktop/web can select the `uar` chat lane when a UAR service URL and compiled
+  agent artifact are configured through the typed Tauri command surface.
 - Android local inference is still owned by the current LiteRT-LM path. It is
   not yet routed through UAR.
 
 ## Release UAR-1 — Runtime facade and projection certification
 
-Goal: make UAR visible as a first-class runtime boundary without changing
-production chat execution yet.
+Goal: make UAR visible as a first-class runtime boundary and add an explicitly
+configured desktop/web service lane without changing mobile local execution yet.
 
 - Keep `gen_ui_agent::uar` as the stable local boundary.
 - Expose `UarRuntimeStatus` through FFI/Tauri so every platform can show:
@@ -39,6 +41,11 @@ production chat execution yet.
   - stream events;
   - cancel run;
   - project UAR events into KnowMe A2UI. **Done at Rust seam level.**
+- Provide typed desktop/web configuration for UAR service URL, keychain-backed
+  API key, compiled agent artifact, and optional session id. **Done.**
+- Add a non-default `uar` chat lane for desktop/web that uses that service
+  facade and remaps projected UAR events back to the KnowMe run id. **Done at
+  Rust seam level.**
 - Add golden fixtures from UAR's `uar.agui/1` profile:
   - reasoning;
   - text;

@@ -148,6 +148,18 @@ export interface UarRuntimeStatus {
   submodulePath: string;
   submoduleCommit: string | null;
 }
+export interface ConfiguredUarService {
+  serviceUrl: string | null;
+  hasApiKey: boolean;
+  hasAgentArtifact: boolean;
+  sessionId: string | null;
+}
+export interface SaveUarServiceRequest {
+  serviceUrl: string;
+  apiKey: string | null;
+  agentArtifactJson: string;
+  sessionId: string | null;
+}
 export function cancelAgentRun(runId: string): Promise<boolean> {
   return invoke<boolean>(cmd("cancel_agent_run"), { runId });
 }
@@ -165,6 +177,12 @@ export function localRuntimeDiagnostics(): Promise<RuntimeDiagnostics | null> {
 }
 export function uarRuntimeStatus(): Promise<UarRuntimeStatus> {
   return invoke<UarRuntimeStatus>(cmd("uar_runtime_status"));
+}
+export function uarServiceConfig(): Promise<ConfiguredUarService> {
+  return invoke<ConfiguredUarService>(cmd("uar_service_config"));
+}
+export function uarServiceSave(request: SaveUarServiceRequest): Promise<void> {
+  return invoke<void>(cmd("uar_service_save"), { request });
 }
 export interface ProviderCatalogEntry {
   id: string;

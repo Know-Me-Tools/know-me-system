@@ -554,6 +554,58 @@ Denies the uar_runtime_status command without any pre-configured scope.
 <tr>
 <td>
 
+`gen-ui:allow-uar-service-config`
+
+</td>
+<td>
+
+Enables the uar_service_config command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-uar-service-config`
+
+</td>
+<td>
+
+Denies the uar_service_config command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:allow-uar-service-save`
+
+</td>
+<td>
+
+Enables the uar_service_save command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-uar-service-save`
+
+</td>
+<td>
+
+Denies the uar_service_save command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `gen-ui:allow-write`
 
 </td>

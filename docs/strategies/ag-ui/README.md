@@ -5,9 +5,14 @@ and every KnowMe surface — the wire profile, the normalization seam into KnowM
 provider-neutral contracts, what exists today in this repo, the verified gaps, and
 the releases that close them.
 
-**Status:** v1.0 strategy, 2026-07-19. Grounded in the vendored UAR submodule
+**Status:** v1.1 strategy, 2026-07-19 (v1.1 reconciles with the service facade that
+landed the same day). Grounded in the vendored UAR submodule
 (`rust/vendor/universal-agent-runtime`, v1.0.0) and the existing seam in
-`rust/crates/gen_ui_protocol`. Companions: `docs/strategies/agents/README.md`
+`rust/crates/gen_ui_protocol`. The governing integration documents are
+`docs/strategies/uar-knowme-runtime-integration.md` (ownership, deployment modes,
+phases) and `docs/strategies/uar-future-release-roadmap.md` (releases UAR-1…5);
+this doc owns the **event contract** those releases speak. Companions:
+`docs/strategies/agents/README.md`
 (placements, UAR grounding), `docs/strategies/a2ui/README.md` (the rendering
 contract these events carry), `docs/strategies/local-models/android-agentskills-process-future-roadmap.md`
 (mobile execution releases), PAGS-SPEC-KM-UIX-001 (the UI that consumes the stream).
@@ -55,16 +60,22 @@ The projection seam is already built and unit-tested; the live connection is not
 | **UAR ingress seam** `normalize_uar_agui_event` — maps `uar.agui/1` → `StreamEvent`, incl. `REASONING_MESSAGE_CONTENT` → `ThinkingDelta`, full `TOOL_CALL_*` lifecycle, `CUSTOM uar.skill.activated` → `SkillActivation`, unknown → `StreamEvent::Custom` | `rust/crates/gen_ui_protocol/src/lib.rs` | Working, unit-tested offline |
 | `A2uiAdapter` — `StreamEvent` → `A2uiEvent`; cross-token `<think>` state machine (boundary-tested at every split point), tool-argument fragment accumulation, unclosed-reasoning protocol error, unknown events → `ArtifactBlock("provider_event")` | `gen_ui_protocol` | Working, unit-tested |
 | `AguiAdapter` — `A2uiEvent` → `AguiEvent` (bidirectional seam) | `gen_ui_protocol` | Partial: `RunStarted`, `TextMessageContent`, `RunFinished` only |
+| **Service-mode facade** `UarServiceRuntime` — creates UAR runs over the UAR HTTP SDK, consumes SSE, projects through the shared adapter (`UarEventProjector`) preserving order; `UarRuntimeStatus` exposed over FFI/Tauri (`embedded`/`service`/`cloud` mode + integration state + submodule commit) | `rust/crates/gen_ui_agent/src/uar.rs` | Working at the Rust seam (non-mobile builds); the desktop/web `uar` lane can route chat through a configured service, but live-service runtime certification remains open |
 | FFI event stream to Flutter (JSON envelopes) + `ChatNotifier.streamBlock` + PEM persistence of messages/blocks | `gen_ui_ffi`, `mobile/lib/features/chat` | Working |
 | Certified end-to-end proof on physical Android (embedded `knowme_diagnostics` MCP namespace → visible ordered blocks, persisted, restored) | see `docs/strategies/local-models/android-litert-lm-six-gates-roadmap.md` | Working for the MCP path |
 
 ## 4. The gaps (what "AG-UI implementation" still means)
 
-1. **No live UAR stream.** Nothing in the workspace consumes UAR yet — the
-   submodule is excluded from the workspace build (`rust/Cargo.toml`) and there
-   is no runtime facade. `normalize_uar_agui_event` is proven only against
-   fixtures. The facade is Release A of the agent-skills roadmap; this doc owns
-   the event contract it must speak.
+1. **No production certification yet; embedded mode missing.** The submodule is
+   excluded from the workspace build (`rust/Cargo.toml`) and linked through the
+   HTTP SDK only. The *service-mode* facade exists at the Rust seam
+   (`UarServiceRuntime`, `UarEventProjector` — `gen_ui_agent::uar`), and
+   desktop/web can select the `uar` lane when `uar_service_url` plus a compiled
+   `uar_agent_artifact` are configured. The projection is proven against
+   fixtures and the SDK stream shape; it is not yet certified against a running
+   UAR service. What remains: the **embedded/mobile kernel** (UAR-2 in the
+   future-release roadmap; Phase 2 of the integration doc), production
+   defaulting, and live service-mode certification.
 2. **Envelope identity is dropped.** `eventId`, `sequence`, and `threadId` do
    not survive normalization; `StreamEvent`/`A2uiEvent` carry `run_id` only.
    Dedupe, ordering, replay, and the inspector's timeline (UIX-001 §10.6) all

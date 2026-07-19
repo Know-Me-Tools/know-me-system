@@ -160,6 +160,10 @@ policy explicitly includes them.
   - embedded/mobile;
   - HTTP/service. **Service facade exists at the Rust seam level through
     `UarServiceRuntime`; embedded/mobile remains future work.**
+- Expose typed desktop/web service configuration and the non-default `uar` chat
+  lane. **Done:** the Tauri command surface can save a UAR service URL,
+  keychain-backed API key reference, compiled agent artifact, and optional
+  session id; `gen_ui_agent::chat` routes that lane through `UarServiceRuntime`.
 - Define event mapping tests from UAR stream payloads to KnowMe `ContentBlock`
   variants.
 - Keep the existing local LiteRT-LM path active while the facade is introduced.
@@ -212,6 +216,6 @@ This preserves current Android progress while moving the architecture toward
 UAR as the real agent runtime authority.
 
 The next implementation checkpoint is the future-release roadmap in
-`docs/strategies/uar-future-release-roadmap.md`: expose the status surface in
-the UI, add more UAR golden fixtures, then wire the mobile embedded UAR kernel
-as the owner of real chat/agent execution.
+`docs/strategies/uar-future-release-roadmap.md`: certify the desktop/web `uar`
+lane against a live UAR service, add more UAR golden fixtures, then wire the
+mobile embedded UAR kernel as the owner of real chat/agent execution.

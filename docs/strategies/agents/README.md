@@ -262,8 +262,12 @@ corrections fall out:
 
 1. **Placements map to UAR consumption modes, not to new code.**
    - `embedded` (mobile, the only phone option) = UAR **as a Rust library**, behind a
-     facade in `gen_ui_agent` (Release A of
-     `docs/strategies/local-models/android-agentskills-process-future-roadmap.md`).
+     facade in `gen_ui_agent`. The facade boundary already exists:
+     `gen_ui_agent::uar` (`UarServiceRuntime`, `UarEventProjector`,
+     `UarRuntimeStatus`) serves the **service mode** over the UAR HTTP SDK today
+     (non-mobile builds, integration state `ProjectionOnly`); the **embedded
+     kernel** is UAR-2 in `docs/strategies/uar-future-release-roadmap.md` /
+     Phase 2 of `docs/strategies/uar-knowme-runtime-integration.md`.
      UAR's compatibility policy explicitly does **not** guarantee its Rust API during
      1.x — the supported surface is sidecar HTTP/SSE. Mobile has no sidecar option,
      so: pin the submodule SHA, keep the facade the *only* touchpoint, and treat

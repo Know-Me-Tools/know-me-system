@@ -6,9 +6,12 @@ how they persist and roam (storage), how a run picks and renders one
 (selection), and the renderer conformance gate. This is the completion plan for
 the "A2UI registry and component definition/storage/selection" gap.
 
-**Status:** v1.0 strategy, 2026-07-19. Grounded in the vendored UAR submodule
+**Status:** v1.1 strategy, 2026-07-19 (v1.1 aligns ownership with the integration
+doc: UAR owns the catalog; KnowMe owns rendering conformance). Grounded in the vendored UAR submodule
 (`rust/vendor/universal-agent-runtime` v1.0.0, `src/uar/a2ui/`) and the existing
-Flutter renderer (`flutter_packages/gen_ui_widgets`). Companions:
+Flutter renderer (`flutter_packages/gen_ui_widgets`). The governing ownership split
+is `docs/strategies/uar-knowme-runtime-integration.md` ("A2UI catalog
+integration"). Companions:
 `docs/strategies/ag-ui/README.md` (the event transport that carries A2UI
 traffic), `docs/strategies/plugins/README.md` §4 (`knowme:ui-library`
 capability cards), `docs/strategies/agents/README.md` (agent UI surfaces),
@@ -74,21 +77,25 @@ rule as capability ids) and a semver `version`. Authoring new first-party
 components means extending the catalog URN with a version bump — vocabulary
 governance per plugins doc §4.2.1, never ad-hoc per-producer shapes.
 
-### 3.2 Storage — UAR's registry is in-memory; KnowMe's must not be
+### 3.2 Storage — UAR owns the catalog; KnowMe persists a cache plus contributions
 
-Two storage classes:
+The ownership line (integration doc): **UAR owns the catalog registry and the
+supported component profiles; KnowMe owns rendering conformance.** Storage falls
+into two classes accordingly:
 
 | Class | Contents | Store | Lifecycle |
 |---|---|---|---|
-| **Built-in catalog** | The versioned first-party vocabulary | Loaded from the pinned UAR/catalog data at boot (in-memory is fine — it is reproducible from the artifact) | Swaps only with an app/submodule update; version surfaced in diagnostics |
+| **Catalog cache** | The approved UAR catalog profiles (`urn:uar:a2ui:catalog:1` at the pinned submodule version, plus later UAR-issued updates) | Reproducible from the pinned artifact at boot; optionally persisted as an **offline-rendering cache** on mobile (the integration doc's "cache approved profiles for offline rendering") | Refreshed only with a submodule/catalog update; version surfaced in diagnostics |
 | **Contributed schemas** | Plugin `ui-library` components, installed agent surfaces | **SurrealDB `a2ui_schema` records**: `{id, version, schema_json, source (plugin/agent id), content_hash, installed_at}` | Persist across restart; sync with the plugin/agent definition they arrived with (definitions travel, grants don't — plugins doc §10); removed on uninstall |
 
-KnowMe's registry (a `gen_ui_context`-adjacent module behind FFI, not a Flutter
-construct) resolves `a2ui_schema_id` across both classes, built-in first, then
-contributed, with exact-version then compatible-minor semantics. **The embedded
-UAR instance keeps its own in-memory registry for its own surfaces**; KnowMe's
-persisted registry is the cross-restart, cross-placement record — the two are
-synchronized at agent/plugin install time, never merged ad hoc.
+KnowMe's registry module (behind FFI, not a Flutter construct) resolves
+`a2ui_schema_id` across both classes, catalog first, then contributed, with
+exact-version then compatible-minor semantics. It is a **conformance cache and
+contribution store, never a competing catalog authority**: components whose ids
+are not in the UAR catalog or an installed contribution are rejected (fail
+closed, §3.3). The embedded UAR instance keeps its own in-memory registry for
+its own surfaces; the two are synchronized at agent/plugin install time, never
+merged ad hoc.
 
 ### 3.3 Selection — deterministic resolve-then-negotiate
 
@@ -104,6 +111,11 @@ When a run wants to show a surface:
    partial → render supported components + labeled fallback for the rest
    (plugins doc §4.2.1: "a labeled fallback, never a crash or a blank");
    below minimum vocabulary → labeled fallback with an upgrade hint.
+   **Fail closed on the unknown:** a component id outside the UAR catalog and
+   all installed contributions is never executed or rendered as an interactive
+   element — the labeled fallback *is* the closed failure surface, and the
+   rejection is logged with the run's provenance (integration doc: "unknown
+   catalog ids or component names fail closed").
 4. **Interact** — user gestures produce typed `A2uiAction`s (Flutter: the
    existing `A2uiSurfaceView` callback) routed Riverpod → Repository → FFI →
    the paused run as its tool result (UAR's `routes.rs` ingestion in server
