@@ -322,12 +322,44 @@ Verification:
   chat UI. The adb input command inserted `%20` literally into the prompt, so
   this remains a runtime smoke test, not a clean prompt-certification artifact.
 
+## EMBEDDED LOCAL TOOL CERTIFICATION CHECKPOINT
+
+Date: 2026-07-19
+
+Implemented:
+
+- Added an embedded `knowme_diagnostics` MCP server during mobile boot.
+- Registered it as trusted-local in the same `gen_ui_agent::state::mcp()`
+  registry used by prompt assembly and local tool execution.
+- Exposed one safe certification tool:
+  `knowme_diagnostics__local_runtime_status`.
+- The tool is argument-free, read-only, non-destructive, idempotent, and
+  closed-world, so it is eligible for automatic execution under the existing
+  host gate.
+- The tool returns structured runtime status including runtime kind, platform,
+  default local model, and safe-local-tool availability.
+
+Verification:
+
+- `cargo check -p gen_ui_ffi -p gen_ui_agent`
+- `cargo test -p gen_ui_agent local_tool -- --nocapture`
+- `flutter analyze lib`
+- `flutter build apk --debug --target-platform android-arm64`
+- `scripts/android/verify-native-inference-gates.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
+- Physical-device boot on `SM S936U` logged
+  `mobile diagnostics MCP tools registered server=knowme_diagnostics`.
+- Physical-device tool-loop prompt on `SM S936U` produced the following logcat
+  evidence:
+  - `LiteRT-LM generation returned empty text tool_calls=1 context="initial"`;
+  - `LiteRT-LM generation produced tool call id=litert-tool-0 name=knowme_diagnostics__local_runtime_status context="initial"`;
+  - `LiteRT-LM tool-result continuation starting tool_results=1`;
+  - `LiteRT-LM generation produced text chars=9 tool_calls=0 context="tool_result"`.
+
 Remaining for `litertlm-local-tools`:
 
 - Add user confirmation UX/policy for mutating, destructive, or open-world
   tools.
-- Certify on physical Android prompts where LiteRT-LM actually chooses and uses
-  an allowed local tool end-to-end.
+- Expand prompt certification beyond the deterministic diagnostics tool.
 
 ## BLOCKERS
 

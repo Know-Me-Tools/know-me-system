@@ -39,6 +39,10 @@ attached Samsung `SM S936U` running Android 16/API 36:
   Android graphics/runtime libraries required by the LiteRT-LM SDK, such as
   `libEGL.so`, `libGLESv2.so`, `libGLESv3.so`, and `libandroid.so`, are allowed;
   OEM OpenCL/vendor libraries remain forbidden in the startup-critical baseline.
+- Mobile boot registers an embedded trusted-local `knowme_diagnostics` MCP
+  server. It exposes a single read-only, non-destructive, closed-world
+  `local_runtime_status` tool so physical devices can certify the complete
+  LiteRT-LM manual tool loop without depending on Forge network availability.
 - The generic `gemma-4-E2B-it.litertlm` artifact downloaded to app-private cache,
   matched the pinned byte length, passed SHA-256 verification, and was published.
 - `MainActivity` loads `libgen_ui_ffi.so` through `System.loadLibrary`, so
@@ -77,11 +81,16 @@ attached Samsung `SM S936U` running Android 16/API 36:
   active LiteRT-LM conversation and observes the continuation stream for a
   corrected tool call. Trust, confirmation, destructive, and open-world failures
   are not repairable and remain terminal.
+- Physical-device local tool certification now passes on the attached Samsung:
+  LiteRT-LM emitted `tool_calls=1`, called
+  `knowme_diagnostics__local_runtime_status`, received the host tool result, and
+  produced a final continuation response.
 
 This proves the CPU smoke lane and code-level tool-call candidate preservation.
-It does not yet prove that the model reliably chooses tools for certified
-prompts. True token-level streaming callbacks, confirmation UX, cancellation
-certification, and broader device coverage remain future gates.
+It also proves one complete safe local tool loop on a physical Android device.
+True token-level streaming callbacks, confirmation UX, cancellation
+certification, richer tool prompt certification, and broader device coverage
+remain future gates.
 
 ## Roadmap
 
@@ -119,6 +128,8 @@ certification, and broader device coverage remain future gates.
 - [x] Preserve model tool-call candidates as canonical stream events.
 - [x] Parse model tool-call candidates through fail-closed validation.
 - [x] Preserve MCP tool annotations in local inference tool definitions.
+- [x] Register an embedded trusted-local diagnostics MCP server during mobile
+  boot for offline-safe tool-loop certification.
 - [x] Execute trusted-local read-only/non-destructive/closed-world tool calls and
   reject all other local tool calls with typed tool-result errors.
 - [x] Feed safe tool results back into LiteRT-LM and continue generation.
@@ -126,6 +137,8 @@ certification, and broader device coverage remain future gates.
   by executable tool loops.
 - [x] Allow at most two bounded repair attempts for malformed JSON or schema
   mismatches, and observe corrected tool calls emitted during continuation.
+- [x] Certify one physical-device tool loop where LiteRT-LM chooses a safe local
+  tool, receives the host result, and continues generation.
 - [ ] Enforce user confirmation policy for mutating, destructive, or open-world
   tools before execution.
 - Persist tool-call and tool-result events with the same AG-UI/A2UI content-block

@@ -4341,6 +4341,7 @@ version = "0.1.0"
 dependencies = [
  "android_logger 0.14.1",
  "anyhow",
+ "async-trait",
  "flutter_rust_bridge",
  "futures",
  "gen_ui_agent",
@@ -4349,6 +4350,7 @@ dependencies = [
  "gen_ui_db",
  "gen_ui_db_graph",
  "gen_ui_inference",
+ "gen_ui_mcp",
  "gen_ui_protocol",
  "gen_ui_runtime",
  "gen_ui_types",

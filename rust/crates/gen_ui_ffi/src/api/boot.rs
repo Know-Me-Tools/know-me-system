@@ -8,9 +8,102 @@ use std::sync::Arc;
 
 use gen_ui_agent::ConfigBackend;
 use gen_ui_db_graph::{GraphStore, GraphStoreConfig, LazyFastEmbedder};
+use gen_ui_mcp::{McpServerHandle, McpTransport};
 // frb's Result<T,E> detection needs a literal `Result<...>` — see chat.rs's
 // note; CoreResult<T>'s generic alias is invisible to frb's codegen.
-use gen_ui_types::CoreError;
+use gen_ui_types::{CoreError, CoreResult};
+
+struct MobileDiagnosticsTransport;
+
+#[async_trait::async_trait]
+impl McpTransport for MobileDiagnosticsTransport {
+    async fn request(
+        &self,
+        method: &str,
+        params: Option<serde_json::Value>,
+    ) -> CoreResult<serde_json::Value> {
+        match method {
+            "tools/list" => Ok(serde_json::json!({
+                "tools": [{
+                    "name": "local_runtime_status",
+                    "title": "Local Runtime Status",
+                    "description": "Report the current KnowMe on-device runtime, platform, default local model, and safe local-tool capability status. Use this when asked to inspect the local model, runtime, device backend, or available local tools.",
+                    "inputSchema": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {}
+                    },
+                    "annotations": {
+                        "readOnlyHint": true,
+                        "destructiveHint": false,
+                        "idempotentHint": true,
+                        "openWorldHint": false
+                    },
+                    "outputSchema": {
+                        "type": "object",
+                        "required": ["ok", "runtimeKind", "platform", "defaultModel", "safeLocalTools"],
+                        "properties": {
+                            "ok": {"type": "boolean"},
+                            "runtimeKind": {"type": "string"},
+                            "platform": {"type": "string"},
+                            "defaultModel": {"type": "string"},
+                            "safeLocalTools": {"type": "boolean"}
+                        }
+                    }
+                }]
+            })),
+            "tools/call" => {
+                let name = params
+                    .as_ref()
+                    .and_then(|value| value.get("name"))
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or_default();
+                if name != "local_runtime_status" {
+                    return Err(CoreError::Terminal(format!(
+                        "unknown diagnostics tool '{name}'"
+                    )));
+                }
+                Ok(serde_json::json!({
+                    "content": [{
+                        "type": "text",
+                        "text": "KnowMe local runtime is available with a safe read-only diagnostics tool."
+                    }],
+                    "structuredContent": {
+                        "ok": true,
+                        "runtimeKind": if cfg!(target_os = "android") {
+                            "litert-lm"
+                        } else {
+                            "llama.cpp"
+                        },
+                        "platform": std::env::consts::OS,
+                        "defaultModel": gen_ui_inference::catalog::current_mobile_platform()
+                            .map(|platform| platform.default_model().model_id)
+                            .unwrap_or(gen_ui_inference::catalog::ANDROID_GEMMA4_E2B_LITERTLM_ID),
+                        "safeLocalTools": true
+                    },
+                    "isError": false
+                }))
+            }
+            other => Err(CoreError::Terminal(format!(
+                "unsupported diagnostics MCP method '{other}'"
+            ))),
+        }
+    }
+}
+
+async fn register_mobile_diagnostics_mcp() -> Result<(), CoreError> {
+    let registry = gen_ui_agent::state::mcp()?;
+    let handle = registry.register(McpServerHandle::new_trusted_local(
+        "knowme_diagnostics",
+        Box::new(MobileDiagnosticsTransport),
+    ));
+    handle.refresh_tools().await?;
+    tracing::info!(
+        server = %handle.name,
+        "mobile diagnostics MCP tools registered"
+    );
+    Ok(())
+}
 
 /// Boot-order invariant, step 1: open the embedded SurrealDB store (config +
 /// memory/graph-RAG both live in it on mobile — see gen_ui_agent::state::init's
@@ -103,6 +196,9 @@ pub async fn run_migrations(data_dir: String) -> Result<(), CoreError> {
         store,
         Some(inference),
     );
+    register_mobile_diagnostics_mcp()
+        .await
+        .map_err(|e| boot_fail("mobile diagnostics MCP registration", e))?;
     tracing::info!("mobile migrations ready");
     Ok(())
 }
