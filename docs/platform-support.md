@@ -7,8 +7,8 @@ media capability, or materially better UX requires it.
 
 Current baseline:
 
-- Dart: 3.10 or newer
-- Flutter: 3.35.7 or newer
+- Dart: 3.13.0-0 or newer
+- Flutter: 3.47.0-0.1.pre or newer
 - Android: API 29 (Android 10) or newer
 - Android native ABI: arm64-v8a
 - iOS: 15.0 or newer

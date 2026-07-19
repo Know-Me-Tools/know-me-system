@@ -2,7 +2,7 @@
 name = "knowme-poc"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.96"
+rust-version = "1.97.1"
 
 [lib]
 name = "knowme_poc"

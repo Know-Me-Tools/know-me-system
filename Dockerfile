@@ -2,7 +2,7 @@
 
 FROM node:24-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d AS web
 WORKDIR /workspace
-RUN corepack enable && corepack prepare pnpm@11.11.0 --activate
+RUN corepack enable && corepack prepare pnpm@11.15.0 --activate
 COPY packages ./packages
 COPY rust/crates/tauri-plugin-gen-ui/guest-js ./rust/crates/tauri-plugin-gen-ui/guest-js
 COPY desktop/package.json desktop/pnpm-lock.yaml desktop/pnpm-workspace.yaml ./desktop/
@@ -11,7 +11,7 @@ RUN pnpm install --frozen-lockfile
 COPY desktop ./
 RUN pnpm build
 
-FROM rust:1.96-trixie@sha256:1f0dbad1df66647807e6952d1db85d0b2bda7606cb2139d82517e4f009967376 AS rust-builder
+FROM rust:1.97.1-trixie@sha256:4f9fcd47f7c1126d2c8dd20e594f8ec852492fe429c2c6c11ca56eebfffaf0d9 AS rust-builder
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         clang cmake git libclang-dev pkg-config protobuf-compiler \

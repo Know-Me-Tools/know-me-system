@@ -139,7 +139,7 @@ class RustBuilder {
   CargoBuildOptions? get _buildOptions =>
       environment.crateOptions.cargo[environment.configuration];
 
-  String get _toolchain => _buildOptions?.toolchain ?? '1.96';
+  String get _toolchain => _buildOptions?.toolchain ?? '1.97.1';
 
   /// Returns the path of directory containing build artifacts.
   Future<String> build() async {

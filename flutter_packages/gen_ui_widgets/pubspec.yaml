@@ -4,8 +4,8 @@ description: ContentBlock widget set for gen_ui — an exhaustive Flutter render
 version: 0.1.0
 publish_to: none # set to https://pub.dev when ready to publish
 environment:
-  sdk: ">=3.10.0 <4.0.0"
-  flutter: ">=3.35.7"
+  sdk: ">=3.13.0-0 <4.0.0"
+  flutter: ">=3.47.0-0.1.pre"
 
 dependencies:
   flutter:

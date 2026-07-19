@@ -11,11 +11,11 @@
 #   - Rationale for non-obvious pins lives next to the value.
 
 [toolchain]
-# SurrealDB 3.2's `fastnum` transitive dep needs rustc >=1.94; the wasm32 lane
-# only compiled cleanly on 1.96 (references/rust/wasm-targets.md).
-rust = "1.96"
+# Latest stable Rust baseline as of 2026-07-19. Compatibility with older Rust
+# is not a product constraint; keep this aligned with rust/rust-toolchain.toml.
+rust = "1.97.1"
 node = "24+"            # Active LTS — pin, do not use `--lts`
-flutter = "3.45.0-0.1.pre" # quality-first mobile pin; includes Dart 3.13.0
+flutter = "3.47.0-0.1.pre" # latest beta as of 2026-07-19; includes Dart 3.13.0-282.1.beta
 typescript = "7.x"      # Go-native compiler — no version pin
 bun = "latest"
 pnpm = "latest"
@@ -30,7 +30,7 @@ zustand = "5"
 openspec = "1.6.0+"             # @fission-ai/openspec — never the squatted bare package
 
 [data]
-surrealdb = "3.2"               # embedded graph/vector/FTS, kv-rocksdb native / kv-indxdb wasm
+surrealdb = "3.2.1"             # embedded graph/vector/FTS, kv-rocksdb native / kv-indxdb wasm
 pglite_oxide = "0.5.1"          # desktop config-DB only (macOS arm64 / Win x64 / Linux x64+arm64)
 
 # Inference engines are per-lane decisions, not one global choice. Android uses
