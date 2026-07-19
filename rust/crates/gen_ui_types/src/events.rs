@@ -32,6 +32,10 @@ pub enum StreamEvent {
         output_json: String,
         is_error: bool,
     },
+    SkillActivation {
+        name: String,
+        status: String,
+    },
     Custom {
         source: String,
         event_name: String,

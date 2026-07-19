@@ -40,9 +40,11 @@ attached Samsung `SM S936U` running Android 16/API 36:
   `libEGL.so`, `libGLESv2.so`, `libGLESv3.so`, and `libandroid.so`, are allowed;
   OEM OpenCL/vendor libraries remain forbidden in the startup-critical baseline.
 - Mobile boot registers an embedded trusted-local `knowme_diagnostics` MCP
-  server. It exposes a single read-only, non-destructive, closed-world
-  `local_runtime_status` tool so physical devices can certify the complete
-  LiteRT-LM manual tool loop without depending on Forge network availability.
+  server. It exposes a read-only, non-destructive, closed-world
+  `local_runtime_status` tool for safe automatic execution and an
+  `approval_required_echo` tool that is deliberately open-world so physical
+  devices can certify the explicit approval/resume path without depending on
+  Forge network availability.
 - The generic `gemma-4-E2B-it.litertlm` artifact downloaded to app-private cache,
   matched the pinned byte length, passed SHA-256 verification, and was published.
 - `MainActivity` loads `libgen_ui_ffi.so` through `System.loadLibrary`, so
@@ -85,12 +87,24 @@ attached Samsung `SM S936U` running Android 16/API 36:
   LiteRT-LM emitted `tool_calls=1`, called
   `knowme_diagnostics__local_runtime_status`, received the host tool result, and
   produced a final continuation response.
+- Physical-device approval-required local tool certification now passes on the
+  attached Samsung for `knowme_diagnostics__approval_required_echo`: LiteRT-LM
+  emitted the tool call, Flutter rendered the approval-required policy card,
+  a visible `Approve and run` tap executed the host-stored pending call by
+  approval ID, the UI rendered the resulting `ToolUse` and `ToolResult` blocks,
+  and expanded details contained `Approved diagnostic echo`,
+  `approved_pending_tool_call`, and the approved phrase.
+- The core stream contract now has a typed `SkillActivation` event that maps to
+  the existing `ContentBlock::Skill` block. Skill activation chunks must be
+  surfaced and persisted alongside thinking, citation, tool, memory, lifecycle,
+  and artifact chunks instead of being demoted to opaque raw/provider artifacts.
 
 This proves the CPU smoke lane and code-level tool-call candidate preservation.
-It also proves one complete safe local tool loop on a physical Android device.
-True token-level streaming callbacks, confirmation UX, cancellation
-certification, richer tool prompt certification, and broader device coverage
-remain future gates.
+It also proves one complete safe local tool loop and one explicit
+approval-required local tool loop on a physical Android device. True
+token-level streaming callbacks, cancellation certification, richer prompt
+certification, final post-tool answer quality, long tool-name UI polish, and
+broader device coverage remain future gates.
 
 ## Roadmap
 
@@ -145,10 +159,15 @@ remain future gates.
   of mutating, destructive, or open-world tools. The host stores the exact
   validated pending call by approval ID, Flutter approval calls a dedicated FFI
   method, Rust executes the stored call, and the result resumes the active
-  LiteRT-LM conversation. Physical-device certification of this approval UX is
-  still required before marking the product gate complete.
+  LiteRT-LM conversation.
+- [x] Certify one physical-device approval-required local tool flow where the
+  visible Flutter policy card executes only the host-stored pending call by
+  approval ID and renders the resulting tool-use/tool-result blocks.
 - Persist tool-call and tool-result events with the same AG-UI/A2UI content-block
   contract used by other providers.
+- Persist skill activation events with the same AG-UI/A2UI content-block
+  contract. A skill activation is a first-class semantic chunk, not assistant
+  answer Markdown and not a raw artifact fallback.
 - Require explicit confirmation before any mutating tool can execute.
 
 ### R4 — Device certification

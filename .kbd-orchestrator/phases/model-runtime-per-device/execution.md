@@ -452,8 +452,72 @@ Verification:
 
 Remaining for `litertlm-local-tools`:
 
-- Physically certify an approval-required local tool flow on Android hardware.
-- Expand prompt certification beyond the deterministic diagnostics tool.
+- Expand prompt certification beyond the deterministic diagnostics tool. The
+  approval-required hardware certification is recorded in the next checkpoint.
+
+## PHYSICAL TOOL APPROVAL / SKILL CHUNK CHECKPOINT
+
+Date: 2026-07-19
+
+Implemented:
+
+- Added a second embedded trusted-local diagnostics MCP tool,
+  `approval_required_echo`. It is read-only, non-destructive, and idempotent,
+  but advertises `openWorldHint: true` so the existing local tool policy forces
+  explicit approval instead of automatic execution.
+- Fixed Flutter `ContentBlock.fromJson` decoding for Rust snake_case wire
+  fields on tool-use, tool-result, and image blocks. This prevents
+  `ToolUse.input_json`, `ToolResult.tool_use_id`, `ToolResult.output_json`,
+  `ToolResult.is_error`, and `Image.data_base64` from failing in the UI stream.
+- Added a typed `StreamEvent::SkillActivation` contract and mapped it through
+  `A2uiAdapter` to the existing `ContentBlock::Skill` variant. Skill activation
+  chunks are now part of the canonical semantic event plan, parallel to
+  thinking, citation, tool, memory, lifecycle, and artifact chunks. They must be
+  rendered outside assistant answer Markdown and persisted as ordered semantic
+  blocks.
+
+Verification:
+
+- `cargo test -p gen_ui_ffi mobile_diagnostics_exposes_safe_and_approval_required_tools -- --nocapture`
+- `cargo test -p gen_ui_protocol skill_activations_emit_skill_blocks -- --nocapture`
+- `cargo test -p gen_ui_agent local_tool -- --nocapture`
+- `cargo check -p gen_ui_agent -p gen_ui_ffi`
+- `cargo check -p gen_ui_protocol -p gen_ui_types`
+- `flutter analyze lib ../flutter_packages/gen_ui_widgets/lib test/features/chat/theme_accessibility_test.dart`
+- `flutter test test/features/chat/theme_accessibility_test.dart`
+- `flutter build apk --debug --target-platform android-arm64`
+- `../scripts/android/verify-native-inference-gates.sh build/app/outputs/flutter-apk/app-debug.apk`
+- Fresh install/launch of the rebuilt APK on `SM S936U`: logcat contained
+  `mobile diagnostics MCP tools registered server=knowme_diagnostics` and
+  `mobile migrations ready`, with no `AndroidRuntime`, `FATAL EXCEPTION`,
+  `UnsatisfiedLinkError`, or `dlopen failed`.
+
+Physical-device evidence:
+
+- Device: Samsung `SM S936U`, serial `R5GYB4AZD7A`, Android 16/API 36.
+- Installed and launched `tools.knowme.knowme/.MainActivity`.
+- Prompted LiteRT-LM to call
+  `knowme_diagnostics__approval_required_echo` with phrase `approval-two`.
+- The native logs showed:
+  - `LiteRT-LM generation produced tool call id=litert-tool-0 name=knowme_diagnostics__approval_required_echo context="initial"`
+  - `LiteRT-LM tool-result continuation starting tool_results=1`
+  - `LiteRT-LM generation returned empty text tool_calls=0 context="tool_result"`
+- The Flutter UI rendered an approval-required policy card with an
+  `Approve and run` action. After an explicit tap, the UI rendered
+  `Tool use knowme_diagnostics__approval_required_echo` and `Tool completed`
+  blocks. Expanded details contained `Approved diagnostic echo`, `approval-two`,
+  and `approved_pending_tool_call`, proving that approval executed the
+  host-stored pending call by approval ID and surfaced the tool output.
+
+Remaining for `litertlm-local-tools`:
+
+- Expand prompt certification beyond deterministic diagnostics tools.
+- Improve the LiteRT-LM post-tool continuation prompt/handling so approval
+  flows reliably produce a useful final assistant answer when a final answer is
+  required. The approval/tool-result path is certified; final answer quality for
+  tool-result continuations is not.
+- Polish long tool-name layout in Flutter cards; the certified physical UI
+  wraps long names awkwardly on narrow screens.
 
 ## BLOCKERS
 

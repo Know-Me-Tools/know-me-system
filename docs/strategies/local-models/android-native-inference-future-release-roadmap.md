@@ -52,11 +52,16 @@ vendor library dependency.
   office/personal task following, Mermaid, code, constrained JSON, multi-turn
   memory, cancellation, recovery after restart, and multiple safe tool calls.
 - Certify the confirmation UX/policy for mutating, destructive, and open-world
-  tools on a physical device. The code path must prove that approval executes
-  only a host-stored pending call by approval ID, never arbitrary model-visible
+  tools beyond the embedded diagnostic tool. The baseline physical proof now
+  exists for a read-only/open-world diagnostic: approval executes only a
+  host-stored pending call by approval ID, never arbitrary model-visible
   interaction prose.
-- Persist tool-use, tool-result, confirmation, cancellation, and error evidence
-  with the same AG-UI/A2UI content-block contract as other providers.
+- Persist tool-use, tool-result, skill activation, confirmation, cancellation,
+  and error evidence with the same AG-UI/A2UI content-block contract as other
+  providers.
+- Treat skill activation chunks as first-class ordered semantic blocks, rendered
+  outside answer Markdown in the same turn region model as thinking, citation,
+  tool, memory, lifecycle, and artifact chunks.
 
 ## Explicit non-goal
 

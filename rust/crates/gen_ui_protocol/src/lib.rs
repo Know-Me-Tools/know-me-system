@@ -192,6 +192,13 @@ impl A2uiAdapter {
                     is_error: *is_error,
                 },
             }],
+            StreamEvent::SkillActivation { name, status } => vec![A2uiEvent::Block {
+                run_id: self.run_id.clone(),
+                block: ContentBlock::Skill {
+                    name: name.clone(),
+                    status: status.clone(),
+                },
+            }],
 
             StreamEvent::Custom {
                 source,
@@ -501,6 +508,20 @@ mod tests {
             &output[0],
             A2uiEvent::Block { block: ContentBlock::Thinking { text }, .. }
                 if text == "provider reasoning"
+        ));
+    }
+
+    #[test]
+    fn skill_activations_emit_skill_blocks() {
+        let mut adapter = A2uiAdapter::new("run-1");
+        let output = adapter.ingest(&StreamEvent::SkillActivation {
+            name: "document_ingest".into(),
+            status: "running".into(),
+        });
+        assert!(matches!(
+            &output[0],
+            A2uiEvent::Block { block: ContentBlock::Skill { name, status }, .. }
+                if name == "document_ingest" && status == "running"
         ));
     }
 

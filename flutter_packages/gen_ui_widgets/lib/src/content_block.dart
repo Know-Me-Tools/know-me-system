@@ -28,14 +28,14 @@ sealed class ContentBlock {
           json['value'] as String?,
         ),
         'toolUse' => ToolUseBlock(
-          json['id'] as String,
-          json['name'] as String,
-          json['inputJson'] as String,
+          _jsonString(json, 'id'),
+          _jsonString(json, 'name'),
+          _jsonString(json, 'inputJson', snakeKey: 'input_json'),
         ),
         'toolResult' => ToolResultBlock(
-          json['toolUseId'] as String,
-          json['outputJson'] as String,
-          json['isError'] as bool,
+          _jsonString(json, 'toolUseId', snakeKey: 'tool_use_id'),
+          _jsonString(json, 'outputJson', snakeKey: 'output_json'),
+          _jsonBool(json, 'isError', snakeKey: 'is_error'),
         ),
         'skill' => SkillBlock(json['name'] as String, json['status'] as String),
         'artifact' => ArtifactBlock(
@@ -45,13 +45,37 @@ sealed class ContentBlock {
         ),
         'image' => ImageBlock(
           json['url'] as String?,
-          json['dataBase64'] as String?,
+          _jsonNullableString(json, 'dataBase64', snakeKey: 'data_base64'),
           json['mime'] as String,
         ),
         'divider' => const DividerBlock(),
         final type => throw FormatException('Unknown ContentBlock type: $type'),
       };
 }
+
+String _jsonString(
+  Map<String, dynamic> json,
+  String key, {
+  String? snakeKey,
+  String defaultValue = '',
+}) =>
+    (json[key] ?? (snakeKey == null ? null : json[snakeKey]))?.toString() ??
+    defaultValue;
+
+String? _jsonNullableString(
+  Map<String, dynamic> json,
+  String key, {
+  String? snakeKey,
+}) => (json[key] ?? (snakeKey == null ? null : json[snakeKey]))?.toString();
+
+bool _jsonBool(
+  Map<String, dynamic> json,
+  String key, {
+  String? snakeKey,
+  bool defaultValue = false,
+}) =>
+    (json[key] ?? (snakeKey == null ? null : json[snakeKey])) as bool? ??
+    defaultValue;
 
 class TextBlock extends ContentBlock {
   final String text;

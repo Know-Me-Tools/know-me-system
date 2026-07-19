@@ -32,6 +32,27 @@ void main() {
     }
   });
 
+  test('content blocks decode Rust snake-case tool wire fields', () {
+    final toolUse = ContentBlock.fromJson({
+      'type': 'toolUse',
+      'id': 'litert-tool-0',
+      'name': 'knowme_diagnostics__approval_required_echo',
+      'input_json': '{"phrase":"approval-ok"}',
+    });
+    expect(toolUse, isA<ToolUseBlock>());
+    expect((toolUse as ToolUseBlock).inputJson, '{"phrase":"approval-ok"}');
+
+    final toolResult = ContentBlock.fromJson({
+      'type': 'toolResult',
+      'tool_use_id': 'litert-tool-0',
+      'output_json': '{"ok":false}',
+      'is_error': true,
+    });
+    expect(toolResult, isA<ToolResultBlock>());
+    expect((toolResult as ToolResultBlock).toolUseId, 'litert-tool-0');
+    expect(toolResult.isError, isTrue);
+  });
+
   testWidgets('rich block actions are labeled and at least 48 pixels', (
     tester,
   ) async {

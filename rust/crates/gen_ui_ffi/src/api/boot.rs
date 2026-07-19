@@ -24,33 +24,67 @@ impl McpTransport for MobileDiagnosticsTransport {
     ) -> CoreResult<serde_json::Value> {
         match method {
             "tools/list" => Ok(serde_json::json!({
-                "tools": [{
-                    "name": "local_runtime_status",
-                    "title": "Local Runtime Status",
-                    "description": "Report the current KnowMe on-device runtime, platform, default local model, and safe local-tool capability status. Use this when asked to inspect the local model, runtime, device backend, or available local tools.",
-                    "inputSchema": {
-                        "type": "object",
-                        "additionalProperties": false,
-                        "properties": {}
+                "tools": [
+                    {
+                        "name": "local_runtime_status",
+                        "title": "Local Runtime Status",
+                        "description": "Report the current KnowMe on-device runtime, platform, default local model, and safe local-tool capability status. Use this when asked to inspect the local model, runtime, device backend, or available local tools.",
+                        "inputSchema": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {}
+                        },
+                        "annotations": {
+                            "readOnlyHint": true,
+                            "destructiveHint": false,
+                            "idempotentHint": true,
+                            "openWorldHint": false
+                        },
+                        "outputSchema": {
+                            "type": "object",
+                            "required": ["ok", "runtimeKind", "platform", "defaultModel", "safeLocalTools"],
+                            "properties": {
+                                "ok": {"type": "boolean"},
+                                "runtimeKind": {"type": "string"},
+                                "platform": {"type": "string"},
+                                "defaultModel": {"type": "string"},
+                                "safeLocalTools": {"type": "boolean"}
+                            }
+                        }
                     },
-                    "annotations": {
-                        "readOnlyHint": true,
-                        "destructiveHint": false,
-                        "idempotentHint": true,
-                        "openWorldHint": false
-                    },
-                    "outputSchema": {
-                        "type": "object",
-                        "required": ["ok", "runtimeKind", "platform", "defaultModel", "safeLocalTools"],
-                        "properties": {
-                            "ok": {"type": "boolean"},
-                            "runtimeKind": {"type": "string"},
-                            "platform": {"type": "string"},
-                            "defaultModel": {"type": "string"},
-                            "safeLocalTools": {"type": "boolean"}
+                    {
+                        "name": "approval_required_echo",
+                        "title": "Approval Required Echo",
+                        "description": "Echo a short certification phrase only after explicit user approval. Use this only when the user asks to test or certify the local tool approval flow.",
+                        "inputSchema": {
+                            "type": "object",
+                            "required": ["phrase"],
+                            "additionalProperties": false,
+                            "properties": {
+                                "phrase": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 80
+                                }
+                            }
+                        },
+                        "annotations": {
+                            "readOnlyHint": true,
+                            "destructiveHint": false,
+                            "idempotentHint": true,
+                            "openWorldHint": true
+                        },
+                        "outputSchema": {
+                            "type": "object",
+                            "required": ["ok", "phrase", "approvalFlow"],
+                            "properties": {
+                                "ok": {"type": "boolean"},
+                                "phrase": {"type": "string"},
+                                "approvalFlow": {"type": "string"}
+                            }
                         }
                     }
-                }]
+                ]
             })),
             "tools/call" => {
                 let name = params
@@ -58,6 +92,25 @@ impl McpTransport for MobileDiagnosticsTransport {
                     .and_then(|value| value.get("name"))
                     .and_then(serde_json::Value::as_str)
                     .unwrap_or_default();
+                if name == "approval_required_echo" {
+                    let phrase = params
+                        .as_ref()
+                        .and_then(|value| value.pointer("/arguments/phrase"))
+                        .and_then(serde_json::Value::as_str)
+                        .unwrap_or_default();
+                    return Ok(serde_json::json!({
+                        "content": [{
+                            "type": "text",
+                            "text": format!("Approved diagnostic echo: {phrase}")
+                        }],
+                        "structuredContent": {
+                            "ok": true,
+                            "phrase": phrase,
+                            "approvalFlow": "approved_pending_tool_call"
+                        },
+                        "isError": false
+                    }));
+                }
                 if name != "local_runtime_status" {
                     return Err(CoreError::Terminal(format!(
                         "unknown diagnostics tool '{name}'"
@@ -239,4 +292,84 @@ pub async fn load_seeds() -> Result<u32, CoreError> {
 /// desktop's exactly.
 pub async fn attach_sync_shapes() -> Result<(), CoreError> {
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mobile_diagnostics_exposes_safe_and_approval_required_tools() {
+        gen_ui_runtime::init(Some(2));
+        gen_ui_runtime::handle().block_on(async {
+            let transport = MobileDiagnosticsTransport;
+            let listed = transport
+                .request("tools/list", None)
+                .await
+                .expect("tools/list succeeds");
+            let tools = listed
+                .get("tools")
+                .and_then(serde_json::Value::as_array)
+                .expect("tools array");
+
+            let safe = tools
+                .iter()
+                .find(|tool| {
+                    tool.get("name").and_then(serde_json::Value::as_str)
+                        == Some("local_runtime_status")
+                })
+                .expect("safe diagnostics tool");
+            assert_eq!(
+                safe.pointer("/annotations/openWorldHint")
+                    .and_then(serde_json::Value::as_bool),
+                Some(false)
+            );
+
+            let approval = tools
+                .iter()
+                .find(|tool| {
+                    tool.get("name").and_then(serde_json::Value::as_str)
+                        == Some("approval_required_echo")
+                })
+                .expect("approval diagnostics tool");
+            assert_eq!(
+                approval
+                    .pointer("/annotations/readOnlyHint")
+                    .and_then(serde_json::Value::as_bool),
+                Some(true)
+            );
+            assert_eq!(
+                approval
+                    .pointer("/annotations/destructiveHint")
+                    .and_then(serde_json::Value::as_bool),
+                Some(false)
+            );
+            assert_eq!(
+                approval
+                    .pointer("/annotations/openWorldHint")
+                    .and_then(serde_json::Value::as_bool),
+                Some(true),
+                "open-world annotation intentionally forces manual confirmation"
+            );
+
+            let called = transport
+                .request(
+                    "tools/call",
+                    Some(serde_json::json!({
+                        "name": "approval_required_echo",
+                        "arguments": {"phrase": "approval-ok"}
+                    })),
+                )
+                .await
+                .expect("approval echo call succeeds after host approval");
+            assert_eq!(
+                called.pointer("/structuredContent/approvalFlow"),
+                Some(&serde_json::json!("approved_pending_tool_call"))
+            );
+            assert_eq!(
+                called.pointer("/structuredContent/phrase"),
+                Some(&serde_json::json!("approval-ok"))
+            );
+        });
+    }
 }
