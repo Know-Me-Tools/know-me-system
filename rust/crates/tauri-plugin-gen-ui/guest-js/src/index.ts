@@ -137,6 +137,17 @@ export interface RuntimeGateReport {
   evidence?: string;
   errorCode?: string;
 }
+export type UarDeploymentMode = "embedded_library" | "http_service" | "cloud_service";
+export type UarIntegrationState = "not_wired" | "projection_only" | "embedded_kernel" | "service_runtime";
+export interface UarRuntimeStatus {
+  authority: string;
+  targetMode: UarDeploymentMode;
+  currentState: UarIntegrationState;
+  localProviderRole: string;
+  mobileSidecarAllowed: boolean;
+  submodulePath: string;
+  submoduleCommit: string | null;
+}
 export function cancelAgentRun(runId: string): Promise<boolean> {
   return invoke<boolean>(cmd("cancel_agent_run"), { runId });
 }
@@ -151,6 +162,9 @@ export function cancelModelOperation(): Promise<void> {
 }
 export function localRuntimeDiagnostics(): Promise<RuntimeDiagnostics | null> {
   return invoke<RuntimeDiagnostics | null>(cmd("local_runtime_diagnostics"));
+}
+export function uarRuntimeStatus(): Promise<UarRuntimeStatus> {
+  return invoke<UarRuntimeStatus>(cmd("uar_runtime_status"));
 }
 export interface ProviderCatalogEntry {
   id: string;

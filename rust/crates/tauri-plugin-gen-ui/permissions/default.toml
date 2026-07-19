@@ -8,6 +8,7 @@ permissions = [
     "allow-get-active-lane",
     "allow-set-active-lane",
     "allow-has-local-engine",
+    "allow-uar-runtime-status",
     "allow-run-migrations",
     "allow-load-seeds",
     "allow-attach-sync-shapes",

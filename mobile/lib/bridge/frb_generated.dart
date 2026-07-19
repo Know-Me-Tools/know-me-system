@@ -77,7 +77,7 @@ class GenUiCore
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => -1651365145;
+  int get rustContentHash => -1649705225;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -265,6 +265,8 @@ abstract class GenUiCoreApi extends BaseApi {
   Stream<String> crateApiStreamsSyncStatus();
 
   Future<String> crateApiChatThemeMode();
+
+  Future<String> crateApiChatUarRuntimeStatus();
 
   RustArcIncrementStrongCountFnType
   get rust_arc_increment_strong_count_A2UiEvent;
@@ -1934,6 +1936,34 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
 
   TaskConstMeta get kCrateApiChatThemeModeConstMeta =>
       const TaskConstMeta(debugName: "theme_mode", argNames: []);
+
+  @override
+  Future<String> crateApiChatUarRuntimeStatus() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 49,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatUarRuntimeStatusConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatUarRuntimeStatusConstMeta =>
+      const TaskConstMeta(debugName: "uar_runtime_status", argNames: []);
 
   RustArcIncrementStrongCountFnType
   get rust_arc_increment_strong_count_A2UiEvent => wire

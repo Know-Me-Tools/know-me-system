@@ -74,6 +74,9 @@ Future<void> cancelModelOperation() => ffi.cancelModelOperation();
 Future<Map<String, dynamic>?> localRuntimeDiagnostics() async =>
     jsonDecode(await ffi.localRuntimeDiagnostics()) as Map<String, dynamic>?;
 
+Future<Map<String, dynamic>> uarRuntimeStatus() async =>
+    jsonDecode(await ffi.uarRuntimeStatus()) as Map<String, dynamic>;
+
 Future<String> getThemeMode() => ffi.themeMode();
 
 Future<void> setThemeMode(String mode) => ffi.setThemeMode(mode: mode);

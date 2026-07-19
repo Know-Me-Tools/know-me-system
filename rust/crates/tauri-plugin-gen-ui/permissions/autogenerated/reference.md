@@ -8,6 +8,7 @@ Default gen-ui permissions: startup/read/chat intents. Mutating ENTITY commands 
 - `allow-get-active-lane`
 - `allow-set-active-lane`
 - `allow-has-local-engine`
+- `allow-uar-runtime-status`
 - `allow-run-migrations`
 - `allow-load-seeds`
 - `allow-attach-sync-shapes`
@@ -520,6 +521,32 @@ Enables the stream_agent_a2ui command without any pre-configured scope.
 <td>
 
 Denies the stream_agent_a2ui command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:allow-uar-runtime-status`
+
+</td>
+<td>
+
+Enables the uar_runtime_status command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-uar-runtime-status`
+
+</td>
+<td>
+
+Denies the uar_runtime_status command without any pre-configured scope.
 
 </td>
 </tr>

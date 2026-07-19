@@ -69,6 +69,9 @@ Future<void> cancelModelOperation() =>
 Future<String> localRuntimeDiagnostics() =>
     GenUiCore.instance.api.crateApiChatLocalRuntimeDiagnostics();
 
+Future<String> uarRuntimeStatus() =>
+    GenUiCore.instance.api.crateApiChatUarRuntimeStatus();
+
 Future<String> themeMode() => GenUiCore.instance.api.crateApiChatThemeMode();
 
 Future<void> setThemeMode({required String mode}) =>
