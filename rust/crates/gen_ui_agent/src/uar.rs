@@ -557,6 +557,60 @@ mod tests {
     }
 
     #[test]
+    fn projector_maps_uar_citation_to_visible_block() {
+        let mut projector = UarEventProjector::new("run-1");
+        let output = projector.ingest_agui_payload(&serde_json::json!({
+            "type": "CUSTOM",
+            "profile": "uar.agui/1",
+            "name": "uar.citation.added",
+            "value": {
+                "source": "policy.pdf",
+                "quote": "Approvals are required before mutating external state."
+            },
+            "runId": "run-1"
+        }));
+
+        assert!(matches!(
+            &output[0],
+            A2uiEvent::Block {
+                block: ContentBlock::Citation { source, quote },
+                ..
+            } if source == "policy.pdf"
+                && quote == "Approvals are required before mutating external state."
+        ));
+    }
+
+    #[test]
+    fn projector_maps_uar_memory_to_visible_block() {
+        let mut projector = UarEventProjector::new("run-1");
+        let output = projector.ingest_agui_payload(&serde_json::json!({
+            "type": "CUSTOM",
+            "profile": "uar.agui/1",
+            "name": "uar.memory.updated",
+            "value": {
+                "operation": "stored",
+                "key": "office.default_format",
+                "value": "concise markdown"
+            },
+            "runId": "run-1"
+        }));
+
+        assert!(matches!(
+            &output[0],
+            A2uiEvent::Block {
+                block: ContentBlock::Memory {
+                    operation,
+                    key,
+                    value
+                },
+                ..
+            } if operation == "stored"
+                && key == "office.default_format"
+                && value.as_deref() == Some("concise markdown")
+        ));
+    }
+
+    #[test]
     fn projector_keeps_tool_stream_state_across_uar_events() {
         let mut projector = UarEventProjector::new("run-1");
         assert!(projector
