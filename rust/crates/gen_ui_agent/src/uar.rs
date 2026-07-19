@@ -722,4 +722,66 @@ mod tests {
         ));
         assert!(matches!(&output[2], A2uiEvent::RunFinished { .. }));
     }
+
+    #[tokio::test]
+    #[cfg(not(any(target_os = "ios", target_os = "android")))]
+    async fn sdk_stream_projection_maps_direct_agui_service_events() {
+        let source = futures::stream::iter([
+            Ok(universal_agent_runtime_sdk::StreamEvent {
+                id: Some("1".into()),
+                event: Some("agui.message.delta".into()),
+                data: serde_json::json!({"delta": {"text": "hello"}}),
+            }),
+            Ok(universal_agent_runtime_sdk::StreamEvent {
+                id: Some("2".into()),
+                event: Some("agui.citation.added".into()),
+                data: serde_json::json!({
+                    "citation": {
+                        "url": "https://example.test",
+                        "title": "Example",
+                        "snippet": "Cited text."
+                    }
+                }),
+            }),
+            Ok(universal_agent_runtime_sdk::StreamEvent {
+                id: Some("3".into()),
+                event: Some("agui.tool_call.complete".into()),
+                data: serde_json::json!({
+                    "id": "call-1",
+                    "name": "docs.search",
+                    "arguments_json": "{\"q\":\"uar\"}"
+                }),
+            }),
+        ])
+        .boxed();
+
+        let output: Vec<_> = project_sdk_stream("run-1".into(), source)
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .map(Result::unwrap)
+            .collect();
+
+        assert!(output.iter().any(|event| matches!(
+            event,
+            A2uiEvent::Block {
+                block: ContentBlock::Text { text },
+                ..
+            } if text == "hello"
+        )));
+        assert!(output.iter().any(|event| matches!(
+            event,
+            A2uiEvent::Block {
+                block: ContentBlock::Citation { source, quote },
+                ..
+            } if source == "Example" && quote == "Cited text."
+        )));
+        assert!(output.iter().any(|event| matches!(
+            event,
+            A2uiEvent::Block {
+                block: ContentBlock::ToolUse { id, name, input_json },
+                ..
+            } if id == "call-1" && name == "docs.search" && input_json == "{\"q\":\"uar\"}"
+        )));
+    }
 }

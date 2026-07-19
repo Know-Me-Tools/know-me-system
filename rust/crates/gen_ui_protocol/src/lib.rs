@@ -308,6 +308,19 @@ pub fn stream_event_to_uar_normalized_payload(event: &StreamEvent) -> serde_json
                 "arguments_json": ""
             }
         }),
+        StreamEvent::ToolCallReady {
+            id,
+            name,
+            input_json,
+        } => serde_json::json!({
+            "type": "tool_call.complete",
+            "data": {
+                "call_index": 0,
+                "id": id,
+                "name": name,
+                "arguments_json": input_json
+            }
+        }),
         StreamEvent::ToolResult {
             tool_use_id,
             output_json,
@@ -382,7 +395,25 @@ pub fn stream_event_to_uar_normalized_payload(event: &StreamEvent) -> serde_json
 pub fn normalize_uar_agui_event(payload: &serde_json::Value) -> StreamEvent {
     let event_type = json_string(payload, &["type"]).unwrap_or("CUSTOM");
     match event_type {
+        "agui.stream.start" => StreamEvent::MessageStart,
         "RUN_STARTED" => StreamEvent::MessageStart,
+        "agui.message.delta" => StreamEvent::TextDelta {
+            index: json_u32(payload, &["index"])
+                .or_else(|| json_u32(payload, &["message", "index"]))
+                .unwrap_or(0),
+            delta: first_json_string(
+                payload,
+                &[
+                    &["delta", "text"][..],
+                    &["delta"][..],
+                    &["text"][..],
+                    &["content"][..],
+                    &["message", "content"][..],
+                ],
+            )
+            .unwrap_or_default()
+            .to_owned(),
+        },
         "TEXT_MESSAGE_CONTENT" => StreamEvent::TextDelta {
             index: json_u32(payload, &["index"]).unwrap_or(0),
             delta: first_json_string(
@@ -392,6 +423,21 @@ pub fn normalize_uar_agui_event(payload: &serde_json::Value) -> StreamEvent {
                     &["content"][..],
                     &["text"][..],
                     &["message", "content"][..],
+                ],
+            )
+            .unwrap_or_default()
+            .to_owned(),
+        },
+        "agui.thinking.delta" | "agui.reasoning.delta" => StreamEvent::ThinkingDelta {
+            index: json_u32(payload, &["index"]).unwrap_or(0),
+            delta: first_json_string(
+                payload,
+                &[
+                    &["delta", "text"][..],
+                    &["delta"][..],
+                    &["text"][..],
+                    &["content"][..],
+                    &["reasoning"][..],
                 ],
             )
             .unwrap_or_default()
@@ -425,6 +471,26 @@ pub fn normalize_uar_agui_event(payload: &serde_json::Value) -> StreamEvent {
             .unwrap_or("unknown_tool")
             .to_owned(),
         },
+        "agui.tool_call.delta" => StreamEvent::ToolCallDelta {
+            id: first_json_string(
+                payload,
+                &[&["id"][..], &["toolCallId"][..], &["tool_call_id"][..]],
+            )
+            .unwrap_or("unknown-tool-call")
+            .to_owned(),
+            delta: first_json_string(
+                payload,
+                &[
+                    &["delta", "arguments"][..],
+                    &["arguments_delta"][..],
+                    &["delta"][..],
+                    &["args"][..],
+                    &["arguments"][..],
+                ],
+            )
+            .map(str::to_owned)
+            .unwrap_or_default(),
+        },
         "TOOL_CALL_ARGS" => StreamEvent::ToolCallDelta {
             id: first_json_string(
                 payload,
@@ -457,6 +523,37 @@ pub fn normalize_uar_agui_event(payload: &serde_json::Value) -> StreamEvent {
             .unwrap_or("unknown-tool-call")
             .to_owned(),
         },
+        "agui.tool_call.complete" => StreamEvent::ToolCallReady {
+            id: first_json_string(
+                payload,
+                &[&["id"][..], &["toolCallId"][..], &["tool_call_id"][..]],
+            )
+            .unwrap_or("unknown-tool-call")
+            .to_owned(),
+            name: first_json_string(
+                payload,
+                &[&["name"][..], &["toolName"][..], &["tool", "name"][..]],
+            )
+            .unwrap_or("unknown_tool")
+            .to_owned(),
+            input_json: first_json_string(
+                payload,
+                &[
+                    &["arguments_json"][..],
+                    &["input_json"][..],
+                    &["arguments"][..],
+                    &["input"][..],
+                ],
+            )
+            .map(str::to_owned)
+            .unwrap_or_else(|| {
+                payload
+                    .get("arguments")
+                    .or_else(|| payload.get("input"))
+                    .map(json_payload_to_string)
+                    .unwrap_or_default()
+            }),
+        },
         "TOOL_CALL_RESULT" => StreamEvent::ToolResult {
             tool_use_id: first_json_string(
                 payload,
@@ -474,8 +571,92 @@ pub fn normalize_uar_agui_event(payload: &serde_json::Value) -> StreamEvent {
                 .or_else(|| json_bool(payload, &["is_error"]))
                 .unwrap_or(false),
         },
+        "agui.tool_result" => StreamEvent::ToolResult {
+            tool_use_id: first_json_string(
+                payload,
+                &[&["id"][..], &["toolCallId"][..], &["tool_call_id"][..]],
+            )
+            .unwrap_or("unknown-tool-call")
+            .to_owned(),
+            output_json: payload
+                .get("content")
+                .or_else(|| payload.get("result"))
+                .or_else(|| payload.get("output"))
+                .map(json_payload_to_string)
+                .unwrap_or_else(|| "{}".to_owned()),
+            is_error: !json_bool(payload, &["success"]).unwrap_or(true),
+        },
+        "agui.citation.added" => StreamEvent::Citation {
+            source: first_json_string(
+                payload,
+                &[
+                    &["citation", "title"][..],
+                    &["citation", "url"][..],
+                    &["source"][..],
+                    &["url"][..],
+                ],
+            )
+            .unwrap_or("unknown")
+            .to_owned(),
+            quote: first_json_string(
+                payload,
+                &[
+                    &["citation", "snippet"][..],
+                    &["citation", "quote"][..],
+                    &["quote"][..],
+                    &["snippet"][..],
+                    &["text"][..],
+                ],
+            )
+            .unwrap_or_default()
+            .to_owned(),
+        },
+        "agui.memory.update" => StreamEvent::Memory {
+            operation: first_json_string(payload, &[&["operation"][..], &["phase"][..]])
+                .unwrap_or("set")
+                .to_owned(),
+            key: first_json_string(payload, &[&["key"][..], &["memory", "key"][..]])
+                .unwrap_or("unknown")
+                .to_owned(),
+            value: first_json_string(payload, &[&["value"][..], &["memory", "value"][..]])
+                .map(str::to_owned),
+        },
+        "agui.memory.recall" => StreamEvent::Memory {
+            operation: "recall".to_owned(),
+            key: "memory_context".to_owned(),
+            value: payload.get("items").map(json_payload_to_string),
+        },
+        "agui.skill.activated" => StreamEvent::SkillActivation {
+            name: first_json_string(
+                payload,
+                &[
+                    &["skill", "id"][..],
+                    &["skill", "title"][..],
+                    &["skill", "name"][..],
+                    &["name"][..],
+                ],
+            )
+            .unwrap_or("unknown_skill")
+            .to_owned(),
+            status: first_json_string(payload, &[&["phase"][..], &["status"][..]])
+                .unwrap_or("activated")
+                .to_owned(),
+        },
         "CUSTOM" => normalize_uar_custom_event(payload),
+        "agui.done" => StreamEvent::Done,
         "RUN_FINISHED" => StreamEvent::Done,
+        "agui.error" => StreamEvent::Error {
+            message: first_json_string(
+                payload,
+                &[
+                    &["message"][..],
+                    &["error", "message"][..],
+                    &["value", "message"][..],
+                ],
+            )
+            .unwrap_or("UAR run failed")
+            .to_owned(),
+        },
         "RUN_ERROR" => StreamEvent::Error {
             message: first_json_string(
                 payload,
@@ -735,6 +916,9 @@ impl UarNormalizedEventAdapter {
                     }
                 })]
             }
+            StreamEvent::ToolCallReady { .. } => {
+                vec![stream_event_to_uar_normalized_payload(event)]
+            }
             other => vec![stream_event_to_uar_normalized_payload(other)],
         }
     }
@@ -915,6 +1099,18 @@ impl A2uiAdapter {
                     None => vec![],
                 }
             }
+            StreamEvent::ToolCallReady {
+                id,
+                name,
+                input_json,
+            } => vec![A2uiEvent::Block {
+                run_id: self.run_id.clone(),
+                block: ContentBlock::ToolUse {
+                    id: id.clone(),
+                    name: name.clone(),
+                    input_json: input_json.clone(),
+                },
+            }],
             StreamEvent::ToolResult {
                 tool_use_id,
                 output_json,
@@ -1992,6 +2188,121 @@ mod tests {
                 && content.contains("agui.state.patch")
                 && content.contains("/a2ui/surfaces/surface-1")
         ));
+    }
+
+    #[test]
+    fn direct_uar_agui_service_events_map_to_semantic_blocks() {
+        let events = [
+            normalize_uar_agui_event(&serde_json::json!({
+                "type": "agui.message.delta",
+                "kind": "message",
+                "phase": "delta",
+                "delta": {"text": "hello"}
+            })),
+            normalize_uar_agui_event(&serde_json::json!({
+                "type": "agui.thinking.delta",
+                "kind": "thinking",
+                "phase": "delta",
+                "delta": {"text": "reason"}
+            })),
+            normalize_uar_agui_event(&serde_json::json!({
+                "type": "agui.citation.added",
+                "kind": "citation",
+                "phase": "added",
+                "citation": {
+                    "url": "https://example.test/policy",
+                    "title": "Policy",
+                    "snippet": "Use approval gates."
+                }
+            })),
+            normalize_uar_agui_event(&serde_json::json!({
+                "type": "agui.memory.update",
+                "kind": "memory",
+                "phase": "update",
+                "key": "preference",
+                "value": "markdown",
+                "operation": "set"
+            })),
+            normalize_uar_agui_event(&serde_json::json!({
+                "type": "agui.skill.activated",
+                "kind": "skill",
+                "phase": "activated",
+                "skill": {"id": "office_writer", "title": "Office Writer"}
+            })),
+            normalize_uar_agui_event(&serde_json::json!({
+                "type": "agui.tool_call.complete",
+                "kind": "tool_call",
+                "phase": "complete",
+                "id": "call-1",
+                "name": "calendar.create",
+                "arguments_json": "{\"title\":\"Planning\"}"
+            })),
+            normalize_uar_agui_event(&serde_json::json!({
+                "type": "agui.tool_result",
+                "kind": "tool_result",
+                "id": "call-1",
+                "content": "{\"ok\":true}",
+                "success": true
+            })),
+        ];
+
+        let mut adapter = A2uiAdapter::new("run-1");
+        let output = events
+            .iter()
+            .flat_map(|event| adapter.ingest(event))
+            .collect::<Vec<_>>();
+
+        assert!(output.iter().any(|event| matches!(
+            event,
+            A2uiEvent::Block { block: ContentBlock::Text { text }, .. } if text == "hello"
+        )));
+        assert!(output.iter().any(|event| matches!(
+            event,
+            A2uiEvent::Block { block: ContentBlock::Thinking { text }, .. } if text == "reason"
+        )));
+        assert!(output.iter().any(|event| matches!(
+            event,
+            A2uiEvent::Block {
+                block: ContentBlock::Citation { source, quote },
+                ..
+            } if source == "Policy" && quote == "Use approval gates."
+        )));
+        assert!(output.iter().any(|event| matches!(
+            event,
+            A2uiEvent::Block {
+                block: ContentBlock::Memory {
+                    operation,
+                    key,
+                    value
+                },
+                ..
+            } if operation == "set" && key == "preference" && value.as_deref() == Some("markdown")
+        )));
+        assert!(output.iter().any(|event| matches!(
+            event,
+            A2uiEvent::Block { block: ContentBlock::Skill { name, status }, .. }
+                if name == "office_writer" && status == "activated"
+        )));
+        assert!(output.iter().any(|event| matches!(
+            event,
+            A2uiEvent::Block {
+                block: ContentBlock::ToolUse { id, name, input_json },
+                ..
+            } if id == "call-1"
+                && name == "calendar.create"
+                && input_json == "{\"title\":\"Planning\"}"
+        )));
+        assert!(output.iter().any(|event| matches!(
+            event,
+            A2uiEvent::Block {
+                block: ContentBlock::ToolResult {
+                    tool_use_id,
+                    output_json,
+                    is_error
+                },
+                ..
+            } if tool_use_id == "call-1" && output_json == "{\"ok\":true}" && !is_error
+        )));
     }
 
     #[test]
