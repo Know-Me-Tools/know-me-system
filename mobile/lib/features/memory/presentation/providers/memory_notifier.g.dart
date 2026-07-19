@@ -15,15 +15,15 @@ final memoryProvider = MemoryNotifierProvider._();
 final class MemoryNotifierProvider
     extends $NotifierProvider<MemoryNotifier, MemoryResult> {
   MemoryNotifierProvider._()
-      : super(
-          from: null,
-          argument: null,
-          retry: null,
-          name: r'memoryProvider',
-          isAutoDispose: true,
-          dependencies: null,
-          $allTransitiveDependencies: null,
-        );
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'memoryProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
 
   @override
   String debugGetCreateSourceHash() => _$memoryNotifierHash();
@@ -47,13 +47,16 @@ abstract class _$MemoryNotifier extends $Notifier<MemoryResult> {
   MemoryResult build();
   @$mustCallSuper
   @override
-  WhenComplete runBuild() {
+  void runBuild() {
     final ref = this.ref as $Ref<MemoryResult, MemoryResult>;
-    final element = ref.element as $ClassProviderElement<
-        AnyNotifier<MemoryResult, MemoryResult>,
-        MemoryResult,
-        Object?,
-        Object?>;
-    return element.handleCreate(ref, build);
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<MemoryResult, MemoryResult>,
+              MemoryResult,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
   }
 }

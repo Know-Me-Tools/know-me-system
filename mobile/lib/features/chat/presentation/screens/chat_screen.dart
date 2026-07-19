@@ -66,7 +66,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               total + message.content.length + (message.isStreaming ? 1 : 0),
         ),
       ),
-      (_, __) => _scheduleScrollToLatest(),
+      (_, _) => _scheduleScrollToLatest(),
     );
 
     return KnowMeScreen(
@@ -102,7 +102,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         ScrollViewKeyboardDismissBehavior.onDrag,
                     padding: const EdgeInsets.fromLTRB(12, 16, 12, 24),
                     itemCount: state.messages.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 16),
+                    separatorBuilder: (_, _) => const SizedBox(height: 16),
                     itemBuilder: (context, i) {
                       final message = state.messages[i];
                       return _MessageBubble(
@@ -303,8 +303,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ),
     ];
     final attachmentPaths = [
-      for (final file in _attachments)
-        if (file.path case final path?) path,
+      for (final file in _attachments) ?file.path,
     ];
     _controller.clear();
     setState(() {
@@ -1021,7 +1020,7 @@ class _ConversationSheet extends ConsumerWidget {
               Expanded(
                 child: ListView.separated(
                   itemCount: state.conversations.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final conversation = state.conversations[index];
                     final selected = conversation.id == state.threadId;

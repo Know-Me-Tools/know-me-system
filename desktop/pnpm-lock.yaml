@@ -30,8 +30,8 @@ importers:
         specifier: 0.5.4
         version: 0.5.4
       '@electric-sql/pglite-sync':
-        specifier: ^0.4.0
-        version: 0.4.2(@electric-sql/pglite@0.5.4)
+        specifier: ^0.6.5
+        version: 0.6.5(@electric-sql/pglite@0.5.4)
       '@fontsource-variable/geist':
         specifier: ^5.2.9
         version: 5.2.9
@@ -55,7 +55,7 @@ importers:
         version: 0.2.1(@types/react@19.2.17)(react@19.2.7)
       '@tailwindcss/vite':
         specifier: ^4.0.0
-        version: 4.3.2(vite@8.1.4(esbuild@0.28.1)(jiti@2.7.0))
+        version: 4.3.2(vite@8.1.5(esbuild@0.28.1)(jiti@2.7.0))
       '@tanstack/react-router':
         specifier: ^1.0.0
         version: 1.170.18(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -66,7 +66,7 @@ importers:
         specifier: ^3.0.0
         version: 3.14.6(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tauri-apps/api':
-        specifier: ^2.0.0
+        specifier: ^2.11.1
         version: 2.11.1
       '@tauri-apps/plugin-os':
         specifier: ^2.3.2
@@ -120,13 +120,13 @@ importers:
         specifier: ^1.6.2
         version: 1.6.2(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       react:
-        specifier: ^19.0.0
+        specifier: ^19.2.7
         version: 19.2.7
       react-day-picker:
         specifier: ^10.0.1
         version: 10.0.1(@types/react@19.2.17)(react@19.2.7)
       react-dom:
-        specifier: ^19.0.0
+        specifier: ^19.2.7
         version: 19.2.7(react@19.2.7)
       react-markdown:
         specifier: ^9.0.0
@@ -162,11 +162,11 @@ importers:
         specifier: ^3.25.76
         version: 3.25.76
       zustand:
-        specifier: ^5.0.0
+        specifier: ^5.0.14
         version: 5.0.14(@types/react@19.2.17)(immer@10.2.0)(react@19.2.7)(use-sync-external-store@1.6.0(react@19.2.7))
     devDependencies:
       '@tauri-apps/cli':
-        specifier: ^2.10.3
+        specifier: ^2.11.4
         version: 2.11.4
       '@testing-library/react':
         specifier: ^16.0.0
@@ -175,10 +175,10 @@ importers:
         specifier: ^14.0.0
         version: 14.6.1(@testing-library/dom@10.4.1)
       '@types/react':
-        specifier: ^19.0.0
+        specifier: ^19.2.17
         version: 19.2.17
       '@types/react-dom':
-        specifier: ^19.0.0
+        specifier: ^19.2.3
         version: 19.2.3(@types/react@19.2.17)
       '@typescript-eslint/eslint-plugin':
         specifier: ^8.0.0
@@ -187,8 +187,8 @@ importers:
         specifier: ^8.0.0
         version: 8.64.0(eslint@9.39.5(jiti@2.7.0))(typescript@7.0.2)
       '@vitejs/plugin-react':
-        specifier: ^6.0.0
-        version: 6.0.3(vite@8.1.4(esbuild@0.28.1)(jiti@2.7.0))
+        specifier: ^6.0.3
+        version: 6.0.3(vite@8.1.5(esbuild@0.28.1)(jiti@2.7.0))
       eslint:
         specifier: ^9.0.0
         version: 9.39.5(jiti@2.7.0)
@@ -202,11 +202,11 @@ importers:
         specifier: ^3.0.0
         version: 3.9.5
       typescript:
-        specifier: ^7.0.0
+        specifier: ^7.0.2
         version: 7.0.2
       vite:
-        specifier: ^8.0.0
-        version: 8.1.4(esbuild@0.28.1)(jiti@2.7.0)
+        specifier: ^8.1.5
+        version: 8.1.5(esbuild@0.28.1)(jiti@2.7.0)
       vitest:
         specifier: ^3.0.0
         version: 3.2.7(@types/debug@4.1.13)(jiti@2.7.0)(jsdom@25.0.1)(lightningcss@1.32.0)
@@ -532,10 +532,10 @@ packages:
     peerDependencies:
       '@electric-sql/client': 1.0.14
 
-  '@electric-sql/pglite-sync@0.4.2':
-    resolution: {integrity: sha512-tZNl1zfJ8bSG/1RAvDkww6Y8x0L1Oum+IdOqWdxbAKNQqMVfqJ9Pvt5L1pSc1zdUG0eKu3F3QM8UJjhEstoaqw==}
+  '@electric-sql/pglite-sync@0.6.5':
+    resolution: {integrity: sha512-qh+5S0XvMqQP0Lzcaae/puu9OpVb2tWmXFV9rOTOjlj3h48cHv2CSoWb80aWgzcubl3QbekFVj6RMhtLTr9p0Q==}
     peerDependencies:
-      '@electric-sql/pglite': 0.3.16
+      '@electric-sql/pglite': 0.5.4
 
   '@electric-sql/pglite@0.5.4':
     resolution: {integrity: sha512-yYZUyyXrHU7tPlCjwZQJ6hIG9DscdCCn7Uk0mYKwC1FeHX286AbcmFveMiRBEak8e9iPupjsoVImN3yJZVed2g==}
@@ -890,7 +890,7 @@ packages:
   '@prometheus-ags/gen-ui-react@file:../packages/gen-ui-react':
     resolution: {directory: ../packages/gen-ui-react, type: directory}
     peerDependencies:
-      react: ^19.0.0
+      react: ^19.2.7
 
   '@prometheus-ags/prometheus-entity-management@3.0.0-alpha.0':
     resolution: {integrity: sha512-Ph7XAaO5sNsTKn0tNZV1OBqR0rtugyZQlY+gPFWReAasVS77NoYG42H2Op6zysbsOTF5MsqpRuKWrWCErHWbtg==}
@@ -5066,8 +5066,8 @@ packages:
       yaml:
         optional: true
 
-  vite@8.1.4:
-    resolution: {integrity: sha512-bTT9PsdWO+MQMNG9ZXIP/qM9wGh37DFxTV/sPq9cFpHr3w4jkgef032PkAL9jAqhk3Nz8NQw3O8n6/xFkqO4QQ==}
+  vite@8.1.5:
+    resolution: {integrity: sha512-7ULLwsCdYx/nRyrpiEwvqb5TFHrMVZyBt+rg/OAXT7rgj/z+DtTDyKFeLAdDkubDVDKD8jOsndmy7m55XcfUsw==}
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
     peerDependencies:
@@ -5724,7 +5724,7 @@ snapshots:
     optionalDependencies:
       '@rollup/rollup-darwin-arm64': 4.62.2
 
-  '@electric-sql/pglite-sync@0.4.2(@electric-sql/pglite@0.5.4)':
+  '@electric-sql/pglite-sync@0.6.5(@electric-sql/pglite@0.5.4)':
     dependencies:
       '@electric-sql/client': 1.5.24
       '@electric-sql/experimental': 1.0.14(@electric-sql/client@1.5.24)
@@ -7030,12 +7030,12 @@ snapshots:
       '@tailwindcss/oxide-win32-arm64-msvc': 4.3.2
       '@tailwindcss/oxide-win32-x64-msvc': 4.3.2
 
-  '@tailwindcss/vite@4.3.2(vite@8.1.4(esbuild@0.28.1)(jiti@2.7.0))':
+  '@tailwindcss/vite@4.3.2(vite@8.1.5(esbuild@0.28.1)(jiti@2.7.0))':
     dependencies:
       '@tailwindcss/node': 4.3.2
       '@tailwindcss/oxide': 4.3.2
       tailwindcss: 4.3.2
-      vite: 8.1.4(esbuild@0.28.1)(jiti@2.7.0)
+      vite: 8.1.5(esbuild@0.28.1)(jiti@2.7.0)
 
   '@tanstack/history@1.162.0': {}
 
@@ -7504,10 +7504,10 @@ snapshots:
       d3-selection: 3.0.0
       d3-transition: 3.0.1(d3-selection@3.0.0)
 
-  '@vitejs/plugin-react@6.0.3(vite@8.1.4(esbuild@0.28.1)(jiti@2.7.0))':
+  '@vitejs/plugin-react@6.0.3(vite@8.1.5(esbuild@0.28.1)(jiti@2.7.0))':
     dependencies:
       '@rolldown/pluginutils': 1.0.1
-      vite: 8.1.4(esbuild@0.28.1)(jiti@2.7.0)
+      vite: 8.1.5(esbuild@0.28.1)(jiti@2.7.0)
 
   '@vitest/expect@3.2.7':
     dependencies:
@@ -10404,7 +10404,7 @@ snapshots:
       jiti: 2.7.0
       lightningcss: 1.32.0
 
-  vite@8.1.4(esbuild@0.28.1)(jiti@2.7.0):
+  vite@8.1.5(esbuild@0.28.1)(jiti@2.7.0):
     dependencies:
       lightningcss: 1.32.0
       picomatch: 4.0.5

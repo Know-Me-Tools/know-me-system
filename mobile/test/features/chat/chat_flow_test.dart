@@ -80,7 +80,7 @@ void main() {
       final container = ProviderContainer(
         overrides: [chatRepositoryProvider.overrideWithValue(repo)],
       );
-      final subscription = container.listen(chatProvider, (_, __) {});
+      final subscription = container.listen(chatProvider, (_, _) {});
       addTearDown(container.dispose);
       addTearDown(subscription.close);
 
@@ -127,7 +127,7 @@ void main() {
       final container = ProviderContainer(
         overrides: [chatRepositoryProvider.overrideWithValue(repo)],
       );
-      final subscription = container.listen(chatProvider, (_, __) {});
+      final subscription = container.listen(chatProvider, (_, _) {});
       addTearDown(container.dispose);
       addTearDown(subscription.close);
 
@@ -171,7 +171,7 @@ void main() {
       final container = ProviderContainer(
         overrides: [chatRepositoryProvider.overrideWithValue(repo)],
       );
-      final subscription = container.listen(chatProvider, (_, __) {});
+      final subscription = container.listen(chatProvider, (_, _) {});
       addTearDown(container.dispose);
       addTearDown(subscription.close);
 

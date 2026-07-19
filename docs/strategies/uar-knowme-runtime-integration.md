@@ -115,6 +115,11 @@ model spec, calls the local provider with the structured request, and streams
 UAR `NormalizedEvent`-shaped payloads back out. This does not wire embedded
 mobile UAR yet; it makes the future UAR `ExternalLlmDriver` provider
 registration a closure-level adapter instead of a prompt-flattening rewrite.
+UAR itself now also exposes the matching opt-in runtime hook:
+`Orchestrator::from_driver(...)` and `RunManager::with_llm_driver(...)`. The
+default service path still constructs `LiterLlmDriver`; embedded/mobile hosts
+can inject an `ExternalLlmDriver` without changing provider routing for cloud
+or desktop service deployments.
 
 ## Event and block mapping
 
@@ -231,10 +236,14 @@ non-invasive way:
    `UarLocalInferenceDriverBridge` can call any platform-selected
    `InferenceProvider`, including Android LiteRT-LM, from a UAR payload and
    return UAR normalized-event payloads.
-5. Add Android certification report fields for `uarRuntimeMode` and
+5. Add the UAR injected-driver run hook. **Done:** UAR supports
+   `Orchestrator::from_driver(...)` and `RunManager::with_llm_driver(...)`, so
+   a host-provided `ExternalLlmDriver` can become the primary model stream for
+   a run.
+6. Add Android certification report fields for `uarRuntimeMode` and
    `uarSubmoduleCommit`. **Done:** the local certification report records UAR
    authority, target modes, current integration state, and submodule metadata.
-6. Keep physical local-model gates green.
+7. Keep physical local-model gates green.
 
 This preserves current Android progress while moving the architecture toward
 UAR as the real agent runtime authority.

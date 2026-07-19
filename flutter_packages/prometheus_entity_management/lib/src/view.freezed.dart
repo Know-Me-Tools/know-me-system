@@ -748,7 +748,7 @@ return $default(_that.entityType,_that.filters,_that.sorts,_that.limit,_that.cur
 @JsonSerializable()
 
 class _ViewDescriptor implements ViewDescriptor {
-  const _ViewDescriptor({required this.entityType, final  List<FilterSpec> filters = const <FilterSpec>[], final  List<SortSpec> sorts = const <SortSpec>[], this.limit, this.cursor}): _filters = filters,_sorts = sorts;
+  const _ViewDescriptor({required this.entityType, List<FilterSpec> filters = const <FilterSpec>[], List<SortSpec> sorts = const <SortSpec>[], this.limit, this.cursor}): _filters = filters,_sorts = sorts;
   factory _ViewDescriptor.fromJson(Map<String, dynamic> json) => _$ViewDescriptorFromJson(json);
 
 @override final  String entityType;

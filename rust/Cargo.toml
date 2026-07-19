@@ -116,7 +116,7 @@ candle-core       = "0.7"
 candle-nn         = "0.7"
 candle-transformers = "0.7"
 fastembed         = { version = "5", default-features = false, features = ["hf-hub-rustls-tls", "ort-download-binaries-rustls-tls", "image-models"] }
-flutter_rust_bridge = { version = "2.12", features = ["anyhow"] }
+flutter_rust_bridge = { version = "2.13.0-beta.5", features = ["anyhow"] }
 dashmap           = "6.1"
 parking_lot       = "0.12"
 once_cell         = "1.20"

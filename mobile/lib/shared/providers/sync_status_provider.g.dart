@@ -17,21 +17,26 @@ final syncStatusProvider = SyncStatusProvider._();
 /// Read-only event feed from Rust — a stream provider (auto-dispose by default).
 /// UI-only in effect, but it reaches the FFI, so retry stays off.
 
-final class SyncStatusProvider extends $FunctionalProvider<
-        AsyncValue<SyncStatus>, SyncStatus, Stream<SyncStatus>>
+final class SyncStatusProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<SyncStatus>,
+          SyncStatus,
+          Stream<SyncStatus>
+        >
     with $FutureModifier<SyncStatus>, $StreamProvider<SyncStatus> {
   /// Read-only event feed from Rust — a stream provider (auto-dispose by default).
   /// UI-only in effect, but it reaches the FFI, so retry stays off.
   SyncStatusProvider._()
-      : super(
-          from: null,
-          argument: null,
-          retry: _noRetry,
-          name: r'syncStatusProvider',
-          isAutoDispose: true,
-          dependencies: null,
-          $allTransitiveDependencies: null,
-        );
+    : super(
+        from: null,
+        argument: null,
+        retry: _noRetry,
+        name: r'syncStatusProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
 
   @override
   String debugGetCreateSourceHash() => _$syncStatusHash();

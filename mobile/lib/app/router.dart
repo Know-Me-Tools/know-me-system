@@ -24,12 +24,12 @@ final appRouter = GoRouter(
     ShellRoute(
       builder: (context, state, child) => _Shell(child: child),
       routes: [
-        GoRoute(path: '/home', builder: (_, __) => const HomeScreen()),
-        GoRoute(path: '/chat', builder: (_, __) => const ChatScreen()),
-        GoRoute(path: '/hands', builder: (_, __) => const HandsScreen()),
-        GoRoute(path: '/memory', builder: (_, __) => const MemoryScreen()),
-        GoRoute(path: '/models', builder: (_, __) => const ModelsScreen()),
-        GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
+        GoRoute(path: '/home', builder: (_, _) => const HomeScreen()),
+        GoRoute(path: '/chat', builder: (_, _) => const ChatScreen()),
+        GoRoute(path: '/hands', builder: (_, _) => const HandsScreen()),
+        GoRoute(path: '/memory', builder: (_, _) => const MemoryScreen()),
+        GoRoute(path: '/models', builder: (_, _) => const ModelsScreen()),
+        GoRoute(path: '/settings', builder: (_, _) => const SettingsScreen()),
       ],
     ),
   ],

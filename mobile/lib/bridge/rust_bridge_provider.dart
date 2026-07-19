@@ -95,20 +95,20 @@ Future<int> deleteMessageContext(List<String> messageIds) async =>
 Future<int> promoteContext(List<String> ids) async =>
     (await ffi.memoryPromoteContext(ids: ids)).toInt();
 
-/// chat_events(run_id) -> Stream<A2uiEvent>. Fold into ContentBlocks.
+/// `chat_events(run_id) -> Stream<A2uiEvent>`. Fold into ContentBlocks.
 /// The FFI stream carries JSON (see gen_ui_ffi::api::streams's doc comment on
-/// why — frb can't mirror an enum only ever seen as a StreamSink<T> param),
+/// why — frb can't mirror an enum only ever seen as a `StreamSink<T>` param),
 /// decoded here into the app's own sealed A2uiEvent using the same serde tag
 /// shape ("type", snake_case) as gen_ui_types::events::A2uiEvent.
 Stream<bridge_events.A2uiEvent> chatEvents(String runId) => ffi
     .chatEvents(runId: runId)
     .map((json) => bridge_events.A2uiEvent.fromJson(jsonDecode(json)));
 
-/// entity_changes() -> Stream<ChangeEvent>. Bridged to ref.invalidate by PEM.
+/// `entity_changes() -> Stream<ChangeEvent>`. Bridged to ref.invalidate by PEM.
 Stream<ChangeEvent> entityChanges() =>
     ffi.entityChanges().map((json) => ChangeEvent.fromJson(jsonDecode(json)));
 
-/// sync_status() -> Stream<SyncStatus>. Drives the sync chip.
+/// `sync_status() -> Stream<SyncStatus>`. Drives the sync chip.
 Stream<SyncStatus> syncStatus() =>
     ffi.syncStatus().map((json) => SyncStatus.fromJson(jsonDecode(json)));
 

@@ -41,13 +41,13 @@ final class ChatNotifierProvider
   }
 }
 
-String _$chatNotifierHash() => r'32dfc8ad5f3f820866564a3799224c028e35c88b';
+String _$chatNotifierHash() => r'8c5d5d25c0a85fb72959a882f6b188c393770103';
 
 abstract class _$ChatNotifier extends $Notifier<ChatState> {
   ChatState build();
   @$mustCallSuper
   @override
-  WhenComplete runBuild() {
+  void runBuild() {
     final ref = this.ref as $Ref<ChatState, ChatState>;
     final element =
         ref.element
@@ -57,6 +57,6 @@ abstract class _$ChatNotifier extends $Notifier<ChatState> {
               Object?,
               Object?
             >;
-    return element.handleCreate(ref, build);
+    element.handleCreate(ref, build);
   }
 }

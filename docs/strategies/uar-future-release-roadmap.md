@@ -32,6 +32,10 @@ route to.
   existing domain `SkillActivated` and provider-event `Artifact` events, so the
   external local-provider path does not need to hide semantic chunks inside
   unrelated runtime-step payloads.
+- UAR now has an opt-in injected-driver run path:
+  `Orchestrator::from_driver(...)` and `RunManager::with_llm_driver(...)`.
+  Service/default deployments still build `LiterLlmDriver`; embedded mobile can
+  supply an `ExternalLlmDriver` backed by KnowMe's local provider bridge.
 - `gen_ui_agent::uar::UarServiceRuntime` can create a UAR run through the UAR
   HTTP SDK, consume its SSE stream, and project events into KnowMe A2UI blocks.
 - Desktop/web A2UI action responses can be submitted back to the active UAR run
@@ -103,6 +107,9 @@ Flutter → Rust FFI boundary.
 - Register KnowMe's Android LiteRT-LM/Gemma local lane as a UAR provider.
   The provider should use UAR's `ExternalLlmDriver` seam with
   `gen_ui_agent::uar::UarLocalInferenceDriverBridge` as the host callback.
+- Construct the embedded/mobile UAR run manager with
+  `RunManager::with_llm_driver(...)` so UAR owns the run/tool/skill loop while
+  KnowMe owns only the local model bridge and lifecycle diagnostics.
 - Keep Android CPU LiteRT-LM as the universal correctness floor.
 - Keep GPU/NPU delegates optional and selected only after physical-device
   certification.

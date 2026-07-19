@@ -395,7 +395,7 @@ abstract class _$EntityCrud extends $Notifier<EditBuffer> {
   EditBuffer build(String entityType, String id, Map<String, Object?> initial);
   @$mustCallSuper
   @override
-  WhenComplete runBuild() {
+  void runBuild() {
     final ref = this.ref as $Ref<EditBuffer, EditBuffer>;
     final element =
         ref.element
@@ -405,9 +405,6 @@ abstract class _$EntityCrud extends $Notifier<EditBuffer> {
               Object?,
               Object?
             >;
-    return element.handleCreate(
-      ref,
-      () => build(_$args.$1, _$args.$2, _$args.$3),
-    );
+    element.handleCreate(ref, () => build(_$args.$1, _$args.$2, _$args.$3));
   }
 }
