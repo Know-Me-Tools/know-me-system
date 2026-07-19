@@ -129,9 +129,14 @@ async fn chat_send_streams_a_real_local_response() {
 
     // send() loads the model before returning, so this call absorbs the
     // (potentially minutes-long) first-run download by design.
-    let run_id = gen_ui_agent::chat::send("Say hello in exactly one word.".into(), Vec::new())
-        .await
-        .expect("chat::send should resolve the local lane and start a run");
+    let run_id = gen_ui_agent::chat::send(
+        "Say hello in exactly one word.".into(),
+        Vec::new(),
+        "live-conversation".into(),
+        "main".into(),
+    )
+    .await
+    .expect("chat::send should resolve the local lane and start a run");
     eprintln!("model ready + run started in {:?}", started.elapsed());
 
     let mut text = String::new();
@@ -158,7 +163,12 @@ async fn chat_send_streams_a_real_local_response() {
                 assert_eq!(id, run_id);
                 break;
             }
-            A2uiEvent::RunError { message, .. } => panic!("local generation failed: {message}"),
+            A2uiEvent::RunError { error, .. } => {
+                panic!("local generation failed: {}", error.message)
+            }
+            A2uiEvent::RunPhaseChanged { .. }
+            | A2uiEvent::RunCancelled { .. }
+            | A2uiEvent::ContextTelemetry { .. } => {}
         }
     }
 

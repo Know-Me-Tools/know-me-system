@@ -21,7 +21,7 @@ const cleanup = useChatStore.getState().initListeners()
 window.addEventListener('beforeunload', cleanup)
 
 // StartupGate blocks the app until the first-run boot sequence (migrations →
-// seeds → shapes) reaches ready — the boot-order invariant made visible.
+// compatibility metadata and sync shapes) reaches ready.
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <StartupGate>

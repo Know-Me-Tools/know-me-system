@@ -15,7 +15,8 @@
 // frb-exposed fn below spells out `Result<T, CoreError>` literally; using
 // `CoreResult<T>` here would silently make Dart receive an opaque blob with
 // no field/error access instead of a normal Future<T> that throws on Err.
-pub use gen_ui_db_graph::{MemoryHit, RelatedEntity};
+pub use gen_ui_db_graph::{MemoryHit, MemoryProvenance, RelatedEntity};
+pub use gen_ui_types::inference::{InferenceMessage, InferenceRole};
 pub use gen_ui_types::CoreError;
 
 /// Start a chat turn; returns the run_id whose events arrive on chat_events(run_id).
@@ -24,13 +25,21 @@ pub use gen_ui_types::CoreError;
 pub async fn chat_send(
     thread_id: String,
     message: String,
-    messages: Vec<String>,
+    messages: Vec<InferenceMessage>,
     attachment_paths: Vec<String>,
+    branch_id: String,
+    user_message_id: String,
 ) -> Result<String, CoreError> {
-    let _ = thread_id;
-    gen_ui_agent::chat::send_with_attachments(message, messages, attachment_paths)
-        .await
-        .map_err(Into::into)
+    gen_ui_agent::chat::send_with_attachments(
+        message,
+        messages,
+        attachment_paths,
+        thread_id,
+        branch_id,
+        user_message_id,
+    )
+    .await
+    .map_err(Into::into)
 }
 
 /// Submit a typed A2UI/AG-UI user interaction and start the agent's response.
@@ -39,12 +48,39 @@ pub async fn chat_send(
 pub async fn chat_action(
     thread_id: String,
     interaction_json: String,
-    messages: Vec<String>,
+    messages: Vec<InferenceMessage>,
+    branch_id: String,
 ) -> Result<String, CoreError> {
-    let _ = thread_id;
-    gen_ui_agent::chat::send_interaction(interaction_json, messages)
+    gen_ui_agent::chat::send_interaction(interaction_json, messages, thread_id, branch_id)
         .await
         .map_err(Into::into)
+}
+
+/// Cancel an active run. Cancellation is cooperative: already received
+/// semantic blocks remain persisted, and the stream terminates with a typed
+/// `run_cancelled` event rather than fabricated assistant text.
+pub fn chat_cancel(run_id: String) -> Result<bool, CoreError> {
+    gen_ui_agent::state::cancel_run(&run_id).map_err(Into::into)
+}
+
+pub async fn prepare_local_model() -> Result<(), CoreError> {
+    gen_ui_agent::chat::prepare_local_model()
+        .await
+        .map_err(Into::into)
+}
+
+pub fn local_model_status() -> Result<String, CoreError> {
+    let status = gen_ui_agent::chat::local_model_status()?;
+    serde_json::to_string(&status).map_err(|error| CoreError::Serde(error.to_string()))
+}
+
+pub fn cancel_model_operation() -> Result<(), CoreError> {
+    gen_ui_agent::chat::cancel_model_operation().map_err(Into::into)
+}
+
+pub async fn local_runtime_diagnostics() -> Result<String, CoreError> {
+    let diagnostics = gen_ui_agent::chat::local_runtime_diagnostics().await?;
+    serde_json::to_string(&diagnostics).map_err(|error| CoreError::Serde(error.to_string()))
 }
 
 pub async fn theme_mode() -> Result<String, CoreError> {
@@ -91,6 +127,26 @@ pub async fn memory_ingest_attachments(paths: Vec<String>) -> Result<Vec<String>
 /// Hybrid memory search (vector recall + graph expansion + BM25, RRF-fused in Rust).
 pub async fn memory_search(query: String, k: u32) -> Result<Vec<MemoryHit>, CoreError> {
     gen_ui_agent::memory::search(query, k)
+        .await
+        .map_err(Into::into)
+}
+
+pub async fn memory_delete_conversation_context(
+    conversation_id: String,
+) -> Result<usize, CoreError> {
+    gen_ui_agent::memory::delete_conversation_context(conversation_id)
+        .await
+        .map_err(Into::into)
+}
+
+pub async fn memory_delete_message_context(message_ids: Vec<String>) -> Result<usize, CoreError> {
+    gen_ui_agent::memory::delete_message_context(message_ids)
+        .await
+        .map_err(Into::into)
+}
+
+pub async fn memory_promote_context(ids: Vec<String>) -> Result<usize, CoreError> {
+    gen_ui_agent::memory::promote_context(ids)
         .await
         .map_err(Into::into)
 }

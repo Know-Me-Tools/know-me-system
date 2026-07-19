@@ -12,6 +12,9 @@ class A2uiContentDriver {
     required this.messageId,
     required this.onBlock,
     required this.onFinalize,
+    this.onPhase,
+    this.onCancelled,
+    this.onTelemetry,
     this.onError,
   });
 
@@ -19,7 +22,10 @@ class A2uiContentDriver {
   final void Function({required String messageId, required ContentBlock block})
   onBlock;
   final void Function(String messageId) onFinalize;
-  final void Function(String messageId, String message)? onError;
+  final void Function(String messageId, RunPhaseChanged phase)? onPhase;
+  final void Function(String messageId, RunCancelled event)? onCancelled;
+  final void Function(String messageId, ContextTelemetry event)? onTelemetry;
+  final void Function(String messageId, ChatRunError error)? onError;
 
   StreamSubscription<A2uiEvent>? _sub;
   final Completer<void> _done = Completer<void>();
@@ -33,19 +39,36 @@ class A2uiContentDriver {
         switch (event) {
           case RunStarted():
             break;
+          case final RunPhaseChanged phase:
+            onPhase?.call(messageId, phase);
           case BlockEvent(:final block):
             onBlock(messageId: messageId, block: block);
           case RunFinished():
             onFinalize(messageId);
             if (!_done.isCompleted) _done.complete();
-          case RunError(:final message):
-            onError?.call(messageId, message);
+          case final RunCancelled cancelled:
+            onCancelled?.call(messageId, cancelled);
             onFinalize(messageId);
             if (!_done.isCompleted) _done.complete();
+          case RunError(:final error):
+            onError?.call(messageId, error);
+            onFinalize(messageId);
+            if (!_done.isCompleted) _done.complete();
+          case final ContextTelemetry telemetry:
+            onTelemetry?.call(messageId, telemetry);
         }
       },
       onError: (Object error, StackTrace stackTrace) {
-        onError?.call(messageId, error.toString());
+        onError?.call(
+          messageId,
+          ChatRunError(
+            code: 'event_stream_error',
+            phase: 'generation',
+            message: error.toString(),
+            retryable: true,
+            diagnostics: stackTrace.toString(),
+          ),
+        );
         onFinalize(messageId);
         if (!_done.isCompleted) _done.complete();
       },

@@ -6,7 +6,7 @@
     ".kbd-orchestrator/phases/model-runtime-per-device/progress.json"
   ],
   "nextStage": "reflect",
-  "summaryForNext": "OpenSpec is selected through the KBD apply driver. qwen35-model-runtime is active first; vision and tools follow in parallel, with physical-device proof last.",
+  "summaryForNext": "OpenSpec is selected through the KBD apply driver. Android is now LiteRT-LM first: android-litertlm-runtime is the completed/current baseline slice, litertlm-native-adapter is next, then local tools, then physical-device proof. Do not resume retired Android Qwen/Vulkan/OpenCL work.",
   "skipped": false,
   "skipReason": null
 }

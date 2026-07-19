@@ -121,11 +121,13 @@ impl AppServices {
     pub async fn start_chat(
         &self,
         user_message: String,
-        history: Vec<String>,
+        history: Vec<gen_ui_types::inference::InferenceMessage>,
+        conversation_id: String,
+        branch_id: String,
     ) -> Result<String, HostError> {
         let receiver =
             gen_ui_agent::state::subscribe().map_err(|error| HostError::Chat(error.to_string()))?;
-        let run_id = gen_ui_agent::chat::send(user_message, history)
+        let run_id = gen_ui_agent::chat::send(user_message, history, conversation_id, branch_id)
             .await
             .map_err(|error| HostError::Chat(error.to_string()))?;
         self.pending_runs
@@ -136,8 +138,10 @@ impl AppServices {
     pub async fn start_chat_with_byok(
         &self,
         user_message: String,
-        history: Vec<String>,
+        history: Vec<gen_ui_types::inference::InferenceMessage>,
         config: EphemeralCloudConfig,
+        conversation_id: String,
+        branch_id: String,
     ) -> Result<String, HostError> {
         let receiver =
             gen_ui_agent::state::subscribe().map_err(|error| HostError::Chat(error.to_string()))?;
@@ -150,6 +154,8 @@ impl AppServices {
                 api_key: config.api_key,
                 model: config.model,
             },
+            conversation_id,
+            branch_id,
         )
         .map_err(|error| HostError::Chat(error.to_string()))?;
         self.pending_runs

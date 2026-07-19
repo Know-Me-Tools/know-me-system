@@ -28,6 +28,7 @@ async-trait.workspace = true
 keyring.workspace = true
 log = "0.4"
 tracing.workspace = true
+futures.workspace = true
 tauri = { version = "2", default-features = false }
 tokio = { workspace = true, features = ["time"] }
 sqlx.workspace = true

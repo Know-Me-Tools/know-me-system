@@ -95,7 +95,7 @@ LET $vs = SELECT id, text, kind, entity, vector::distance::knn() AS distance
 LET $ft = SELECT id, text, kind, entity, search::score(0) AS ft_score
     FROM memory WHERE text @0@ $q
     ORDER BY ft_score DESC LIMIT 64;
-SELECT meta::id(id) AS id, text, kind, rrf_score AS score
+SELECT meta::id(id) AS id, text, kind, provenance, rrf_score AS score
     FROM search::rrf([$vs, $ft], 60, 128)
     LIMIT $k;
 "#;
@@ -114,7 +114,7 @@ SELECT meta::id(id) AS id, text, kind, rrf_score AS score
 /// Binds `$qvec` and `$k`. No `$q`: without a lexical lane there is nothing to match text
 /// against, and binding an unused parameter would imply otherwise.
 pub const VECTOR_SEARCH_QUERY: &str = r#"
-SELECT meta::id(id) AS id, text, kind,
+SELECT meta::id(id) AS id, text, kind, provenance,
        math::fixed(1.0 / (1.0 + vector::distance::knn()), 6) AS score
     FROM memory WHERE embedding <|64,64|> $qvec
     ORDER BY score DESC

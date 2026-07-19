@@ -1,18 +1,40 @@
 // TJ-ARCH-MOB-001 compliant
 //! Raw stream + protocol event enums. Pure data — transformation logic is in
 //! gen_ui_protocol (which depends on this crate).
+use crate::lifecycle::{RunError, RunPhase, RunStatus};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum StreamEvent {
     MessageStart,
-    TextDelta { index: u32, delta: String },
-    ThinkingDelta { index: u32, delta: String },
-    ToolCallStarted { id: String, name: String },
-    ToolCallDelta { id: String, delta: String },
-    ToolCallComplete { id: String },
-    Error { message: String },
+    TextDelta {
+        index: u32,
+        delta: String,
+    },
+    ThinkingDelta {
+        index: u32,
+        delta: String,
+    },
+    ToolCallStarted {
+        id: String,
+        name: String,
+    },
+    ToolCallDelta {
+        id: String,
+        delta: String,
+    },
+    ToolCallComplete {
+        id: String,
+    },
+    Custom {
+        source: String,
+        event_name: String,
+        payload: serde_json::Value,
+    },
+    Error {
+        message: String,
+    },
     Done,
 }
 
@@ -24,6 +46,12 @@ pub enum A2uiEvent {
     RunStarted {
         run_id: String,
     },
+    RunPhaseChanged {
+        run_id: String,
+        phase: RunPhase,
+        status: RunStatus,
+        message: String,
+    },
     Block {
         run_id: String,
         block: crate::content_block::ContentBlock,
@@ -31,9 +59,18 @@ pub enum A2uiEvent {
     RunFinished {
         run_id: String,
     },
+    RunCancelled {
+        run_id: String,
+        phase: RunPhase,
+        message: String,
+    },
     RunError {
         run_id: String,
-        message: String,
+        error: RunError,
+    },
+    ContextTelemetry {
+        run_id: String,
+        payload: serde_json::Value,
     },
 }
 
@@ -41,9 +78,12 @@ impl A2uiEvent {
     pub fn run_id(&self) -> &str {
         match self {
             Self::RunStarted { run_id }
+            | Self::RunPhaseChanged { run_id, .. }
             | Self::Block { run_id, .. }
             | Self::RunFinished { run_id }
-            | Self::RunError { run_id, .. } => run_id,
+            | Self::RunCancelled { run_id, .. }
+            | Self::RunError { run_id, .. }
+            | Self::ContextTelemetry { run_id, .. } => run_id,
         }
     }
 }

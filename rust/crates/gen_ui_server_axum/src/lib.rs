@@ -74,7 +74,19 @@ pub struct StartRunRequest {
     pub message: String,
     #[serde(default)]
     pub history: Vec<ChatMessage>,
+    #[serde(default = "default_conversation_id")]
+    pub conversation_id: String,
+    #[serde(default = "default_branch_id")]
+    pub branch_id: String,
     pub byok: Option<ByokConfig>,
+}
+
+fn default_conversation_id() -> String {
+    "hosted-conversation".into()
+}
+
+fn default_branch_id() -> String {
+    "main".into()
 }
 
 #[derive(Debug, Deserialize)]
@@ -100,15 +112,6 @@ pub enum ChatRole {
     Assistant,
 }
 
-impl ChatRole {
-    fn as_str(&self) -> &'static str {
-        match self {
-            Self::User => "user",
-            Self::Assistant => "assistant",
-        }
-    }
-}
-
 #[derive(Serialize)]
 struct StartRunResponse {
     run_id: String,
@@ -129,8 +132,18 @@ async fn start_run(
     let history = request
         .history
         .into_iter()
-        .flat_map(|message| [message.role.as_str().to_string(), message.content])
+        .map(|message| gen_ui_types::inference::InferenceMessage {
+            role: match message.role {
+                ChatRole::User => gen_ui_types::inference::InferenceRole::User,
+                ChatRole::Assistant => gen_ui_types::inference::InferenceRole::Assistant,
+            },
+            content: message.content,
+            name: None,
+            tool_call_id: None,
+        })
         .collect();
+    let conversation_id = request.conversation_id;
+    let branch_id = request.branch_id;
     let run_id = if let Some(byok) = request.byok {
         if byok.provider.trim().is_empty()
             || byok.model.trim().is_empty()
@@ -151,10 +164,14 @@ async fn start_run(
                     api_key: byok.api_key,
                     base_url: byok.base_url,
                 },
+                conversation_id,
+                branch_id,
             )
             .await?
     } else {
-        services.start_chat(message.to_string(), history).await?
+        services
+            .start_chat(message.to_string(), history, conversation_id, branch_id)
+            .await?
     };
     let events_url = format!("{API_PREFIX}/chat/runs/{run_id}/events");
     Ok((
@@ -173,20 +190,22 @@ async fn run_events(
         let mut active = false;
         loop {
             match receiver.recv().await {
-                Ok(ref event @ A2uiEvent::RunStarted { ref run_id }) if run_id == &event_run_id => {
-                    active = true;
-                    yield Ok(Event::default().event("a2ui").json_data(event).unwrap_or_else(|_| Event::default().event("serialization_error")));
-                }
-                Ok(ref event @ A2uiEvent::Block { ref run_id, .. }) if active && run_id == &event_run_id => {
-                    yield Ok(Event::default().event("a2ui").json_data(event).unwrap_or_else(|_| Event::default().event("serialization_error")));
-                }
-                Ok(ref event @ A2uiEvent::RunFinished { ref run_id }) if active && run_id == &event_run_id => {
-                    yield Ok(Event::default().event("a2ui").json_data(event).unwrap_or_else(|_| Event::default().event("serialization_error")));
-                    break;
-                }
-                Ok(ref event @ A2uiEvent::RunError { ref run_id, .. }) if active && run_id == &event_run_id => {
-                    yield Ok(Event::default().event("a2ui").json_data(event).unwrap_or_else(|_| Event::default().event("serialization_error")));
-                    break;
+                Ok(event) if event.run_id() == event_run_id => {
+                    if matches!(event, A2uiEvent::RunStarted { .. }) {
+                        active = true;
+                    }
+                    if active {
+                        let terminal = matches!(
+                            event,
+                            A2uiEvent::RunFinished { .. }
+                                | A2uiEvent::RunCancelled { .. }
+                                | A2uiEvent::RunError { .. }
+                        );
+                        yield Ok(Event::default().event("a2ui").json_data(&event).unwrap_or_else(|_| Event::default().event("serialization_error")));
+                        if terminal {
+                            break;
+                        }
+                    }
                 }
                 Ok(_) => {}
                 Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {

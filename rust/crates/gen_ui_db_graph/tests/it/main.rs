@@ -70,6 +70,7 @@ fn ingest_then_search_finds_the_memory() {
                 text: "the octopus is a highly intelligent cephalopod".into(),
                 kind: "note".into(),
                 entity: None,
+                provenance: None,
             })
             .await
             .expect("ingest succeeds");
@@ -103,6 +104,7 @@ fn lexical_lane_matches_rare_term() {
                     text: text.into(),
                     kind: "note".into(),
                     entity: None,
+                    provenance: None,
                 })
                 .await
                 .expect("ingest");
@@ -136,6 +138,7 @@ fn vector_mode_returns_scored_hits() {
                     text: text.into(),
                     kind: "note".into(),
                     entity: None,
+                    provenance: None,
                 })
                 .await
                 .expect("ingest");
@@ -174,6 +177,7 @@ fn empty_inputs_are_rejected() {
                 text: "   ".into(),
                 kind: "note".into(),
                 entity: None,
+                provenance: None,
             })
             .await
             .is_err());

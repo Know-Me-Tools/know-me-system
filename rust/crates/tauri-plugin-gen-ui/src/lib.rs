@@ -22,6 +22,7 @@ pub use error::{Error, Result};
 pub const GEN_UI_CHAT_EVENT: &str = "gen-ui://chat-event";
 pub const GEN_UI_ENTITY_CHANGE: &str = "gen-ui://entity-change";
 pub const GEN_UI_SYNC_STATUS: &str = "gen-ui://sync-status";
+pub const GEN_UI_MODEL_STATUS: &str = "gen-ui://model-status";
 
 /// Build the plugin. Register in the Tauri app with `.plugin(tauri_plugin_gen_ui::init())`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
@@ -31,6 +32,11 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::get_active_lane,
             commands::set_active_lane,
             commands::has_local_engine,
+            commands::cancel_agent_run,
+            commands::prepare_local_model,
+            commands::local_model_status,
+            commands::cancel_model_operation,
+            commands::local_runtime_diagnostics,
             commands::provider_catalog,
             commands::provider_list,
             commands::provider_save,
@@ -49,6 +55,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::entity_update,
             commands::entity_delete,
             commands::memory_search,
+            commands::memory_delete_conversation_context,
+            commands::memory_delete_message_context,
+            commands::memory_promote_context,
             commands::graph_expand,
             commands::scribe_start,
             commands::scribe_stop,
@@ -62,9 +71,25 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             // (see state.rs's doc comment on double-init).
             dev_ollama::install_if_requested();
             spawn_chat_event_forwarder(app.app_handle().clone());
+            spawn_model_status_forwarder(app.app_handle().clone());
             Ok(())
         })
         .build()
+}
+
+fn spawn_model_status_forwarder<R: Runtime>(app: tauri::AppHandle<R>) {
+    gen_ui_runtime::spawn(async move {
+        let mut stream = loop {
+            match gen_ui_agent::chat::watch_local_model_status() {
+                Ok(stream) => break stream,
+                Err(_) => tokio::time::sleep(std::time::Duration::from_millis(50)).await,
+            }
+        };
+        use futures::StreamExt;
+        while let Some(status) = stream.next().await {
+            let _ = app.emit(GEN_UI_MODEL_STATUS, &status);
+        }
+    });
 }
 
 /// Forward gen_ui_agent's A2uiEvent broadcast onto the Tauri event channel the
@@ -92,8 +117,8 @@ fn spawn_chat_event_forwarder<R: Runtime>(app: tauri::AppHandle<R>) {
                 gen_ui_types::events::A2uiEvent::RunFinished { run_id } => {
                     tracing::info!(run_id = %run_id, "desktop chat run finished")
                 }
-                gen_ui_types::events::A2uiEvent::RunError { message, .. } => {
-                    tracing::error!(error = %message, "desktop chat run failed")
+                gen_ui_types::events::A2uiEvent::RunError { error, .. } => {
+                    tracing::error!(error = %error.message, code = %error.code, "desktop chat run failed")
                 }
                 _ => {}
             }

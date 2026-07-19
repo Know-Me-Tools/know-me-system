@@ -13,6 +13,7 @@ import 'api/streams.dart' as ffi;
 import 'frb_generated.dart' show GenUiCore;
 import 'third_party/gen_ui_db_graph.dart' show MemoryHit, RelatedEntity;
 import 'third_party/gen_ui_types/transport.dart' as transport_wire;
+import 'third_party/gen_ui_types/inference.dart';
 import 'third_party/gen_ui_types/view.dart' as view_wire;
 import 'package:prometheus_entity_management/prometheus_entity_management.dart';
 
@@ -29,24 +30,46 @@ Future<void> initRustBridge({String? dataDir}) async {
 Future<String> chatSend(
   String threadId,
   String message,
-  List<String> messages,
+  List<InferenceMessage> messages,
   List<String> attachmentPaths,
+  String branchId,
+  String userMessageId,
 ) => ffi.chatSend(
   threadId: threadId,
   message: message,
   messages: messages,
   attachmentPaths: attachmentPaths,
+  branchId: branchId,
+  userMessageId: userMessageId,
 );
 
 Future<String> chatAction(
   String threadId,
   String interactionJson,
-  List<String> messages,
+  List<InferenceMessage> messages,
+  String branchId,
 ) => ffi.chatAction(
   threadId: threadId,
   interactionJson: interactionJson,
   messages: messages,
+  branchId: branchId,
 );
+
+Future<bool> chatCancel(String runId) => ffi.chatCancel(runId: runId);
+
+Future<void> prepareLocalModel() => ffi.prepareLocalModel();
+
+Future<Map<String, dynamic>> localModelStatus() async =>
+    jsonDecode(await ffi.localModelStatus()) as Map<String, dynamic>;
+
+Stream<Map<String, dynamic>> watchLocalModelStatus() => ffi
+    .localModelStatusEvents()
+    .map((value) => jsonDecode(value) as Map<String, dynamic>);
+
+Future<void> cancelModelOperation() => ffi.cancelModelOperation();
+
+Future<Map<String, dynamic>?> localRuntimeDiagnostics() async =>
+    jsonDecode(await ffi.localRuntimeDiagnostics()) as Map<String, dynamic>?;
 
 Future<String> getThemeMode() => ffi.themeMode();
 
@@ -54,6 +77,17 @@ Future<void> setThemeMode(String mode) => ffi.setThemeMode(mode: mode);
 
 Future<String> resolveRemoteContent(String url, String kind) =>
     ffi.resolveRemoteContent(url: url, kind: kind);
+
+Future<int> deleteConversationContext(String conversationId) async =>
+    (await ffi.memoryDeleteConversationContext(
+      conversationId: conversationId,
+    )).toInt();
+
+Future<int> deleteMessageContext(List<String> messageIds) async =>
+    (await ffi.memoryDeleteMessageContext(messageIds: messageIds)).toInt();
+
+Future<int> promoteContext(List<String> ids) async =>
+    (await ffi.memoryPromoteContext(ids: ids)).toInt();
 
 /// chat_events(run_id) -> Stream<A2uiEvent>. Fold into ContentBlocks.
 /// The FFI stream carries JSON (see gen_ui_ffi::api::streams's doc comment on

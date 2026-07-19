@@ -13,16 +13,16 @@
 [toolchain]
 # SurrealDB 3.2's `fastnum` transitive dep needs rustc >=1.94; the wasm32 lane
 # only compiled cleanly on 1.96 (references/rust/wasm-targets.md).
-rust = "1.96+"
+rust = "1.96"
 node = "24+"            # Active LTS — pin, do not use `--lts`
-flutter = "beta"        # beta channel, latest (ships the Dart MCP server)
+flutter = "3.45.0-0.1.pre" # quality-first mobile pin; includes Dart 3.13.0
 typescript = "7.x"      # Go-native compiler — no version pin
 bun = "latest"
 pnpm = "latest"
 
 [frameworks]
 tauri_cli = "2.10+"
-flutter_rust_bridge = "2.12+"   # must match the workspace's frb crate version
+flutter_rust_bridge = "2.12.0"  # recovery pin shared with the Flutter package
 riverpod = "3.3"                # flutter_riverpod ^3.3, riverpod_annotation 4.x
 vite = "8"
 react = "19"
@@ -33,11 +33,12 @@ openspec = "1.6.0+"             # @fission-ai/openspec — never the squatted ba
 surrealdb = "3.2"               # embedded graph/vector/FTS, kv-rocksdb native / kv-indxdb wasm
 pglite_oxide = "0.5.1"          # desktop config-DB only (macOS arm64 / Win x64 / Linux x64+arm64)
 
-# Inference engines are per-lane decisions, not one global choice
-# (assessment 2026-07-16 §3.3: no documented mobile path for mistral.rs/candle;
-# the shipped mobile-LLM ecosystem runs on llama.cpp).
+# Inference engines are per-lane decisions, not one global choice. Android uses
+# LiteRT-LM as the universal recovery baseline; llama.cpp remains quarantined
+# outside Android production because OpenCL/Adreno proved device-specific.
 [inference]
 desktop = "llama-cpp-2"         # pinned/checksummed Qwen GGUF; zero-config reference default
-mobile = "llama-cpp-2"          # same engine and catalog model behind InferenceProvider
+android = "LiteRT-LM"           # Gemma 4 E2B .litertlm behind InferenceProvider
+ios = "llama-cpp-2"             # retained until iOS Qwen/Metal re-certification
 web = "WebLLM"                  # MLC WebGPU lane; zero-key browser default
 mistral_optional = "mistral.rs" # experimental desktop alternative behind InferenceProvider

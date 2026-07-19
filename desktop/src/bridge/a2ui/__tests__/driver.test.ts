@@ -29,27 +29,47 @@ describe('createA2uiWireAdapter', () => {
 
     // Rust sends deltas; the store renders one block that grows.
     expect(events).toEqual([
+      { type: 'started', messageId: 'msg-1', runId: 'run-1' },
       { type: 'contentBlock', messageId: 'msg-1', blockIndex: 0, block: { type: 'text', text: 'Hello' } },
       { type: 'contentBlock', messageId: 'msg-1', blockIndex: 0, block: { type: 'text', text: 'Hello world' } },
       { type: 'messageComplete', messageId: 'msg-1' },
     ])
   })
 
-  it('closes the message on run_error so the UI stops spinning', () => {
+  it('preserves partial content and emits a typed run error', () => {
     const { events, adapter } = collect()
     adapter.bind('msg-2')
 
     adapter.handle({ type: 'block', block: { type: 'text', text: 'partial' } })
-    adapter.handle({ type: 'run_error', message: 'model load failed' })
+    adapter.handle({
+      type: 'run_error', run_id: 'run-2',
+      error: { code: 'model_load_failed', phase: 'model_loading', message: 'model load failed', retryable: true },
+    })
 
-    // The partial answer is preserved, with the failure appended.
+    // The failure remains lifecycle state, never fabricated assistant text.
     expect(events.at(-2)).toEqual({
       type: 'contentBlock',
       messageId: 'msg-2',
       blockIndex: 0,
-      block: { type: 'text', text: 'partial\n\nmodel load failed' },
+      block: { type: 'text', text: 'partial' },
     })
-    expect(events.at(-1)).toEqual({ type: 'messageComplete', messageId: 'msg-2' })
+    expect(events.at(-1)).toEqual({
+      type: 'error', messageId: 'msg-2', runId: 'run-2',
+      error: { code: 'model_load_failed', phase: 'model_loading', message: 'model load failed', retryable: true },
+    })
+  })
+
+  it('keeps thinking blocks when answer text starts', () => {
+    const { events, adapter } = collect()
+    adapter.bind('msg-reasoning')
+    adapter.handle({ type: 'block', block: { type: 'thinking', text: 'reason' } })
+    adapter.handle({ type: 'block', block: { type: 'text', text: 'answer' } })
+    adapter.handle({ type: 'block', block: { type: 'text', text: ' done' } })
+    expect(events).toEqual([
+      { type: 'contentBlock', messageId: 'msg-reasoning', block: { type: 'thinking', text: 'reason' } },
+      { type: 'contentBlock', messageId: 'msg-reasoning', blockIndex: 1, block: { type: 'text', text: 'answer' } },
+      { type: 'contentBlock', messageId: 'msg-reasoning', blockIndex: 1, block: { type: 'text', text: 'answer done' } },
+    ])
   })
 
   it('drops events that arrive with no bound message rather than guessing', () => {

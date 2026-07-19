@@ -6,6 +6,7 @@
 import '../frb_generated.dart';
 import '../third_party/gen_ui_db_graph.dart';
 import '../third_party/gen_ui_types/error.dart';
+import '../third_party/gen_ui_types/inference.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 /// Start a chat turn; returns the run_id whose events arrive on chat_events(run_id).
@@ -14,13 +15,17 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 Future<String> chatSend({
   required String threadId,
   required String message,
-  required List<String> messages,
+  required List<InferenceMessage> messages,
   required List<String> attachmentPaths,
+  required String branchId,
+  required String userMessageId,
 }) => GenUiCore.instance.api.crateApiChatChatSend(
   threadId: threadId,
   message: message,
   messages: messages,
   attachmentPaths: attachmentPaths,
+  branchId: branchId,
+  userMessageId: userMessageId,
 );
 
 /// Submit a typed A2UI/AG-UI user interaction and start the agent's response.
@@ -29,12 +34,32 @@ Future<String> chatSend({
 Future<String> chatAction({
   required String threadId,
   required String interactionJson,
-  required List<String> messages,
+  required List<InferenceMessage> messages,
+  required String branchId,
 }) => GenUiCore.instance.api.crateApiChatChatAction(
   threadId: threadId,
   interactionJson: interactionJson,
   messages: messages,
+  branchId: branchId,
 );
+
+/// Cancel an active run. Cancellation is cooperative: already received
+/// semantic blocks remain persisted, and the stream terminates with a typed
+/// `run_cancelled` event rather than fabricated assistant text.
+Future<bool> chatCancel({required String runId}) =>
+    GenUiCore.instance.api.crateApiChatChatCancel(runId: runId);
+
+Future<void> prepareLocalModel() =>
+    GenUiCore.instance.api.crateApiChatPrepareLocalModel();
+
+Future<String> localModelStatus() =>
+    GenUiCore.instance.api.crateApiChatLocalModelStatus();
+
+Future<void> cancelModelOperation() =>
+    GenUiCore.instance.api.crateApiChatCancelModelOperation();
+
+Future<String> localRuntimeDiagnostics() =>
+    GenUiCore.instance.api.crateApiChatLocalRuntimeDiagnostics();
 
 Future<String> themeMode() => GenUiCore.instance.api.crateApiChatThemeMode();
 
@@ -65,6 +90,20 @@ Future<List<String>> memoryIngestAttachments({required List<String> paths}) =>
 /// Hybrid memory search (vector recall + graph expansion + BM25, RRF-fused in Rust).
 Future<List<MemoryHit>> memorySearch({required String query, required int k}) =>
     GenUiCore.instance.api.crateApiChatMemorySearch(query: query, k: k);
+
+Future<BigInt> memoryDeleteConversationContext({
+  required String conversationId,
+}) => GenUiCore.instance.api.crateApiChatMemoryDeleteConversationContext(
+  conversationId: conversationId,
+);
+
+Future<BigInt> memoryDeleteMessageContext({required List<String> messageIds}) =>
+    GenUiCore.instance.api.crateApiChatMemoryDeleteMessageContext(
+      messageIds: messageIds,
+    );
+
+Future<BigInt> memoryPromoteContext({required List<String> ids}) =>
+    GenUiCore.instance.api.crateApiChatMemoryPromoteContext(ids: ids);
 
 /// Expand the entity graph around a node to a given depth.
 Future<List<RelatedEntity>> graphExpand({

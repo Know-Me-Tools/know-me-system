@@ -23,6 +23,7 @@ import {
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useChatStore } from "@/features/chat/stores/chatStore";
 import {
   ActionBarMorePrimitive,
   ActionBarPrimitive,
@@ -51,6 +52,7 @@ import {
   PencilIcon,
   RefreshCwIcon,
   SquareIcon,
+  TrashIcon,
 } from "lucide-react";
 import {
   createContext,
@@ -321,7 +323,7 @@ const AssistantMessage: FC = () => {
               }
               case "text":
                 return (
-                  <div className="my-2 w-fit max-w-[88%] rounded-2xl rounded-es-md bg-[color:var(--color-card)] px-4 py-3 text-[color:var(--color-fg)]">
+                  <div className="my-2 w-fit max-w-[80%] rounded-2xl rounded-es-md bg-[color:var(--color-card)] px-4 py-3 text-[color:var(--color-fg)]">
                     <MarkdownText />
                   </div>
                 );
@@ -361,6 +363,9 @@ const AssistantMessage: FC = () => {
 };
 
 const AssistantActionBar: FC = () => {
+  const messageId = useAuiState((s) => s.message.id);
+  const regenerateResponse = useChatStore((s) => s.regenerateResponse);
+  const deleteResponse = useChatStore((s) => s.deleteResponse);
   return (
     <ActionBarPrimitive.Root
       hideWhenRunning
@@ -372,7 +377,15 @@ const AssistantActionBar: FC = () => {
                     </AuiIf><AuiIf condition={(s) => !s.message.isCopied}>
                       <CopyIcon className="animate-in zoom-in-75 fade-in duration-150" />
                     </AuiIf></ActionBarPrimitive.Copy>
-      <ActionBarPrimitive.Reload render={<TooltipIconButton tooltip="Refresh" />}><RefreshCwIcon /></ActionBarPrimitive.Reload>
+      <TooltipIconButton tooltip="Regenerate" onClick={() => void regenerateResponse(messageId)}><RefreshCwIcon /></TooltipIconButton>
+      <TooltipIconButton
+        tooltip="Delete response"
+        onClick={() => {
+          if (window.confirm("Delete this response and the later messages on this branch?")) {
+            void deleteResponse(messageId)
+          }
+        }}
+      ><TrashIcon /></TooltipIconButton>
       <ActionBarMorePrimitive.Root>
         <ActionBarMorePrimitive.Trigger render={<TooltipIconButton tooltip="More" className="data-[state=open]:bg-accent" />}><MoreHorizontalIcon /></ActionBarMorePrimitive.Trigger>
         <ActionBarMorePrimitive.Content
@@ -399,7 +412,7 @@ const UserMessage: FC = () => {
       <UserMessageAttachments />
 
       <div className="aui-user-message-content-wrapper relative col-start-2 min-w-0">
-        <div className="aui-user-message-content peer max-w-[88%] bg-[color:var(--color-ember-soft)] text-foreground rounded-2xl rounded-ee-md px-4 py-3 wrap-break-word empty:hidden">
+        <div className="aui-user-message-content peer max-w-[80%] bg-[color:var(--color-ember-soft)] text-foreground rounded-2xl rounded-ee-md px-4 py-3 wrap-break-word empty:hidden">
           <MessagePrimitive.Parts />
         </div>
         <div className="aui-user-action-bar-wrapper absolute start-0 top-1/2 -translate-x-full -translate-y-1/2 pe-2 peer-empty:hidden rtl:translate-x-full">
@@ -416,12 +429,16 @@ const UserMessage: FC = () => {
 };
 
 const UserActionBar: FC = () => {
+  const messageId = useAuiState((s) => s.message.id);
+  const resubmitMessage = useChatStore((s) => s.resubmitMessage);
   return (
     <ActionBarPrimitive.Root
       hideWhenRunning
       autohide="not-last"
       className="aui-user-action-bar-root flex flex-col items-end"
     >
+      <ActionBarPrimitive.Copy render={<TooltipIconButton tooltip="Copy" />}><CopyIcon /></ActionBarPrimitive.Copy>
+      <TooltipIconButton tooltip="Resubmit" onClick={() => void resubmitMessage(messageId)}><RefreshCwIcon /></TooltipIconButton>
       <ActionBarPrimitive.Edit render={<TooltipIconButton tooltip="Edit" className="aui-user-action-edit" />}><PencilIcon /></ActionBarPrimitive.Edit>
     </ActionBarPrimitive.Root>
   );

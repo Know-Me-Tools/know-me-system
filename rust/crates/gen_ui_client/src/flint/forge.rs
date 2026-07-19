@@ -12,6 +12,7 @@ use crate::flint::token::AuthState;
 use gen_ui_mcp::{McpRegistry, McpServerHandle, SseTransport};
 use gen_ui_types::content_block::ContentBlock;
 use gen_ui_types::events::A2uiEvent;
+use gen_ui_types::lifecycle::{RunError, RunPhase};
 use gen_ui_types::transport::{EntityRecord, EntityTransport, ListResult};
 use gen_ui_types::view::{FilterOp, ViewDescriptor};
 use gen_ui_types::{CoreError, CoreResult};
@@ -492,14 +493,34 @@ impl AguiStreamAdapter {
             .into_iter()
             .map(|event| match event {
                 A2uiEvent::RunStarted { run_id } => A2uiEvent::RunStarted { run_id },
+                A2uiEvent::RunPhaseChanged {
+                    phase,
+                    status,
+                    message,
+                    ..
+                } => A2uiEvent::RunPhaseChanged {
+                    run_id: self.run_id.clone(),
+                    phase,
+                    status,
+                    message,
+                },
                 A2uiEvent::Block { block, .. } => A2uiEvent::Block {
                     run_id: self.run_id.clone(),
                     block,
                 },
                 A2uiEvent::RunFinished { run_id } => A2uiEvent::RunFinished { run_id },
-                A2uiEvent::RunError { message, .. } => A2uiEvent::RunError {
+                A2uiEvent::RunCancelled { phase, message, .. } => A2uiEvent::RunCancelled {
                     run_id: self.run_id.clone(),
+                    phase,
                     message,
+                },
+                A2uiEvent::RunError { error, .. } => A2uiEvent::RunError {
+                    run_id: self.run_id.clone(),
+                    error,
+                },
+                A2uiEvent::ContextTelemetry { payload, .. } => A2uiEvent::ContextTelemetry {
+                    run_id: self.run_id.clone(),
+                    payload,
                 },
             })
             .collect()
@@ -508,7 +529,7 @@ impl AguiStreamAdapter {
     fn protocol_error(&self, message: &str) -> A2uiEvent {
         A2uiEvent::RunError {
             run_id: self.run_id.clone(),
-            message: message.into(),
+            error: RunError::protocol(message),
         }
     }
 }
@@ -616,7 +637,13 @@ pub fn agui_to_a2ui(ev: &AgUiEvent) -> Vec<A2uiEvent> {
         }],
         AgUiEvent::RunError { message } => vec![A2uiEvent::RunError {
             run_id: String::new(),
-            message: message.clone(),
+            error: RunError {
+                code: "provider_error".into(),
+                phase: RunPhase::Generation,
+                message: message.clone(),
+                retryable: true,
+                diagnostics: None,
+            },
         }],
         AgUiEvent::TextMessageStart
         | AgUiEvent::TextMessageEnd

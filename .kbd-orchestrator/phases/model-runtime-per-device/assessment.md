@@ -4,6 +4,22 @@ Project: KnowMe
 Date: 2026-07-18
 Codebase baseline: The Rust core already exposes a llama.cpp-backed mobile inference seam, but the shipped implementation still downloads and loads a pinned Qwen2.5 0.5B text-only model with CPU-default parameters.
 
+## Supersession note — 2026-07-19
+
+This assessment records the pre-recovery baseline. Its Android Qwen3.5,
+Vulkan, OpenCL, and MTMD conclusions are superseded by the LiteRT-LM-first
+Android plan in `plan.md`, `execution.md`, and
+`docs/strategies/local-models/android-litert-lm-six-gates-roadmap.md`.
+
+Current Android direction:
+
+- Runtime: LiteRT-LM behind the Rust `InferenceProvider`.
+- Default model: `gemma-4-e2b-it-litertlm`.
+- Baseline backend: CPU first.
+- Optional GPU/NPU or SM8750-specific artifacts require physical-device gate
+  reports, correctness proof, thermal safety, and measured improvement.
+- Completion is not a green build; completion requires physical-device evidence.
+
 ## IMPLEMENTATION STATUS
 
 - Shared inference seam: **PARTIAL** — `gen_ui_types::inference::InferenceProvider` provides load/generate/unload, but `LocalModelSpec` has only a model id and context length; it has no platform, projector, backend, or capability fields.

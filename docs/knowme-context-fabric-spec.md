@@ -136,9 +136,10 @@ session; temp 0.0–0.2 on structured turns; post-parse semantic validation;
 What exists and is kept:
 
 - **`InferenceProvider` trait seam** (`gen_ui_inference`): engines behind a
-  trait; mobile = `llama-cpp-2` 0.1.151 vendored (Metal/Vulkan + mtmd feature
-  gates in `gen_ui_ffi`); desktop lane `local-mistral` target-gated off mobile.
-  The context fabric slots in as a sibling seam, not inside any engine.
+  trait; Android = LiteRT-LM Gemma 4 E2B through the Rust boundary, iOS retains
+  the existing llama.cpp/Qwen lane until re-certification, desktop has its own
+  local engine lanes. The context fabric slots in as a sibling seam, not inside
+  any engine.
 - **Hybrid retrieval** (`gen_ui_db_graph`): SurrealDB `search::rrf` fuses
   vector + BM25 lanes; `rrf.rs` fuses the RELATE graph-hop lane (k=60,
   limit=20) with an explicitly documented constraint — RRF only for lanes that
@@ -154,9 +155,9 @@ What exists and is kept:
   inline; after this spec it *requests* an assembled context from the builder.
 
 Gaps this spec closes: no capability profiles; no budget arithmetic anywhere;
-no chunking; no MMR/recency re-ranking; no history strategies; `llguidance`
-declared in the vendored crate but absent from `local-llama-vulkan` /
-`local-llama-metal` composites; no context telemetry.
+no chunking; no MMR/recency re-ranking; no history strategies; Android tool
+calling now targets LiteRT-LM constrained decoding/manual tools rather than
+llama.cpp `llguidance`; no context telemetry.
 
 ### 4.2 cherry-studio fork (`src/renderer/.../contextStrategy.ts` + agent lane)
 
@@ -293,16 +294,16 @@ pub struct DeviceProfile {
 ```rust
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelProfile {
-    pub id: String,                     // "qwen3.5-9b-q4km"
+    pub id: String,                     // "gemma-4-e2b-it-litertlm"
     pub family: String,
     pub params_b: f32,
     pub quant: QuantTier,               // F16 | Q8 | Q5 | Q4 | Cloud
-    pub nominal_context: u32,           // 262_144
+    pub nominal_context: u32,           // 32_768 for Android Gemma 4 E2B
     pub trusted_context: u32,           // 8_192 — empirically defended ceiling
     pub extended_context: Option<u32>,  // 16_384 behind degraded-mode flag
     pub attention: AttentionKind,       // Dense | HybridGdn { full_attn_layers: u8 }
-    pub supports_vision: bool,          // mtmd projector present
-    pub tool_call_format: ToolCallFormat, // Qwen35 | Hermes | OpenAI | ...
+    pub supports_vision: bool,          // Android default is text-only; Xberg/OCR feeds text
+    pub tool_call_format: ToolCallFormat, // LiteRtLm | Qwen35 | Hermes | OpenAI | ...
     pub thinking_modes: ThinkingModes,  // None | Toggleable | Always
 }
 ```
@@ -763,9 +764,9 @@ approval before the next begins. Estimates are ranges at stated confidence;
 they assume one primary implementer with review support.
 
 **Phase 0 — Spikes & gates (3–5 days, 80% confidence)**
-- P0-1: Wire `llama-cpp-2/llguidance` into `local-llama-metal` /
-  `local-llama-vulkan`; smoke a constrained JSON tool call on both devices.
-  *Gate: overhead ≤ 10% tok/s.*
+- P0-1: Wire LiteRT-LM Android SDK constrained decoding/manual tool calling on Android;
+  keep iOS Qwen/Metal as a separate re-certification lane.
+  *Gate: Android CPU baseline produces valid bounded tool calls before GPU/NPU optimization.*
 - P0-2: Estimator drift measurement — exact tokenizer vs chars/4 over a 50-doc
   corpus (notes, code, mixed-language). *Gate: margin table confirmed.*
 - P0-3: Needle-in-haystack on actual Q4_K_M GGUFs (facts at 10/40/70/95%

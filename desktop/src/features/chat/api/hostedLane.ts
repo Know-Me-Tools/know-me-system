@@ -25,11 +25,13 @@ export async function* streamHostedChat(
   message: string,
   history: { role: 'user' | 'assistant'; content: string }[],
   byok: HostedByok,
+  conversationId: string,
+  branchId: string,
 ): AsyncGenerator<A2uiWireEvent> {
   const response = await fetch('/api/v1/chat/runs', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ message, history, byok: {
+    body: JSON.stringify({ message, history, conversation_id: conversationId, branch_id: branchId, byok: {
       provider: byok.provider,
       model: byok.model,
       api_key: byok.apiKey,

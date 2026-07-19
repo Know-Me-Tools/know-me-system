@@ -16,16 +16,15 @@ beforeEach(() => {
 })
 
 describe('startupStore', () => {
-  it('runs the boot sequence in order: migrations → seeds → shapes → ready', async () => {
+  it('runs only compatibility-critical startup work before ready', async () => {
     invoke.mockResolvedValue(undefined)
 
     await useStartupStore.getState().run()
 
     expect(useStartupStore.getState().phase).toBe('ready')
-    // The boot-order invariant: shapes come AFTER migrations and seeds.
+    // Heavy seed embedding is intentionally lazy and absent from startup.
     expect(invoke.mock.calls.map((c) => c[0])).toEqual([
       'plugin:gen-ui|run_migrations',
-      'plugin:gen-ui|load_seeds',
       'plugin:gen-ui|attach_sync_shapes',
     ])
   })

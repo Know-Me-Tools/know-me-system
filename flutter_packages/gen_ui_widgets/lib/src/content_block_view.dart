@@ -161,11 +161,12 @@ class ContentBlockThinking extends StatefulWidget {
 }
 
 class _ContentBlockThinkingState extends State<ContentBlockThinking> {
-  bool _expanded = false;
+  bool? _manualExpanded;
 
   @override
   Widget build(BuildContext context) {
     final colors = shad.Theme.of(context).colorScheme;
+    final expanded = _manualExpanded ?? widget.isStreaming;
     return _BlockSurface(
       semanticLabel: 'Thinking',
       background: colors.secondary,
@@ -185,25 +186,32 @@ class _ContentBlockThinkingState extends State<ContentBlockThinking> {
           _CopyButton(value: widget.text, label: 'Copy thinking'),
           Semantics(
             button: true,
-            expanded: _expanded,
-            label: _expanded ? 'Collapse thinking' : 'Expand thinking',
+            expanded: expanded,
+            label: expanded ? 'Collapse thinking' : 'Expand thinking',
             child: IconButton(
-              tooltip: _expanded ? 'Collapse thinking' : 'Expand thinking',
-              onPressed: () => setState(() => _expanded = !_expanded),
+              tooltip: expanded ? 'Collapse thinking' : 'Expand thinking',
+              onPressed: () => setState(() => _manualExpanded = !expanded),
               icon: Icon(
-                _expanded ? Icons.expand_less : Icons.expand_more,
+                expanded ? Icons.expand_less : Icons.expand_more,
                 color: colors.mutedForeground,
               ),
             ),
           ),
         ],
       ),
-      child: _expanded
+      child: expanded
           ? Semantics(
               liveRegion: widget.isStreaming,
               child: Padding(
                 padding: const EdgeInsets.only(top: 8),
-                child: GenUiMarkdown(data: widget.text),
+                child: SelectableText(
+                  widget.text,
+                  style: TextStyle(
+                    color: colors.foreground,
+                    fontSize: 14,
+                    height: 1.45,
+                  ),
+                ),
               ),
             )
           : null,

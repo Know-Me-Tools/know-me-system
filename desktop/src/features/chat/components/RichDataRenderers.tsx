@@ -1,7 +1,7 @@
 // TJ-ARCH-MOB-001 compliant — Assistant UI data-part registration.
 import { useAssistantDataUI, type DataMessagePartComponent } from '@assistant-ui/react'
 import DOMPurify from 'dompurify'
-import { BookOpenText, Brain, PackageOpen, Sparkles } from 'lucide-react'
+import { AlertTriangle, Ban, BookOpenText, Brain, LoaderCircle, PackageOpen, Sparkles } from 'lucide-react'
 import type { ContentBlock } from '@/bridge/a2ui/types'
 
 type BlockOf<T extends ContentBlock['type']> = Extract<ContentBlock, { type: T }>
@@ -50,10 +50,36 @@ const ArtifactData: DataMessagePartComponent<BlockOf<'artifact'>> = ({ data }) =
   )
 }
 
+interface RunLifecycleData { phase: string; message: string }
+interface RunErrorData extends RunLifecycleData { code: string; retryable: boolean; diagnostics?: string }
+
+const RunLifecycle: DataMessagePartComponent<RunLifecycleData> = ({ data }) => (
+  <section className="my-3 flex items-center gap-3 rounded-xl bg-[color:var(--color-surface)] p-4" role="status" aria-live="polite">
+    <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
+    <div><p className="text-sm font-semibold">{data.message}</p><p className="text-xs text-[color:var(--color-fg-sub)]">{data.phase.replaceAll('_', ' ')}</p></div>
+  </section>
+)
+
+const RunError: DataMessagePartComponent<RunErrorData> = ({ data }) => (
+  <section className="my-3 flex items-start gap-3 rounded-xl bg-destructive/10 p-4 text-destructive" role="alert">
+    <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+    <div><p className="text-sm font-semibold">{data.message}</p><p className="mt-1 text-xs">{data.phase.replaceAll('_', ' ')} · {data.code}{data.retryable ? ' · retry available' : ''}</p></div>
+  </section>
+)
+
+const RunCancelled: DataMessagePartComponent<RunLifecycleData> = ({ data }) => (
+  <section className="my-3 flex items-center gap-3 rounded-xl bg-[color:var(--color-surface)] p-4" role="status">
+    <Ban className="size-4" aria-hidden /><span className="text-sm">{data.message}</span>
+  </section>
+)
+
 export function RichDataRenderers() {
   useAssistantDataUI({ name: 'memory', render: MemoryData })
   useAssistantDataUI({ name: 'citation', render: CitationData })
   useAssistantDataUI({ name: 'skill', render: SkillData })
   useAssistantDataUI({ name: 'artifact', render: ArtifactData })
+  useAssistantDataUI({ name: 'runLifecycle', render: RunLifecycle })
+  useAssistantDataUI({ name: 'runError', render: RunError })
+  useAssistantDataUI({ name: 'runCancelled', render: RunCancelled })
   return null
 }

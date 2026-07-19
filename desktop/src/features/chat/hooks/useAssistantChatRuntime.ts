@@ -42,11 +42,25 @@ function toAssistantPart(block: ContentBlock): AssistantPart {
 }
 
 function convertMessage(message: Message): ThreadMessageLike {
+  const content = message.content.map(toAssistantPart)
+  if (message.role === 'assistant') {
+    if (message.runStatus === 'error' && message.error) {
+      content.push({ type: 'data', name: 'runError', data: message.error } as AssistantPart)
+    } else if (message.runStatus === 'cancelled') {
+      content.push({ type: 'data', name: 'runCancelled', data: {
+        phase: message.runPhase ?? 'generation', message: message.statusMessage ?? 'Run cancelled',
+      } } as AssistantPart)
+    } else if (message.isStreaming && message.statusMessage) {
+      content.push({ type: 'data', name: 'runLifecycle', data: {
+        phase: message.runPhase ?? 'preparing', message: message.statusMessage,
+      } } as AssistantPart)
+    }
+  }
   return {
     id: message.id,
     role: message.role,
     createdAt: new Date(message.timestamp),
-    content: message.content.map(toAssistantPart),
+    content,
     ...(message.role === 'assistant' ? {
       status: message.isStreaming
         ? { type: 'running' as const }
@@ -70,6 +84,7 @@ export function useAssistantChatRuntime() {
   const switchConversation = useChatStore((state) => state.switchConversation)
   const renameConversation = useChatStore((state) => state.renameConversation)
   const deleteConversation = useChatStore((state) => state.deleteConversation)
+  const cancelActiveRun = useChatStore((state) => state.cancelActiveRun)
 
   useEffect(() => {
     void hydrateConversations().catch((cause: unknown) => console.error('conversation hydration failed', cause))
@@ -88,6 +103,7 @@ export function useAssistantChatRuntime() {
       const text = textFromComposer(message.content)
       if (text) await sendMessage(text)
     },
+    onCancel: cancelActiveRun,
     adapters: {
       threadList: {
         threadId: activeConversationId,

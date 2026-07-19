@@ -28,9 +28,14 @@ fn app_data_dir<R: Runtime>(app: &tauri::AppHandle<R>) -> Result<std::path::Path
 // directly by name (no separate invoke-key layer), so the two ecosystems
 // have different but internally consistent naming.
 #[tauri::command]
-pub async fn stream_agent_a2ui(user_message: String, messages: Vec<String>) -> Result<String> {
+pub async fn stream_agent_a2ui(
+    user_message: String,
+    messages: Vec<gen_ui_types::inference::InferenceMessage>,
+    conversation_id: String,
+    branch_id: String,
+) -> Result<String> {
     tracing::info!(history_items = messages.len(), "desktop chat turn starting");
-    let run_id = gen_ui_agent::chat::send(user_message, messages)
+    let run_id = gen_ui_agent::chat::send(user_message, messages, conversation_id, branch_id)
         .await
         .map_err(gen_ui_types::CoreError::from)
         .map_err(crate::Error::from)?;
@@ -63,6 +68,44 @@ pub async fn set_active_lane(lane: String) -> Result<()> {
 #[tauri::command]
 pub async fn has_local_engine() -> Result<bool> {
     Ok(gen_ui_agent::chat::has_local_engine())
+}
+
+#[tauri::command]
+pub fn cancel_agent_run(run_id: String) -> Result<bool> {
+    gen_ui_agent::state::cancel_run(&run_id)
+        .map_err(gen_ui_types::CoreError::from)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+pub async fn prepare_local_model() -> Result<()> {
+    gen_ui_agent::chat::prepare_local_model()
+        .await
+        .map_err(gen_ui_types::CoreError::from)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+pub fn local_model_status() -> Result<gen_ui_types::lifecycle::ModelOperationState> {
+    gen_ui_agent::chat::local_model_status()
+        .map_err(gen_ui_types::CoreError::from)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+pub fn cancel_model_operation() -> Result<()> {
+    gen_ui_agent::chat::cancel_model_operation()
+        .map_err(gen_ui_types::CoreError::from)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+pub async fn local_runtime_diagnostics(
+) -> Result<Option<gen_ui_types::lifecycle::RuntimeDiagnostics>> {
+    gen_ui_agent::chat::local_runtime_diagnostics()
+        .await
+        .map_err(gen_ui_types::CoreError::from)
+        .map_err(Into::into)
 }
 
 #[tauri::command]
@@ -439,6 +482,30 @@ pub async fn memory_search(
         .map_err(crate::Error::from)?;
     tracing::info!(count = hits.len(), "desktop memory search ready");
     Ok(hits)
+}
+
+#[tauri::command]
+pub async fn memory_delete_conversation_context(conversation_id: String) -> Result<usize> {
+    gen_ui_agent::memory::delete_conversation_context(conversation_id)
+        .await
+        .map_err(gen_ui_types::CoreError::from)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+pub async fn memory_delete_message_context(message_ids: Vec<String>) -> Result<usize> {
+    gen_ui_agent::memory::delete_message_context(message_ids)
+        .await
+        .map_err(gen_ui_types::CoreError::from)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+pub async fn memory_promote_context(ids: Vec<String>) -> Result<usize> {
+    gen_ui_agent::memory::promote_context(ids)
+        .await
+        .map_err(gen_ui_types::CoreError::from)
+        .map_err(Into::into)
 }
 
 /// Graph expansion from an entity. Same delegation, same C-104 gap as above.

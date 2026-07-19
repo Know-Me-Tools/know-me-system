@@ -13,6 +13,9 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 Stream<String> chatEvents({required String runId}) =>
     GenUiCore.instance.api.crateApiStreamsChatEvents(runId: runId);
 
+Stream<String> localModelStatusEvents() =>
+    GenUiCore.instance.api.crateApiStreamsLocalModelStatusEvents();
+
 /// Subscribe to entity change events. One Dart listener fans these into
 /// `ref.invalidate` calls per the PEM-Flutter cascade-invalidation design.
 /// Emits `gen_ui_types::transport::ChangeEvent` JSON once Wave-1 (C-003)

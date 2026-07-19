@@ -5,6 +5,7 @@
 //! A2uiEvent broadcast channel every chat run publishes to. One instance per
 //! process — callers `init()` once at startup (after migrations), then `send()`
 //! and `subscribe()` freely.
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use gen_ui_db_graph::GraphStore;
@@ -39,6 +40,7 @@ pub struct AgentState {
     pub mcp: McpRegistry,
     events: broadcast::Sender<A2uiEvent>,
     event_history: parking_lot::Mutex<std::collections::BTreeMap<String, Vec<A2uiEvent>>>,
+    run_cancellations: parking_lot::Mutex<std::collections::BTreeMap<String, Arc<AtomicBool>>>,
 }
 
 static STATE: OnceCell<AgentState> = OnceCell::new();
@@ -79,6 +81,7 @@ pub fn init_with_inference(
         mcp: McpRegistry::new(),
         events: tx,
         event_history: parking_lot::Mutex::new(Default::default()),
+        run_cancellations: parking_lot::Mutex::new(Default::default()),
     };
     if STATE.set(state).is_err() {
         tracing::warn!(
@@ -131,6 +134,34 @@ pub(crate) fn publish(event: A2uiEvent) {
         // No subscribers is not an error — a run started before any UI attached
         // (or with devtools closed) still completes; it just has no listener.
         let _ = state.events.send(event);
+    }
+}
+
+pub(crate) fn register_run(run_id: &str) -> Arc<AtomicBool> {
+    let token = Arc::new(AtomicBool::new(false));
+    if let Ok(state) = get() {
+        state
+            .run_cancellations
+            .lock()
+            .insert(run_id.to_owned(), token.clone());
+    }
+    token
+}
+
+pub fn cancel_run(run_id: &str) -> Result<bool, AgentError> {
+    let state = get()?;
+    let token = state.run_cancellations.lock().get(run_id).cloned();
+    if let Some(token) = token {
+        token.store(true, Ordering::Release);
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
+pub(crate) fn finish_run(run_id: &str) {
+    if let Ok(state) = get() {
+        state.run_cancellations.lock().remove(run_id);
     }
 }
 

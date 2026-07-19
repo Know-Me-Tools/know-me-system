@@ -1,36 +1,55 @@
 # mobile-model-runtime Specification
 
 ## Purpose
-TBD - created by archiving change qwen35-model-runtime. Update Purpose after archive.
+
+Define the current mobile local-inference runtime policy. Android uses LiteRT-LM
+with Gemma 4 E2B as the universal recovery baseline. iOS retains the existing
+Qwen/llama.cpp lane until it is re-certified separately.
+
 ## Requirements
-### Requirement: Per-device Qwen3.5 model selection
 
-The local runtime MUST select the pinned Qwen3.5 model for the current mobile
-platform without requiring inference decisions in the Flutter UI layer.
+### Requirement: Android selects LiteRT-LM Gemma 4 E2B by default
 
-#### Scenario: iOS selects the capable-phone model
+The Android local runtime MUST select a pinned LiteRT-LM `.litertlm` artifact
+without requiring model or backend decisions in Flutter.
 
-- **WHEN** the runtime is initialized on iOS
-- **THEN** it selects `qwen3.5-9b-q4-k-m` and its matching F16 multimodal projector
-- **AND** it may fall back to the pinned 4B artifact when the 9B artifact cannot fit
-
-#### Scenario: Android selects the thermally appropriate model
+#### Scenario: Android selects the generic LiteRT-LM artifact
 
 - **WHEN** the runtime is initialized on Android
-- **THEN** it selects `qwen3.5-4b-q4-k-m` and its matching F16 multimodal projector
-- **AND** it enables Vulkan with a CPU fallback when Vulkan is unavailable
+- **THEN** it selects `gemma-4-e2b-it-litertlm`
+- **AND** it resolves `gemma-4-E2B-it.litertlm`
+- **AND** it treats CPU as the universal correctness baseline
+
+#### Scenario: Device-specific artifacts are optimization candidates only
+
+- **WHEN** the device reports Qualcomm SM8750
+- **THEN** the runtime may expose `gemma-4-e2b-it-litertlm-sm8750`
+- **AND** it MUST NOT select that artifact unless correctness, thermal, and
+  performance certification has passed on the physical device
+
+### Requirement: Android does not use llama.cpp OpenCL as production default
+
+The Android production lane MUST NOT depend on llama.cpp OpenCL, Vulkan, or
+vendor OpenCL dynamic-library loading for startup or baseline inference.
+
+#### Scenario: Android build uses the default local runtime
+
+- **WHEN** the Android FFI crate is built
+- **THEN** it enables `local-litert-lm`
+- **AND** it does not enable `local-llama-opencl`
 
 ### Requirement: Verified resumable model artifacts
 
 The runtime MUST pin every model artifact by immutable repository revision, byte
-length, and SHA-256, and MUST never activate an incomplete or corrupt file.
+length, and SHA-256/X-Linked-ETag, and MUST never activate an incomplete or
+corrupt file.
 
 #### Scenario: Interrupted download resumes safely
 
-- **WHEN** a partial `.gguf.part` file exists
+- **WHEN** a partial `.litertlm.part` file exists
 - **THEN** the runtime requests the remaining byte range and appends only a `206`
   response
-- **AND** it verifies the final byte length and SHA-256 before atomic activation
+- **AND** it verifies final byte length and digest before activation
 
 #### Scenario: Corrupt artifact is rejected
 
@@ -38,35 +57,77 @@ length, and SHA-256, and MUST never activate an incomplete or corrupt file.
 - **THEN** the runtime removes or replaces that artifact
 - **AND** inference does not load it
 
-### Requirement: Mobile inference backend diagnostics
+### Requirement: Local tool and event semantics remain canonical
 
-The runtime MUST report the selected model, active backend, and any fallback reason
-through the Rust inference service.
+The Android LiteRT-LM provider MUST preserve the shared structured
+`InferenceProvider` request and event contract.
 
-#### Scenario: GPU backend is selected
+#### Scenario: Tool schemas are available to local inference
 
-- **WHEN** Metal is available on iOS or Vulkan is available on Android
-- **THEN** the runtime attempts full GPU layer offload
-- **AND** diagnostics identify the selected backend
+- **WHEN** a local request includes registered tool schemas
+- **THEN** LiteRT-LM receives structured tool declarations
+- **AND** tool execution remains manual and permission-gated by the host
 
-#### Scenario: CPU fallback is selected
+#### Scenario: Provider chunks are normalized
 
-- **WHEN** GPU initialization or memory preflight fails
-- **THEN** the runtime retries with CPU execution or the pinned 4B fallback
-- **AND** diagnostics include a non-empty fallback reason
+- **WHEN** LiteRT-LM emits text, thinking, tool calls, tool results, errors, or
+  custom chunks
+- **THEN** the provider maps them into canonical stream events
+- **AND** unknown chunks are preserved instead of discarded
 
-### Requirement: Useful local generation defaults
+### Requirement: Mobile inference lifecycle is visible
 
-The local runtime MUST use an 8K context and a 1,024-token output ceiling by
-default while preserving explicit user preferences.
+The runtime MUST report model preparation, backend selection, errors, and
+fallback reasons through shared lifecycle APIs.
 
-#### Scenario: Existing legacy preference is migrated
+#### Scenario: Model preparation cannot reach the Android adapter
 
-- **WHEN** persisted preferences contain the old 0.5B model or no model
-- **THEN** boot migrates the model to the current platform default
-- **AND** writes the new context and output defaults
+- **WHEN** the LiteRT-LM Android SDK adapter is missing or JNI setup has not run
+- **THEN** the runtime emits a stable `litert_lm_native_adapter_unavailable`
+  error
+- **AND** the UI can render that as an explicit error instead of hanging
 
-#### Scenario: User preference is preserved
+### Requirement: Android native readiness is device-gated
 
-- **WHEN** a user has explicitly selected a supported model or generation limit
-- **THEN** boot does not overwrite that selection
+The Android runtime MUST NOT treat a successful build as proof that local
+inference works. It MUST expose a runtime gate report covering library loading,
+artifact presence, artifact verification, CPU baseline initialization, native
+adapter/delegate loading, and backend self-test.
+
+#### Scenario: Native adapter is not reachable
+
+- **WHEN** the Android LiteRT-LM provider resolves and verifies the model
+- **AND** the official LiteRT-LM Android SDK adapter is not reachable
+- **THEN** diagnostics include passed gates for FFI selection and artifact
+  verification
+- **AND** diagnostics mark native adapter loading as failed with
+  `litert_lm_native_adapter_unavailable`
+- **AND** diagnostics mark backend self-test as skipped
+
+#### Scenario: Native adapter loads on Android
+
+- **WHEN** the Android LiteRT-LM provider verifies the model
+- **AND** the Rust JNI adapter initializes the official LiteRT-LM Android SDK on
+  CPU
+- **THEN** diagnostics mark native adapter loading as passed
+- **AND** the runtime can generate a canonical stream containing message start,
+  text delta or error, and done events
+
+#### Scenario: Optional acceleration is unavailable or unproven
+
+- **WHEN** a GPU, NPU, or device-specific LiteRT-LM artifact cannot pass the
+  runtime self-test and benchmark gate on the physical device
+- **THEN** the runtime keeps or falls back to the CPU baseline
+- **AND** diagnostics include the fallback reason
+- **AND** the UI can show that local inference is degraded rather than hidden
+
+### Requirement: iOS remains separately certified
+
+The Android LiteRT-LM migration MUST NOT silently change the iOS model/runtime
+lane.
+
+#### Scenario: iOS initializes local inference
+
+- **WHEN** the runtime is initialized on iOS
+- **THEN** it keeps the existing iOS Qwen/llama.cpp selection until the iOS
+  re-certification phase replaces it

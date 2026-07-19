@@ -77,8 +77,25 @@ export type ChatLane = "cloud" | "local";
  * the run_id returns, so a resolved promise means generation is genuinely
  * underway rather than still fetching weights.
  */
-export function streamAgentA2ui(userMessage: string, messages: string[]): Promise<string> {
-  return invoke<string>(cmd("stream_agent_a2ui"), { userMessage, messages });
+export interface InferenceHistoryMessage {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string;
+  name?: string;
+  tool_call_id?: string;
+}
+
+export function streamAgentA2ui(
+  userMessage: string,
+  messages: InferenceHistoryMessage[],
+  conversationId: string,
+  branchId: string,
+): Promise<string> {
+  return invoke<string>(cmd("stream_agent_a2ui"), {
+    userMessage,
+    messages,
+    conversationId,
+    branchId,
+  });
 }
 /** Which lane chat turns currently run on. Zero-config installs prefer local. */
 export function getActiveLane(): Promise<ChatLane> {
@@ -95,6 +112,45 @@ export function setActiveLane(lane: ChatLane): Promise<void> {
 /** Whether this build has a local-inference engine — gate the toggle on this. */
 export function hasLocalEngine(): Promise<boolean> {
   return invoke<boolean>(cmd("has_local_engine"));
+}
+export type ModelOperationState =
+  | { state: "not_installed" }
+  | { state: "downloading"; bytes_received: number; total_bytes: number; bytes_per_second: number; resumable: boolean }
+  | { state: "verifying" }
+  | { state: "loading" }
+  | { state: "ready"; diagnostics: RuntimeDiagnostics }
+  | { state: "cancelling" }
+  | { state: "cancelled" }
+  | { state: "failed"; error: { code: string; phase: string; message: string; retryable: boolean; diagnostics?: string } };
+export interface RuntimeDiagnostics {
+  modelId: string;
+  backend: string;
+  deviceName?: string;
+  offloadedLayers?: number;
+  fallbackReason?: string;
+  gateReport?: RuntimeGateReport[];
+}
+export interface RuntimeGateReport {
+  gate: number;
+  name: string;
+  status: 'pending' | 'passed' | 'failed' | 'skipped' | 'not_applicable';
+  evidence?: string;
+  errorCode?: string;
+}
+export function cancelAgentRun(runId: string): Promise<boolean> {
+  return invoke<boolean>(cmd("cancel_agent_run"), { runId });
+}
+export function prepareLocalModel(): Promise<void> {
+  return invoke<void>(cmd("prepare_local_model"));
+}
+export function localModelStatus(): Promise<ModelOperationState> {
+  return invoke<ModelOperationState>(cmd("local_model_status"));
+}
+export function cancelModelOperation(): Promise<void> {
+  return invoke<void>(cmd("cancel_model_operation"));
+}
+export function localRuntimeDiagnostics(): Promise<RuntimeDiagnostics | null> {
+  return invoke<RuntimeDiagnostics | null>(cmd("local_runtime_diagnostics"));
 }
 export interface ProviderCatalogEntry {
   id: string;
@@ -188,6 +244,15 @@ export type SearchMode = "hybrid" | "vector";
 export function memorySearch(query: string, k: number, mode?: SearchMode): Promise<MemoryHit[]> {
   return invoke<MemoryHit[]>(cmd("memory_search"), { query, k, mode });
 }
+export function memoryDeleteConversationContext(conversationId: string): Promise<number> {
+  return invoke<number>(cmd("memory_delete_conversation_context"), { conversationId });
+}
+export function memoryDeleteMessageContext(messageIds: string[]): Promise<number> {
+  return invoke<number>(cmd("memory_delete_message_context"), { messageIds });
+}
+export function memoryPromoteContext(ids: string[]): Promise<number> {
+  return invoke<number>(cmd("memory_promote_context"), { ids });
+}
 export function graphExpand(entityId: string, depth: number): Promise<RelatedEntity[]> {
   return invoke<RelatedEntity[]>(cmd("graph_expand"), { entityId, depth });
 }
@@ -204,6 +269,7 @@ export function scribeStop(): Promise<string> {
 export const CHAT_EVENT = "gen-ui://chat-event";
 export const ENTITY_CHANGE = "gen-ui://entity-change";
 export const SYNC_STATUS = "gen-ui://sync-status";
+export const MODEL_STATUS = "gen-ui://model-status";
 
 export function onChatEvent<T>(handler: (payload: T) => void): Promise<UnlistenFn> {
   return listen<T>(CHAT_EVENT, (e) => handler(e.payload));
@@ -213,4 +279,7 @@ export function onEntityChange<T>(handler: (payload: T) => void): Promise<Unlist
 }
 export function onSyncStatus<T>(handler: (payload: T) => void): Promise<UnlistenFn> {
   return listen<T>(SYNC_STATUS, (e) => handler(e.payload));
+}
+export function onLocalModelStatus(handler: (payload: ModelOperationState) => void): Promise<UnlistenFn> {
+  return listen<ModelOperationState>(MODEL_STATUS, (e) => handler(e.payload));
 }

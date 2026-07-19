@@ -83,6 +83,11 @@ fn classify(err: &CoreError) -> WriteOutcome {
             tracing::debug!(error = %e, "write replay: io, will retry");
             WriteOutcome::Retry
         }
+        // A caller-requested cancellation is terminal for this attempt. It
+        // must not leave the durable replay queue spinning forever.
+        CoreError::Cancelled(e) => WriteOutcome::Poison {
+            reason: format!("cancelled: {e}"),
+        },
     }
 }
 
@@ -208,6 +213,7 @@ mod tests {
             CoreError::NotFound(s) => CoreError::NotFound(s.clone()),
             CoreError::Serde(s) => CoreError::Serde(s.clone()),
             CoreError::Io(s) => CoreError::Io(s.clone()),
+            CoreError::Cancelled(s) => CoreError::Cancelled(s.clone()),
         }
     }
 

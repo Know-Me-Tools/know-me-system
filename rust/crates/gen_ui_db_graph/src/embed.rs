@@ -43,6 +43,46 @@ mod native {
         inner: Mutex<TextEmbedding>,
     }
 
+    /// Defers model download/loading until the first actual embedding request.
+    /// `model_info` is static, so GraphStore can validate and open its schema
+    /// during startup without touching the network or ONNX runtime.
+    pub struct LazyFastEmbedder {
+        cache_dir: std::path::PathBuf,
+        inner: Mutex<Option<FastEmbedder>>,
+    }
+
+    impl LazyFastEmbedder {
+        pub fn new(cache_dir: impl Into<std::path::PathBuf>) -> Self {
+            Self {
+                cache_dir: cache_dir.into(),
+                inner: Mutex::new(None),
+            }
+        }
+    }
+
+    impl Embedder for LazyFastEmbedder {
+        fn model_info(&self) -> EmbeddingModelInfo {
+            EmbeddingModelInfo {
+                name: "all-MiniLM-L6-v2".into(),
+                dim: EMBED_DIM,
+            }
+        }
+
+        fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>, GraphError> {
+            let mut guard = self
+                .inner
+                .lock()
+                .map_err(|_| GraphError::Embedding("lazy embedder mutex poisoned".into()))?;
+            if guard.is_none() {
+                *guard = Some(FastEmbedder::new(&self.cache_dir)?);
+            }
+            guard
+                .as_ref()
+                .ok_or_else(|| GraphError::Embedding("embedder did not initialize".into()))?
+                .embed(texts)
+        }
+    }
+
     impl FastEmbedder {
         /// Load the default 384-dim model. Blocking (may download) — construct at
         /// startup off the async runtime.
@@ -88,4 +128,4 @@ mod native {
 }
 
 #[cfg(feature = "embed-native")]
-pub use native::FastEmbedder;
+pub use native::{FastEmbedder, LazyFastEmbedder};

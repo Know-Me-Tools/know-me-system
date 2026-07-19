@@ -4,6 +4,7 @@ members = [
     "crates/gen_ui_types",
     "crates/gen_ui_runtime",
     "crates/gen_ui_protocol",
+    "crates/gen_ui_context",
     "crates/gen_ui_document",
     "crates/gen_ui_client",
     "crates/gen_ui_mcp",
@@ -63,6 +64,7 @@ json-patch        = "4.2"
 reqwest           = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
 sha2              = "0.10"
 encoding_rs       = "0.8"
+jni               = "0.21"
 
 llama-cpp-2       = { version = "0.1.151", default-features = false }
 reqwest-eventsource = "0.6"

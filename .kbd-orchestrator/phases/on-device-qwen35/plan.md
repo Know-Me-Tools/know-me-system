@@ -1,4 +1,11 @@
 PLAN: on-device-qwen35
+
+SUPERSEDED FOR ANDROID: Android production local inference has moved to
+LiteRT-LM Gemma 4 E2B in `model-runtime-per-device` / `android-litertlm-runtime`.
+Do not implement Android Qwen GGUF, Vulkan, OpenCL, or Android MTMD/projector
+work from this file. The iOS Qwen/Metal lane remains a later re-certification
+track.
+
 Project: KnowMe
 Date: 2026-07-18T20:23:58Z
 OpenSpec available: YES
@@ -57,7 +64,7 @@ COMMANDS TO RUN
 /opsx:new qwen35-device-proof
 
 TRADE-OFFS AND SCOPE CUTS
-- The Android Hexagon NPU/LiteRT-LM path is deferred; this phase uses the existing llama.cpp abstraction with Vulkan correctness testing and CPU fallback.
+- Android LiteRT-LM is no longer deferred; it supersedes this file's Android Qwen/llama.cpp plan. Keep this phase only for iOS Qwen/Metal re-certification.
 - The iPhone 9B model must pass an app-memory preflight; an automatic 4B fallback is required rather than allowing iOS jetsam termination.
 - PDF/Office binary understanding remains document extraction/preview work; this phase's native multimodal scope is raster image input.
 

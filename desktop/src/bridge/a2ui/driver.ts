@@ -1,18 +1,32 @@
 // TJ-ARCH-MOB-001 compliant
-import type { ContentBlock, MessageUsage } from './types'
+import type { ChatRunError, ContentBlock, MessageUsage, RunStatus } from './types'
+
+export type RunLifecycleUpdate =
+  | { type: 'started'; messageId: string; runId: string }
+  | { type: 'phase'; messageId: string; runId: string; phase: string; status: RunStatus; message: string }
+  | { type: 'error'; messageId: string; runId: string; error: ChatRunError }
+  | { type: 'cancelled'; messageId: string; runId: string; phase: string; message: string }
+  | { type: 'telemetry'; messageId: string; runId: string; payload: unknown }
 
 export type CoreA2uiEvent =
   | { type: 'contentBlock'; messageId: string; blockIndex?: number; block: ContentBlock }
   | { type: 'messageComplete'; messageId: string; usage?: MessageUsage }
+  | RunLifecycleUpdate
 
 export function applyA2uiEvent(
   event: CoreA2uiEvent,
   streamBlock: (value: { messageId: string; blockIndex?: number; block: ContentBlock }) => void,
   finalize: (messageId: string, usage?: MessageUsage) => void,
+  updateLifecycle: (update: RunLifecycleUpdate) => void = () => {},
 ): void {
   switch (event.type) {
     case 'contentBlock': streamBlock(event); break
     case 'messageComplete': finalize(event.messageId, event.usage); break
+    case 'started':
+    case 'phase':
+    case 'error':
+    case 'cancelled':
+    case 'telemetry': updateLifecycle(event); break
   }
 }
 
@@ -27,9 +41,12 @@ export function applyA2uiEvent(
  */
 export type A2uiWireEvent =
   | { type: 'run_started'; run_id: string }
+  | { type: 'run_phase_changed'; run_id: string; phase: string; status: RunStatus; message: string }
   | { type: 'block'; block: ContentBlock }
   | { type: 'run_finished'; run_id: string }
-  | { type: 'run_error'; message: string }
+  | { type: 'run_cancelled'; run_id: string; phase: string; message: string }
+  | { type: 'run_error'; run_id: string; error: ChatRunError }
+  | { type: 'context_telemetry'; run_id: string; payload: unknown }
 
 /**
  * Adapt Rust wire events into the message-addressed events the store consumes.
@@ -47,38 +64,52 @@ export function createA2uiWireAdapter(
 ): { bind: (messageId: string) => void; handle: (wire: A2uiWireEvent) => void } {
   let messageId: string | null = null
   let text = ''
+  let blockCount = 0
+  let textBlockIndex: number | null = null
 
   return {
     bind: (id: string) => {
       messageId = id
       text = ''
+      blockCount = 0
+      textBlockIndex = null
     },
     handle: (wire: A2uiWireEvent) => {
       if (messageId === null) return
       switch (wire.type) {
         case 'run_started':
+          emit({ type: 'started', messageId, runId: wire.run_id })
+          break
+        case 'run_phase_changed':
+          emit({ type: 'phase', messageId, runId: wire.run_id, phase: wire.phase, status: wire.status, message: wire.message })
           break
         case 'block':
           if (wire.block.type === 'text') {
             text += wire.block.text
-            emit({ type: 'contentBlock', messageId, blockIndex: 0, block: { type: 'text', text } })
+            if (textBlockIndex === null) {
+              textBlockIndex = blockCount
+              blockCount += 1
+              emit({ type: 'contentBlock', messageId, blockIndex: textBlockIndex, block: { type: 'text', text } })
+            } else {
+              emit({ type: 'contentBlock', messageId, blockIndex: textBlockIndex, block: { type: 'text', text } })
+            }
           } else {
             // Richer blocks (tool use, citations) pass straight through once the
             // core starts emitting them.
             emit({ type: 'contentBlock', messageId, block: wire.block })
+            blockCount += 1
           }
           break
         case 'run_error':
-          // Surface the failure in the transcript rather than leaving the
-          // message spinning forever.
-          emit({
-            type: 'contentBlock',
-            messageId,
-            blockIndex: 0,
-            block: { type: 'text', text: text ? `${text}\n\n${wire.message}` : wire.message },
-          })
-          emit({ type: 'messageComplete', messageId })
+          emit({ type: 'error', messageId, runId: wire.run_id, error: wire.error })
           messageId = null
+          break
+        case 'run_cancelled':
+          emit({ type: 'cancelled', messageId, runId: wire.run_id, phase: wire.phase, message: wire.message })
+          messageId = null
+          break
+        case 'context_telemetry':
+          emit({ type: 'telemetry', messageId, runId: wire.run_id, payload: wire.payload })
           break
         case 'run_finished':
           emit({ type: 'messageComplete', messageId })

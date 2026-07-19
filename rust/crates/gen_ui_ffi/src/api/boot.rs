@@ -7,7 +7,7 @@
 use std::sync::Arc;
 
 use gen_ui_agent::ConfigBackend;
-use gen_ui_db_graph::{FastEmbedder, GraphStore, GraphStoreConfig};
+use gen_ui_db_graph::{GraphStore, GraphStoreConfig, LazyFastEmbedder};
 // frb's Result<T,E> detection needs a literal `Result<...>` — see chat.rs's
 // note; CoreResult<T>'s generic alias is invisible to frb's codegen.
 use gen_ui_types::CoreError;
@@ -38,10 +38,7 @@ pub async fn run_migrations(data_dir: String) -> Result<(), CoreError> {
     let db_path = format!("{data_dir}/knowme-poc.db");
     let embed_cache = std::path::PathBuf::from(&data_dir).join("model-cache/fastembed");
     std::fs::create_dir_all(&embed_cache).map_err(|e| boot_fail("model cache create", e))?;
-    let embedder = gen_ui_runtime::spawn_blocking(move || FastEmbedder::new(embed_cache))
-        .await
-        .map_err(|e| boot_fail("embedder task join", e))?
-        .map_err(|e| boot_fail("embedder load", e))?;
+    let embedder = LazyFastEmbedder::new(embed_cache);
 
     let store = GraphStore::open(GraphStoreConfig {
         endpoint: format!("rocksdb://{db_path}"),
@@ -55,18 +52,21 @@ pub async fn run_migrations(data_dir: String) -> Result<(), CoreError> {
 
     // Resolve the default entirely in Rust so Flutter never contains device
     // or model-selection logic. Existing user-selected preferences are kept;
-    // only the old bundled Qwen2.5 default is migrated.
+    // only superseded bundled Android Qwen defaults are migrated.
     let default_model = gen_ui_inference::catalog::current_mobile_platform()
         .map(|platform| platform.default_model().model_id)
-        .unwrap_or(gen_ui_inference::catalog::ANDROID_QWEN35_4B_ID)
+        .unwrap_or(gen_ui_inference::catalog::ANDROID_GEMMA4_E2B_LITERTLM_ID)
         .to_string();
     let existing_pref = store
         .get_model_pref("chat", "local")
         .await
         .map_err(|e| boot_fail("local model preference read", e))?;
-    let migrate_legacy = existing_pref
-        .as_ref()
-        .is_none_or(|pref| pref.model_id == "qwen2.5-0.5b-instruct-q4");
+    let migrate_legacy = existing_pref.as_ref().is_none_or(|pref| {
+        matches!(
+            pref.model_id.as_str(),
+            "qwen2.5-0.5b-instruct-q4" | "qwen3.5-4b-q4-k-m" | "qwen3-4b-instruct-2507-q5-k-m"
+        )
+    });
     if migrate_legacy {
         store
             .upsert_model_pref(&gen_ui_db_graph::ModelPref {
@@ -78,13 +78,22 @@ pub async fn run_migrations(data_dir: String) -> Result<(), CoreError> {
                     "context_len": 8192,
                     "max_tokens": 1024,
                     "temperature": 0.7,
-                    "top_p": 0.95
+                    "top_p": 0.8,
+                    "top_k": 20,
+                    "min_p": 0.0,
+                    "presence_penalty": 0.0
                 }),
             })
             .await
             .map_err(|e| boot_fail("local model preference write", e))?;
     }
 
+    #[cfg(target_os = "android")]
+    let inference: Arc<dyn gen_ui_types::inference::InferenceProvider> =
+        Arc::new(gen_ui_inference::LiteRtLmEngine::new(
+            std::path::PathBuf::from(&data_dir).join("model-cache/litert-lm"),
+        ));
+    #[cfg(not(target_os = "android"))]
     let inference: Arc<dyn gen_ui_types::inference::InferenceProvider> =
         Arc::new(gen_ui_inference::LlamaCppEngine::new(
             std::path::PathBuf::from(&data_dir).join("model-cache/llama"),

@@ -209,6 +209,7 @@ pub async fn seed_corpus(store: &GraphStore) -> Result<usize, GraphError> {
                 text: seed.text.to_string(),
                 kind: seed.kind.to_string(),
                 entity: None,
+                provenance: None,
             })
             .await?;
     }

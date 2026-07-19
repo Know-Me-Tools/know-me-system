@@ -11,33 +11,33 @@ Source plan: `.kbd-orchestrator/phases/model-runtime-per-device/plan.md`
 
 ## EXECUTION SCOPE
 
-- `qwen35-model-runtime`: device-aware Qwen3.5 catalog, verified downloads, acceleration, fallback, generation defaults
-- `qwen35-mobile-vision`: typed image input and mtmd projector path
-- `qwen35-local-tools`: bounded structured tool-call continuation
-- `qwen35-device-proof`: physical iPhone and Android build/deployment evidence
+- `android-litertlm-runtime`: Android LiteRT-LM Gemma 4 E2B catalog, verified downloads, lifecycle, and diagnostics
+- `litertlm-native-adapter`: official LiteRT-LM Android SDK behind the Rust `InferenceProvider`
+- `litertlm-local-tools`: bounded structured tool-call continuation
+- `litertlm-device-proof`: physical Android build/deployment evidence and gate report
 
 ## DISPATCH CONTRACTS
 
-- `qwen35-model-runtime` → `/kbd-apply qwen35-model-runtime`
+- `android-litertlm-runtime` → `/kbd-apply android-litertlm-runtime`
   - Model class: frontier
   - Concrete model: `claude-sonnet-4-6` (per project model policy)
   - Model rationale: high-complexity cross-layer native runtime change
   - Progress file: `.kbd-orchestrator/phases/model-runtime-per-device/progress.json`
   - Handoff: complete each OpenSpec task through `kbd-apply`; run focused Rust checks before marking implementation complete
 
-- `qwen35-mobile-vision` → `/kbd-apply qwen35-mobile-vision`
+- `litertlm-native-adapter` → `/kbd-apply litertlm-native-adapter`
   - Model class: frontier
   - Concrete model: `claude-sonnet-4-6`
-  - Model rationale: high-complexity FFI and native multimodal change
+  - Model rationale: high-complexity JNI/FFI and native multimodal change
   - Progress file: `.kbd-orchestrator/phases/model-runtime-per-device/progress.json`
 
-- `qwen35-local-tools` → `/kbd-apply qwen35-local-tools`
+- `litertlm-local-tools` → `/kbd-apply litertlm-local-tools`
   - Model class: frontier
   - Concrete model: `claude-sonnet-4-6`
   - Model rationale: high-complexity security-sensitive agent/tool loop
   - Progress file: `.kbd-orchestrator/phases/model-runtime-per-device/progress.json`
 
-- `qwen35-device-proof` → manual physical-device verification
+- `litertlm-device-proof` → manual physical-device verification
   - Model class: frontier
   - Concrete model: `claude-sonnet-4-6`
   - Model rationale: external devices and deployment state require direct verification
@@ -47,27 +47,28 @@ Source plan: `.kbd-orchestrator/phases/model-runtime-per-device/plan.md`
 
 - Never activate an artifact before revision, byte length, and SHA-256 verification succeeds.
 - Never execute a local tool call without registry and permission validation.
-- Never accept Vulkan output without the runtime correctness self-test; CPU fallback is required.
+- Never mark Android local inference ready without a LiteRT-LM runtime gate report and physical-device self-test evidence.
+- Never select GPU/NPU or device-specific LiteRT-LM artifacts until correctness, thermal safety, and measurable improvement are proven.
 
 ## FALLBACK CONDITIONS
 
 - If OpenSpec task state cannot be synchronized, stop and restore the KBD apply path before editing further.
-- If a model/projector checksum or architecture check fails, discard the temporary artifact.
-- If Metal/Vulkan initialization or smoke output fails, use the documented CPU/4B fallback and record diagnostics.
+- If a model checksum or architecture check fails, discard the temporary artifact.
+- If LiteRT-LM native adapter/delegate initialization or smoke output fails, use the documented CPU baseline or report a typed unavailable/error state with diagnostics.
 
 ## VERIFICATION REQUIREMENTS
 
 - `cd rust && cargo check --workspace`
-- Focused Rust tests for catalog, resume/checksum, backend selection, and inference contracts
+- Focused Rust tests for catalog, resume/checksum, LiteRT-LM diagnostics, backend selection, and inference contracts
 - `cd mobile && flutter analyze` and affected Flutter tests
-- Physical-device proof for iPhone 17 Pro Max and Galaxy S25 Ultra in the final change
+- Physical-device proof for the attached Android phone in the final Android change; iOS re-certification remains separate
 
 ## PROGRESS LEDGER
 
-- [IN_PROGRESS] `qwen35-model-runtime` — Codex via `/kbd-apply`
-- [PENDING] `qwen35-mobile-vision` — Codex via `/kbd-apply`
-- [PENDING] `qwen35-local-tools` — Codex via `/kbd-apply`
-- [PENDING] `qwen35-device-proof` — Manual physical-device verification
+- [COMPLETED] `android-litertlm-runtime` — Codex via `/kbd-apply`
+- [COMPLETED] `litertlm-native-adapter` — Codex via `/kbd-apply`
+- [PENDING] `litertlm-local-tools` — Codex via `/kbd-apply`
+- [COMPLETED] `litertlm-device-proof` — Manual physical-device verification
 
 ## OUTPUTS
 
@@ -75,12 +76,51 @@ Source plan: `.kbd-orchestrator/phases/model-runtime-per-device/plan.md`
 - Runtime catalog/diagnostic implementation
 - Physical-device evidence attached to the final change
 
+## DEVICE EVIDENCE — ANDROID LITERT-LM CPU SMOKE
+
+Date: 2026-07-19
+Device: Samsung `SM S936U`, serial `R5GYB4AZD7A`, Android 16/API 36
+Package: `tools.knowme.knowme`
+Runtime: LiteRT-LM Android SDK, generic `gemma-4-E2B-it.litertlm`, CPU baseline
+
+Verified:
+
+- `flutter build apk --debug --target-platform android-arm64` succeeded.
+- `scripts/android/verify-native-inference-gates.sh mobile/build/app/outputs/flutter-apk/app-debug.apk` passed G1/G2:
+  - `libgen_ui_ffi.so` has no vendor GPU/OpenCL `DT_NEEDED`.
+  - APK is arm64-only and contains `libgen_ui_ffi.so` and `liblitertlm_jni.so`.
+  - APK does not bundle vendor GPU/OpenCL libraries.
+- Fresh install/launch succeeded with process alive.
+- `MainActivity` loads `libgen_ui_ffi.so` via `System.loadLibrary`, causing `JNI_OnLoad` to capture the JavaVM.
+- The model artifact downloaded to app-private cache, matched byte length `2,588,147,712`, passed SHA-256 verification, and was published.
+- LiteRT-LM loaded the cached artifact and initialized the Android SDK native runtime.
+- Prompt smoke produced a visible assistant response: user prompt `Say%20only%20OK`, assistant response `OK`.
+
+Key logcat evidence:
+
+```text
+LiteRT-LM model download progress ... bytes_received=2588147712 total_bytes=2588147712
+LiteRT-LM model verification starting ... gemma-4-E2B-it.litertlm.part
+LiteRT-LM model verified and published ... gemma-4-E2B-it.litertlm
+LiteRT-LM model loading model=gemma-4-e2b-it-litertlm
+LiteRT-LM native adapter loaded model=gemma-4-e2b-it-litertlm
+LiteRT-LM generation starting
+LiteRT-LM generation produced text chars=2
+```
+
+Known remaining gaps:
+
+- The adapter currently returns one complete message instead of true token-level streaming callbacks.
+- LiteRT-LM tool declarations/manual tool loop are not yet wired.
+- Cancellation has not been certified during LiteRT-LM generation/load.
+- The visible conversation still contains old error bubbles from earlier failed attempts; those are persisted historical errors, not current-run failures.
+
 ## BLOCKERS
 
 - NONE at dispatch time
 
 ## REFLECTION HANDOFF
 
-Reflect must consume per-change implementation, evidence, certification, and publication status, including any Android Vulkan fallback or iOS memory fallback observed on physical hardware.
+Reflect must consume per-change implementation, evidence, certification, and publication status, including Android LiteRT-LM gate reports, CPU/delegate selection, and iOS memory fallback observed during separate iOS re-certification.
 
 ## EXECUTION READY

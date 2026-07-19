@@ -16,6 +16,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'third_party/gen_ui_db_graph.dart';
 import 'third_party/gen_ui_types/error.dart';
 import 'third_party/gen_ui_types/events.dart';
+import 'third_party/gen_ui_types/inference.dart';
 import 'third_party/gen_ui_types/sync.dart';
 import 'third_party/gen_ui_types/transport.dart';
 import 'third_party/gen_ui_types/view.dart';
@@ -76,7 +77,7 @@ class GenUiCore
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => -893984489;
+  int get rustContentHash => -2093150028;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -95,6 +96,16 @@ abstract class GenUiCoreApi extends BaseApi {
     required String id,
     required String entityType,
     required String label,
+  });
+
+  Future<BigInt> genUiDbGraphGraphStoreDeleteConversationContext({
+    required GraphStore that,
+    required String conversationId,
+  });
+
+  Future<BigInt> genUiDbGraphGraphStoreDeleteMessageContext({
+    required GraphStore that,
+    required List<String> messageIds,
   });
 
   Future<List<(String, String)>> genUiDbGraphGraphStoreEdgeEndpointsForTest({
@@ -129,6 +140,11 @@ abstract class GenUiCoreApi extends BaseApi {
     required GraphStoreConfig cfg,
   });
 
+  Future<BigInt> genUiDbGraphGraphStorePromoteContext({
+    required GraphStore that,
+    required List<String> ids,
+  });
+
   Future<void> genUiDbGraphGraphStoreRelate({
     required GraphStore that,
     required String from,
@@ -145,19 +161,26 @@ abstract class GenUiCoreApi extends BaseApi {
 
   Future<void> crateApiBootAttachSyncShapes();
 
+  Future<void> crateApiChatCancelModelOperation();
+
   Future<String> crateApiChatChatAction({
     required String threadId,
     required String interactionJson,
-    required List<String> messages,
+    required List<InferenceMessage> messages,
+    required String branchId,
   });
+
+  Future<bool> crateApiChatChatCancel({required String runId});
 
   Stream<String> crateApiStreamsChatEvents({required String runId});
 
   Future<String> crateApiChatChatSend({
     required String threadId,
     required String message,
-    required List<String> messages,
+    required List<InferenceMessage> messages,
     required List<String> attachmentPaths,
+    required String branchId,
+    required String userMessageId,
   });
 
   Stream<String> crateApiStreamsEntityChanges();
@@ -191,6 +214,20 @@ abstract class GenUiCoreApi extends BaseApi {
 
   Future<int> crateApiBootLoadSeeds();
 
+  Future<String> crateApiChatLocalModelStatus();
+
+  Stream<String> crateApiStreamsLocalModelStatusEvents();
+
+  Future<String> crateApiChatLocalRuntimeDiagnostics();
+
+  Future<BigInt> crateApiChatMemoryDeleteConversationContext({
+    required String conversationId,
+  });
+
+  Future<BigInt> crateApiChatMemoryDeleteMessageContext({
+    required List<String> messageIds,
+  });
+
   Future<String> crateApiChatMemoryIngest({required String text});
 
   Future<String> crateApiChatMemoryIngestAttachment({required String path});
@@ -199,10 +236,16 @@ abstract class GenUiCoreApi extends BaseApi {
     required List<String> paths,
   });
 
+  Future<BigInt> crateApiChatMemoryPromoteContext({required List<String> ids});
+
+  Future<MemoryProvenance> genUiDbGraphMemoryProvenanceDefault();
+
   Future<List<MemoryHit>> crateApiChatMemorySearch({
     required String query,
     required int k,
   });
+
+  Future<void> crateApiChatPrepareLocalModel();
 
   Future<String> crateApiChatResolveRemoteContent({
     required String url,
@@ -361,6 +404,84 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
       );
 
   @override
+  Future<BigInt> genUiDbGraphGraphStoreDeleteConversationContext({
+    required GraphStore that,
+    required String conversationId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerGraphStore(
+            that,
+            serializer,
+          );
+          sse_encode_String(conversationId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 3,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_usize,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerGraphError,
+        ),
+        constMeta: kGenUiDbGraphGraphStoreDeleteConversationContextConstMeta,
+        argValues: [that, conversationId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kGenUiDbGraphGraphStoreDeleteConversationContextConstMeta =>
+      const TaskConstMeta(
+        debugName: "GraphStore_delete_conversation_context",
+        argNames: ["that", "conversationId"],
+      );
+
+  @override
+  Future<BigInt> genUiDbGraphGraphStoreDeleteMessageContext({
+    required GraphStore that,
+    required List<String> messageIds,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerGraphStore(
+            that,
+            serializer,
+          );
+          sse_encode_list_String(messageIds, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 4,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_usize,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerGraphError,
+        ),
+        constMeta: kGenUiDbGraphGraphStoreDeleteMessageContextConstMeta,
+        argValues: [that, messageIds],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kGenUiDbGraphGraphStoreDeleteMessageContextConstMeta =>
+      const TaskConstMeta(
+        debugName: "GraphStore_delete_message_context",
+        argNames: ["that", "messageIds"],
+      );
+
+  @override
   Future<List<(String, String)>> genUiDbGraphGraphStoreEdgeEndpointsForTest({
     required GraphStore that,
   }) {
@@ -375,7 +496,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 3,
+            funcId: 5,
             port: port_,
           );
         },
@@ -416,7 +537,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 4,
+            funcId: 6,
             port: port_,
           );
         },
@@ -455,7 +576,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 5,
+            funcId: 7,
             port: port_,
           );
         },
@@ -496,7 +617,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 6,
+            funcId: 8,
             port: port_,
           );
         },
@@ -539,7 +660,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 7,
+            funcId: 9,
             port: port_,
           );
         },
@@ -576,7 +697,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 8,
+            funcId: 10,
             port: port_,
           );
         },
@@ -595,6 +716,45 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
 
   TaskConstMeta get kGenUiDbGraphGraphStoreOpenConstMeta =>
       const TaskConstMeta(debugName: "GraphStore_open", argNames: ["cfg"]);
+
+  @override
+  Future<BigInt> genUiDbGraphGraphStorePromoteContext({
+    required GraphStore that,
+    required List<String> ids,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerGraphStore(
+            that,
+            serializer,
+          );
+          sse_encode_list_String(ids, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 11,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_usize,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerGraphError,
+        ),
+        constMeta: kGenUiDbGraphGraphStorePromoteContextConstMeta,
+        argValues: [that, ids],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kGenUiDbGraphGraphStorePromoteContextConstMeta =>
+      const TaskConstMeta(
+        debugName: "GraphStore_promote_context",
+        argNames: ["that", "ids"],
+      );
 
   @override
   Future<void> genUiDbGraphGraphStoreRelate({
@@ -617,7 +777,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 9,
+            funcId: 12,
             port: port_,
           );
         },
@@ -660,7 +820,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 10,
+            funcId: 13,
             port: port_,
           );
         },
@@ -691,7 +851,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 12,
+            funcId: 15,
             port: port_,
           );
         },
@@ -711,10 +871,39 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
       const TaskConstMeta(debugName: "attach_sync_shapes", argNames: []);
 
   @override
+  Future<void> crateApiChatCancelModelOperation() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 16,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatCancelModelOperationConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatCancelModelOperationConstMeta =>
+      const TaskConstMeta(debugName: "cancel_model_operation", argNames: []);
+
+  @override
   Future<String> crateApiChatChatAction({
     required String threadId,
     required String interactionJson,
-    required List<String> messages,
+    required List<InferenceMessage> messages,
+    required String branchId,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -722,11 +911,12 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(threadId, serializer);
           sse_encode_String(interactionJson, serializer);
-          sse_encode_list_String(messages, serializer);
+          sse_encode_list_inference_message(messages, serializer);
+          sse_encode_String(branchId, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 13,
+            funcId: 17,
             port: port_,
           );
         },
@@ -736,7 +926,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
               sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
         ),
         constMeta: kCrateApiChatChatActionConstMeta,
-        argValues: [threadId, interactionJson, messages],
+        argValues: [threadId, interactionJson, messages, branchId],
         apiImpl: this,
       ),
     );
@@ -744,8 +934,37 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
 
   TaskConstMeta get kCrateApiChatChatActionConstMeta => const TaskConstMeta(
     debugName: "chat_action",
-    argNames: ["threadId", "interactionJson", "messages"],
+    argNames: ["threadId", "interactionJson", "messages", "branchId"],
   );
+
+  @override
+  Future<bool> crateApiChatChatCancel({required String runId}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(runId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 18,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_bool,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatChatCancelConstMeta,
+        argValues: [runId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatChatCancelConstMeta =>
+      const TaskConstMeta(debugName: "chat_cancel", argNames: ["runId"]);
 
   @override
   Stream<String> crateApiStreamsChatEvents({required String runId}) {
@@ -760,7 +979,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 14,
+              funcId: 19,
               port: port_,
             );
           },
@@ -786,8 +1005,10 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
   Future<String> crateApiChatChatSend({
     required String threadId,
     required String message,
-    required List<String> messages,
+    required List<InferenceMessage> messages,
     required List<String> attachmentPaths,
+    required String branchId,
+    required String userMessageId,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -795,12 +1016,14 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(threadId, serializer);
           sse_encode_String(message, serializer);
-          sse_encode_list_String(messages, serializer);
+          sse_encode_list_inference_message(messages, serializer);
           sse_encode_list_String(attachmentPaths, serializer);
+          sse_encode_String(branchId, serializer);
+          sse_encode_String(userMessageId, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 15,
+            funcId: 20,
             port: port_,
           );
         },
@@ -810,7 +1033,14 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
               sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
         ),
         constMeta: kCrateApiChatChatSendConstMeta,
-        argValues: [threadId, message, messages, attachmentPaths],
+        argValues: [
+          threadId,
+          message,
+          messages,
+          attachmentPaths,
+          branchId,
+          userMessageId,
+        ],
         apiImpl: this,
       ),
     );
@@ -818,7 +1048,14 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
 
   TaskConstMeta get kCrateApiChatChatSendConstMeta => const TaskConstMeta(
     debugName: "chat_send",
-    argNames: ["threadId", "message", "messages", "attachmentPaths"],
+    argNames: [
+      "threadId",
+      "message",
+      "messages",
+      "attachmentPaths",
+      "branchId",
+      "userMessageId",
+    ],
   );
 
   @override
@@ -833,7 +1070,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 16,
+              funcId: 21,
               port: port_,
             );
           },
@@ -865,7 +1102,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 17,
+            funcId: 22,
             port: port_,
           );
         },
@@ -898,7 +1135,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 18,
+            funcId: 23,
             port: port_,
           );
         },
@@ -933,7 +1170,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 19,
+            funcId: 24,
             port: port_,
           );
         },
@@ -964,7 +1201,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 20,
+            funcId: 25,
             port: port_,
           );
         },
@@ -995,7 +1232,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 21,
+            funcId: 26,
             port: port_,
           );
         },
@@ -1028,7 +1265,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 22,
+            funcId: 27,
             port: port_,
           );
         },
@@ -1059,7 +1296,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 23,
+            funcId: 28,
             port: port_,
           );
         },
@@ -1086,7 +1323,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 24,
+            funcId: 29,
             port: port_,
           );
         },
@@ -1106,6 +1343,165 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
       const TaskConstMeta(debugName: "load_seeds", argNames: []);
 
   @override
+  Future<String> crateApiChatLocalModelStatus() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 30,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatLocalModelStatusConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatLocalModelStatusConstMeta =>
+      const TaskConstMeta(debugName: "local_model_status", argNames: []);
+
+  @override
+  Stream<String> crateApiStreamsLocalModelStatusEvents() {
+    final sink = RustStreamSink<String>();
+    unawaited(
+      handler.executeNormal(
+        NormalTask(
+          callFfi: (port_) {
+            final serializer = SseSerializer(generalizedFrbRustBinding);
+            sse_encode_StreamSink_String_Sse(sink, serializer);
+            pdeCallFfi(
+              generalizedFrbRustBinding,
+              serializer,
+              funcId: 31,
+              port: port_,
+            );
+          },
+          codec: SseCodec(
+            decodeSuccessData: sse_decode_unit,
+            decodeErrorData: null,
+          ),
+          constMeta: kCrateApiStreamsLocalModelStatusEventsConstMeta,
+          argValues: [sink],
+          apiImpl: this,
+        ),
+      ),
+    );
+    return sink.stream;
+  }
+
+  TaskConstMeta get kCrateApiStreamsLocalModelStatusEventsConstMeta =>
+      const TaskConstMeta(
+        debugName: "local_model_status_events",
+        argNames: ["sink"],
+      );
+
+  @override
+  Future<String> crateApiChatLocalRuntimeDiagnostics() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 32,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatLocalRuntimeDiagnosticsConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatLocalRuntimeDiagnosticsConstMeta =>
+      const TaskConstMeta(debugName: "local_runtime_diagnostics", argNames: []);
+
+  @override
+  Future<BigInt> crateApiChatMemoryDeleteConversationContext({
+    required String conversationId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(conversationId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 33,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_usize,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatMemoryDeleteConversationContextConstMeta,
+        argValues: [conversationId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatMemoryDeleteConversationContextConstMeta =>
+      const TaskConstMeta(
+        debugName: "memory_delete_conversation_context",
+        argNames: ["conversationId"],
+      );
+
+  @override
+  Future<BigInt> crateApiChatMemoryDeleteMessageContext({
+    required List<String> messageIds,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_list_String(messageIds, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 34,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_usize,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatMemoryDeleteMessageContextConstMeta,
+        argValues: [messageIds],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatMemoryDeleteMessageContextConstMeta =>
+      const TaskConstMeta(
+        debugName: "memory_delete_message_context",
+        argNames: ["messageIds"],
+      );
+
+  @override
   Future<String> crateApiChatMemoryIngest({required String text}) {
     return handler.executeNormal(
       NormalTask(
@@ -1115,7 +1511,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 25,
+            funcId: 35,
             port: port_,
           );
         },
@@ -1144,7 +1540,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 26,
+            funcId: 36,
             port: port_,
           );
         },
@@ -1178,7 +1574,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 27,
+            funcId: 37,
             port: port_,
           );
         },
@@ -1201,6 +1597,65 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
       );
 
   @override
+  Future<BigInt> crateApiChatMemoryPromoteContext({required List<String> ids}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_list_String(ids, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 38,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_usize,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatMemoryPromoteContextConstMeta,
+        argValues: [ids],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatMemoryPromoteContextConstMeta =>
+      const TaskConstMeta(
+        debugName: "memory_promote_context",
+        argNames: ["ids"],
+      );
+
+  @override
+  Future<MemoryProvenance> genUiDbGraphMemoryProvenanceDefault() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 39,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_memory_provenance,
+          decodeErrorData: null,
+        ),
+        constMeta: kGenUiDbGraphMemoryProvenanceDefaultConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kGenUiDbGraphMemoryProvenanceDefaultConstMeta =>
+      const TaskConstMeta(debugName: "memory_provenance_default", argNames: []);
+
+  @override
   Future<List<MemoryHit>> crateApiChatMemorySearch({
     required String query,
     required int k,
@@ -1214,7 +1669,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 28,
+            funcId: 40,
             port: port_,
           );
         },
@@ -1234,6 +1689,34 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
       const TaskConstMeta(debugName: "memory_search", argNames: ["query", "k"]);
 
   @override
+  Future<void> crateApiChatPrepareLocalModel() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 41,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatPrepareLocalModelConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatPrepareLocalModelConstMeta =>
+      const TaskConstMeta(debugName: "prepare_local_model", argNames: []);
+
+  @override
   Future<String> crateApiChatResolveRemoteContent({
     required String url,
     required String kind,
@@ -1247,7 +1730,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 29,
+            funcId: 42,
             port: port_,
           );
         },
@@ -1279,7 +1762,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 30,
+            funcId: 43,
             port: port_,
           );
         },
@@ -1307,7 +1790,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 31,
+            funcId: 44,
             port: port_,
           );
         },
@@ -1335,7 +1818,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 32,
+            funcId: 45,
             port: port_,
           );
         },
@@ -1366,7 +1849,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 33,
+              funcId: 46,
               port: port_,
             );
           },
@@ -1395,7 +1878,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 34,
+            funcId: 47,
             port: port_,
           );
         },
@@ -1651,6 +2134,12 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
   }
 
   @protected
+  MemoryProvenance dco_decode_box_autoadd_memory_provenance(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_memory_provenance(raw);
+  }
+
+  @protected
   MemoryRecord dco_decode_box_autoadd_memory_record(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_memory_record(raw);
@@ -1719,6 +2208,26 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
   }
 
   @protected
+  InferenceMessage dco_decode_inference_message(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return InferenceMessage(
+      role: dco_decode_inference_role(arr[0]),
+      content: dco_decode_String(arr[1]),
+      name: dco_decode_opt_String(arr[2]),
+      toolCallId: dco_decode_opt_String(arr[3]),
+    );
+  }
+
+  @protected
+  InferenceRole dco_decode_inference_role(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return InferenceRole.values[raw as int];
+  }
+
+  @protected
   List<String> dco_decode_list_String(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_String).toList();
@@ -1734,6 +2243,12 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
   List<FilterSpec> dco_decode_list_filter_spec(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_filter_spec).toList();
+  }
+
+  @protected
+  List<InferenceMessage> dco_decode_list_inference_message(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_inference_message).toList();
   }
 
   @protected
@@ -1782,13 +2297,29 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
   MemoryHit dco_decode_memory_hit(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 4)
-      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
     return MemoryHit(
       id: dco_decode_String(arr[0]),
       text: dco_decode_String(arr[1]),
       kind: dco_decode_String(arr[2]),
       score: dco_decode_f_32(arr[3]),
+      provenance: dco_decode_opt_box_autoadd_memory_provenance(arr[4]),
+    );
+  }
+
+  @protected
+  MemoryProvenance dco_decode_memory_provenance(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return MemoryProvenance(
+      conversationId: dco_decode_opt_String(arr[0]),
+      branchId: dco_decode_opt_String(arr[1]),
+      messageId: dco_decode_opt_String(arr[2]),
+      runId: dco_decode_opt_String(arr[3]),
+      durable: dco_decode_bool(arr[4]),
     );
   }
 
@@ -1796,13 +2327,14 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
   MemoryRecord dco_decode_memory_record(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 4)
-      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
     return MemoryRecord(
       id: dco_decode_opt_String(arr[0]),
       text: dco_decode_String(arr[1]),
       kind: dco_decode_String(arr[2]),
       entity: dco_decode_opt_String(arr[3]),
+      provenance: dco_decode_opt_box_autoadd_memory_provenance(arr[4]),
     );
   }
 
@@ -1816,6 +2348,12 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
   EntityRecord? dco_decode_opt_box_autoadd_entity_record(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_entity_record(raw);
+  }
+
+  @protected
+  MemoryProvenance? dco_decode_opt_box_autoadd_memory_provenance(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_memory_provenance(raw);
   }
 
   @protected
@@ -2140,6 +2678,14 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
   }
 
   @protected
+  MemoryProvenance sse_decode_box_autoadd_memory_provenance(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_memory_provenance(deserializer));
+  }
+
+  @protected
   MemoryRecord sse_decode_box_autoadd_memory_record(
     SseDeserializer deserializer,
   ) {
@@ -2209,6 +2755,28 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
   }
 
   @protected
+  InferenceMessage sse_decode_inference_message(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_role = sse_decode_inference_role(deserializer);
+    var var_content = sse_decode_String(deserializer);
+    var var_name = sse_decode_opt_String(deserializer);
+    var var_toolCallId = sse_decode_opt_String(deserializer);
+    return InferenceMessage(
+      role: var_role,
+      content: var_content,
+      name: var_name,
+      toolCallId: var_toolCallId,
+    );
+  }
+
+  @protected
+  InferenceRole sse_decode_inference_role(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return InferenceRole.values[inner];
+  }
+
+  @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
@@ -2242,6 +2810,20 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
     var ans_ = <FilterSpec>[];
     for (var idx_ = 0; idx_ < len_; ++idx_) {
       ans_.add(sse_decode_filter_spec(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<InferenceMessage> sse_decode_list_inference_message(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <InferenceMessage>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_inference_message(deserializer));
     }
     return ans_;
   }
@@ -2320,11 +2902,32 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
     var var_text = sse_decode_String(deserializer);
     var var_kind = sse_decode_String(deserializer);
     var var_score = sse_decode_f_32(deserializer);
+    var var_provenance = sse_decode_opt_box_autoadd_memory_provenance(
+      deserializer,
+    );
     return MemoryHit(
       id: var_id,
       text: var_text,
       kind: var_kind,
       score: var_score,
+      provenance: var_provenance,
+    );
+  }
+
+  @protected
+  MemoryProvenance sse_decode_memory_provenance(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_conversationId = sse_decode_opt_String(deserializer);
+    var var_branchId = sse_decode_opt_String(deserializer);
+    var var_messageId = sse_decode_opt_String(deserializer);
+    var var_runId = sse_decode_opt_String(deserializer);
+    var var_durable = sse_decode_bool(deserializer);
+    return MemoryProvenance(
+      conversationId: var_conversationId,
+      branchId: var_branchId,
+      messageId: var_messageId,
+      runId: var_runId,
+      durable: var_durable,
     );
   }
 
@@ -2335,11 +2938,15 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
     var var_text = sse_decode_String(deserializer);
     var var_kind = sse_decode_String(deserializer);
     var var_entity = sse_decode_opt_String(deserializer);
+    var var_provenance = sse_decode_opt_box_autoadd_memory_provenance(
+      deserializer,
+    );
     return MemoryRecord(
       id: var_id,
       text: var_text,
       kind: var_kind,
       entity: var_entity,
+      provenance: var_provenance,
     );
   }
 
@@ -2362,6 +2969,19 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
 
     if (sse_decode_bool(deserializer)) {
       return (sse_decode_box_autoadd_entity_record(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  MemoryProvenance? sse_decode_opt_box_autoadd_memory_provenance(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_memory_provenance(deserializer));
     } else {
       return null;
     }
@@ -2725,6 +3345,15 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
   }
 
   @protected
+  void sse_encode_box_autoadd_memory_provenance(
+    MemoryProvenance self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_memory_provenance(self, serializer);
+  }
+
+  @protected
   void sse_encode_box_autoadd_memory_record(
     MemoryRecord self,
     SseSerializer serializer,
@@ -2789,6 +3418,24 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
   }
 
   @protected
+  void sse_encode_inference_message(
+    InferenceMessage self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_inference_role(self.role, serializer);
+    sse_encode_String(self.content, serializer);
+    sse_encode_opt_String(self.name, serializer);
+    sse_encode_opt_String(self.toolCallId, serializer);
+  }
+
+  @protected
+  void sse_encode_inference_role(InferenceRole self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.length, serializer);
@@ -2818,6 +3465,18 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_filter_spec(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_inference_message(
+    List<InferenceMessage> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_inference_message(item, serializer);
     }
   }
 
@@ -2893,6 +3552,20 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
     sse_encode_String(self.text, serializer);
     sse_encode_String(self.kind, serializer);
     sse_encode_f_32(self.score, serializer);
+    sse_encode_opt_box_autoadd_memory_provenance(self.provenance, serializer);
+  }
+
+  @protected
+  void sse_encode_memory_provenance(
+    MemoryProvenance self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_opt_String(self.conversationId, serializer);
+    sse_encode_opt_String(self.branchId, serializer);
+    sse_encode_opt_String(self.messageId, serializer);
+    sse_encode_opt_String(self.runId, serializer);
+    sse_encode_bool(self.durable, serializer);
   }
 
   @protected
@@ -2902,6 +3575,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
     sse_encode_String(self.text, serializer);
     sse_encode_String(self.kind, serializer);
     sse_encode_opt_String(self.entity, serializer);
+    sse_encode_opt_box_autoadd_memory_provenance(self.provenance, serializer);
   }
 
   @protected
@@ -2924,6 +3598,19 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
     sse_encode_bool(self != null, serializer);
     if (self != null) {
       sse_encode_box_autoadd_entity_record(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_memory_provenance(
+    MemoryProvenance? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_memory_provenance(self, serializer);
     }
   }
 
@@ -3158,6 +3845,21 @@ class GraphStoreImpl extends RustOpaque implements GraphStore {
     label: label,
   );
 
+  /// Delete non-durable context owned by a conversation. Durable records are
+  /// retained only after an explicit promotion action.
+  Future<BigInt> deleteConversationContext({required String conversationId}) =>
+      GenUiCore.instance.api.genUiDbGraphGraphStoreDeleteConversationContext(
+        that: this,
+        conversationId: conversationId,
+      );
+
+  /// Remove facts/chunks whose only provenance is a deleted branch tail.
+  Future<BigInt> deleteMessageContext({required List<String> messageIds}) =>
+      GenUiCore.instance.api.genUiDbGraphGraphStoreDeleteMessageContext(
+        that: this,
+        messageIds: messageIds,
+      );
+
   /// Test-only inspection of stored relation endpoint IDs.
   Future<List<(String, String)>> edgeEndpointsForTest() => GenUiCore
       .instance
@@ -3207,6 +3909,12 @@ class GraphStoreImpl extends RustOpaque implements GraphStore {
     k: k,
     mode: mode,
   );
+
+  /// Promote selected conversation chunks into durable governed knowledge.
+  Future<BigInt> promoteContext({required List<String> ids}) => GenUiCore
+      .instance
+      .api
+      .genUiDbGraphGraphStorePromoteContext(that: this, ids: ids);
 
   /// INTENT: create a directed RELATE edge `from -> to` with a relation label.
   /// Edges are what `graph_expand` traverses.

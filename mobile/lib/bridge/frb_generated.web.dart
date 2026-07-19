@@ -17,6 +17,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_web.dart';
 import 'third_party/gen_ui_db_graph.dart';
 import 'third_party/gen_ui_types/error.dart';
 import 'third_party/gen_ui_types/events.dart';
+import 'third_party/gen_ui_types/inference.dart';
 import 'third_party/gen_ui_types/sync.dart';
 import 'third_party/gen_ui_types/transport.dart';
 import 'third_party/gen_ui_types/view.dart';
@@ -172,6 +173,9 @@ abstract class GenUiCoreApiImplPlatform extends BaseApiImpl<GenUiCoreWire> {
   EntityRecord dco_decode_box_autoadd_entity_record(dynamic raw);
 
   @protected
+  MemoryProvenance dco_decode_box_autoadd_memory_provenance(dynamic raw);
+
+  @protected
   MemoryRecord dco_decode_box_autoadd_memory_record(dynamic raw);
 
   @protected
@@ -199,6 +203,12 @@ abstract class GenUiCoreApiImplPlatform extends BaseApiImpl<GenUiCoreWire> {
   int dco_decode_i_32(dynamic raw);
 
   @protected
+  InferenceMessage dco_decode_inference_message(dynamic raw);
+
+  @protected
+  InferenceRole dco_decode_inference_role(dynamic raw);
+
+  @protected
   List<String> dco_decode_list_String(dynamic raw);
 
   @protected
@@ -206,6 +216,9 @@ abstract class GenUiCoreApiImplPlatform extends BaseApiImpl<GenUiCoreWire> {
 
   @protected
   List<FilterSpec> dco_decode_list_filter_spec(dynamic raw);
+
+  @protected
+  List<InferenceMessage> dco_decode_list_inference_message(dynamic raw);
 
   @protected
   List<MemoryHit> dco_decode_list_memory_hit(dynamic raw);
@@ -229,6 +242,9 @@ abstract class GenUiCoreApiImplPlatform extends BaseApiImpl<GenUiCoreWire> {
   MemoryHit dco_decode_memory_hit(dynamic raw);
 
   @protected
+  MemoryProvenance dco_decode_memory_provenance(dynamic raw);
+
+  @protected
   MemoryRecord dco_decode_memory_record(dynamic raw);
 
   @protected
@@ -236,6 +252,9 @@ abstract class GenUiCoreApiImplPlatform extends BaseApiImpl<GenUiCoreWire> {
 
   @protected
   EntityRecord? dco_decode_opt_box_autoadd_entity_record(dynamic raw);
+
+  @protected
+  MemoryProvenance? dco_decode_opt_box_autoadd_memory_provenance(dynamic raw);
 
   @protected
   int? dco_decode_opt_box_autoadd_u_32(dynamic raw);
@@ -386,6 +405,11 @@ abstract class GenUiCoreApiImplPlatform extends BaseApiImpl<GenUiCoreWire> {
   );
 
   @protected
+  MemoryProvenance sse_decode_box_autoadd_memory_provenance(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   MemoryRecord sse_decode_box_autoadd_memory_record(
     SseDeserializer deserializer,
   );
@@ -417,6 +441,12 @@ abstract class GenUiCoreApiImplPlatform extends BaseApiImpl<GenUiCoreWire> {
   int sse_decode_i_32(SseDeserializer deserializer);
 
   @protected
+  InferenceMessage sse_decode_inference_message(SseDeserializer deserializer);
+
+  @protected
+  InferenceRole sse_decode_inference_role(SseDeserializer deserializer);
+
+  @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer);
 
   @protected
@@ -426,6 +456,11 @@ abstract class GenUiCoreApiImplPlatform extends BaseApiImpl<GenUiCoreWire> {
 
   @protected
   List<FilterSpec> sse_decode_list_filter_spec(SseDeserializer deserializer);
+
+  @protected
+  List<InferenceMessage> sse_decode_list_inference_message(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<MemoryHit> sse_decode_list_memory_hit(SseDeserializer deserializer);
@@ -453,6 +488,9 @@ abstract class GenUiCoreApiImplPlatform extends BaseApiImpl<GenUiCoreWire> {
   MemoryHit sse_decode_memory_hit(SseDeserializer deserializer);
 
   @protected
+  MemoryProvenance sse_decode_memory_provenance(SseDeserializer deserializer);
+
+  @protected
   MemoryRecord sse_decode_memory_record(SseDeserializer deserializer);
 
   @protected
@@ -460,6 +498,11 @@ abstract class GenUiCoreApiImplPlatform extends BaseApiImpl<GenUiCoreWire> {
 
   @protected
   EntityRecord? sse_decode_opt_box_autoadd_entity_record(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  MemoryProvenance? sse_decode_opt_box_autoadd_memory_provenance(
     SseDeserializer deserializer,
   );
 
@@ -635,6 +678,12 @@ abstract class GenUiCoreApiImplPlatform extends BaseApiImpl<GenUiCoreWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_memory_provenance(
+    MemoryProvenance self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_memory_record(
     MemoryRecord self,
     SseSerializer serializer,
@@ -668,6 +717,15 @@ abstract class GenUiCoreApiImplPlatform extends BaseApiImpl<GenUiCoreWire> {
   void sse_encode_i_32(int self, SseSerializer serializer);
 
   @protected
+  void sse_encode_inference_message(
+    InferenceMessage self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_inference_role(InferenceRole self, SseSerializer serializer);
+
+  @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
 
   @protected
@@ -679,6 +737,12 @@ abstract class GenUiCoreApiImplPlatform extends BaseApiImpl<GenUiCoreWire> {
   @protected
   void sse_encode_list_filter_spec(
     List<FilterSpec> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_inference_message(
+    List<InferenceMessage> self,
     SseSerializer serializer,
   );
 
@@ -716,6 +780,12 @@ abstract class GenUiCoreApiImplPlatform extends BaseApiImpl<GenUiCoreWire> {
   void sse_encode_memory_hit(MemoryHit self, SseSerializer serializer);
 
   @protected
+  void sse_encode_memory_provenance(
+    MemoryProvenance self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_memory_record(MemoryRecord self, SseSerializer serializer);
 
   @protected
@@ -724,6 +794,12 @@ abstract class GenUiCoreApiImplPlatform extends BaseApiImpl<GenUiCoreWire> {
   @protected
   void sse_encode_opt_box_autoadd_entity_record(
     EntityRecord? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_memory_provenance(
+    MemoryProvenance? self,
     SseSerializer serializer,
   );
 

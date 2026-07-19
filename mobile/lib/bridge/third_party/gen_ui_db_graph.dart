@@ -19,6 +19,13 @@ abstract class GraphStore implements RustOpaqueInterface {
     required String label,
   });
 
+  /// Delete non-durable context owned by a conversation. Durable records are
+  /// retained only after an explicit promotion action.
+  Future<BigInt> deleteConversationContext({required String conversationId});
+
+  /// Remove facts/chunks whose only provenance is a deleted branch tail.
+  Future<BigInt> deleteMessageContext({required List<String> messageIds});
+
   /// Test-only inspection of stored relation endpoint IDs.
   Future<List<(String, String)>> edgeEndpointsForTest();
 
@@ -58,6 +65,9 @@ abstract class GraphStore implements RustOpaqueInterface {
   static Future<GraphStore> open({required GraphStoreConfig cfg}) =>
       GenUiCore.instance.api.genUiDbGraphGraphStoreOpen(cfg: cfg);
 
+  /// Promote selected conversation chunks into durable governed knowledge.
+  Future<BigInt> promoteContext({required List<String> ids});
+
   /// INTENT: create a directed RELATE edge `from -> to` with a relation label.
   /// Edges are what `graph_expand` traverses.
   Future<void> relate({
@@ -85,17 +95,23 @@ class MemoryHit {
   final String text;
   final String kind;
   final double score;
+  final MemoryProvenance? provenance;
 
   const MemoryHit({
     required this.id,
     required this.text,
     required this.kind,
     required this.score,
+    this.provenance,
   });
 
   @override
   int get hashCode =>
-      id.hashCode ^ text.hashCode ^ kind.hashCode ^ score.hashCode;
+      id.hashCode ^
+      text.hashCode ^
+      kind.hashCode ^
+      score.hashCode ^
+      provenance.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -105,7 +121,46 @@ class MemoryHit {
           id == other.id &&
           text == other.text &&
           kind == other.kind &&
-          score == other.score;
+          score == other.score &&
+          provenance == other.provenance;
+}
+
+class MemoryProvenance {
+  final String? conversationId;
+  final String? branchId;
+  final String? messageId;
+  final String? runId;
+  final bool durable;
+
+  const MemoryProvenance({
+    this.conversationId,
+    this.branchId,
+    this.messageId,
+    this.runId,
+    required this.durable,
+  });
+
+  static Future<MemoryProvenance> default_() =>
+      GenUiCore.instance.api.genUiDbGraphMemoryProvenanceDefault();
+
+  @override
+  int get hashCode =>
+      conversationId.hashCode ^
+      branchId.hashCode ^
+      messageId.hashCode ^
+      runId.hashCode ^
+      durable.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MemoryProvenance &&
+          runtimeType == other.runtimeType &&
+          conversationId == other.conversationId &&
+          branchId == other.branchId &&
+          messageId == other.messageId &&
+          runId == other.runId &&
+          durable == other.durable;
 }
 
 /// A memory row as ingested. `id` is `None` on the way in (DB assigns it).
@@ -117,16 +172,26 @@ class MemoryRecord {
   /// Optional owning entity record id (e.g. `entity:project_x`).
   final String? entity;
 
+  /// Origin of governed facts/chunks. Conversation-scoped records remain
+  /// traceable across branches and can be deleted without leaving ghost
+  /// context. Legacy records deserialize as unscoped memory.
+  final MemoryProvenance? provenance;
+
   const MemoryRecord({
     this.id,
     required this.text,
     required this.kind,
     this.entity,
+    this.provenance,
   });
 
   @override
   int get hashCode =>
-      id.hashCode ^ text.hashCode ^ kind.hashCode ^ entity.hashCode;
+      id.hashCode ^
+      text.hashCode ^
+      kind.hashCode ^
+      entity.hashCode ^
+      provenance.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -136,7 +201,8 @@ class MemoryRecord {
           id == other.id &&
           text == other.text &&
           kind == other.kind &&
-          entity == other.entity;
+          entity == other.entity &&
+          provenance == other.provenance;
 }
 
 /// A neighbour reached by graph expansion, with the RRF score from re-fusing the

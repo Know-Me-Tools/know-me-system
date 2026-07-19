@@ -15,15 +15,14 @@ part 'startup_notifier.g.dart';
 
 Duration? _noRetry(int retryCount, Object error) => null;
 
-/// Runs migrations → seeds → shapes once, yielding each phase as it begins and
+/// Opens schema compatibility and sync once. Embedding models, demo seeds,
+/// Xberg, and inference are deliberately lazy and never block the app shell.
 /// [StartupPhase.ready] when the store is usable. A stream provider so the gate
 /// rebuilds per phase; auto-dispose by default. Retry is off — see file header.
 @Riverpod(retry: _noRetry)
 Stream<StartupPhase> startup(Ref ref) async* {
   yield StartupPhase.migrations;
   await bridge.runMigrations(dataDir: dataDirOverride);
-  yield StartupPhase.seeds;
-  await bridge.loadSeeds();
   yield StartupPhase.shapes;
   await bridge.attachSyncShapes();
   yield StartupPhase.ready;
