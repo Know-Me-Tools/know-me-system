@@ -180,6 +180,18 @@ impl A2uiAdapter {
                     None => vec![],
                 }
             }
+            StreamEvent::ToolResult {
+                tool_use_id,
+                output_json,
+                is_error,
+            } => vec![A2uiEvent::Block {
+                run_id: self.run_id.clone(),
+                block: ContentBlock::ToolResult {
+                    tool_use_id: tool_use_id.clone(),
+                    output_json: output_json.clone(),
+                    is_error: *is_error,
+                },
+            }],
 
             StreamEvent::Custom {
                 source,
@@ -394,6 +406,34 @@ mod tests {
                 }
                 other => panic!("expected ToolUse, got {other:?}"),
             }
+        }
+    }
+
+    #[test]
+    fn tool_results_emit_tool_result_blocks() {
+        let mut a = A2uiAdapter::new("run-1");
+        let out = a.ingest(&StreamEvent::ToolResult {
+            tool_use_id: "c1".into(),
+            output_json: r#"{"ok":false}"#.into(),
+            is_error: true,
+        });
+
+        assert_eq!(out.len(), 1);
+        match &out[0] {
+            A2uiEvent::Block {
+                block:
+                    ContentBlock::ToolResult {
+                        tool_use_id,
+                        output_json,
+                        is_error,
+                    },
+                ..
+            } => {
+                assert_eq!(tool_use_id, "c1");
+                assert_eq!(output_json, r#"{"ok":false}"#);
+                assert!(*is_error);
+            }
+            other => panic!("expected ToolResult block, got {other:?}"),
         }
     }
 

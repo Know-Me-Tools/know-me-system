@@ -27,6 +27,11 @@ pub enum StreamEvent {
     ToolCallComplete {
         id: String,
     },
+    ToolResult {
+        tool_use_id: String,
+        output_json: String,
+        is_error: bool,
+    },
     Custom {
         source: String,
         event_name: String,

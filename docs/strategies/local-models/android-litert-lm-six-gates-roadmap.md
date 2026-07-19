@@ -51,11 +51,17 @@ attached Samsung `SM S936U` running Android 16/API 36:
   SDK's `OpenApiTool` provider path with automatic execution disabled.
 - Returned LiteRT-LM `Message.toolCalls` are normalized into canonical
   `ToolCallStarted`, `ToolCallDelta`, and `ToolCallComplete` stream events.
+- The canonical stream envelope now includes `ToolResult`, and the local path
+  validates LiteRT-LM tool-call candidates against the advertised shortlist,
+  JSON shape, required fields, and shallow property types. It then fails closed
+  with a typed tool-result error until permission/mutation policy metadata is
+  available for safe host execution.
 
 This proves the CPU smoke lane and code-level tool-call candidate preservation.
 It does not yet prove that the model reliably chooses tools for certified
-prompts. True token-level streaming callbacks, host-side tool execution/repair,
-cancellation certification, and broader device coverage remain future gates.
+prompts or that a full local tool loop can execute and continue generation. True
+token-level streaming callbacks, host-side tool execution/repair, cancellation
+certification, and broader device coverage remain future gates.
 
 ## Roadmap
 
@@ -91,7 +97,9 @@ cancellation certification, and broader device coverage remain future gates.
 - [x] Shortlist registered tools before prompt assembly.
 - [x] Provide LiteRT-LM with structured tool declarations.
 - [x] Preserve model tool-call candidates as canonical stream events.
-- [ ] Parse model tool-call candidates through schema validation.
+- [x] Parse model tool-call candidates through fail-closed validation.
+- [ ] Replace shallow JSON validation with the shared full schema validator used
+  by executable tool loops.
 - Enforce permission policy before execution.
 - Allow at most two bounded repair attempts.
 - Persist tool-call and tool-result events with the same AG-UI/A2UI content-block

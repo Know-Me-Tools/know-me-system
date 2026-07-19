@@ -140,6 +140,42 @@ Verification:
 - `flutter analyze lib`
 - Physical-device no-regression smoke on `SM S936U`: cached model loaded and prompt `Say%20only%20OK` generated `OK`; logcat reported `tool_calls=0` for that prompt.
 
+## LOCAL TOOL RESULT / VALIDATION CHECKPOINT
+
+Date: 2026-07-19
+
+Implemented:
+
+- Added canonical `StreamEvent::ToolResult` so local, cloud, AG-UI, and A2UI
+  paths have a typed host-result half for manual tool calling.
+- `gen_ui_protocol::A2uiAdapter` maps `ToolResult` into the existing
+  exhaustive `ContentBlock::ToolResult` variant.
+- Android LiteRT-LM local generation now observes completed tool-call
+  candidates, validates them against the turn's advertised tool shortlist,
+  parses argument JSON, checks required fields, and checks shallow JSON-schema
+  property types.
+- Valid local tool calls fail closed with a typed `ToolResult` error until
+  permission and mutability policy metadata exists. This deliberately prevents
+  automatic MCP execution from a local model without confirmation policy.
+
+Verification:
+
+- `cargo test -p gen_ui_protocol`
+- `cargo test -p gen_ui_agent local_tool_gate -- --nocapture`
+- `cargo check -p gen_ui_agent`
+- `cargo test -p gen_ui_inference --features local-litert-lm`
+- `flutter analyze lib`
+- `flutter build apk --debug --target-platform android-arm64`
+- `scripts/android/verify-native-inference-gates.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
+
+Remaining for `litertlm-local-tools`:
+
+- Attach registry permission/mutation metadata to local tool definitions.
+- Execute safe/confirmed tools through the existing MCP bridge.
+- Send tool-result messages back to LiteRT-LM and continue generation.
+- Add bounded repair attempts for invalid arguments.
+- Certify the model actually chooses tools on physical Android prompt suites.
+
 ## BLOCKERS
 
 - NONE at dispatch time
