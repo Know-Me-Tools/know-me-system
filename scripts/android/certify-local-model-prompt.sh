@@ -150,9 +150,15 @@ while (( SECONDS < deadline )); do
   adb logcat -d -v time > "$LOG_PATH"
   tap_matching_node "Latest" >/dev/null 2>&1 || true
   dump_ui || true
-  if rg -q "FATAL EXCEPTION|tools\\.knowme\\.knowme E AndroidRuntime|UnsatisfiedLinkError|libgen_ui_ffi.*dlopen failed|dlopen failed.*libgen_ui_ffi|liblitertlm.*dlopen failed|dlopen failed.*liblitertlm|JNI_OnLoad.*failed" "$LOG_PATH"; then
-    echo "G6 FAIL: fatal or KnowMe native-load failure found while certifying local model prompt" >&2
-    rg -n "FATAL EXCEPTION|tools\\.knowme\\.knowme E AndroidRuntime|UnsatisfiedLinkError|libgen_ui_ffi.*dlopen failed|dlopen failed.*libgen_ui_ffi|liblitertlm.*dlopen failed|dlopen failed.*liblitertlm|JNI_OnLoad.*failed" "$LOG_PATH" >&2
+  if [[ -z "$(adb shell pidof "$PACKAGE" | tr -d '\r' || true)" ]]; then
+    echo "G6 FAIL: app process is not alive while certifying local model prompt" >&2
+    echo "logcat: $LOG_PATH" >&2
+    echo "ui xml: $UI_XML_PATH" >&2
+    exit 1
+  fi
+  if rg -q "tools\\.knowme\\.knowme E AndroidRuntime|UnsatisfiedLinkError|libgen_ui_ffi.*dlopen failed|dlopen failed.*libgen_ui_ffi|liblitertlm.*dlopen failed|dlopen failed.*liblitertlm|JNI_OnLoad.*failed" "$LOG_PATH"; then
+    echo "G6 FAIL: KnowMe native-load failure found while certifying local model prompt" >&2
+    rg -n "tools\\.knowme\\.knowme E AndroidRuntime|UnsatisfiedLinkError|libgen_ui_ffi.*dlopen failed|dlopen failed.*libgen_ui_ffi|liblitertlm.*dlopen failed|dlopen failed.*liblitertlm|JNI_OnLoad.*failed" "$LOG_PATH" >&2
     echo "logcat: $LOG_PATH" >&2
     echo "ui xml: $UI_XML_PATH" >&2
     exit 1

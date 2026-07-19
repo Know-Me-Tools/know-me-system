@@ -898,6 +898,11 @@ async fn send_local(
     let engine = engine.clone();
     let run_id_for_task = run_id.clone();
     let active_run = ActiveRun::new(&run_id);
+    let history_summary = history
+        .iter()
+        .map(|message| format!("{}:{}", message.role.as_str(), message.content.chars().count()))
+        .collect::<Vec<_>>()
+        .join(",");
     gen_ui_runtime::spawn(async move {
         let mut adapter = A2uiAdapter::new(run_id_for_task.clone());
         for event in adapter.ingest(&StreamEvent::MessageStart) {
@@ -913,6 +918,12 @@ async fn send_local(
             status: RunStatus::Preparing,
             message: "Assembling governed context".into(),
         });
+        tracing::info!(
+            run_id = %run_id_for_task,
+            history_count = history.len(),
+            history_summary = %history_summary,
+            "local chat history received for context assembly"
+        );
 
         let assembled = match assemble_context(
             &model_id,

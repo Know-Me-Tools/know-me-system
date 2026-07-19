@@ -143,15 +143,20 @@ attached Samsung `SM S936U` running Android 16/API 36:
   response, force-stops the app, relaunches it, and requires the marker to
   reappear from restored UI state. It passed on the attached Samsung with
   marker `KMRESTART045015`.
+- Multi-turn history now has a physical gate:
+  `scripts/android/certify-local-multiturn-history.sh` seeds a local-model
+  response with a marker, sends a second prompt that does not contain the full
+  marker, and requires the second response to recover the marker from the
+  immediately previous assistant message. It passed on the attached Samsung
+  with marker `KMMULTI051210`.
 
 This proves the CPU smoke lane and code-level tool-call candidate preservation.
 It also proves one complete safe local tool loop and one explicit
 approval-required local tool loop on a physical Android device. True
-token-level streaming callbacks, multi-turn history certification,
-cancellation certification, explicit tool-calling suite coverage,
-empty-continuation fallback certification, skill-activation UI proof,
-stale-card cleanup affordances, and broader device coverage remain future
-gates.
+token-level streaming callbacks, cancellation certification, explicit
+tool-calling suite coverage, empty-continuation fallback certification,
+skill-activation UI proof, stale-card cleanup affordances, and broader device
+coverage remain future gates.
 
 ## Roadmap
 
@@ -254,8 +259,10 @@ gates.
   cases on the attached Samsung.
 - [x] Certify restart recovery by force-stopping/relaunching the app after a
   generated local-model response and requiring persisted UI restoration.
-- [ ] Certify multi-turn history, cancellation, explicit tool-calling, and
-  empty-continuation fallback cases.
+- [x] Certify multi-turn history with a second prompt that does not include the
+  full marker and must recover it from the previous assistant message.
+- [ ] Certify cancellation, explicit tool-calling, and empty-continuation
+  fallback cases.
 - [ ] Add physical UI certification for skill activation chunks so a real
   skill activation is visible as its own ordered `ContentBlock::Skill` region,
   parallel to thinking and citation chunks.

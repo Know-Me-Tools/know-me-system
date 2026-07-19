@@ -108,9 +108,16 @@ while (( SECONDS < deadline )); do
   tap_matching_node "Latest" >/dev/null 2>&1 || true
   dump_ui || true
 
-  if rg -q "FATAL EXCEPTION|tools\\.knowme\\.knowme E AndroidRuntime|UnsatisfiedLinkError|libgen_ui_ffi.*dlopen failed|liblitertlm.*dlopen failed|JNI_OnLoad.*failed" "$LOG_PATH"; then
-    echo "RESTART FAIL: fatal or native-load failure found after relaunch" >&2
-    rg -n "FATAL EXCEPTION|tools\\.knowme\\.knowme E AndroidRuntime|UnsatisfiedLinkError|libgen_ui_ffi.*dlopen failed|liblitertlm.*dlopen failed|JNI_OnLoad.*failed" "$LOG_PATH" >&2
+  if [[ -z "$(adb shell pidof "$PACKAGE" | tr -d '\r' || true)" ]]; then
+    echo "RESTART FAIL: app process is not alive after relaunch" >&2
+    echo "logcat: $LOG_PATH" >&2
+    echo "ui xml: $UI_XML_PATH" >&2
+    exit 1
+  fi
+
+  if rg -q "tools\\.knowme\\.knowme E AndroidRuntime|UnsatisfiedLinkError|libgen_ui_ffi.*dlopen failed|liblitertlm.*dlopen failed|JNI_OnLoad.*failed" "$LOG_PATH"; then
+    echo "RESTART FAIL: KnowMe native-load failure found after relaunch" >&2
+    rg -n "tools\\.knowme\\.knowme E AndroidRuntime|UnsatisfiedLinkError|libgen_ui_ffi.*dlopen failed|liblitertlm.*dlopen failed|JNI_OnLoad.*failed" "$LOG_PATH" >&2
     echo "logcat: $LOG_PATH" >&2
     echo "ui xml: $UI_XML_PATH" >&2
     exit 1

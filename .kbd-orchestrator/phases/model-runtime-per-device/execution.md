@@ -817,13 +817,60 @@ Physical-device evidence:
 - Relaunch logcat artifact: `/tmp/knowme-local-restart-recovery.log`.
 - Relaunch UIAutomator artifact: `/tmp/knowme-local-restart-recovery.xml`.
 
+## ANDROID MULTI-TURN HISTORY CHECKPOINT
+
+Date: 2026-07-19
+
+Implemented:
+
+- Added `scripts/android/certify-local-multiturn-history.sh`.
+- The script delegates to the physical prompt gate to seed a real LiteRT-LM
+  response with a marker, then submits a second prompt that does not include
+  the full marker and requires the model/UI to recover it from the immediately
+  previous assistant message.
+- Tightened Android certification harness failure detection: `uiautomator dump`
+  can crash with `UiAutomationService already registered` on this Samsung when
+  dumps are invoked rapidly. The cert scripts now fail on a missing KnowMe
+  process or KnowMe/native-load failures instead of treating arbitrary
+  `uiautomator` `FATAL EXCEPTION` records as app crashes.
+- Added local-run context diagnostics that log history count, roles, and text
+  lengths before context assembly. The passing multi-turn run showed history
+  reached Rust; no message text is logged.
+
+Verification:
+
+- `bash -n scripts/android/certify-local-model-prompt.sh`
+- `bash -n scripts/android/certify-local-restart-recovery.sh`
+- `bash -n scripts/android/certify-local-multiturn-history.sh`
+- `cargo check --manifest-path rust/Cargo.toml -p gen_ui_agent`
+- `cd mobile && flutter build apk --debug --target-platform android-arm64`
+- `scripts/android/verify-native-inference-gates.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
+- `TIMEOUT_SECONDS=300 scripts/android/certify-local-multiturn-history.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
+
+Physical-device evidence:
+
+- Device: Samsung `SM S936U`, serial `R5GYB4AZD7A`, Android 16/API 36.
+- Seed prompt: `Reply exactly KMMULTI051210.`
+- Seed output: `G5 PASS: LiteRT-LM generation started`,
+  `G6 PASS: LiteRT-LM produced text`, and
+  `G6 PASS: expected visible UI text found: KMMULTI051210`.
+- Second prompt: `Read the immediately previous assistant message It contains
+  one all caps codeword beginning with KMMULTI Reply with exactly that codeword
+  then HISTORYOK Do not explain`.
+- Second output: `MULTITURN PASS: second turn recovered prior marker from chat
+  history`.
+- Logcat artifact: `/tmp/knowme-local-multiturn-history.log`.
+- UIAutomator artifact: `/tmp/knowme-local-multiturn-history.xml`.
+- Seed logcat artifact: `/tmp/knowme-local-multiturn-seed.log`.
+- Seed UIAutomator artifact: `/tmp/knowme-local-multiturn-seed.xml`.
+
 Remaining:
 
-- Add separate wrappers for multi-turn history, cancellation, explicit
-  tool-calling suites, and skill activation UI proof. Skill activations already
-  map to `ContentBlock::Skill`; the remaining gate is physical evidence that a
-  real activation renders and persists as its own ordered block beside thinking
-  and citation chunks.
+- Add separate wrappers for cancellation, explicit tool-calling suites, and
+  skill activation UI proof. Skill activations already map to
+  `ContentBlock::Skill`; the remaining gate is physical evidence that a real
+  activation renders and persists as its own ordered block beside thinking and
+  citation chunks.
 
 ## BLOCKERS
 

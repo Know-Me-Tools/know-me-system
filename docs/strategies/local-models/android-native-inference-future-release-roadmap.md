@@ -30,11 +30,15 @@ vendor library dependency.
 - Use `scripts/android/certify-local-restart-recovery.sh` to prove a generated
   local-model response survives force-stop/relaunch and is restored as visible
   UI state.
+- Use `scripts/android/certify-local-multiturn-history.sh` to prove the local
+  context path includes previous turns: the second prompt intentionally omits
+  the full marker and must recover it from the immediately previous assistant
+  message.
 - Add richer physical model-certification wrappers for tool calling,
-  cancellation, multi-turn history, skill activation UI proof, and
-  empty-continuation fallback coverage. The current wrappers prove launch,
-  single-turn prompt quality, and restart recovery; they are not the full local
-  agent certification suite.
+  cancellation, skill activation UI proof, and empty-continuation fallback
+  coverage. The current wrappers prove launch, single-turn prompt quality,
+  restart recovery, and multi-turn history; they are not the full local agent
+  certification suite.
 - Store device identity, Android API level, ABI, SoC, backend, model artifact,
   load time, first-token latency, throughput, memory pressure, and thermal state
   in a fleet capability record.
@@ -87,10 +91,10 @@ vendor library dependency.
 ## Release R+4 — Richer local-agent certification
 
 - Expand prompt certification beyond the embedded diagnostics MCP tool:
-  multi-turn memory, cancellation, explicit tool-calling suites, skill
-  activation UI proof, and empty-continuation fallback behavior. Office/personal
-  task following, Mermaid, code, constrained JSON, and restart recovery now have
-  physical Android wrapper evidence.
+  cancellation, explicit tool-calling suites, skill activation UI proof, and
+  empty-continuation fallback behavior. Office/personal task following,
+  Mermaid, code, constrained JSON, restart recovery, and multi-turn history now
+  have physical Android wrapper evidence.
 - Certify the confirmation UX/policy for mutating, destructive, and open-world
   tools beyond the embedded diagnostic tool. The baseline physical proof now
   exists for a read-only/open-world diagnostic: approval executes only a
