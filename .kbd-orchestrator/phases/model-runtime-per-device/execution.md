@@ -355,6 +355,21 @@ Verification:
   - `LiteRT-LM tool-result continuation starting tool_results=1`;
   - `LiteRT-LM generation produced text chars=9 tool_calls=0 context="tool_result"`.
 
+## FUTURE RELEASE ROADMAP CHECKPOINT
+
+Date: 2026-07-19
+
+Documented:
+
+- Added
+  `docs/strategies/local-models/android-native-inference-future-release-roadmap.md`.
+- Captured the Android six-gate postmortem's durable process changes: automatic
+  device-side proof, AgentSkills routing, fleet certification records, and
+  richer local-agent prompt certification.
+- Preserved the current LiteRT-LM-first direction. Vulkan/OpenCL remain explicit
+  non-goals for the Android production baseline and may only return later as
+  quarantined optimization experiments behind physical proof gates.
+
 Remaining for `litertlm-local-tools`:
 
 - Add user confirmation UX/policy for mutating, destructive, or open-world
