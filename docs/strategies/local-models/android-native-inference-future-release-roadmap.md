@@ -27,9 +27,13 @@ vendor library dependency.
   UI-driven gate. The suite is intentionally case-selectable so long-running
   model checks can be certified incrementally while still using one automation
   path.
+- Use `scripts/android/certify-local-restart-recovery.sh` to prove a generated
+  local-model response survives force-stop/relaunch and is restored as visible
+  UI state.
 - Add richer physical model-certification wrappers for tool calling,
-  cancellation, restart recovery, and prompt-suite coverage. The current prompt
-  wrapper proves one UI→Rust→LiteRT-LM→ContentBlock path, not the full local
+  cancellation, multi-turn history, skill activation UI proof, and
+  empty-continuation fallback coverage. The current wrappers prove launch,
+  single-turn prompt quality, and restart recovery; they are not the full local
   agent certification suite.
 - Store device identity, Android API level, ABI, SoC, backend, model artifact,
   load time, first-token latency, throughput, memory pressure, and thermal state
@@ -83,8 +87,10 @@ vendor library dependency.
 ## Release R+4 — Richer local-agent certification
 
 - Expand prompt certification beyond the embedded diagnostics MCP tool:
-  office/personal task following, Mermaid, code, constrained JSON, multi-turn
-  memory, cancellation, recovery after restart, and multiple safe tool calls.
+  multi-turn memory, cancellation, explicit tool-calling suites, skill
+  activation UI proof, and empty-continuation fallback behavior. Office/personal
+  task following, Mermaid, code, constrained JSON, and restart recovery now have
+  physical Android wrapper evidence.
 - Certify the confirmation UX/policy for mutating, destructive, and open-world
   tools beyond the embedded diagnostic tool. The baseline physical proof now
   exists for a read-only/open-world diagnostic: approval executes only a

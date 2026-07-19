@@ -743,6 +743,7 @@ Verification:
 - `bash -n scripts/android/certify-local-prompt-suite.sh`
 - `CASES=exact TIMEOUT_SECONDS=300 scripts/android/certify-local-prompt-suite.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
 - `CASES=mermaid TIMEOUT_SECONDS=300 scripts/android/certify-local-prompt-suite.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
+- `CASES=office,code,json TIMEOUT_SECONDS=300 scripts/android/certify-local-prompt-suite.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
 
 Physical-device evidence:
 
@@ -761,15 +762,68 @@ Physical-device evidence:
     `G6 PASS: expected visible UI text found: Mermaid diagram`.
   - Logcat artifact: `/tmp/knowme-local-model-certification-mermaid.log`.
   - UIAutomator artifact: `/tmp/knowme-local-model-certification-mermaid.xml`.
+- Office case:
+  - Prompt: `Write three agenda bullets for a project sync and include marker
+    KMOFFICE044503.`
+  - Output: `G5 PASS: LiteRT-LM generation started`,
+    `G6 PASS: LiteRT-LM produced text`, and
+    `G6 PASS: expected visible UI text found: KMOFFICE044503|agenda`.
+  - Logcat artifact: `/tmp/knowme-local-model-certification-office.log`.
+  - UIAutomator artifact: `/tmp/knowme-local-model-certification-office.xml`.
+- Code case:
+  - Prompt: `Write a Dart function called greet and include marker
+    KMCODE044503 in a comment.`
+  - Output: `G5 PASS: LiteRT-LM generation started`,
+    `G6 PASS: LiteRT-LM produced text`, and
+    `G6 PASS: expected visible UI text found: KMCODE044503|greet`.
+  - Logcat artifact: `/tmp/knowme-local-model-certification-code.log`.
+  - UIAutomator artifact: `/tmp/knowme-local-model-certification-code.xml`.
+- JSON case:
+  - Prompt: `Return JSON with fields status and marker. Include marker
+    KMJSON044503.`
+  - Output: `G5 PASS: LiteRT-LM generation started`,
+    `G6 PASS: LiteRT-LM produced text`, and
+    `G6 PASS: expected visible UI text found: KMJSON044503|status`.
+  - Logcat artifact: `/tmp/knowme-local-model-certification-json.log`.
+  - UIAutomator artifact: `/tmp/knowme-local-model-certification-json.xml`.
+
+## ANDROID RESTART RECOVERY CHECKPOINT
+
+Date: 2026-07-19
+
+Implemented:
+
+- Added `scripts/android/certify-local-restart-recovery.sh`.
+- The script first delegates to the physical prompt gate to create a real
+  LiteRT-LM response, then force-stops the app, relaunches it, and requires the
+  generated marker to be visible from restored UI state.
+
+Verification:
+
+- `bash -n scripts/android/certify-local-restart-recovery.sh`
+- `TIMEOUT_SECONDS=300 scripts/android/certify-local-restart-recovery.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
+
+Physical-device evidence:
+
+- Device: Samsung `SM S936U`, serial `R5GYB4AZD7A`, Android 16/API 36.
+- Seed prompt: `Reply exactly KMRESTART045015.`
+- Seed output: `G5 PASS: LiteRT-LM generation started`,
+  `G6 PASS: LiteRT-LM produced text`, and
+  `G6 PASS: expected visible UI text found: KMRESTART045015`.
+- Relaunch output: `RESTART PASS: app relaunched and persisted marker is
+  visible: KMRESTART045015`.
+- Seed logcat artifact: `/tmp/knowme-local-restart-seed.log`.
+- Seed UIAutomator artifact: `/tmp/knowme-local-restart-seed.xml`.
+- Relaunch logcat artifact: `/tmp/knowme-local-restart-recovery.log`.
+- Relaunch UIAutomator artifact: `/tmp/knowme-local-restart-recovery.xml`.
 
 Remaining:
 
-- Run and tune the `office`, `code`, and `json` cases.
-- Add separate wrappers for multi-turn history, cancellation, restart recovery,
-  explicit tool-calling suites, and skill activation UI proof. Skill
-  activations already map to `ContentBlock::Skill`; the remaining gate is
-  physical evidence that a real activation renders and persists as its own
-  ordered block beside thinking and citation chunks.
+- Add separate wrappers for multi-turn history, cancellation, explicit
+  tool-calling suites, and skill activation UI proof. Skill activations already
+  map to `ContentBlock::Skill`; the remaining gate is physical evidence that a
+  real activation renders and persists as its own ordered block beside thinking
+  and citation chunks.
 
 ## BLOCKERS
 

@@ -133,12 +133,23 @@ attached Samsung `SM S936U` running Android 16/API 36:
   `scripts/android/certify-local-prompt-suite.sh`. The `exact` case physically
   passed with `KMEXACT043202`, and the `mermaid` case physically passed by
   rendering a visible Mermaid diagram for a fully specified Start-to-End graph.
+- The same wrapper also physically passed the `office`, `code`, and `json`
+  cases on the attached Samsung. Those runs proved visible UI evidence for a
+  three-bullet project-sync agenda with marker `KMOFFICE044503`, a Dart `greet`
+  function with marker `KMCODE044503`, and constrained JSON containing `status`
+  with marker `KMJSON044503`.
+- Restart recovery now has a physical gate:
+  `scripts/android/certify-local-restart-recovery.sh` seeds a local-model
+  response, force-stops the app, relaunches it, and requires the marker to
+  reappear from restored UI state. It passed on the attached Samsung with
+  marker `KMRESTART045015`.
 
 This proves the CPU smoke lane and code-level tool-call candidate preservation.
 It also proves one complete safe local tool loop and one explicit
 approval-required local tool loop on a physical Android device. True
-token-level streaming callbacks, cancellation certification, the remaining
-office/code/JSON prompt-suite cases, empty-continuation fallback certification,
+token-level streaming callbacks, multi-turn history certification,
+cancellation certification, explicit tool-calling suite coverage,
+empty-continuation fallback certification, skill-activation UI proof,
 stale-card cleanup affordances, and broader device coverage remain future
 gates.
 
@@ -239,8 +250,12 @@ gates.
   Flutter → Rust FFI → LiteRT-LM → normalized `ContentBlock` rendering.
 - [x] Add a repeatable physical prompt-suite wrapper.
 - [x] Certify the Mermaid prompt-suite case on the attached Samsung.
-- [ ] Certify office/personal task, code, constrained JSON, multi-turn history,
-  cancellation, and restart-recovery cases.
+- [x] Certify office/personal task, code, and constrained JSON prompt-suite
+  cases on the attached Samsung.
+- [x] Certify restart recovery by force-stopping/relaunching the app after a
+  generated local-model response and requiring persisted UI restoration.
+- [ ] Certify multi-turn history, cancellation, explicit tool-calling, and
+  empty-continuation fallback cases.
 - [ ] Add physical UI certification for skill activation chunks so a real
   skill activation is visible as its own ordered `ContentBlock::Skill` region,
   parallel to thinking and citation chunks.
