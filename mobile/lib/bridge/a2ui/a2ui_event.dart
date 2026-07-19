@@ -84,10 +84,12 @@ class ChatRunError {
     this.diagnostics,
   });
 
+  String get displayMessage => sanitizeRunErrorMessage(message);
+
   factory ChatRunError.fromJson(Map<String, dynamic> json) => ChatRunError(
     code: json['code'] as String,
     phase: json['phase'] as String,
-    message: json['message'] as String,
+    message: sanitizeRunErrorMessage(json['message'] as String),
     retryable: json['retryable'] as bool,
     diagnostics: json['diagnostics'] as String?,
   );
@@ -99,6 +101,15 @@ class ChatRunError {
     'retryable': retryable,
     if (diagnostics != null) 'diagnostics': diagnostics,
   };
+}
+
+String sanitizeRunErrorMessage(String message) {
+  final trimmed = message.trim();
+  if (trimmed == "Instance of 'CoreErrorImpl'" ||
+      trimmed == 'Instance of CoreErrorImpl') {
+    return 'The local operation failed before details could be decoded. If this was a tool approval, the approval may have expired after app restart or reinstall. Retry the prompt to create a fresh approval request.';
+  }
+  return message;
 }
 
 class RunError extends A2uiEvent {

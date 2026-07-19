@@ -94,6 +94,15 @@ attached Samsung `SM S936U` running Android 16/API 36:
   approval ID, the UI rendered the resulting `ToolUse` and `ToolResult` blocks,
   and expanded details contained `Approved diagnostic echo`,
   `approved_pending_tool_call`, and the approved phrase.
+- Expired or stale approval recovery is now explicit. If a persisted approval
+  card survives a process restart/reinstall but its host-owned pending call is
+  gone, approval returns a run ID and publishes a typed
+  `tool_approval_not_found` error instead of leaking an opaque FRB
+  `CoreErrorImpl` object into chat.
+- Android's LiteRT-LM tool-result continuation now has a bounded fallback: the
+  bridge sends the normal `Message.tool(...)` continuation first and only sends
+  one host-managed follow-up instruction when that continuation is empty and has
+  no additional tool calls.
 - The core stream contract now has a typed `SkillActivation` event that maps to
   the existing `ContentBlock::Skill` block. Skill activation chunks must be
   surfaced and persisted alongside thinking, citation, tool, memory, lifecycle,
@@ -163,6 +172,11 @@ broader device coverage remain future gates.
 - [x] Certify one physical-device approval-required local tool flow where the
   visible Flutter policy card executes only the host-stored pending call by
   approval ID and renders the resulting tool-use/tool-result blocks.
+- [x] Convert expired/stale approval IDs into typed persisted run errors instead
+  of pre-subscription FFI failures or opaque `CoreErrorImpl` UI bubbles.
+- [ ] Certify a clean active approval-required tool flow where LiteRT-LM's
+  post-tool continuation produces a useful final assistant answer, including
+  the bounded empty-continuation fallback path.
 - Persist tool-call and tool-result events with the same AG-UI/A2UI content-block
   contract used by other providers.
 - Persist skill activation events with the same AG-UI/A2UI content-block

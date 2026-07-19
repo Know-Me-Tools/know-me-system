@@ -502,10 +502,31 @@ pub async fn send_interaction(
 /// not route through `send_interaction`: approval is a privileged host action,
 /// not model-visible prose that could be spoofed by arbitrary UI JSON.
 pub async fn approve_tool_confirmation(approval_id: String) -> Result<String, AgentError> {
-    let pending = state::take_pending_tool_confirmation(&approval_id)?;
+    let run_id = uuid::Uuid::new_v4().to_string();
+    let pending = match state::take_pending_tool_confirmation(&approval_id) {
+        Ok(pending) => pending,
+        Err(error) => {
+            let run_id_for_task = run_id.clone();
+            gen_ui_runtime::spawn(async move {
+                let mut adapter = A2uiAdapter::new(run_id_for_task.clone());
+                for event in adapter.ingest(&StreamEvent::MessageStart) {
+                    state::publish(event);
+                }
+                publish_run_error(
+                    &run_id_for_task,
+                    "tool_approval_not_found",
+                    RunPhase::ToolExecution,
+                    format!(
+                        "This tool approval is no longer active. Retry the prompt to create a fresh approval request. Details: {error}"
+                    ),
+                    false,
+                );
+            });
+            return Ok(run_id);
+        }
+    };
     let engine = state::inference()?.clone();
     let registry = state::mcp()?.clone();
-    let run_id = uuid::Uuid::new_v4().to_string();
     let run_id_for_task = run_id.clone();
     let active_run = ActiveRun::new(&run_id);
 
@@ -1822,6 +1843,102 @@ async fn run_stream(
 #[cfg(test)]
 mod attachment_tests {
     use super::*;
+    use std::sync::Arc;
+
+    use async_trait::async_trait;
+    use gen_ui_db::relational::{
+        ConfigStore, ModelPref, Provider, RelationalError, RelationalResult,
+    };
+    use gen_ui_db_graph::{
+        Embedder, EmbeddingModelInfo, GraphError, GraphStore, GraphStoreConfig, EMBED_DIM,
+    };
+
+    struct ZeroEmbedder;
+    impl Embedder for ZeroEmbedder {
+        fn model_info(&self) -> EmbeddingModelInfo {
+            EmbeddingModelInfo {
+                name: "zero-fake".into(),
+                dim: EMBED_DIM,
+            }
+        }
+
+        fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>, GraphError> {
+            Ok(texts.iter().map(|_| vec![0.0; EMBED_DIM]).collect())
+        }
+    }
+
+    struct EmptyConfigStore;
+
+    #[async_trait]
+    impl ConfigStore for EmptyConfigStore {
+        async fn list_providers(&self) -> RelationalResult<Vec<Provider>> {
+            Ok(vec![])
+        }
+
+        async fn upsert_provider(&self, _: &Provider) -> RelationalResult<()> {
+            Err(RelationalError::Sync("read-only test store".into()))
+        }
+
+        async fn delete_provider(&self, _: &str) -> RelationalResult<()> {
+            Err(RelationalError::Sync("read-only test store".into()))
+        }
+
+        async fn get_model_pref(&self, _: &str, _: &str) -> RelationalResult<Option<ModelPref>> {
+            Ok(None)
+        }
+
+        async fn upsert_model_pref(&self, _: &ModelPref) -> RelationalResult<()> {
+            Err(RelationalError::Sync("read-only test store".into()))
+        }
+
+        async fn get_setting(&self, _: &str) -> RelationalResult<Option<serde_json::Value>> {
+            Ok(None)
+        }
+
+        async fn set_setting(&self, _: &str, _: serde_json::Value) -> RelationalResult<()> {
+            Err(RelationalError::Sync("read-only test store".into()))
+        }
+    }
+
+    async fn init_agent_state_for_tests(database: &str) {
+        gen_ui_runtime::init(Some(2));
+        let memory = Arc::new(
+            GraphStore::open(GraphStoreConfig {
+                endpoint: "memory".to_string(),
+                namespace: "test".to_string(),
+                database: database.to_string(),
+                embedder: Arc::new(ZeroEmbedder),
+            })
+            .await
+            .expect("ephemeral graph store opens"),
+        );
+        state::init(
+            crate::ConfigBackend::Postgres(Arc::new(EmptyConfigStore)),
+            memory,
+        );
+    }
+
+    #[tokio::test]
+    async fn expired_tool_approval_publishes_typed_run_error() {
+        init_agent_state_for_tests("expired_tool_approval").await;
+
+        let run_id = approve_tool_confirmation("missing-approval".into())
+            .await
+            .expect("expired approval still returns a run id");
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        let (backlog, _) = state::subscribe_run(&run_id).expect("run subscription");
+
+        assert!(backlog
+            .iter()
+            .any(|event| matches!(event, A2uiEvent::RunStarted { run_id: id } if id == &run_id)));
+        assert!(backlog.iter().any(|event| matches!(
+            event,
+            A2uiEvent::RunError { run_id: id, error }
+                if id == &run_id
+                    && error.code == "tool_approval_not_found"
+                    && error.message.contains("Retry the prompt")
+        )));
+    }
 
     #[test]
     fn attachment_types_route_images_documents_and_video_safely() {

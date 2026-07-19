@@ -90,7 +90,16 @@ object KnowMeLiteRtLmBridge {
             error("tool result continuation requires at least one named tool result")
         }
         val response = activeConversation.sendMessage(Message.tool(Contents.of(responses)))
-        return messageToJson(response)
+        if (messageHasVisibleOutput(response)) {
+            return messageToJson(response)
+        }
+
+        val followUp = activeConversation.sendMessage(
+            "Use the tool result that was just provided to answer the user's original request. " +
+                "If the tool result reports an error, explain the error briefly. " +
+                "Do not call another tool unless it is required to answer."
+        )
+        return messageToJson(followUp, toolResultFallbackApplied = true)
     }
 
     @JvmStatic
@@ -180,7 +189,7 @@ object KnowMeLiteRtLmBridge {
         return null
     }
 
-    private fun messageToJson(message: Message): String {
+    private fun messageToJson(message: Message, toolResultFallbackApplied: Boolean = false): String {
         val result = JSONObject()
         result.put("role", message.role.value)
         result.put("text", message.contents.contents.joinToString(separator = "") { contentToText(it) })
@@ -192,9 +201,14 @@ object KnowMeLiteRtLmBridge {
             calls.put(item)
         }
         result.put("toolCalls", calls)
+        result.put("toolResultFallbackApplied", toolResultFallbackApplied)
         result.put("raw", message.toString())
         return result.toString()
     }
+
+    private fun messageHasVisibleOutput(message: Message): Boolean =
+        message.contents.contents.any { contentToText(it).isNotBlank() } ||
+            message.toolCalls.isNotEmpty()
 
     private fun contentToText(content: Content): String =
         when (content) {

@@ -177,7 +177,7 @@ class ChatNotifier extends _$ChatNotifier {
             message.copyWith(
               runStatus: 'error',
               runPhase: error.phase,
-              statusMessage: error.message,
+              statusMessage: error.displayMessage,
               error: error,
               isStreaming: false,
             )

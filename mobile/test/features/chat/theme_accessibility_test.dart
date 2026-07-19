@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gen_ui_widgets/gen_ui_widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
 
+import 'package:knowme_poc/bridge/a2ui/a2ui_event.dart';
 import 'package:knowme_poc/core/theme/tokens.dart';
 
 void main() {
@@ -51,6 +52,18 @@ void main() {
     expect(toolResult, isA<ToolResultBlock>());
     expect((toolResult as ToolResultBlock).toolUseId, 'litert-tool-0');
     expect(toolResult.isError, isTrue);
+  });
+
+  test('opaque Rust errors are sanitized for user-visible bubbles', () {
+    final error = ChatRunError.fromJson({
+      'code': 'tool_approval_start_failed',
+      'phase': 'tool_execution',
+      'message': "Instance of 'CoreErrorImpl'",
+      'retryable': false,
+    });
+
+    expect(error.message, isNot(contains('CoreErrorImpl')));
+    expect(error.displayMessage, contains('approval may have expired'));
   });
 
   testWidgets('rich block actions are labeled and at least 48 pixels', (

@@ -519,6 +519,57 @@ Remaining for `litertlm-local-tools`:
 - Polish long tool-name layout in Flutter cards; the certified physical UI
   wraps long names awkwardly on narrow screens.
 
+## TOOL CONTINUATION / EXPIRED APPROVAL ERROR CHECKPOINT
+
+Date: 2026-07-19
+
+Implemented:
+
+- Android LiteRT-LM still sends the official `Message.tool(...)` continuation
+  first. If that continuation returns neither text nor additional tool calls,
+  the Android bridge now sends one bounded host-managed follow-up instruction in
+  the same conversation asking the model to answer from the just-provided tool
+  result. This addresses the observed silent post-approval finish without
+  changing prompt ownership or allowing Flutter to assemble prompts.
+- Expired or stale tool approvals no longer fail across FFI before the UI can
+  subscribe. `approve_tool_confirmation` now returns a run ID and publishes a
+  typed `RunError` with code `tool_approval_not_found` when the approval ID is
+  no longer present in host state.
+- Flutter sanitizes opaque persisted FRB `CoreErrorImpl` messages into a
+  user-safe explanation that the local operation failed before details could be
+  decoded and, for tool approvals, the approval may have expired after restart
+  or reinstall.
+
+Verification:
+
+- `cargo test -p gen_ui_agent expired_tool_approval_publishes_typed_run_error -- --nocapture`
+- `cargo test -p gen_ui_agent local_tool -- --nocapture`
+- `cargo check -p gen_ui_agent -p gen_ui_ffi -p gen_ui_protocol -p gen_ui_types`
+- `flutter analyze lib ../flutter_packages/gen_ui_widgets/lib test/features/chat/theme_accessibility_test.dart`
+- `flutter test test/features/chat/theme_accessibility_test.dart`
+- `flutter build apk --debug --target-platform android-arm64`
+- `../scripts/android/verify-native-inference-gates.sh build/app/outputs/flutter-apk/app-debug.apk`
+
+Physical-device evidence:
+
+- Installed and launched the rebuilt APK on Samsung `SM S936U`.
+- Navigated to Chat and verified persisted opaque approval-start failures no
+  longer render `CoreErrorImpl`; the UI dump contained `approval may have
+  expired` and `Retry the prompt`.
+- Launch/logcat smoke showed no `FATAL EXCEPTION`,
+  `tools.knowme.knowme E AndroidRuntime`, `UnsatisfiedLinkError`, or
+  `dlopen failed`.
+
+Remaining for `litertlm-local-tools`:
+
+- Re-run a clean active approval-required prompt on physical Android and prove
+  the new post-tool fallback produces a final assistant answer when LiteRT-LM's
+  direct `Message.tool(...)` continuation is empty. The fallback is built and
+  build-verified, but the active-flow physical pass was blocked by stale
+  persisted approval cards from reinstall attempts.
+- Add a UI affordance to dismiss/repair stale persisted approval cards after
+  process restart so they cannot be mistaken for active approvals.
+
 ## BLOCKERS
 
 - NONE at dispatch time

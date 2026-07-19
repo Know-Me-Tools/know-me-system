@@ -834,9 +834,10 @@ class _RunErrorBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = KnowMePalette.of(context);
+    final message = error.displayMessage;
     return Semantics(
       liveRegion: true,
-      label: 'Error: ${error.message}',
+      label: 'Error: $message',
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
@@ -848,7 +849,7 @@ class _RunErrorBubble extends StatelessWidget {
           children: [
             Icon(Icons.error_outline, color: palette.destructive),
             const SizedBox(width: 10),
-            Expanded(child: Text(error.message)),
+            Expanded(child: Text(message)),
           ],
         ),
       ),
