@@ -42,6 +42,8 @@ pub struct AgentState {
     events: broadcast::Sender<A2uiEvent>,
     event_history: parking_lot::Mutex<std::collections::BTreeMap<String, Vec<A2uiEvent>>>,
     run_cancellations: parking_lot::Mutex<std::collections::BTreeMap<String, Arc<AtomicBool>>>,
+    #[cfg(not(any(target_os = "ios", target_os = "android")))]
+    uar_run_mappings: parking_lot::Mutex<std::collections::BTreeMap<String, UarRunMapping>>,
     pending_tool_confirmations:
         parking_lot::Mutex<std::collections::BTreeMap<String, PendingToolConfirmation>>,
 }
@@ -53,6 +55,13 @@ pub(crate) struct PendingToolConfirmation {
     pub tool_use_id: String,
     pub tool_name: String,
     pub arguments: JsonValue,
+}
+
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+#[derive(Debug, Clone)]
+pub(crate) struct UarRunMapping {
+    pub knowme_run_id: String,
+    pub uar_run_id: String,
 }
 
 static STATE: OnceCell<AgentState> = OnceCell::new();
@@ -94,6 +103,8 @@ pub fn init_with_inference(
         events: tx,
         event_history: parking_lot::Mutex::new(Default::default()),
         run_cancellations: parking_lot::Mutex::new(Default::default()),
+        #[cfg(not(any(target_os = "ios", target_os = "android")))]
+        uar_run_mappings: parking_lot::Mutex::new(Default::default()),
         pending_tool_confirmations: parking_lot::Mutex::new(Default::default()),
     };
     if STATE.set(state).is_err() {
@@ -175,7 +186,32 @@ pub fn cancel_run(run_id: &str) -> Result<bool, AgentError> {
 pub(crate) fn finish_run(run_id: &str) {
     if let Ok(state) = get() {
         state.run_cancellations.lock().remove(run_id);
+        #[cfg(not(any(target_os = "ios", target_os = "android")))]
+        state
+            .uar_run_mappings
+            .lock()
+            .retain(|_, mapping| mapping.knowme_run_id != run_id);
     }
+}
+
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+pub(crate) fn register_uar_run(conversation_id: &str, knowme_run_id: &str, uar_run_id: &str) {
+    if let Ok(state) = get() {
+        state.uar_run_mappings.lock().insert(
+            conversation_id.to_owned(),
+            UarRunMapping {
+                knowme_run_id: knowme_run_id.to_owned(),
+                uar_run_id: uar_run_id.to_owned(),
+            },
+        );
+    }
+}
+
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+pub(crate) fn uar_run_for_conversation(
+    conversation_id: &str,
+) -> Result<Option<UarRunMapping>, AgentError> {
+    Ok(get()?.uar_run_mappings.lock().get(conversation_id).cloned())
 }
 
 pub(crate) fn register_pending_tool_confirmation(pending: PendingToolConfirmation) {

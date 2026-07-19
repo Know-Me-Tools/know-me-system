@@ -66,6 +66,14 @@ pub struct UarRunRequest {
 }
 
 #[cfg(not(any(target_os = "ios", target_os = "android")))]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct UarArtifactResponse {
+    pub artifact_id: String,
+    pub response: serde_json::Value,
+}
+
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 pub struct UarProjectedRun {
     pub run_id: String,
     pub events: BoxStream<'static, Result<A2uiEvent, AgentError>>,
@@ -92,6 +100,12 @@ pub trait UarRuntimeFacade: Send + Sync {
     async fn start_run(&self, request: UarRunRequest) -> Result<UarProjectedRun, AgentError>;
     #[cfg(not(any(target_os = "ios", target_os = "android")))]
     async fn cancel_run(&self, run_id: &str) -> Result<bool, AgentError>;
+    #[cfg(not(any(target_os = "ios", target_os = "android")))]
+    async fn submit_artifact_response(
+        &self,
+        run_id: &str,
+        response: UarArtifactResponse,
+    ) -> Result<(), AgentError>;
 }
 
 #[cfg(not(any(target_os = "ios", target_os = "android")))]
@@ -153,6 +167,25 @@ impl UarRuntimeFacade for UarServiceRuntime {
             .cancel(run_id)
             .await
             .map(|response| response.cancelled)
+            .map_err(uar_sdk_error)
+    }
+
+    async fn submit_artifact_response(
+        &self,
+        run_id: &str,
+        response: UarArtifactResponse,
+    ) -> Result<(), AgentError> {
+        self.client
+            .runs()
+            .submit_artifact_response(
+                run_id,
+                universal_agent_runtime_sdk::ArtifactResponseRequest {
+                    artifact_id: response.artifact_id,
+                    response: response.response,
+                },
+            )
+            .await
+            .map(|_| ())
             .map_err(uar_sdk_error)
     }
 }

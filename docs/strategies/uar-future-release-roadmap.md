@@ -18,6 +18,9 @@ route to.
   A2UI/content blocks.
 - `gen_ui_agent::uar::UarServiceRuntime` can create a UAR run through the UAR
   HTTP SDK, consume its SSE stream, and project events into KnowMe A2UI blocks.
+- Desktop/web A2UI action responses can be submitted back to the active UAR run
+  through the same `/api/uar/runs/{run_id}/artifact-response` endpoint UAR's
+  own frontend uses.
 - Flutter FFI and the Tauri plugin expose read-only UAR runtime status.
 - Desktop/web can select the `uar` chat lane when a UAR service URL and compiled
   agent artifact are configured through the typed Tauri command surface.
@@ -40,6 +43,7 @@ configured desktop/web service lane without changing mobile local execution yet.
   - create run;
   - stream events;
   - cancel run;
+  - submit A2UI artifact responses;
   - project UAR events into KnowMe A2UI. **Done at Rust seam level.**
 - Provide typed desktop/web configuration for UAR service URL, keychain-backed
   API key, compiled agent artifact, and optional session id. **Done.**

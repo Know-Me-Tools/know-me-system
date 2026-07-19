@@ -52,6 +52,9 @@ records the **supersession of the Vulkan/OpenCL plan**: the production Android
 lane is **LiteRT-LM with Gemma 4 E2B, CPU as the universal correctness floor,
 optional device-specific acceleration only after physical proof**, with
 llama.cpp retained as an optional CPU/GGUF fallback and desktop/server lane.
+`docs/strategies/uar-future-release-roadmap.md` makes the same call a standing
+non-goal ("do not reintroduce Android llama.cpp/OpenCL/Vulkan as the default
+path"), so this is settled direction, not an open question.
 
 Consequence: UIX-001's backend-honesty copy (§6.7 backend chip, §8.1 backend
 row, §8.4 capability figures, §13.2 sampling display) names the llama.cpp

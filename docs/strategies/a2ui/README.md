@@ -67,8 +67,8 @@ component vocabulary *is* the sandbox.
 
 ### 3.1 Definition — one catalog of record, three producers
 
-Components and surfaces come from three producers: the **built-in catalog**
-(first-party vocabulary, base = UAR's `urn:uar:a2ui:catalog:1` at the pinned
+Components and surfaces come from three producers: the **UAR catalog**
+(first-party vocabulary, UAR-owned, base = `urn:uar:a2ui:catalog:1` at the pinned
 submodule version), **agent artifacts** (UAR-AGENT-MD §06 surface
 declarations), and **plugin `ui-library` cards** (plugins doc §4). One schema
 format governs all three: the UAR `ArtifactSchema` shape, extended with a
@@ -119,9 +119,11 @@ When a run wants to show a surface:
 4. **Interact** — user gestures produce typed `A2uiAction`s (Flutter: the
    existing `A2uiSurfaceView` callback) routed Riverpod → Repository → FFI →
    the paused run as its tool result (UAR's `routes.rs` ingestion in server
-   placements; the facade's equivalent when embedded). Local interaction stays
-   local: inputs echo and validate on-device; the bus sees semantic events
-   ("form submitted"), never keystrokes (plugins doc §4.2.3).
+   placements; KnowMe's service-mode facade now calls the same
+   `/api/uar/runs/{run_id}/artifact-response` seam; embedded mobile remains
+   the future in-process equivalent). Local interaction stays local: inputs
+   echo and validate on-device; the bus sees semantic events ("form
+   submitted"), never keystrokes (plugins doc §4.2.3).
 
 ### 3.4 Conformance — parity is a gate, not an intention
 
@@ -146,11 +148,12 @@ fallback rules, zero bespoke settings UI.
 ## 5. Completion plan (releases)
 
 - **A2UI-R1 — Registry + storage.** `a2ui_schema` SurrealDB table; KnowMe
-  registry module behind FFI with the two-class resolution; built-in catalog
-  load at boot; `schema_not_found` fallback panel (both renderers).
+  registry module behind FFI with the two-class resolution; catalog cache load
+  at boot; `schema_not_found` fallback panel (both renderers).
 - **A2UI-R2 — Selection + negotiation.** Vocabulary-version capability check
   per platform; labeled partial/fallback rendering; `A2uiAction` → run-resume
-  wired through the UAR facade (embedded) and `routes.rs` (server placements).
+  wired through the UAR service facade and `routes.rs` for server placements,
+  with embedded mobile as the remaining in-process lane.
 - **A2UI-R3 — Settings-form generator.** `schema` + `ui_hints` → A2UI form
   surfaces for plugin/agent/provider settings (consumes R1+R2).
 - **A2UI-R4 — Conformance gate.** Shared fixture set; Flutter goldens + React

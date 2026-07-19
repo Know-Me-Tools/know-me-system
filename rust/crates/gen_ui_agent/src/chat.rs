@@ -521,6 +521,15 @@ pub async fn send_interaction(
             "interaction payload must be a JSON object".into(),
         ));
     }
+    let lane = state::config()?
+        .get_setting(SETTING_ACTIVE_LANE)
+        .await?
+        .and_then(|value| value.as_str().map(str::to_owned))
+        .unwrap_or_else(default_lane);
+    if lane == LANE_UAR {
+        let run_id = uuid::Uuid::new_v4().to_string();
+        return submit_uar_interaction(run_id, conversation_id, value).await;
+    }
     send(
         format!(
             "The user submitted this structured client interaction. Continue the conversation and honor its surface/action context:\n{}",
@@ -531,6 +540,158 @@ pub async fn send_interaction(
         branch_id,
     )
     .await
+}
+
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+async fn submit_uar_interaction(
+    run_id: String,
+    conversation_id: String,
+    interaction: serde_json::Value,
+) -> Result<String, AgentError> {
+    let run_id_for_task = run_id.clone();
+    let active_run = ActiveRun::new(&run_id);
+    gen_ui_runtime::spawn(async move {
+        use crate::uar::UarRuntimeFacade;
+
+        let mut adapter = A2uiAdapter::new(run_id_for_task.clone());
+        for event in adapter.ingest(&StreamEvent::MessageStart) {
+            state::publish(event);
+        }
+        if active_run.cancelled() {
+            active_run.publish_cancelled(RunPhase::Queued);
+            return;
+        }
+
+        state::publish(A2uiEvent::RunPhaseChanged {
+            run_id: run_id_for_task.clone(),
+            phase: RunPhase::ToolExecution,
+            status: RunStatus::Preparing,
+            message: "Submitting A2UI response to Universal Agent Runtime".into(),
+        });
+
+        let response = match uar_artifact_response_from_interaction(&interaction) {
+            Some(response) => response,
+            None => {
+                publish_run_error(
+                    &run_id_for_task,
+                    "uar_interaction_not_a2ui_response",
+                    RunPhase::ToolExecution,
+                    "The UAR lane only accepts typed A2UI artifact responses through chat_action; no artifact id was present in the interaction payload.",
+                    false,
+                );
+                return;
+            }
+        };
+        let mapping = match state::uar_run_for_conversation(&conversation_id) {
+            Ok(Some(mapping)) => mapping,
+            Ok(None) => {
+                publish_run_error(
+                    &run_id_for_task,
+                    "uar_run_not_found",
+                    RunPhase::ToolExecution,
+                    "No active UAR run is registered for this conversation. Retry the prompt to create a fresh UAR run.",
+                    false,
+                );
+                return;
+            }
+            Err(error) => {
+                publish_run_error(
+                    &run_id_for_task,
+                    "uar_run_lookup_failed",
+                    RunPhase::ToolExecution,
+                    error.to_string(),
+                    true,
+                );
+                return;
+            }
+        };
+
+        let config = match load_uar_service_chat_config().await {
+            Ok(config) => config,
+            Err(error) => {
+                publish_run_error(
+                    &run_id_for_task,
+                    "uar_service_not_configured",
+                    RunPhase::ToolExecution,
+                    error.to_string(),
+                    true,
+                );
+                return;
+            }
+        };
+        let runtime = match crate::uar::UarServiceRuntime::new(&config.service_url, config.api_key)
+        {
+            Ok(runtime) => runtime,
+            Err(error) => {
+                publish_run_error(
+                    &run_id_for_task,
+                    "uar_service_client_failed",
+                    RunPhase::ToolExecution,
+                    error.to_string(),
+                    true,
+                );
+                return;
+            }
+        };
+        if active_run.cancelled() {
+            active_run.publish_cancelled(RunPhase::ToolExecution);
+            return;
+        }
+        match runtime
+            .submit_artifact_response(&mapping.uar_run_id, response.clone())
+            .await
+        {
+            Ok(()) => {
+                state::publish(A2uiEvent::ContextTelemetry {
+                    run_id: run_id_for_task.clone(),
+                    payload: serde_json::json!({
+                        "runtime": "universal-agent-runtime",
+                        "mode": "http_service",
+                        "uarRunId": mapping.uar_run_id,
+                        "sourceKnowmeRunId": mapping.knowme_run_id,
+                        "artifactId": response.artifact_id,
+                        "operation": "artifact_response_submitted",
+                    }),
+                });
+                for event in adapter.ingest(&StreamEvent::Done) {
+                    state::publish(event);
+                }
+            }
+            Err(error) => {
+                publish_run_error(
+                    &run_id_for_task,
+                    "uar_artifact_response_failed",
+                    RunPhase::ToolExecution,
+                    error.to_string(),
+                    true,
+                );
+            }
+        }
+    });
+    Ok(run_id)
+}
+
+#[cfg(any(target_os = "ios", target_os = "android"))]
+async fn submit_uar_interaction(
+    run_id: String,
+    _conversation_id: String,
+    _interaction: serde_json::Value,
+) -> Result<String, AgentError> {
+    let run_id_for_task = run_id.clone();
+    gen_ui_runtime::spawn(async move {
+        let mut adapter = A2uiAdapter::new(run_id_for_task.clone());
+        for event in adapter.ingest(&StreamEvent::MessageStart) {
+            state::publish(event);
+        }
+        publish_run_error(
+            &run_id_for_task,
+            "uar_embedded_mobile_not_wired",
+            RunPhase::ToolExecution,
+            "UAR mobile A2UI actions require embedded-library mode; local sidecars are not allowed.",
+            false,
+        );
+    });
+    Ok(run_id)
 }
 
 /// Execute a host-owned pending local tool confirmation and resume the active
@@ -1011,7 +1172,7 @@ async fn send_uar_service(
             .start_run(crate::uar::UarRunRequest {
                 artifact: config.artifact,
                 input: user_message,
-                session_id: config.session_id.or(Some(conversation_id)),
+                session_id: config.session_id.or(Some(conversation_id.clone())),
             })
             .await
         {
@@ -1037,6 +1198,7 @@ async fn send_uar_service(
             }),
         });
         let uar_run_id = projected.run_id.clone();
+        state::register_uar_run(&conversation_id, &run_id_for_task, &uar_run_id);
         let mut events = std::pin::pin!(projected.events);
         while let Some(event) = events.next().await {
             if active_run.cancelled() {
@@ -1178,6 +1340,67 @@ async fn artifact_from_string_or_path(value: &str) -> Result<serde_json::Value, 
         ));
     }
     Ok(artifact)
+}
+
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
+fn uar_artifact_response_from_interaction(
+    value: &serde_json::Value,
+) -> Option<crate::uar::UarArtifactResponse> {
+    if let Some(response) = value
+        .get("a2uiResponse")
+        .and_then(serde_json::Value::as_object)
+    {
+        let artifact_id = response
+            .get("artifactId")
+            .or_else(|| response.get("artifact_id"))
+            .and_then(serde_json::Value::as_str)?
+            .to_owned();
+        let response = response
+            .get("response")
+            .cloned()
+            .unwrap_or_else(|| serde_json::Value::Object(response.clone()));
+        return Some(crate::uar::UarArtifactResponse {
+            artifact_id,
+            response,
+        });
+    }
+
+    let action = value.get("action")?;
+    let artifact_id = value
+        .get("artifactId")
+        .or_else(|| value.get("artifact_id"))
+        .and_then(serde_json::Value::as_str)
+        .or_else(|| {
+            action
+                .get("artifactId")
+                .or_else(|| action.get("artifact_id"))
+                .and_then(serde_json::Value::as_str)
+        })
+        .or_else(|| {
+            action
+                .get("context")
+                .and_then(|context| {
+                    context
+                        .get("artifactId")
+                        .or_else(|| context.get("artifact_id"))
+                })
+                .and_then(serde_json::Value::as_str)
+        })
+        .or_else(|| {
+            action
+                .get("surfaceId")
+                .or_else(|| value.get("surfaceId"))
+                .and_then(serde_json::Value::as_str)
+        })?
+        .to_owned();
+
+    Some(crate::uar::UarArtifactResponse {
+        artifact_id,
+        response: serde_json::json!({
+            "action": action,
+            "a2uiClientDataModel": value.get("a2uiClientDataModel").cloned(),
+        }),
+    })
 }
 
 #[cfg(not(any(target_os = "ios", target_os = "android")))]
@@ -2494,6 +2717,47 @@ mod attachment_tests {
                 block: gen_ui_types::content_block::ContentBlock::Skill { name, status },
             } if run_id == "knowme-run" && name == "calendar" && status == "running"
         ));
+    }
+
+    #[cfg(not(any(target_os = "ios", target_os = "android")))]
+    #[test]
+    fn uar_a2ui_response_accepts_explicit_envelope() {
+        let response = uar_artifact_response_from_interaction(&serde_json::json!({
+            "a2uiResponse": {
+                "artifactId": "artifact-1",
+                "response": {"accepted": true}
+            }
+        }))
+        .expect("explicit UAR A2UI response envelope parses");
+
+        assert_eq!(response.artifact_id, "artifact-1");
+        assert_eq!(response.response["accepted"], true);
+    }
+
+    #[cfg(not(any(target_os = "ios", target_os = "android")))]
+    #[test]
+    fn uar_a2ui_response_accepts_flutter_action_envelope() {
+        let response = uar_artifact_response_from_interaction(&serde_json::json!({
+            "version": "v0.9",
+            "action": {
+                "surfaceId": "artifact-2",
+                "name": "submit",
+                "sourceComponentId": "button-1",
+                "context": {"form": "settings"}
+            },
+            "a2uiClientDataModel": {
+                "version": "v0.9",
+                "surfaces": {"artifact-2": {"choice": "yes"}}
+            }
+        }))
+        .expect("Flutter A2UI action envelope parses");
+
+        assert_eq!(response.artifact_id, "artifact-2");
+        assert_eq!(response.response["action"]["name"], "submit");
+        assert_eq!(
+            response.response["a2uiClientDataModel"]["surfaces"]["artifact-2"]["choice"],
+            "yes"
+        );
     }
 
     #[tokio::test]

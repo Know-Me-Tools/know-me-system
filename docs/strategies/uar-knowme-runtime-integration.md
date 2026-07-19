@@ -163,7 +163,9 @@ policy explicitly includes them.
 - Expose typed desktop/web service configuration and the non-default `uar` chat
   lane. **Done:** the Tauri command surface can save a UAR service URL,
   keychain-backed API key reference, compiled agent artifact, and optional
-  session id; `gen_ui_agent::chat` routes that lane through `UarServiceRuntime`.
+  session id; `gen_ui_agent::chat` routes that lane through `UarServiceRuntime`
+  and submits A2UI action responses back through UAR's artifact-response
+  endpoint.
 - Define event mapping tests from UAR stream payloads to KnowMe `ContentBlock`
   variants.
 - Keep the existing local LiteRT-LM path active while the facade is introduced.
