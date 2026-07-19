@@ -19,6 +19,11 @@ const _blocks = <ContentBlock>[
   MemoryBlock('read', 'favorite_color', 'ember'),
   ToolUseBlock('tool-1', 'memory_search', '{"query":"favorite color"}'),
   ToolResultBlock('tool-1', '{"matches":2}', false),
+  ToolResultBlock(
+    'tool-2',
+    '{"ok":false,"code":"local_tool_requires_confirmation","message":"The local model produced a valid tool-call candidate, but KnowMe did not execute it because the tool is not explicitly read-only, non-destructive, and closed-world.","tool":"files__delete","requiresConfirmation":true,"executionStatus":"not_executed","reasons":["tool_may_be_destructive"],"confirmation":{"status":"required","executionStatus":"not_executed","policy":"manual_confirmation_required_for_mutating_destructive_or_open_world_tools"}}',
+    true,
+  ),
   SkillBlock('memory-recall', 'completed'),
   ArtifactBlock('artifact-1', 'markdown', '# Generated note\nReady to save.'),
   ImageBlock(null, null, 'image/png'),

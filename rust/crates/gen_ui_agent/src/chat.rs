@@ -1172,6 +1172,16 @@ fn local_tool_policies(registry: &gen_ui_mcp::McpRegistry) -> BTreeMap<String, L
         for tool in server.cached_tools() {
             let name = crate::tools::qualify(&server_name, &tool.name);
             let annotations = tool.annotations.unwrap_or_default();
+            let mut confirmation_reasons = Vec::new();
+            if annotations.read_only_hint != Some(true) {
+                confirmation_reasons.push("tool_is_not_declared_read_only".to_string());
+            }
+            if annotations.destructive_hint != Some(false) {
+                confirmation_reasons.push("tool_may_be_destructive".to_string());
+            }
+            if annotations.open_world_hint != Some(false) {
+                confirmation_reasons.push("tool_uses_open_world_context".to_string());
+            }
             let auto_execute = trusted
                 && annotations.read_only_hint == Some(true)
                 && annotations.destructive_hint == Some(false)
@@ -1181,6 +1191,7 @@ fn local_tool_policies(registry: &gen_ui_mcp::McpRegistry) -> BTreeMap<String, L
                 LocalToolPolicy {
                     trusted_server: trusted,
                     auto_execute,
+                    confirmation_reasons,
                 },
             );
         }
@@ -1220,10 +1231,11 @@ struct LocalToolCallGate {
     repair_attempts: u8,
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Default)]
 struct LocalToolPolicy {
     trusted_server: bool,
     auto_execute: bool,
+    confirmation_reasons: Vec<String>,
 }
 
 impl LocalToolCallGate {
@@ -1272,7 +1284,7 @@ impl LocalToolCallGate {
         let result = match self.validate_call(&call) {
             Ok(arguments) => {
                 self.repair_attempts = 0;
-                let policy = self.policies.get(&call.name).copied().unwrap_or_default();
+                let policy = self.policies.get(&call.name).cloned().unwrap_or_default();
                 if !policy.trusted_server {
                     Err(serde_json::json!({
                         "ok": false,
@@ -1286,6 +1298,14 @@ impl LocalToolCallGate {
                         "code": "local_tool_requires_confirmation",
                         "message": "The local model produced a valid tool-call candidate, but KnowMe did not execute it because the tool is not explicitly read-only, non-destructive, and closed-world.",
                         "tool": call.name,
+                        "requiresConfirmation": true,
+                        "executionStatus": "not_executed",
+                        "reasons": policy.confirmation_reasons,
+                        "confirmation": {
+                            "status": "required",
+                            "executionStatus": "not_executed",
+                            "policy": "manual_confirmation_required_for_mutating_destructive_or_open_world_tools"
+                        }
                     }))
                 } else {
                     let (output_json, is_error) =
@@ -1695,6 +1715,7 @@ mod attachment_tests {
                 LocalToolPolicy {
                     trusted_server: false,
                     auto_execute: false,
+                    ..Default::default()
                 },
             )]),
         );
@@ -1858,6 +1879,7 @@ mod attachment_tests {
                 LocalToolPolicy {
                     trusted_server: true,
                     auto_execute: false,
+                    confirmation_reasons: vec!["tool_uses_open_world_context".into()],
                 },
             )]),
         );
@@ -1884,6 +1906,15 @@ mod attachment_tests {
                 let parsed: serde_json::Value =
                     serde_json::from_str(&output_json).expect("tool result is JSON");
                 assert_eq!(parsed["code"], "local_tool_requires_confirmation");
+                assert_eq!(parsed["requiresConfirmation"], true);
+                assert_eq!(parsed["executionStatus"], "not_executed");
+                assert_eq!(
+                    parsed["reasons"]
+                        .as_array()
+                        .expect("confirmation reasons")
+                        .as_slice(),
+                    [serde_json::json!("tool_uses_open_world_context")]
+                );
             }
             other => panic!("expected ToolResult, got {other:?}"),
         }
@@ -1946,6 +1977,7 @@ mod attachment_tests {
                 LocalToolPolicy {
                     trusted_server: true,
                     auto_execute: true,
+                    ..Default::default()
                 },
             )]),
         );
@@ -2013,6 +2045,7 @@ mod attachment_tests {
                 LocalToolPolicy {
                     trusted_server: true,
                     auto_execute: false,
+                    confirmation_reasons: vec!["tool_may_be_destructive".into()],
                 },
             )]),
         );
@@ -2030,6 +2063,15 @@ mod attachment_tests {
                 let parsed: serde_json::Value =
                     serde_json::from_str(&output_json).expect("tool result is JSON");
                 assert_eq!(parsed["code"], "local_tool_requires_confirmation");
+                assert_eq!(parsed["requiresConfirmation"], true);
+                assert_eq!(parsed["executionStatus"], "not_executed");
+                assert_eq!(
+                    parsed["reasons"]
+                        .as_array()
+                        .expect("confirmation reasons")
+                        .as_slice(),
+                    [serde_json::json!("tool_may_be_destructive")]
+                );
             }
             other => panic!("expected ToolResult, got {other:?}"),
         }

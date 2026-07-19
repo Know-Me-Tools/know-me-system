@@ -65,6 +65,37 @@ void main() {
     await expectLater(tester, meetsGuideline(textContrastGuideline));
     await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
   });
+
+  testWidgets(
+    'confirmation-required tool results render as explicit policy cards',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: shad.Theme(
+            data: KnowMeTheme.dark,
+            child: const Scaffold(
+              body: SizedBox(
+                width: 400,
+                child: ContentBlockView(
+                  block: ToolResultBlock(
+                    'tool-2',
+                    '{"ok":false,"code":"local_tool_requires_confirmation","message":"The local model produced a valid tool-call candidate, but KnowMe did not execute it because the tool is not explicitly read-only, non-destructive, and closed-world.","tool":"files__delete","requiresConfirmation":true,"executionStatus":"not_executed","reasons":["tool_may_be_destructive"],"confirmation":{"status":"required","executionStatus":"not_executed","policy":"manual_confirmation_required_for_mutating_destructive_or_open_world_tools"}}',
+                    true,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Approval required'), findsOneWidget);
+      expect(find.text('files__delete'), findsOneWidget);
+      expect(find.text('May be destructive'), findsOneWidget);
+      expect(find.textContaining('Status: not executed'), findsOneWidget);
+      expect(find.byTooltip('Copy tool policy'), findsOneWidget);
+    },
+  );
 }
 
 double _contrast(Color first, Color second) {

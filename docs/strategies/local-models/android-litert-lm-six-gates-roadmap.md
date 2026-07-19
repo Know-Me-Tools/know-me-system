@@ -139,11 +139,13 @@ remain future gates.
   mismatches, and observe corrected tool calls emitted during continuation.
 - [x] Certify one physical-device tool loop where LiteRT-LM chooses a safe local
   tool, receives the host result, and continues generation.
-- [ ] Enforce user confirmation policy for mutating, destructive, or open-world
-  tools before execution.
+- [x] Render mutating, destructive, or open-world tool candidates as explicit
+  approval-required/not-executed policy cards instead of raw JSON errors.
+- [ ] Add a secure pending-tool-call resume contract for user-approved execution
+  of mutating, destructive, or open-world tools.
 - Persist tool-call and tool-result events with the same AG-UI/A2UI content-block
   contract used by other providers.
-- Require explicit confirmation for mutating tools.
+- Require explicit confirmation before any mutating tool can execute.
 
 ### R4 — Device certification
 

@@ -103,6 +103,7 @@ class ContentBlockView extends StatelessWidget {
         toolUseId: toolUseId,
         outputJson: outputJson,
         isError: isError,
+        onInteraction: onInteraction,
       ),
     SkillBlock(:final name, :final status) => ContentBlockSkill(
       name: name,
@@ -355,22 +356,156 @@ class ContentBlockToolResult extends StatelessWidget {
     required this.toolUseId,
     required this.outputJson,
     required this.isError,
+    this.onInteraction,
     super.key,
   });
 
   final String toolUseId;
   final String outputJson;
   final bool isError;
+  final AgentInteractionCallback? onInteraction;
 
   @override
-  Widget build(BuildContext context) => _DisclosureBlock(
-    semanticLabel: isError ? 'Tool failed' : 'Tool completed',
-    icon: isError ? Icons.error_outline : Icons.check_circle_outline,
-    title: isError ? 'Tool failed' : 'Tool completed',
-    status: 'Call ${_shortId(toolUseId)}',
-    body: _prettyJson(outputJson),
-    isError: isError,
-  );
+  Widget build(BuildContext context) {
+    final parsed = _jsonMap(outputJson);
+    if (_isToolConfirmationRequired(parsed)) {
+      return _ToolConfirmationRequiredBlock(
+        toolUseId: toolUseId,
+        payload: parsed!,
+        outputJson: outputJson,
+        onInteraction: onInteraction,
+      );
+    }
+    return _DisclosureBlock(
+      semanticLabel: isError ? 'Tool failed' : 'Tool completed',
+      icon: isError ? Icons.error_outline : Icons.check_circle_outline,
+      title: isError ? 'Tool failed' : 'Tool completed',
+      status: 'Call ${_shortId(toolUseId)}',
+      body: _prettyJson(outputJson),
+      isError: isError,
+    );
+  }
+}
+
+class _ToolConfirmationRequiredBlock extends StatelessWidget {
+  const _ToolConfirmationRequiredBlock({
+    required this.toolUseId,
+    required this.payload,
+    required this.outputJson,
+    this.onInteraction,
+  });
+
+  final String toolUseId;
+  final Map<String, dynamic> payload;
+  final String outputJson;
+  final AgentInteractionCallback? onInteraction;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = shad.Theme.of(context).colorScheme;
+    final tool = payload['tool']?.toString() ?? 'unknown tool';
+    final reasons = _toolConfirmationReasons(payload);
+    final message =
+        payload['message']?.toString() ??
+        'This tool was not executed because it requires explicit approval.';
+    return _BlockSurface(
+      semanticLabel: 'Tool approval required for $tool',
+      background: colors.destructive.withValues(alpha: 0.10),
+      header: Row(
+        children: [
+          Icon(Icons.privacy_tip_outlined, size: 18, color: colors.destructive),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Approval required',
+                  style: TextStyle(
+                    color: colors.foreground,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  tool,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: colors.mutedForeground, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          _CopyButton(
+            value: _prettyJson(outputJson),
+            label: 'Copy tool policy',
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(message, style: TextStyle(color: colors.foreground)),
+            if (reasons.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final reason in reasons)
+                    _PolicyChip(label: _humanizePolicyReason(reason)),
+                ],
+              ),
+            ],
+            const SizedBox(height: 10),
+            Text(
+              'Status: not executed. A future approval flow must resume this exact tool call before it can run.',
+              style: TextStyle(color: colors.mutedForeground, fontSize: 12),
+            ),
+            if (onInteraction != null) ...[
+              const SizedBox(height: 10),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: shad.SecondaryButton(
+                  onPressed: () => onInteraction?.call({
+                    'kind': 'tool_confirmation_review',
+                    'toolUseId': toolUseId,
+                    'tool': tool,
+                    'approved': false,
+                    'reason': 'user_review_requested',
+                  }),
+                  child: const Text('Ask agent to revise'),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PolicyChip extends StatelessWidget {
+  const _PolicyChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = shad.Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: colors.secondary,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(color: colors.mutedForeground, fontSize: 12),
+      ),
+    );
+  }
 }
 
 class ContentBlockSkill extends StatelessWidget {
@@ -1525,6 +1660,28 @@ Map<String, dynamic>? _jsonMap(String value) {
     return null;
   }
 }
+
+bool _isToolConfirmationRequired(Map<String, dynamic>? payload) =>
+    payload != null &&
+    payload['code'] == 'local_tool_requires_confirmation' &&
+    payload['requiresConfirmation'] == true &&
+    payload['executionStatus'] == 'not_executed';
+
+List<String> _toolConfirmationReasons(Map<String, dynamic> payload) =>
+    switch (payload['reasons']) {
+      final List<dynamic> reasons => [
+        for (final reason in reasons)
+          if (reason != null) reason.toString(),
+      ],
+      _ => const [],
+    };
+
+String _humanizePolicyReason(String reason) => switch (reason) {
+  'tool_is_not_declared_read_only' => 'Not declared read-only',
+  'tool_may_be_destructive' => 'May be destructive',
+  'tool_uses_open_world_context' => 'Open-world access',
+  _ => reason.replaceAll('_', ' '),
+};
 
 String _mediaUrl(String content) {
   final json = _jsonMap(content);

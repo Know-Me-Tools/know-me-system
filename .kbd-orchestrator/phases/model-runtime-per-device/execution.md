@@ -370,10 +370,45 @@ Documented:
   non-goals for the Android production baseline and may only return later as
   quarantined optimization experiments behind physical proof gates.
 
+## TOOL CONFIRMATION VISIBILITY CHECKPOINT
+
+Date: 2026-07-19
+
+Implemented:
+
+- Local tool policy results now include stable confirmation metadata for
+  mutating, destructive, or open-world tool candidates:
+  `requiresConfirmation`, `executionStatus`, `reasons`, and a nested
+  `confirmation` policy object.
+- Confirmation-required tool calls remain not executed. They do not trigger
+  repair continuation and cannot be approved through ordinary model prose.
+- Flutter now renders `local_tool_requires_confirmation` `ToolResultBlock`
+  payloads as explicit approval-required/not-executed policy cards with
+  human-readable reason chips and a copy action.
+- The existing `submitInteraction` path is not used for approval execution,
+  because it starts a normal chat turn. A future secure pending-tool-call resume
+  contract is required before user-approved mutating/open-world execution can be
+  enabled.
+
+Verification:
+
+- `cargo test -p gen_ui_agent local_tool -- --nocapture`
+- `flutter analyze lib ../flutter_packages/gen_ui_widgets/lib test/features/chat/theme_accessibility_test.dart`
+- `flutter test test/features/chat/theme_accessibility_test.dart`
+- `cargo check -p gen_ui_agent -p gen_ui_ffi`
+- `cargo test -p gen_ui_types structured_messages_preserve_roles_and_tools`
+- `cargo test -p gen_ui_inference --features local-litert-lm`
+- `flutter build apk --debug --target-platform android-arm64`
+- `scripts/android/verify-native-inference-gates.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
+- Physical-device launch on `SM S936U`: installed the APK, launched
+  `tools.knowme.knowme`, observed `Loaded gen_ui_ffi through
+  System.loadLibrary`, `mobile diagnostics MCP tools registered
+  server=knowme_diagnostics`, and `mobile migrations ready`.
+
 Remaining for `litertlm-local-tools`:
 
-- Add user confirmation UX/policy for mutating, destructive, or open-world
-  tools.
+- Add secure pending-tool-call approval/resume execution for mutating,
+  destructive, or open-world tools.
 - Expand prompt certification beyond the deterministic diagnostics tool.
 
 ## BLOCKERS
