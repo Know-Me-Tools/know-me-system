@@ -12,9 +12,14 @@ vendor library dependency.
 
 - Keep `scripts/android/verify-native-inference-gates.sh` as the minimum static
   APK gate.
-- Add a physical-device wrapper that installs the APK, launches KnowMe, captures
-  logcat, runs the local model smoke prompt, and fails unless the expected
-  runtime log lines appear.
+- Use `scripts/android/verify-device-runtime-gates.sh` as the minimum physical
+  launch gate: install the APK, launch KnowMe, capture logcat, prove the app
+  process remains alive, prove `libgen_ui_ffi.so` loaded through
+  `System.loadLibrary`, and prove Rust reached the mobile migrations-ready
+  state.
+- Add a second physical model-certification wrapper that runs the local model
+  smoke prompt and fails unless the expected LiteRT-LM load/generation/tool
+  runtime log lines and UI-visible content blocks appear.
 - Store device identity, Android API level, ABI, SoC, backend, model artifact,
   load time, first-token latency, throughput, memory pressure, and thermal state
   in a fleet capability record.
@@ -23,6 +28,15 @@ vendor library dependency.
 - Keep the current static gate strict about vendor dependencies: startup-critical
   Android libraries may depend only on NDK/public platform libraries, not
   device-pulled OpenCL/Vulkan/GPU driver binaries.
+- Add an error-message-to-gate decoder to the verification output so failures
+  like `undefined symbol`, namespace access denial, `SIGTRAP` in
+  `__loader_dlopen`, missing `uses-native-library`, and zero backend platforms
+  point to the gate that actually failed.
+- Add an APK packaging check for current Play/Android native-library alignment
+  expectations, including 16 KB page-alignment compatibility where applicable.
+- Add a device probe that records public vendor-library availability from the
+  phone itself. The probe is evidence for optional accelerator experiments only;
+  it must never make a vendor library startup-critical.
 
 ## Release R+2 — AgentSkills/process hardening
 
@@ -35,6 +49,15 @@ vendor library dependency.
 - Keep the skills concise and put heavy references/scripts under progressive
   disclosure so agents execute verification instead of reconstructing the
   rules from memory.
+- The `android-native-inference` skill must include hard prohibitions from the
+  postmortem: do not add startup-critical `DT_NEEDED` entries for non-NDK vendor
+  libraries, do not bundle device-pulled GPU/OpenCL/Vulkan libraries, do not
+  hardcode `/vendor` or `/system/vendor` library paths, do not claim success
+  from a build, and always resolve the SoC/device variant before making
+  accelerator claims.
+- Put the six-gate taxonomy, Android loading-regime table, public-library
+  namespace notes, SONAME examples, manifest stanza, and error decoder under
+  `references/`; put install/launch/logcat/probe automation under `scripts/`.
 
 ## Release R+3 — Fleet certification
 

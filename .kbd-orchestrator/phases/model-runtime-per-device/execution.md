@@ -651,6 +651,39 @@ Remaining:
   trigger it because LiteRT-LM's direct `Message.tool(...)` continuation already
   produced final text.
 
+## ANDROID DEVICE RUNTIME GATE WRAPPER CHECKPOINT
+
+Date: 2026-07-19
+
+Implemented:
+
+- Added `scripts/android/verify-device-runtime-gates.sh` as the physical-device
+  counterpart to the existing static APK gate.
+- The script installs the APK on the attached Android device, clears logcat,
+  launches KnowMe, captures a bounded logcat file, verifies the app process is
+  still alive, verifies `libgen_ui_ffi.so` loaded through
+  `System.loadLibrary`, verifies Rust reached `mobile migrations ready`, and
+  fails on scoped fatal/native-load errors.
+- The script intentionally does not claim model prompt certification. G5/G6
+  LiteRT-LM load/generation/tool certification remains a separate physical
+  workflow layered on top of this launch gate.
+
+Verification:
+
+- `bash -n scripts/android/verify-device-runtime-gates.sh`
+- `scripts/android/verify-native-inference-gates.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
+- `scripts/android/verify-device-runtime-gates.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
+
+Physical-device evidence:
+
+- Device: Samsung `SM-S936U`, Android 16/API 36, ABI `arm64-v8a`, SoC `SM8750`.
+- Gate output:
+  - `G3 PASS: APK installed on attached Android device`
+  - `G4 PASS: app launched and process stayed alive pid=12814`
+  - `G4 PASS: libgen_ui_ffi loaded through System.loadLibrary`
+  - `G4 PASS: Rust mobile boot reached migrations-ready state`
+- Logcat artifact: `/tmp/knowme-device-runtime-gates.log`.
+
 ## BLOCKERS
 
 - NONE at dispatch time

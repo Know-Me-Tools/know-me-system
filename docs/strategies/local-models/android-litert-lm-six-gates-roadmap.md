@@ -24,6 +24,14 @@ Every Android native backend must therefore produce a gate report:
    startup dependencies.
 6. Backend self-test passes on the physical device.
 
+Static packaging checks start with
+`scripts/android/verify-native-inference-gates.sh`. Physical launch checks start
+with `scripts/android/verify-device-runtime-gates.sh`, which installs the APK,
+launches the app, captures logcat, proves the process stayed alive, proves
+`libgen_ui_ffi.so` loaded through `System.loadLibrary`, and proves Rust reached
+the mobile migrations-ready state. Model/prompt certification remains a separate
+physical workflow on top of that launch gate.
+
 The app may expose optional GPU/NPU acceleration only after gate 6 passes and
 benchmarks show a real user-visible win. If any optional acceleration gate fails,
 the app must fall back visibly to CPU.
@@ -274,6 +282,10 @@ fallback. They are not part of the production Android recovery baseline.
   Edge Gallery codebases. Use those references when validating API usage,
   message/tool continuation behavior, cancellation hooks, and Android lifecycle
   integration.
+- Android native-library failures must be decoded by gate, not chased by log
+  string alone: missing link directives, bundled vendor libraries, manifest
+  visibility, classloader namespace, symbol binding, and backend capability are
+  different failures and require different fixes.
 
 References:
 
