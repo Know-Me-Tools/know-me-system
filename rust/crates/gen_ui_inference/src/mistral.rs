@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use futures::stream::{BoxStream, StreamExt};
 use gen_ui_types::error::{CoreError, CoreResult};
 use gen_ui_types::events::StreamEvent;
-use gen_ui_types::inference::{InferenceProvider, LocalModelSpec, SampleParams};
+use gen_ui_types::inference::{InferenceProvider, InferenceRequest, InferenceRole, LocalModelSpec};
 use mistralrs::{
     ChatCompletionChunkResponse, ChunkChoice, Delta, GgufModelBuilder, Model, RequestBuilder,
     Response, TextMessageRole,
@@ -74,7 +74,6 @@ const CATALOG_QWEN_1_5B_FILE: &str = "qwen2.5-1.5b-instruct-q4_0.gguf";
 /// lane picks its own: 40 is the long-standing llama.cpp/HF default and is what
 /// Qwen2.5's own generation_config recommends. It exists mainly to displace
 /// mistral.rs's `top_k = 1` default — see the comment at the call site.
-const DEFAULT_TOP_K: usize = 40;
 
 /// mistral.rs-backed engine. `load` is idempotent per the trait contract: loading
 /// the spec that is already resident is a no-op rather than a re-download.
@@ -178,11 +177,15 @@ impl InferenceProvider for MistralEngine {
         Ok(())
     }
 
-    async fn generate(
+    async fn generate_request(
         &self,
-        prompt: &str,
-        params: &SampleParams,
+        input: &InferenceRequest,
     ) -> CoreResult<BoxStream<'static, StreamEvent>> {
+        if !input.images.is_empty() {
+            return Err(CoreError::Terminal(
+                "this mistral.rs backend is text-only".into(),
+            ));
+        }
         let model = {
             let guard = self.state.read().await;
             let loaded = guard.as_ref().ok_or_else(|| {
@@ -191,8 +194,18 @@ impl InferenceProvider for MistralEngine {
             Arc::clone(&loaded.model)
         };
 
-        let request = RequestBuilder::new()
-            .add_message(TextMessageRole::User, prompt)
+        let mut request = RequestBuilder::new();
+        for message in input.effective_messages() {
+            let role = match message.role {
+                InferenceRole::System => TextMessageRole::System,
+                InferenceRole::User => TextMessageRole::User,
+                InferenceRole::Assistant => TextMessageRole::Assistant,
+                InferenceRole::Tool => TextMessageRole::Tool,
+            };
+            request = request.add_message(role, message.content);
+        }
+        let params = &input.generation_settings;
+        let request = request
             .set_sampler_temperature(params.temperature as f64)
             .set_sampler_topp(params.top_p as f64)
             // MUST be set explicitly. RequestBuilder::new() starts from
@@ -202,7 +215,7 @@ impl InferenceProvider for MistralEngine {
             // 1.5B model degenerates into a repetition loop that echoes the
             // prompt back forever, and no temperature value changes it.
             // Verified against a real model: see tests/local_inference_live.rs.
-            .set_sampler_topk(DEFAULT_TOP_K)
+            .set_sampler_topk(params.top_k.max(1) as usize)
             .set_sampler_max_len(params.max_tokens as usize);
 
         // mistral.rs's `Stream<'a>` borrows the `Model` it came from, but the trait

@@ -72,7 +72,7 @@ builds.
 
 - Architecture: `docs/tj-arch-mob-001.html` (TJ-ARCH-MOB-001)
 - UI/UX: `docs/knowme-ui-ux-standard.md` + `docs/knowme-moodboard-user-journeys.html`
-- Versions: `versions.toml` (Rust 1.96 floor · Tauri 2.10 · React 19 · SurrealDB 3.x · FRB 2.12)
+- Versions: `versions.toml` (Rust 1.97.1 floor · Tauri CLI 2.11.4 · React 19.2.7 · SurrealDB 3.2.1 · FRB 2.13.0-beta.5)
 - Agent rules for working in this repo: `CLAUDE.md`, `AGENTS.md`, `AGENT_BASE_RULES.md`
 
 ---

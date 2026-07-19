@@ -4,6 +4,7 @@ members = [
     "crates/gen_ui_types",
     "crates/gen_ui_runtime",
     "crates/gen_ui_protocol",
+    "crates/gen_ui_context",
     "crates/gen_ui_document",
     "crates/gen_ui_client",
     "crates/gen_ui_mcp",
@@ -23,6 +24,10 @@ members = [
     "crates/knowme_plugin_host",
     "crates/workspace-hack",
 ]
+exclude = [
+    "vendor/universal-agent-runtime",
+    "vendor/universal-agent-runtime/sdks/rust",
+]
 
 [workspace.package]
 version = "0.1.0"
@@ -30,11 +35,10 @@ edition = "2021"
 # MSRV floor. 1.80 (the original TJ-ARCH-MOB-001 minimum) can no longer resolve the
 # current dependency graph — transitive crates (e.g. chacha20 ≥0.10) now require the
 # edition2024 Cargo feature, unparseable before Cargo 1.85. 1.93 is the realistic
-# mid-2026 floor. 1.93 can no longer build the SurrealDB 3.2 graph crate (C-004):
-# its transitive fastnum ≥0.7.5 requires rustc 1.94+, and the wasm target only
-# compiled cleanly on 1.96. Keep in sync with rust-toolchain.toml
-# and CLAUDE.md tool versions.
-rust-version = "1.96"
+# mid-2026 floor. Keep this on the latest stable Rust baseline and in sync with
+# rust-toolchain.toml and versions.toml; legacy compiler compatibility is not a
+# product constraint.
+rust-version = "1.97.1"
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
@@ -60,9 +64,11 @@ mime_guess        = "2.0"
 base64            = "0.22"
 scraper           = "0.27"
 json-patch        = "4.2"
+jsonschema        = { version = "0.48.1", default-features = false }
 reqwest           = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
 sha2              = "0.10"
 encoding_rs       = "0.8"
+jni               = "0.21"
 
 llama-cpp-2       = { version = "0.1.151", default-features = false }
 reqwest-eventsource = "0.6"
@@ -101,7 +107,7 @@ reqwest-eventsource = "0.6"
 # JWT decode (inspect exp/role/tenant_id from gate-minted tokens; no local verify —
 # gate/forge own verification via JWKS). validation disabled for pure claim reads.
 jsonwebtoken      = { version = "9", default-features = false }
-surrealdb         = { version = "3.2",  default-features = false }
+surrealdb         = { version = "3.2.1",  default-features = false }
 sqlx              = { version = "0.8",  default-features = false, features = ["runtime-tokio-rustls", "macros", "migrate"] }
 pglite-oxide       = { version = "0.5.1", default-features = false }
 refinery           = { version = "0.8", default-features = false }
@@ -110,7 +116,7 @@ candle-core       = "0.7"
 candle-nn         = "0.7"
 candle-transformers = "0.7"
 fastembed         = { version = "5", default-features = false, features = ["hf-hub-rustls-tls", "ort-download-binaries-rustls-tls", "image-models"] }
-flutter_rust_bridge = { version = "2.12", features = ["anyhow"] }
+flutter_rust_bridge = { version = "2.13.0-beta.5", features = ["anyhow"] }
 dashmap           = "6.1"
 parking_lot       = "0.12"
 once_cell         = "1.20"
@@ -135,7 +141,7 @@ liter-llm         = { git = "https://github.com/GQAdonis/liter-llm.git", rev = "
 # Optional mistral.rs desktop experiment; the reference app defaults to the
 # pinned llama.cpp/Qwen lane so first-run local chat stays reproducible.
 # User's fork, pinned by SHA (Rule 22/23). Workspace v0.8.3, its own MSRV is 1.88 —
-# clears our 1.96 floor. Metal + accelerate are the macOS acceleration features.
+# clears our 1.97.1 floor. Metal + accelerate are the macOS acceleration features.
 # Consumed ONLY by gen_ui_inference, target-gated to desktop: mistral.rs/candle have
 # no documented mobile deployment path (gen_ui_types::inference §rationale), and the
 # crate cannot build for wasm32 — mobile uses llama-cpp-2, web uses WebLLM.

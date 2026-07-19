@@ -18,10 +18,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.0.0"
+    "@tauri-apps/api": "^2.11.1"
   },
   "devDependencies": {
-    "typescript": "^7.0.0"
+    "typescript": "^7.0.2"
   },
   "publishConfig": {
     "access": "public",

@@ -12,18 +12,20 @@ part of 'notes_provider.dart';
 @ProviderFor(notesRepository)
 final notesRepositoryProvider = NotesRepositoryProvider._();
 
-final class NotesRepositoryProvider extends $FunctionalProvider<NotesRepository,
-    NotesRepository, NotesRepository> with $Provider<NotesRepository> {
+final class NotesRepositoryProvider
+    extends
+        $FunctionalProvider<NotesRepository, NotesRepository, NotesRepository>
+    with $Provider<NotesRepository> {
   NotesRepositoryProvider._()
-      : super(
-          from: null,
-          argument: null,
-          retry: null,
-          name: r'notesRepositoryProvider',
-          isAutoDispose: true,
-          dependencies: null,
-          $allTransitiveDependencies: null,
-        );
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'notesRepositoryProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
 
   @override
   String debugGetCreateSourceHash() => _$notesRepositoryHash();
@@ -52,19 +54,24 @@ String _$notesRepositoryHash() => r'f887a0613df4e8cdba766b932069bfb48f7aef15';
 @ProviderFor(notes)
 final notesProvider = NotesProvider._();
 
-final class NotesProvider extends $FunctionalProvider<AsyncValue<List<Note>>,
-        List<Note>, FutureOr<List<Note>>>
+final class NotesProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<Note>>,
+          List<Note>,
+          FutureOr<List<Note>>
+        >
     with $FutureModifier<List<Note>>, $FutureProvider<List<Note>> {
   NotesProvider._()
-      : super(
-          from: null,
-          argument: null,
-          retry: _noRetry,
-          name: r'notesProvider',
-          isAutoDispose: true,
-          dependencies: null,
-          $allTransitiveDependencies: null,
-        );
+    : super(
+        from: null,
+        argument: null,
+        retry: _noRetry,
+        name: r'notesProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
 
   @override
   String debugGetCreateSourceHash() => _$notesHash();
@@ -88,15 +95,15 @@ final notesActionsProvider = NotesActionsProvider._();
 final class NotesActionsProvider
     extends $AsyncNotifierProvider<NotesActions, void> {
   NotesActionsProvider._()
-      : super(
-          from: null,
-          argument: null,
-          retry: null,
-          name: r'notesActionsProvider',
-          isAutoDispose: true,
-          dependencies: null,
-          $allTransitiveDependencies: null,
-        );
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'notesActionsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
 
   @override
   String debugGetCreateSourceHash() => _$notesActionsHash();
@@ -112,13 +119,16 @@ abstract class _$NotesActions extends $AsyncNotifier<void> {
   FutureOr<void> build();
   @$mustCallSuper
   @override
-  WhenComplete runBuild() {
+  void runBuild() {
     final ref = this.ref as $Ref<AsyncValue<void>, void>;
-    final element = ref.element as $ClassProviderElement<
-        AnyNotifier<AsyncValue<void>, void>,
-        AsyncValue<void>,
-        Object?,
-        Object?>;
-    return element.handleCreate(ref, build);
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<AsyncValue<void>, void>,
+              AsyncValue<void>,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
   }
 }

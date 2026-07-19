@@ -82,11 +82,12 @@ abstract class CargoKitBuildTask extends DefaultTask {
             environment "CARGOKIT_OUTPUT_DIR", outputDir
             environment "CARGOKIT_NDK_VERSION", ndkVersion
             environment "CARGOKIT_SDK_DIR", sdkDirectory
-            // Native dependencies such as llama.cpp inspect the conventional
+            // Native dependencies may inspect the conventional
             // NDK variables directly instead of CargoKit's private variables.
             environment "ANDROID_NDK", ndkDirectory
             environment "ANDROID_NDK_ROOT", ndkDirectory
             environment "NDK_ROOT", ndkDirectory
+            environment "PYTHON3_EXECUTABLE", "python3"
             environment "CARGOKIT_COMPILE_SDK_VERSION", compileSdkVersion
             environment "CARGOKIT_MIN_SDK_VERSION", minSdkVersion
             environment "CARGOKIT_TARGET_PLATFORMS", targetPlatforms.join(",")
@@ -148,6 +149,10 @@ class CargoKitPlugin implements Plugin<Project> {
                 platforms = com.flutter.gradle.FlutterPluginUtils.getTargetPlatforms(project).collect()
             } catch (Exception ignored) {
                 platforms = plugin.getTargetPlatforms().collect()
+            }
+            platforms = platforms.findAll { it == "android-arm64" }
+            if (platforms.isEmpty()) {
+                platforms = ["android-arm64"]
             }
 
             // Unlike upstream cargokit/addFlutterDependencies, x86 emulator

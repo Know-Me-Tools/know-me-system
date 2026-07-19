@@ -70,7 +70,10 @@ Two provider kinds are KnowMe-specific and **auto-registered, never hand-configu
   created/removed with the instance itself. Its model list is served by the peer
   (the cyan `remote` rows in the moodboard). Health = OFP reachability.
 
-Cloud kinds route through liter-llm in UAR (FUNC-SPEC §10's 142+ providers) but are
+Cloud kinds route through liter-llm in UAR — the vendored submodule
+(`rust/vendor/universal-agent-runtime` v1.0.0) carries a 269-provider catalog as
+*discovery* data (a catalog entry is not execution certification; provider access
+stays capability- and health-gated) — but are
 *presented* as first-class providers with their own rows, keys, and health checks.
 Every provider row: status dot · label · base host · kind pill · "Check" button
 (connectivity + auth + a 1-token echo), matching the moodboard Providers tab.

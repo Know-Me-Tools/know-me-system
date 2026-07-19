@@ -104,9 +104,15 @@ A plugin declares any subset. A "full extension" in the old framing is just
 ## 4. A2UI — the one UI plane
 
 Plugins never ship React or Flutter code. UI is **A2UI components as data**: declared
-in the capability card, rendered by the existing gen_ui renderers (React on
-desktop/web, Flutter on mobile — the POC's `gen_ui` protocol crates and the AG-UI
-event stream are exactly this machinery). Wiring is declarative: a component binds to
+in the capability card, rendered by the shared renderers — Flutter via the official
+GenUI SDK (`gen_ui_widgets`' `A2uiSurfaceView`, Google A2UI v0.9), React via UAR's
+`a2ui-*` packages — over the UAR production profile `uar.a2ui/1` (Google A2UI
+v0.9.1, catalog `urn:uar:a2ui:catalog:1`). The transport underneath is the AG-UI
+event stream (`docs/strategies/ag-ui/README.md`); **AG-UI is the event vocabulary,
+A2UI the validated rendering contract** — the two are never the same channel.
+Component definition, registry, storage, selection, and renderer conformance are
+specified in **`docs/strategies/a2ui/README.md`**, which governs wherever this
+section sketches. Wiring is declarative: a component binds to
 the capability's **actions** (user gesture → A2A task) and **events** (task status →
 component state), so interactivity round-trips through the same audited bus as
 everything else. A2UI is the normalization story: **one component library per plugin,

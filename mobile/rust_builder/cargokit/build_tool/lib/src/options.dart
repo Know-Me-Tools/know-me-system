@@ -71,7 +71,7 @@ class CargoBuildOptions {
     if (node is! YamlMap) {
       throw SourceSpanException('Cargo options must be a map', node.span);
     }
-    String toolchain = '1.96';
+    String toolchain = '1.97.1';
     List<String> flags = [];
     for (final MapEntry(:key, :value) in node.nodes.entries) {
       if (key case YamlScalar(value: 'toolchain')) {

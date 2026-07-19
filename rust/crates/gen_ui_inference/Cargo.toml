@@ -13,10 +13,11 @@ license.workspace = true
 # llama-cpp-2 on mobile, WebLLM on web.
 default = []
 local-mistral = ["dep:mistralrs"]
-local-llama = ["dep:llama-cpp-2", "dep:reqwest", "dep:sha2", "dep:encoding_rs"]
+local-llama = ["dep:llama-cpp-2", "dep:reqwest", "dep:sha2", "dep:encoding_rs", "llama-cpp-2/llguidance"]
 local-llama-metal = ["local-llama", "llama-cpp-2/metal"]
-local-llama-vulkan = ["local-llama", "llama-cpp-2/vulkan"]
+local-llama-opencl = ["local-llama", "llama-cpp-2/opencl"]
 local-llama-mtmd = ["local-llama", "llama-cpp-2/mtmd", "llama-cpp-2/common"]
+local-litert-lm = ["dep:reqwest", "dep:sha2", "dep:encoding_rs"]
 
 [dependencies]
 gen_ui_types   = { path = "../gen_ui_types" }
@@ -25,6 +26,8 @@ async-trait.workspace = true
 anyhow.workspace = true
 futures.workspace = true
 tracing.workspace = true
+serde_json.workspace = true
+serde.workspace = true
 # `sync` for the RwLock guarding the loaded model + the mpsc channel that carries
 # generated tokens out of the spawned generation task.
 tokio = { workspace = true, features = ["sync", "fs", "io-util"] }
@@ -43,3 +46,6 @@ encoding_rs = { workspace = true, optional = true }
 # nothing instead of dragging in (or failing on) the whole candle/Metal graph.
 [target.'cfg(not(any(target_os = "ios", target_os = "android", target_arch = "wasm32")))'.dependencies]
 mistralrs = { workspace = true, optional = true }
+
+[target.'cfg(target_os = "android")'.dependencies]
+jni.workspace = true

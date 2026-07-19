@@ -11,6 +11,7 @@ pub mod content_block;
 pub mod error;
 pub mod events;
 pub mod inference;
+pub mod lifecycle;
 pub mod sync;
 pub mod transport;
 pub mod view;

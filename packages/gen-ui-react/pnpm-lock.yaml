@@ -9,14 +9,14 @@ importers:
   .:
     dependencies:
       react:
-        specifier: ^19.0.0
+        specifier: ^19.2.7
         version: 19.2.7
     devDependencies:
       '@types/react':
-        specifier: ^19.0.0
+        specifier: ^19.2.17
         version: 19.2.17
       typescript:
-        specifier: ^7.0.0
+        specifier: ^7.0.2
         version: 7.0.2
 
 packages:

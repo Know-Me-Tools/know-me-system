@@ -479,7 +479,7 @@ return $default(_that.items,_that.nextCursor);case _:
 @JsonSerializable()
 
 class _ListResult implements ListResult {
-  const _ListResult({final  List<EntityRecord> items = const <EntityRecord>[], this.nextCursor}): _items = items;
+  const _ListResult({List<EntityRecord> items = const <EntityRecord>[], this.nextCursor}): _items = items;
   factory _ListResult.fromJson(Map<String, dynamic> json) => _$ListResultFromJson(json);
 
  final  List<EntityRecord> _items;
@@ -752,7 +752,7 @@ return invalidate(_that.entityType,_that.listKey);case _:
 @JsonSerializable()
 
 class ChangeUpsert implements ChangeEvent {
-  const ChangeUpsert({required this.record, final  String? $type}): $type = $type ?? 'upsert';
+  const ChangeUpsert({required this.record, String? $type}): $type = $type ?? 'upsert';
   factory ChangeUpsert.fromJson(Map<String, dynamic> json) => _$ChangeUpsertFromJson(json);
 
  final  EntityRecord record;
@@ -834,7 +834,7 @@ $EntityRecordCopyWith<$Res> get record {
 @JsonSerializable()
 
 class ChangeDelete implements ChangeEvent {
-  const ChangeDelete({required this.entityType, required this.id, final  String? $type}): $type = $type ?? 'delete';
+  const ChangeDelete({required this.entityType, required this.id, String? $type}): $type = $type ?? 'delete';
   factory ChangeDelete.fromJson(Map<String, dynamic> json) => _$ChangeDeleteFromJson(json);
 
  final  String entityType;
@@ -909,7 +909,7 @@ as String,
 @JsonSerializable()
 
 class ChangeInvalidate implements ChangeEvent {
-  const ChangeInvalidate({required this.entityType, this.listKey, final  String? $type}): $type = $type ?? 'invalidate';
+  const ChangeInvalidate({required this.entityType, this.listKey, String? $type}): $type = $type ?? 'invalidate';
   factory ChangeInvalidate.fromJson(Map<String, dynamic> json) => _$ChangeInvalidateFromJson(json);
 
  final  String entityType;

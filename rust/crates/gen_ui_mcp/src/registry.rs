@@ -26,10 +26,58 @@ pub trait McpTransport: Send + Sync {
 pub struct McpTool {
     pub name: String,
     #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
     pub description: Option<String>,
     /// JSON-Schema of the tool's input (`inputSchema` in the MCP spec).
     #[serde(default, rename = "inputSchema")]
     pub input_schema: serde_json::Value,
+    #[serde(default)]
+    pub annotations: Option<McpToolAnnotations>,
+    #[serde(default)]
+    pub execution: Option<McpToolExecution>,
+    #[serde(default, rename = "outputSchema")]
+    pub output_schema: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct McpToolAnnotations {
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub read_only_hint: Option<bool>,
+    #[serde(default)]
+    pub destructive_hint: Option<bool>,
+    #[serde(default)]
+    pub idempotent_hint: Option<bool>,
+    #[serde(default)]
+    pub open_world_hint: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct McpToolExecution {
+    #[serde(default, rename = "taskSupport")]
+    pub task_support: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum McpServerTrust {
+    /// Default for externally registered MCP servers. Tool annotations from
+    /// these servers are still preserved, but they are not enough to permit
+    /// local automatic execution.
+    Untrusted,
+    /// The host registered this server as part of KnowMe's own trusted runtime
+    /// boundary. Individual tools still need read-only/non-destructive/
+    /// closed-world annotations before local automatic execution is allowed.
+    TrustedLocal,
+}
+
+impl Default for McpServerTrust {
+    fn default() -> Self {
+        Self::Untrusted
+    }
 }
 
 /// A connected MCP server: the transport plus its last-known tool inventory.
@@ -37,6 +85,7 @@ pub struct McpServerHandle {
     pub name: String,
     transport: Box<dyn McpTransport>,
     tools: RwLock<Vec<McpTool>>,
+    trust: McpServerTrust,
 }
 
 impl McpServerHandle {
@@ -45,7 +94,21 @@ impl McpServerHandle {
             name: name.into(),
             transport,
             tools: RwLock::new(Vec::new()),
+            trust: McpServerTrust::Untrusted,
         }
+    }
+
+    pub fn new_trusted_local(name: impl Into<String>, transport: Box<dyn McpTransport>) -> Self {
+        Self {
+            name: name.into(),
+            transport,
+            tools: RwLock::new(Vec::new()),
+            trust: McpServerTrust::TrustedLocal,
+        }
+    }
+
+    pub fn trust(&self) -> McpServerTrust {
+        self.trust
     }
 
     /// Refresh the cached tool inventory via `tools/list`.
@@ -103,5 +166,49 @@ impl McpRegistry {
 
     pub fn server_names(&self) -> Vec<String> {
         self.servers.read().keys().cloned().collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mcp_tool_annotations_deserialize_from_tools_list_shape() {
+        let tool: McpTool = serde_json::from_value(serde_json::json!({
+            "name": "search_memory",
+            "title": "Search Memory",
+            "description": "Search governed memory",
+            "inputSchema": {
+                "type": "object",
+                "required": ["query"],
+                "properties": {"query": {"type": "string"}}
+            },
+            "annotations": {
+                "readOnlyHint": true,
+                "destructiveHint": false,
+                "idempotentHint": true,
+                "openWorldHint": false
+            },
+            "execution": {
+                "taskSupport": "optional"
+            },
+            "outputSchema": {
+                "type": "object"
+            }
+        }))
+        .expect("MCP tool parses");
+
+        assert_eq!(tool.title.as_deref(), Some("Search Memory"));
+        let annotations = tool.annotations.expect("annotations parse");
+        assert_eq!(annotations.read_only_hint, Some(true));
+        assert_eq!(annotations.destructive_hint, Some(false));
+        assert_eq!(annotations.idempotent_hint, Some(true));
+        assert_eq!(annotations.open_world_hint, Some(false));
+        assert_eq!(
+            tool.execution.and_then(|value| value.task_support),
+            Some("optional".into())
+        );
+        assert!(tool.output_schema.is_some());
     }
 }

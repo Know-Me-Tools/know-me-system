@@ -9,8 +9,11 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { isTauri } from '@tauri-apps/api/core'
-import { getActiveLane, setActiveLane, hasLocalEngine } from '@prometheus-ags/tauri-plugin-gen-ui'
-import type { ChatLane } from '@prometheus-ags/tauri-plugin-gen-ui'
+import {
+  cancelModelOperation, getActiveLane, hasLocalEngine, onLocalModelStatus,
+  prepareLocalModel, setActiveLane,
+} from '@prometheus-ags/tauri-plugin-gen-ui'
+import type { ChatLane, ModelOperationState } from '@prometheus-ags/tauri-plugin-gen-ui'
 import { isWebGpuAvailable, loadWebLlm, unloadWebLlm } from '../api/webllmLane'
 
 /** Tokens/sec for a completed local run — the honest cost of on-device inference. */
@@ -44,6 +47,20 @@ interface LaneActions {
   prepareLocal: () => Promise<boolean>
   recordThroughput: (tokens: number, seconds: number) => void
   clearThroughput: () => void
+  cancelPreparation: () => Promise<void>
+}
+
+function operationProgress(status: ModelOperationState): LaneLoadProgress | null {
+  switch (status.state) {
+    case 'downloading': return {
+      progress: status.total_bytes > 0 ? status.bytes_received / status.total_bytes : 0,
+      text: `Downloading model · ${(status.bytes_received / 1_048_576).toFixed(0)} of ${(status.total_bytes / 1_048_576).toFixed(0)} MB`,
+    }
+    case 'verifying': return { progress: 0.98, text: 'Verifying model' }
+    case 'loading': return { progress: 0.99, text: 'Loading model into memory' }
+    case 'cancelling': return { progress: 0, text: 'Cancelling model preparation' }
+    default: return null
+  }
 }
 
 export const useLaneStore = create<LaneState & LaneActions>()(
@@ -62,6 +79,12 @@ export const useLaneStore = create<LaneState & LaneActions>()(
           getActiveLane().catch((): ChatLane => 'cloud'),
         ])
         set((s) => { s.localAvailable = available; s.lane = lane })
+        if (available) {
+          void onLocalModelStatus((status) => set((s) => {
+            s.loadProgress = operationProgress(status)
+            if (status.state === 'failed') s.error = status.error.message
+          }))
+        }
         return
       }
       // Plain web: use the keyless local WebLLM lane whenever WebGPU exists.
@@ -74,7 +97,9 @@ export const useLaneStore = create<LaneState & LaneActions>()(
       set((s) => { s.error = null })
       try {
         if (isTauri()) {
-          return await hasLocalEngine()
+          if (!await hasLocalEngine()) return false
+          await prepareLocalModel()
+          return true
         }
         await loadWebLlm((p) => set((s) => { s.loadProgress = p }))
         set((s) => {
@@ -121,5 +146,10 @@ export const useLaneStore = create<LaneState & LaneActions>()(
       }),
 
     clearThroughput: () => set((s) => { s.throughput = null }),
+
+    cancelPreparation: async () => {
+      if (isTauri()) await cancelModelOperation()
+      set((s) => { s.loadProgress = { progress: 0, text: 'Cancelling model preparation' } })
+    },
   })),
 )

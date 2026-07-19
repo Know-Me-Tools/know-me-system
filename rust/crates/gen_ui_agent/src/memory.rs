@@ -3,7 +3,7 @@
 //! (mobile, via frb) and tauri-plugin-gen-ui (desktop, via Tauri IPC) — both
 //! platforms share the SAME embedded SurrealDB GraphStore instance shape (see
 //! `state::init`'s doc comment on why this is not tied to `ConfigBackend`).
-use gen_ui_db_graph::{MemoryHit, MemoryRecord, RelatedEntity, SearchMode};
+use gen_ui_db_graph::{MemoryHit, MemoryProvenance, MemoryRecord, RelatedEntity, SearchMode};
 
 use crate::error::AgentError;
 use crate::state;
@@ -18,6 +18,7 @@ pub async fn ingest(text: String) -> Result<String, AgentError> {
             text,
             kind: "note".to_string(),
             entity: None,
+            provenance: None,
         })
         .await
         .map_err(|e| AgentError::Config(e.to_string()))
@@ -40,6 +41,7 @@ pub async fn ingest_attachment(path: String) -> Result<String, AgentError> {
             text,
             kind: "document".to_string(),
             entity: None,
+            provenance: None,
         })
         .await
         .map_err(|e| AgentError::Config(e.to_string()))
@@ -50,6 +52,56 @@ pub async fn ingest_attachments(paths: Vec<String>) -> Result<Vec<String>, Agent
     let mut ids = Vec::with_capacity(paths.len().min(6));
     for path in paths.into_iter().take(6) {
         ids.push(ingest_attachment(path).await?);
+    }
+    Ok(ids)
+}
+
+/// Persist a normalized chat attachment as stable, conversation-scoped chunks.
+/// The same chunks feed immediate context and later RAG turns; callers must use
+/// the explicit promotion path before they can become durable knowledge.
+pub async fn ingest_conversation_document(
+    document: &gen_ui_document::ProcessedDocument,
+    conversation_id: &str,
+    branch_id: &str,
+    message_id: &str,
+    run_id: &str,
+) -> Result<Vec<String>, AgentError> {
+    let provenance = gen_ui_document::DocumentProvenance {
+        conversation_id: conversation_id.into(),
+        branch_id: branch_id.into(),
+        message_id: message_id.into(),
+        run_id: run_id.into(),
+        source_name: document.file_name.clone(),
+    };
+    let chunks = gen_ui_document::chunk_document(
+        document,
+        &provenance,
+        gen_ui_document::ChunkStrategy::ParentChild {
+            child_target_chars: 1_200,
+        },
+        4_800,
+    );
+    let store = state::memory()?;
+    let mut ids = Vec::with_capacity(chunks.len());
+    for chunk in chunks {
+        ids.push(
+            store
+                .memory_ingest(MemoryRecord {
+                    id: Some(chunk.id),
+                    text: chunk.text,
+                    kind: "document_chunk".into(),
+                    entity: None,
+                    provenance: Some(MemoryProvenance {
+                        conversation_id: Some(conversation_id.into()),
+                        branch_id: Some(branch_id.into()),
+                        message_id: Some(message_id.into()),
+                        run_id: Some(run_id.into()),
+                        durable: false,
+                    }),
+                })
+                .await
+                .map_err(|error| AgentError::Config(error.to_string()))?,
+        );
     }
     Ok(ids)
 }
@@ -74,6 +126,27 @@ pub async fn search_with(
         .memory_search_with(&query, k as usize, mode)
         .await
         .map_err(|e| AgentError::Config(e.to_string()))
+}
+
+pub async fn delete_conversation_context(conversation_id: String) -> Result<usize, AgentError> {
+    state::memory()?
+        .delete_conversation_context(&conversation_id)
+        .await
+        .map_err(|error| AgentError::Config(error.to_string()))
+}
+
+pub async fn delete_message_context(message_ids: Vec<String>) -> Result<usize, AgentError> {
+    state::memory()?
+        .delete_message_context(&message_ids)
+        .await
+        .map_err(|error| AgentError::Config(error.to_string()))
+}
+
+pub async fn promote_context(ids: Vec<String>) -> Result<usize, AgentError> {
+    state::memory()?
+        .promote_context(&ids)
+        .await
+        .map_err(|error| AgentError::Config(error.to_string()))
 }
 
 /// Ingest the demo corpus (C-111). Idempotent — the notes carry stable ids, so the

@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gen_ui_widgets/gen_ui_widgets.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
 
+import '../../../../bridge/a2ui/a2ui_event.dart';
 import '../../../../core/theme/tokens.dart';
 import '../../../../shared/widgets/knowme_screen.dart';
 import '../../../../shared/widgets/sync_chip.dart';
@@ -55,6 +56,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(chatProvider);
     final colors = shad.Theme.of(context).colorScheme;
+    final activeMessage = _activeAssistantMessage(state.messages);
+    final modelBusy = _modelOperationBusy(state.modelOperation);
     ref.listen<int>(
       chatProvider.select(
         (value) => value.messages.fold<int>(
@@ -63,7 +66,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               total + message.content.length + (message.isStreaming ? 1 : 0),
         ),
       ),
-      (_, __) => _scheduleScrollToLatest(),
+      (_, _) => _scheduleScrollToLatest(),
     );
 
     return KnowMeScreen(
@@ -99,16 +102,43 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         ScrollViewKeyboardDismissBehavior.onDrag,
                     padding: const EdgeInsets.fromLTRB(12, 16, 12, 24),
                     itemCount: state.messages.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 16),
-                    itemBuilder: (context, i) => _MessageBubble(
-                      message: state.messages[i],
-                      onInteraction: (interaction) => ref
-                          .read(chatProvider.notifier)
-                          .submitInteraction(interaction),
-                      remoteResolver: (url, kind) => ref
-                          .read(chatProvider.notifier)
-                          .resolveRemoteContent(url, kind),
-                    ),
+                    separatorBuilder: (_, _) => const SizedBox(height: 16),
+                    itemBuilder: (context, i) {
+                      final message = state.messages[i];
+                      return _MessageBubble(
+                        message: message,
+                        onResubmit: () => ref
+                            .read(chatProvider.notifier)
+                            .resubmitMessage(message.id),
+                        onDelete: () => ref
+                            .read(chatProvider.notifier)
+                            .deleteResponse(message.id),
+                        onRegenerate: () => ref
+                            .read(chatProvider.notifier)
+                            .regenerateResponse(message.id),
+                        onInteraction: (interaction) {
+                          if (interaction['kind'] == 'local_tool_approve') {
+                            final approvalId = interaction['approvalId']
+                                ?.toString();
+                            if (approvalId == null || approvalId.isEmpty) {
+                              return null;
+                            }
+                            return ref
+                                .read(chatProvider.notifier)
+                                .approveToolConfirmation(
+                                  message.id,
+                                  approvalId,
+                                );
+                          }
+                          return ref
+                              .read(chatProvider.notifier)
+                              .submitInteraction(interaction);
+                        },
+                        remoteResolver: (url, kind) => ref
+                            .read(chatProvider.notifier)
+                            .resolveRemoteContent(url, kind),
+                      );
+                    },
                   ),
                 if (!_isNearBottom && state.messages.isNotEmpty)
                   PositionedDirectional(
@@ -135,6 +165,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (modelBusy ||
+                      state.modelOperation['state'] == 'failed') ...[
+                    _ModelOperationBanner(
+                      operation: state.modelOperation,
+                      onCancel: modelBusy
+                          ? () => ref
+                                .read(chatProvider.notifier)
+                                .cancelModelOperation()
+                          : null,
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   if (_attachments.isNotEmpty) ...[
                     _AttachmentStrip(
                       files: _attachments,
@@ -164,7 +206,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       Tooltip(
                         message: 'Add images or documents',
                         child: shad.GhostButton(
-                          onPressed: _isSending ? null : _pickAttachments,
+                          onPressed: _isSending || modelBusy
+                              ? null
+                              : _pickAttachments,
                           density: shad.ButtonDensity.icon,
                           child: Semantics(
                             button: true,
@@ -180,14 +224,25 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           placeholder: const Text('Ask KnowMe anything…'),
                           minLines: 1,
                           maxLines: 5,
-                          onSubmitted: _isSending ? null : (_) => _send(),
+                          enabled: !modelBusy,
+                          onSubmitted: _isSending || modelBusy
+                              ? null
+                              : (_) => _send(),
                         ),
                       ),
                       const SizedBox(width: 8),
                       Tooltip(
-                        message: 'Send message',
+                        message: activeMessage == null
+                            ? 'Send message'
+                            : 'Stop generating',
                         child: shad.PrimaryButton(
-                          onPressed: _isSending ? null : _send,
+                          onPressed: _isSending || modelBusy
+                              ? null
+                              : activeMessage == null
+                              ? _send
+                              : () => ref
+                                    .read(chatProvider.notifier)
+                                    .cancelRun(activeMessage.id),
                           density: shad.ButtonDensity.icon,
                           child: _isSending
                               ? const SizedBox(
@@ -199,8 +254,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                 )
                               : Semantics(
                                   button: true,
-                                  label: 'Send message',
-                                  child: const Icon(Icons.arrow_upward),
+                                  label: activeMessage == null
+                                      ? 'Send message'
+                                      : 'Stop generating',
+                                  child: Icon(
+                                    activeMessage == null
+                                        ? Icons.arrow_upward
+                                        : Icons.stop,
+                                  ),
                                 ),
                         ),
                       ),
@@ -226,6 +287,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Future<void> _send() async {
+    if (_modelOperationBusy(ref.read(chatProvider).modelOperation)) return;
     final text = _controller.text.trim();
     if (text.isEmpty && _attachments.isEmpty) return;
     final attachmentBlocks = [
@@ -241,8 +303,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ),
     ];
     final attachmentPaths = [
-      for (final file in _attachments)
-        if (file.path case final path?) path,
+      for (final file in _attachments) ?file.path,
     ];
     _controller.clear();
     setState(() {
@@ -339,14 +400,33 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 }
 
+ChatMessage? _activeAssistantMessage(List<ChatMessage> messages) {
+  for (final message in messages.reversed) {
+    if (message.role == 'assistant' && message.isStreaming) return message;
+  }
+  return null;
+}
+
+bool _modelOperationBusy(Map<String, Object?> operation) =>
+    switch (operation['state']) {
+      'downloading' || 'verifying' || 'loading' || 'cancelling' => true,
+      _ => false,
+    };
+
 class _MessageBubble extends StatelessWidget {
   const _MessageBubble({
     required this.message,
+    required this.onResubmit,
+    required this.onDelete,
+    required this.onRegenerate,
     this.onInteraction,
     this.remoteResolver,
   });
 
   final ChatMessage message;
+  final Future<void> Function() onResubmit;
+  final Future<void> Function() onDelete;
+  final Future<void> Function() onRegenerate;
   final AgentInteractionCallback? onInteraction;
   final RemoteContentResolver? remoteResolver;
 
@@ -359,8 +439,31 @@ class _MessageBubble extends StatelessWidget {
     final maxWidth = (screenWidth * 0.80).clamp(0.0, 720.0);
     final blocks = coalesceContentBlocks(message.content);
     final copyValue = blocks.map(contentBlockCopyText).join('\n\n');
+    if (!isUser) {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxWidth),
+          child: DefaultTextStyle(
+            style: TextStyle(
+              color: colors.foreground,
+              fontSize: 16,
+              height: 1.5,
+            ),
+            child: _AssistantTurn(
+              message: message,
+              blocks: blocks,
+              onInteraction: onInteraction,
+              remoteResolver: remoteResolver,
+              onDelete: onDelete,
+              onRegenerate: onRegenerate,
+            ),
+          ),
+        ),
+      );
+    }
     return Align(
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      alignment: Alignment.centerRight,
       child: Container(
         constraints: BoxConstraints(maxWidth: maxWidth),
         padding: const EdgeInsets.fromLTRB(14, 12, 8, 6),
@@ -403,25 +506,379 @@ class _MessageBubble extends StatelessWidget {
                 ),
               Align(
                 alignment: AlignmentDirectional.centerEnd,
-                child: Tooltip(
-                  message: 'Copy entire message',
-                  child: IconButton(
-                    constraints: const BoxConstraints(
-                      minWidth: 48,
-                      minHeight: 48,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Tooltip(
+                      message: 'Resubmit message',
+                      child: IconButton(
+                        tooltip: 'Resubmit message',
+                        constraints: const BoxConstraints(
+                          minWidth: 48,
+                          minHeight: 48,
+                        ),
+                        onPressed: message.isStreaming ? null : onResubmit,
+                        icon: Icon(
+                          Icons.replay_outlined,
+                          size: 18,
+                          color: colors.mutedForeground,
+                        ),
+                      ),
                     ),
-                    onPressed: () =>
-                        Clipboard.setData(ClipboardData(text: copyValue)),
-                    icon: Icon(
-                      Icons.copy_outlined,
-                      size: 18,
-                      color: colors.mutedForeground,
+                    Tooltip(
+                      message: 'Copy entire message',
+                      child: IconButton(
+                        tooltip: 'Copy entire message',
+                        constraints: const BoxConstraints(
+                          minWidth: 48,
+                          minHeight: 48,
+                        ),
+                        onPressed: () =>
+                            Clipboard.setData(ClipboardData(text: copyValue)),
+                        icon: Icon(
+                          Icons.copy_outlined,
+                          size: 18,
+                          color: colors.mutedForeground,
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AssistantTurn extends StatelessWidget {
+  const _AssistantTurn({
+    required this.message,
+    required this.blocks,
+    required this.onDelete,
+    required this.onRegenerate,
+    this.onInteraction,
+    this.remoteResolver,
+  });
+
+  final ChatMessage message;
+  final List<ContentBlock> blocks;
+  final Future<void> Function() onDelete;
+  final Future<void> Function() onRegenerate;
+  final AgentInteractionCallback? onInteraction;
+  final RemoteContentResolver? remoteResolver;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = shad.Theme.of(context).colorScheme;
+    final segments = <Widget>[];
+    final answer = <ContentBlock>[];
+
+    void flushAnswer() {
+      if (answer.isEmpty) return;
+      final snapshot = List<ContentBlock>.of(answer);
+      answer.clear();
+      segments.add(
+        Container(
+          padding: const EdgeInsets.fromLTRB(14, 12, 10, 8),
+          decoration: BoxDecoration(
+            color: colors.card,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var index = 0; index < snapshot.length; index++)
+                ContentBlockView(
+                  block: snapshot[index],
+                  isStreaming:
+                      message.isStreaming && index == snapshot.length - 1,
+                  onInteraction: onInteraction,
+                  remoteResolver: remoteResolver,
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    for (var index = 0; index < blocks.length; index++) {
+      final block = blocks[index];
+      if (_isAnswerBlock(block)) {
+        answer.add(block);
+        continue;
+      }
+      flushAnswer();
+      final answerHasBegun = blocks.take(index).any(_isAnswerBlock);
+      segments.add(
+        ContentBlockView(
+          block: block,
+          isStreaming:
+              message.isStreaming && !answerHasBegun && block is ThinkingBlock,
+          onInteraction: onInteraction,
+          remoteResolver: remoteResolver,
+        ),
+      );
+    }
+    flushAnswer();
+
+    final waiting =
+        message.isStreaming &&
+        (message.content.isEmpty ||
+            !matchesGeneratingContent(message.runStatus));
+    if (waiting && message.statusMessage != null) {
+      segments.add(_RunStatusBubble(message: message));
+    }
+    if (message.runStatus == 'error' && message.error != null) {
+      segments.add(_RunErrorBubble(error: message.error!));
+    } else if (message.runStatus == 'cancelled') {
+      segments.add(
+        _RunCancelledBubble(
+          message: message.statusMessage ?? 'Response cancelled',
+        ),
+      );
+    }
+
+    final answerCopy = blocks
+        .where(_isAnswerBlock)
+        .map(contentBlockCopyText)
+        .join('\n\n');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var index = 0; index < segments.length; index++) ...[
+          segments[index],
+          if (index != segments.length - 1) const SizedBox(height: 8),
+        ],
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            IconButton(
+              tooltip: 'Copy answer',
+              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+              onPressed: answerCopy.isEmpty
+                  ? null
+                  : () => Clipboard.setData(ClipboardData(text: answerCopy)),
+              icon: const Icon(Icons.copy_outlined, size: 18),
+            ),
+            IconButton(
+              tooltip: 'Regenerate response',
+              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+              onPressed: message.isStreaming ? null : onRegenerate,
+              icon: const Icon(Icons.refresh, size: 18),
+            ),
+            IconButton(
+              tooltip: 'Delete response and later branch messages',
+              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+              onPressed: message.isStreaming
+                  ? null
+                  : () async {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (dialogContext) => AlertDialog(
+                          title: const Text('Delete response?'),
+                          content: const Text(
+                            'This removes the response and later messages on this branch.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () =>
+                                  Navigator.pop(dialogContext, false),
+                              child: const Text('Keep'),
+                            ),
+                            TextButton(
+                              onPressed: () =>
+                                  Navigator.pop(dialogContext, true),
+                              child: const Text('Delete'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirmed == true) await onDelete();
+                    },
+              icon: const Icon(Icons.delete_outline, size: 18),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+bool _isAnswerBlock(ContentBlock block) => switch (block) {
+  TextBlock() ||
+  CodeBlock() ||
+  ArtifactBlock() ||
+  ImageBlock() ||
+  DividerBlock() => true,
+  ThinkingBlock() ||
+  CitationBlock() ||
+  MemoryBlock() ||
+  ToolUseBlock() ||
+  ToolResultBlock() ||
+  SkillBlock() => false,
+};
+
+bool matchesGeneratingContent(String status) =>
+    status == 'thinking' || status == 'generating';
+
+class _RunStatusBubble extends StatelessWidget {
+  const _RunStatusBubble({required this.message});
+  final ChatMessage message;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = shad.Theme.of(context).colorScheme;
+    return Semantics(
+      liveRegion: true,
+      label: message.statusMessage,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: colors.secondary,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: colors.primary,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(message.statusMessage ?? 'Preparing response'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ModelOperationBanner extends StatelessWidget {
+  const _ModelOperationBanner({required this.operation, this.onCancel});
+
+  final Map<String, Object?> operation;
+  final VoidCallback? onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = operation['state']?.toString() ?? 'not_installed';
+    final received = (operation['bytes_received'] as num?)?.toDouble();
+    final total = (operation['total_bytes'] as num?)?.toDouble();
+    final progress = received != null && total != null && total > 0
+        ? received / total
+        : null;
+    final error = operation['error'] is Map
+        ? (operation['error'] as Map)['message']?.toString()
+        : null;
+    final label = switch (state) {
+      'downloading' =>
+        progress == null
+            ? 'Downloading local model'
+            : 'Downloading local model · ${(progress * 100).round()}%',
+      'verifying' => 'Verifying local model',
+      'loading' => 'Loading model into memory',
+      'cancelling' => 'Cancelling model preparation',
+      'failed' => error ?? 'Local model preparation failed',
+      _ => state.replaceAll('_', ' '),
+    };
+    final colors = shad.Theme.of(context).colorScheme;
+    return Semantics(
+      liveRegion: true,
+      label: label,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: state == 'failed'
+              ? colors.destructive.withValues(alpha: 0.1)
+              : colors.secondary,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(child: Text(label)),
+                if (onCancel != null)
+                  SizedBox(
+                    height: 44,
+                    child: shad.SecondaryButton(
+                      onPressed: onCancel,
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+              ],
+            ),
+            if (state == 'downloading') ...[
+              const SizedBox(height: 8),
+              LinearProgressIndicator(value: progress),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RunErrorBubble extends StatelessWidget {
+  const _RunErrorBubble({required this.error});
+  final ChatRunError error;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = KnowMePalette.of(context);
+    final message = error.displayMessage;
+    return Semantics(
+      liveRegion: true,
+      label: 'Error: $message',
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: palette.destructive.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.error_outline, color: palette.destructive),
+            const SizedBox(width: 10),
+            Expanded(child: Text(message)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RunCancelledBubble extends StatelessWidget {
+  const _RunCancelledBubble({required this.message});
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = shad.Theme.of(context).colorScheme;
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: colors.secondary,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.stop_circle_outlined),
+            const SizedBox(width: 10),
+            Expanded(child: Text(message)),
+          ],
         ),
       ),
     );
@@ -563,7 +1020,7 @@ class _ConversationSheet extends ConsumerWidget {
               Expanded(
                 child: ListView.separated(
                   itemCount: state.conversations.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final conversation = state.conversations[index];
                     final selected = conversation.id == state.threadId;

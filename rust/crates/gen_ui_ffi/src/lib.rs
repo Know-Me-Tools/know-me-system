@@ -8,3 +8,21 @@
 //! `flutter_rust_bridge_codegen generate` and is gitignored — do not hand-edit.
 pub mod api;
 mod frb_generated; /* AUTO INJECTED BY flutter_rust_bridge. This line may not be accurate, and you can change it according to your needs. */
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub unsafe extern "system" fn JNI_OnLoad(
+    vm: *mut jni::sys::JavaVM,
+    _reserved: *mut std::ffi::c_void,
+) -> jni::sys::jint {
+    match jni::JavaVM::from_raw(vm) {
+        Ok(java_vm) => {
+            gen_ui_inference::android_litert_jni::set_java_vm(java_vm);
+            jni::sys::JNI_VERSION_1_6
+        }
+        Err(error) => {
+            log::error!("failed to capture Android JavaVM for LiteRT-LM: {error}");
+            jni::sys::JNI_ERR
+        }
+    }
+}

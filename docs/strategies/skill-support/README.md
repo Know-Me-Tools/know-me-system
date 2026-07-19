@@ -5,7 +5,8 @@ distinction, the three skill scopes (global, agent-private, agent-exposed), MCP
 interop in both directions, governance and settings for skills, and the long-run
 convergence between skills and agents.
 
-**Status:** v1.0 strategy, 2026-07-18. Child of
+**Status:** v1.1 strategy, 2026-07-19 (v1.1 adds §8: grounding in the vendored UAR
+skill model). Child of
 `docs/strategies/plugins/README.md` (capabilities, governance/identity §9, settings
 substrate §11) and `docs/strategies/agents/README.md` (pipeline, placements).
 Grounded in what exists: UAR's skill registry (`gen_ui_agent::tools`, `gen_ui_mcp`),
@@ -136,3 +137,43 @@ other. The model makes the convergence *mechanical* rather than confusing:
   version history.
 - KnowMe Builder harness skills: `pxt-new-skill`, `pxt-skill-evals`,
   `pxt-expose-agent-as-skill` join the W7 list in the extensibility spec.
+
+## 8. UAR grounding (2026-07-19): the skill model that actually ships
+
+The vendored UAR submodule (`rust/vendor/universal-agent-runtime` v1.0.0) provides
+the runtime skill model this strategy maps onto. Two sources, two roles:
+
+1. **The runtime model (Rust):** `src/uar/domain/skills.rs` — `Skill`,
+   `SkillManifest`, `SkillKind`, `SkillOrigin`, `SkillExecutionConfig`,
+   `SkillModelRouting`, `SkillTriggers`, `SkillConstraints`, plus `SkillMatch`
+   (`src/uar/domain/matching.rs`) for routing. Skills hot-reload from disk
+   (`notify` watcher), import over REST (`src/uar/api/skills.rs`), compile out of
+   UAR-AGENT-MD skill sections (`src/uar/compiler/compiler_skill.rs`), and execute
+   WASM only behind the opt-in `wasm-runtime` feature. Skill *activations* surface
+   on the AG-UI stream as `CUSTOM uar.skill.activated` events — KnowMe already
+   normalizes those into `StreamEvent::SkillActivation` → `ContentBlock::Skill`
+   (`gen_ui_protocol`; physically certified on Android for the embedded
+   `knowme_diagnostics` MCP namespace — see the six-gates roadmap in
+   `docs/strategies/local-models/`).
+2. **The content corpus (not a dependency):** `crates/prometheus-skill-system`
+   inside the submodule is a *content repository* — categorized `skills/`,
+   `agents/*.md`, `hooks/`, `marketplace/`, `policies/` — not a Rust crate (no
+   `Cargo.toml`, excluded from UAR's workspace). Treat it as seed/publishable
+   content for the marketplace and the capability index, never as a path
+   dependency.
+
+The §2 scope model maps without distortion:
+
+| Scope (§2) | UAR realization |
+|---|---|
+| `global` | Registered in the container's skill registry (the `SkillManifest` set); per-agent grants stay Cedar-side |
+| `agent-private` | The agent artifact's own skill section (`SkillsSection`/`SkillRef` in the compiler IR) — structurally invisible to other agents |
+| `agent-exposed` | An `AgentSkill` on the serving agent's A2A `AgentCard`; the caller sees a tool, the serving agent runs an A2A task under its own identity (§2's pair-chain audit unchanged) |
+
+Execution-plan note: on Android, real AgentSkill certification is Release C of
+`docs/strategies/local-models/android-agentskills-process-future-roadmap.md`
+(Phase 3 of `docs/strategies/uar-knowme-runtime-integration.md`); the
+diagnostics-skill path already proves the event/block/UI contract. MCP interop
+(§3) is unchanged — MCP tools register beneath skill cards exactly as UAR's
+native/MCP unification (schema validation, Cedar, approval, audit) already does
+server-side.

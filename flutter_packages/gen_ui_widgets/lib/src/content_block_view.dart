@@ -103,6 +103,7 @@ class ContentBlockView extends StatelessWidget {
         toolUseId: toolUseId,
         outputJson: outputJson,
         isError: isError,
+        onInteraction: onInteraction,
       ),
     SkillBlock(:final name, :final status) => ContentBlockSkill(
       name: name,
@@ -161,11 +162,12 @@ class ContentBlockThinking extends StatefulWidget {
 }
 
 class _ContentBlockThinkingState extends State<ContentBlockThinking> {
-  bool _expanded = false;
+  bool? _manualExpanded;
 
   @override
   Widget build(BuildContext context) {
     final colors = shad.Theme.of(context).colorScheme;
+    final expanded = _manualExpanded ?? widget.isStreaming;
     return _BlockSurface(
       semanticLabel: 'Thinking',
       background: colors.secondary,
@@ -185,25 +187,32 @@ class _ContentBlockThinkingState extends State<ContentBlockThinking> {
           _CopyButton(value: widget.text, label: 'Copy thinking'),
           Semantics(
             button: true,
-            expanded: _expanded,
-            label: _expanded ? 'Collapse thinking' : 'Expand thinking',
+            expanded: expanded,
+            label: expanded ? 'Collapse thinking' : 'Expand thinking',
             child: IconButton(
-              tooltip: _expanded ? 'Collapse thinking' : 'Expand thinking',
-              onPressed: () => setState(() => _expanded = !_expanded),
+              tooltip: expanded ? 'Collapse thinking' : 'Expand thinking',
+              onPressed: () => setState(() => _manualExpanded = !expanded),
               icon: Icon(
-                _expanded ? Icons.expand_less : Icons.expand_more,
+                expanded ? Icons.expand_less : Icons.expand_more,
                 color: colors.mutedForeground,
               ),
             ),
           ),
         ],
       ),
-      child: _expanded
+      child: expanded
           ? Semantics(
               liveRegion: widget.isStreaming,
               child: Padding(
                 padding: const EdgeInsets.only(top: 8),
-                child: GenUiMarkdown(data: widget.text),
+                child: SelectableText(
+                  widget.text,
+                  style: TextStyle(
+                    color: colors.foreground,
+                    fontSize: 14,
+                    height: 1.45,
+                  ),
+                ),
               ),
             )
           : null,
@@ -347,22 +356,169 @@ class ContentBlockToolResult extends StatelessWidget {
     required this.toolUseId,
     required this.outputJson,
     required this.isError,
+    this.onInteraction,
     super.key,
   });
 
   final String toolUseId;
   final String outputJson;
   final bool isError;
+  final AgentInteractionCallback? onInteraction;
 
   @override
-  Widget build(BuildContext context) => _DisclosureBlock(
-    semanticLabel: isError ? 'Tool failed' : 'Tool completed',
-    icon: isError ? Icons.error_outline : Icons.check_circle_outline,
-    title: isError ? 'Tool failed' : 'Tool completed',
-    status: 'Call ${_shortId(toolUseId)}',
-    body: _prettyJson(outputJson),
-    isError: isError,
-  );
+  Widget build(BuildContext context) {
+    final parsed = _jsonMap(outputJson);
+    if (_isToolConfirmationRequired(parsed)) {
+      return _ToolConfirmationRequiredBlock(
+        toolUseId: toolUseId,
+        payload: parsed!,
+        outputJson: outputJson,
+        onInteraction: onInteraction,
+      );
+    }
+    return _DisclosureBlock(
+      semanticLabel: isError ? 'Tool failed' : 'Tool completed',
+      icon: isError ? Icons.error_outline : Icons.check_circle_outline,
+      title: isError ? 'Tool failed' : 'Tool completed',
+      status: 'Call ${_shortId(toolUseId)}',
+      body: _prettyJson(outputJson),
+      isError: isError,
+    );
+  }
+}
+
+class _ToolConfirmationRequiredBlock extends StatelessWidget {
+  const _ToolConfirmationRequiredBlock({
+    required this.toolUseId,
+    required this.payload,
+    required this.outputJson,
+    this.onInteraction,
+  });
+
+  final String toolUseId;
+  final Map<String, dynamic> payload;
+  final String outputJson;
+  final AgentInteractionCallback? onInteraction;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = shad.Theme.of(context).colorScheme;
+    final tool = payload['tool']?.toString() ?? 'unknown tool';
+    final approvalId =
+        payload['approvalId']?.toString() ??
+        (payload['confirmation'] is Map
+            ? (payload['confirmation'] as Map)['approvalId']?.toString()
+            : null);
+    final reasons = _toolConfirmationReasons(payload);
+    final message =
+        payload['message']?.toString() ??
+        'This tool was not executed because it requires explicit approval.';
+    return _BlockSurface(
+      semanticLabel: 'Tool approval required for $tool',
+      background: colors.destructive.withValues(alpha: 0.10),
+      header: Row(
+        children: [
+          Icon(Icons.privacy_tip_outlined, size: 18, color: colors.destructive),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Approval required',
+                  style: TextStyle(
+                    color: colors.foreground,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  tool,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: colors.mutedForeground, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          _CopyButton(
+            value: _prettyJson(outputJson),
+            label: 'Copy tool policy',
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(message, style: TextStyle(color: colors.foreground)),
+            if (reasons.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final reason in reasons)
+                    _PolicyChip(label: _humanizePolicyReason(reason)),
+                ],
+              ),
+            ],
+            const SizedBox(height: 10),
+            Text(
+              approvalId == null || approvalId.isEmpty
+                  ? 'Status: not executed. This saved tool policy does not include an approval id, so it cannot be resumed.'
+                  : 'Status: not executed. Approval will run this exact stored tool call and resume the model with its result.',
+              style: TextStyle(color: colors.mutedForeground, fontSize: 12),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Approvals are process-local. If this card was restored after an app restart or reinstall, resubmit the prompt to create a fresh approval request.',
+              style: TextStyle(color: colors.mutedForeground, fontSize: 12),
+            ),
+            if (onInteraction != null &&
+                approvalId != null &&
+                approvalId.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: shad.SecondaryButton(
+                  onPressed: () => onInteraction?.call({
+                    'kind': 'local_tool_approve',
+                    'approvalId': approvalId,
+                    'toolUseId': toolUseId,
+                    'tool': tool,
+                  }),
+                  child: const Text('Approve and run'),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PolicyChip extends StatelessWidget {
+  const _PolicyChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = shad.Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: colors.secondary,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(color: colors.mutedForeground, fontSize: 12),
+      ),
+    );
+  }
 }
 
 class ContentBlockSkill extends StatelessWidget {
@@ -1197,6 +1353,8 @@ class _DisclosureBlockState extends State<_DisclosureBlock> {
               children: [
                 Text(
                   widget.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: colors.foreground,
                     fontWeight: FontWeight.w600,
@@ -1517,6 +1675,28 @@ Map<String, dynamic>? _jsonMap(String value) {
     return null;
   }
 }
+
+bool _isToolConfirmationRequired(Map<String, dynamic>? payload) =>
+    payload != null &&
+    payload['code'] == 'local_tool_requires_confirmation' &&
+    payload['requiresConfirmation'] == true &&
+    payload['executionStatus'] == 'not_executed';
+
+List<String> _toolConfirmationReasons(Map<String, dynamic> payload) =>
+    switch (payload['reasons']) {
+      final List<dynamic> reasons => [
+        for (final reason in reasons)
+          if (reason != null) reason.toString(),
+      ],
+      _ => const [],
+    };
+
+String _humanizePolicyReason(String reason) => switch (reason) {
+  'tool_is_not_declared_read_only' => 'Not declared read-only',
+  'tool_may_be_destructive' => 'May be destructive',
+  'tool_uses_open_world_context' => 'Open-world access',
+  _ => reason.replaceAll('_', ' '),
+};
 
 String _mediaUrl(String content) {
   final json = _jsonMap(content);

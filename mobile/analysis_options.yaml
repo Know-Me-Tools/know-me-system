@@ -8,6 +8,14 @@ analyzer:
     - "lib/bridge/third_party/*.dart"
     - "**/*.g.dart"
     - "**/*.freezed.dart"
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    - linux/**
+    - rust_builder/cargokit/**
   errors:
     invalid_annotation_target: ignore
 

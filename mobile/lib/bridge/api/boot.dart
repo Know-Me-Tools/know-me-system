@@ -7,6 +7,10 @@ import '../frb_generated.dart';
 import '../third_party/gen_ui_types/error.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
+// These functions are ignored because they are not marked as `pub`: `register_mobile_diagnostics_mcp`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `MobileDiagnosticsTransport`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `request`
+
 /// Boot-order invariant, step 1: open the embedded SurrealDB store (config +
 /// memory/graph-RAG both live in it on mobile — see gen_ui_agent::state::init's
 /// doc comment on why memory is SurrealDB-only regardless of platform) and

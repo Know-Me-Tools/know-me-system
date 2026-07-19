@@ -10,6 +10,7 @@ import '../domain/entities/chat_conversation.dart';
 import '../domain/entities/chat_message.dart';
 import '../../../bridge/a2ui/a2ui_event.dart';
 import '../../../bridge/rust_bridge_provider.dart' as bridge;
+import '../../../bridge/third_party/gen_ui_types/inference.dart';
 
 class PemChatRepository implements ChatRepository {
   const PemChatRepository(this.transport);
@@ -23,19 +24,68 @@ class PemChatRepository implements ChatRepository {
   Future<String> startTurn({
     required String threadId,
     required String message,
-    required List<String> history,
+    required List<ChatHistoryEntry> history,
+    required String branchId,
+    required String userMessageId,
     List<String> attachmentPaths = const [],
-  }) => bridge.chatSend(threadId, message, history, attachmentPaths);
+  }) => bridge.chatSend(
+    threadId,
+    message,
+    history.map(_toInferenceMessage).toList(growable: false),
+    attachmentPaths,
+    branchId,
+    userMessageId,
+  );
 
   @override
   Stream<A2uiEvent> events(String runId) => bridge.chatEvents(runId);
 
   @override
+  Future<bool> cancelRun(String runId) => bridge.chatCancel(runId);
+
+  @override
+  Stream<Map<String, dynamic>> watchLocalModelStatus() =>
+      bridge.watchLocalModelStatus();
+
+  @override
+  Future<void> prepareLocalModel() => bridge.prepareLocalModel();
+
+  @override
+  Future<void> cancelModelOperation() => bridge.cancelModelOperation();
+
+  @override
+  Future<Map<String, dynamic>?> localRuntimeDiagnostics() =>
+      bridge.localRuntimeDiagnostics();
+
+  @override
   Future<String> submitInteraction({
     required String threadId,
     required String interactionJson,
-    required List<String> history,
-  }) => bridge.chatAction(threadId, interactionJson, history);
+    required List<ChatHistoryEntry> history,
+    required String branchId,
+  }) => bridge.chatAction(
+    threadId,
+    interactionJson,
+    history.map(_toInferenceMessage).toList(growable: false),
+    branchId,
+  );
+
+  @override
+  Future<String> approveToolConfirmation({required String approvalId}) =>
+      bridge.approveToolConfirmation(approvalId);
+
+  static InferenceMessage _toInferenceMessage(ChatHistoryEntry entry) =>
+      InferenceMessage(
+        role: switch (entry.role) {
+          'system' => InferenceRole.system,
+          'assistant' => InferenceRole.assistant,
+          'tool' => InferenceRole.tool,
+          _ => InferenceRole.user,
+        },
+        content: entry.content,
+        name: entry.name,
+        toolCallId: entry.toolCallId,
+      );
 
   @override
   Future<ResolvedRemoteContent> resolveRemoteContent(
@@ -75,6 +125,7 @@ class PemChatRepository implements ChatRepository {
 
   @override
   Future<void> deleteConversation(String id) async {
+    await bridge.deleteConversationContext(id);
     final messages = await listMessages(id);
     for (final message in messages) {
       await transport.delete(_messageType, message.id);
@@ -106,10 +157,31 @@ class PemChatRepository implements ChatRepository {
           'conversationId': conversationId,
           'role': message.role,
           'createdAt': message.createdAt.toUtc().toIso8601String(),
+          'updatedAt': message.updatedAt.toUtc().toIso8601String(),
+          'runId': message.runId,
+          'parentMessageId': message.parentMessageId,
+          'branchId': message.branchId,
+          'runStatus': message.runStatus,
+          'runPhase': message.runPhase,
+          'statusMessage': message.statusMessage,
+          'error': message.error?.toJson(),
+          'generationSettings': message.generationSettings,
+          'runtimeDiagnostics': message.runtimeDiagnostics,
+          'contextPlanVersion': message.contextPlanVersion,
+          'attachmentPaths': message.attachmentPaths,
+          'contextTelemetry': message.contextTelemetry,
           'content': message.content.map(_encodeBlock).toList(growable: false),
         }),
       ),
     );
+  }
+
+  @override
+  Future<void> deleteMessages(List<String> ids) async {
+    await bridge.deleteMessageContext(ids);
+    for (final id in ids) {
+      await transport.delete(_messageType, id);
+    }
   }
 
   EntityRecord _conversationRecord(ChatConversation conversation) =>
@@ -141,6 +213,34 @@ class PemChatRepository implements ChatRepository {
         id: record.id,
         role: data['role'] as String,
         createdAt: DateTime.parse(data['createdAt'] as String),
+        updatedAt: DateTime.tryParse(data['updatedAt']?.toString() ?? ''),
+        runId: data['runId']?.toString(),
+        parentMessageId: data['parentMessageId']?.toString(),
+        branchId: data['branchId']?.toString() ?? 'main',
+        runStatus: data['runStatus']?.toString() ?? 'complete',
+        runPhase: data['runPhase']?.toString(),
+        statusMessage: data['statusMessage']?.toString(),
+        error: data['error'] is Map<String, dynamic>
+            ? ChatRunError.fromJson(data['error'] as Map<String, dynamic>)
+            : null,
+        generationSettings:
+            (data['generationSettings'] as Map<String, dynamic>?)
+                ?.cast<String, Object?>() ??
+            const {},
+        runtimeDiagnostics:
+            (data['runtimeDiagnostics'] as Map<String, dynamic>?)
+                ?.cast<String, Object?>() ??
+            const {},
+        contextPlanVersion: data['contextPlanVersion']?.toString(),
+        attachmentPaths:
+            (data['attachmentPaths'] as List<dynamic>?)
+                ?.map((value) => value.toString())
+                .toList(growable: false) ??
+            const [],
+        contextTelemetry:
+            (data['contextTelemetry'] as Map<String, dynamic>?)
+                ?.cast<String, Object?>() ??
+            const {},
         content: (data['content'] as List<dynamic>)
             .cast<Map<String, dynamic>>()
             .map(ContentBlock.fromJson)

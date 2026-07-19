@@ -3,18 +3,29 @@ import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { subscribeWithSelector } from 'zustand/middleware'
 import { isTauri } from '@tauri-apps/api/core'
-import { onChatEvent, streamAgentA2ui } from '@prometheus-ags/tauri-plugin-gen-ui'
+import {
+  cancelAgentRun,
+  memoryDeleteConversationContext,
+  memoryDeleteMessageContext,
+  onChatEvent,
+  streamAgentA2ui,
+} from '@prometheus-ags/tauri-plugin-gen-ui'
+import type { InferenceHistoryMessage } from '@prometheus-ags/tauri-plugin-gen-ui'
 import type { ContentBlock, Message, MessageUsage } from '@/bridge/a2ui/types'
-import { applyA2uiEvent, createA2uiWireAdapter, type A2uiWireEvent } from '@/bridge/a2ui/driver'
+import { applyA2uiEvent, createA2uiWireAdapter, type A2uiWireEvent, type RunLifecycleUpdate } from '@/bridge/a2ui/driver'
 import { streamWebLlm } from '../api/webllmLane'
 import { streamHostedChat } from '../api/hostedLane'
 import { useLaneStore } from './laneStore'
 import { getSessionByok } from '@/features/settings/stores/providerStore'
 import {
   deleteConversationRecord,
+  deleteMessageRecords,
   listConversationRecords,
+  listMessageRecords,
   saveConversationRecord,
+  saveMessageRecords,
   type ConversationRecord,
+  type MessageRecord,
 } from '@/features/entities/stores/entityRuntime'
 
 const CHAT_TENANT_ID = 'knowme-poc-local'
@@ -49,7 +60,30 @@ function persistActiveConversation(): void {
       created_at: conversation.createdAt,
       updated_at: conversation.updatedAt,
     }
-    void saveConversationRecord(row).catch((cause: unknown) => console.error('conversation persistence failed', cause))
+    const messageRows: MessageRecord[] = conversation.messages.map((message, sequence) => ({
+      id: message.id,
+      tenant_id: CHAT_TENANT_ID,
+      conversation_id: conversation.id,
+      parent_message_id: message.parentMessageId ?? null,
+      branch_id: message.branchId ?? conversation.id,
+      sequence,
+      role: message.role,
+      blocks: message.content,
+      run_id: message.runId ?? null,
+      run_status: message.runStatus ?? null,
+      run_phase: message.runPhase ?? null,
+      status_message: message.statusMessage ?? null,
+      error: message.error ?? null,
+      attachments: [],
+      generation_settings: message.generationSettings ?? null,
+      diagnostics: message.diagnostics ?? null,
+      context_plan_version: message.contextPlanVersion ?? null,
+      context_telemetry: message.contextTelemetry ?? null,
+      created_at: message.timestamp,
+      updated_at: message.updatedAt ?? message.timestamp,
+    }))
+    void Promise.all([saveConversationRecord(row), saveMessageRecords(messageRows)])
+      .catch((cause: unknown) => console.error('conversation persistence failed', cause))
   }, 250)
 }
 
@@ -60,7 +94,7 @@ function persistActiveConversation(): void {
  */
 const wireAdapter = createA2uiWireAdapter((event) => {
   const store = useChatStore.getState()
-  applyA2uiEvent(event, store.streamBlock, store.finalizeMessage)
+  applyA2uiEvent(event, store.streamBlock, store.finalizeMessage, store.updateLifecycle)
 })
 
 /**
@@ -72,13 +106,11 @@ const wireAdapter = createA2uiWireAdapter((event) => {
  * response carries no usage totals, and one chunk is one token in practice. It
  * is labelled an estimate in the UI rather than presented as exact.
  */
-async function streamLocalWeb(text: string, assistantId: string, history: string[]): Promise<void> {
-  const turns = history.reduce<{ role: 'user' | 'assistant'; text: string }[]>((acc, _, i, arr) => {
-    if (i % 2 === 0 && (arr[i] === 'user' || arr[i] === 'assistant')) {
-      acc.push({ role: arr[i] as 'user' | 'assistant', text: arr[i + 1] ?? '' })
-    }
-    return acc
-  }, [])
+async function streamLocalWeb(text: string, assistantId: string, history: InferenceHistoryMessage[]): Promise<void> {
+  const turns = history
+    .filter((message): message is InferenceHistoryMessage & { role: 'user' | 'assistant' } =>
+      message.role === 'user' || message.role === 'assistant')
+    .map((message) => ({ role: message.role, text: message.content }))
 
   const store = useChatStore.getState()
   const startedAt = performance.now()
@@ -92,12 +124,89 @@ async function streamLocalWeb(text: string, assistantId: string, history: string
   } catch (e: unknown) {
     // Surface the failure in the transcript rather than leaving the message
     // spinning forever.
-    store.streamBlock({
-      messageId: assistantId,
-      block: { type: 'text', text: `Local inference failed: ${e instanceof Error ? e.message : String(e)}` },
+    store.updateLifecycle({
+      type: 'error', messageId: assistantId, runId: assistantId,
+      error: { code: 'webllm_inference_failed', phase: 'generation', message: e instanceof Error ? e.message : String(e), retryable: true },
     })
-    store.finalizeMessage(assistantId)
   }
+}
+
+function inferenceHistory(messages: Message[], branchId: string): InferenceHistoryMessage[] {
+  const history: InferenceHistoryMessage[] = []
+  for (const message of messages) {
+    if ((message.branchId ?? branchId) !== branchId) continue
+    const answer = message.content
+      .filter((block): block is Extract<ContentBlock, { type: 'text' }> => block.type === 'text')
+      .map((block) => block.text)
+      .join('')
+    if (answer.trim()) history.push({ role: message.role, content: answer })
+    for (const block of message.content) {
+      if (block.type !== 'toolResult') continue
+      history.push({
+        role: 'tool',
+        content: block.outputJson,
+        tool_call_id: block.toolUseId,
+      })
+    }
+  }
+  return history
+}
+
+async function runInferenceTurn(
+  text: string,
+  assistantId: string,
+  branchId: string,
+  history: InferenceHistoryMessage[],
+  conversationId: string,
+): Promise<void> {
+  const store = useChatStore.getState()
+  const lane = useLaneStore.getState().lane
+  if (!isTauri() && lane === 'local') {
+    const ready = await useLaneStore.getState().prepareLocal()
+    if (!ready) {
+      const cause = useLaneStore.getState().error ?? 'Local model could not be prepared'
+      store.updateLifecycle({ type: 'error', messageId: assistantId, runId: assistantId,
+        error: { code: 'model_prepare_failed', phase: 'model_download', message: cause, retryable: true } })
+      return
+    }
+    await streamLocalWeb(text, assistantId, history)
+    persistActiveConversation()
+    return
+  }
+
+  if (!isTauri()) {
+    const byok = getSessionByok()
+    if (!byok) {
+      store.updateLifecycle({ type: 'error', messageId: assistantId, runId: assistantId,
+        error: { code: 'cloud_provider_missing', phase: 'generation', message: 'Choose Local for zero-configuration chat, or add a session-only cloud provider in Settings.', retryable: false } })
+      return
+    }
+    wireAdapter.bind(assistantId)
+    const hostedHistory = history
+      .filter((entry): entry is InferenceHistoryMessage & { role: 'user' | 'assistant' } =>
+        entry.role === 'user' || entry.role === 'assistant')
+      .map((entry) => ({ role: entry.role, content: entry.content }))
+    try {
+      for await (const event of streamHostedChat(text, hostedHistory, byok, conversationId, branchId)) {
+        wireAdapter.handle(event)
+      }
+    } catch (error) {
+      wireAdapter.handle({ type: 'run_error', run_id: assistantId, error: {
+        code: 'hosted_inference_failed', phase: 'generation',
+        message: error instanceof Error ? error.message : String(error), retryable: true,
+      } })
+    }
+    persistActiveConversation()
+    return
+  }
+
+  wireAdapter.bind(assistantId)
+  await streamAgentA2ui(text, history, conversationId, branchId).catch((error: unknown) => {
+    console.error(error)
+    store.updateLifecycle({ type: 'error', messageId: assistantId, runId: assistantId,
+      error: { code: 'run_start_failed', phase: 'queued', message: error instanceof Error ? error.message : 'Chat failed to start', retryable: true } })
+  })
+  persistActiveConversation()
 }
 
 interface ChatState {
@@ -111,14 +220,19 @@ interface ChatState {
 
 interface ChatActions {
   sendMessage: (text: string) => Promise<void>
+  resubmitMessage: (userMessageId: string) => Promise<void>
+  deleteResponse: (assistantMessageId: string) => Promise<void>
+  regenerateResponse: (assistantMessageId: string) => Promise<void>
   streamBlock: (params: { messageId: string; blockIndex?: number; block: ContentBlock }) => void
   finalizeMessage: (messageId: string, usage?: MessageUsage) => void
+  updateLifecycle: (update: RunLifecycleUpdate) => void
   initListeners: () => () => void
   hydrateConversations: () => Promise<void>
   createConversation: () => void
   switchConversation: (id: string) => void
   renameConversation: (id: string, title: string) => void
   deleteConversation: (id: string) => Promise<void>
+  cancelActiveRun: () => Promise<void>
 }
 
 export const useChatStore = create<ChatState & ChatActions>()(
@@ -149,8 +263,52 @@ export const useChatStore = create<ChatState & ChatActions>()(
       finalizeMessage: (messageId, usage) => {
         set((s) => {
           const msg = s.messages.find((m) => m.id === messageId)
-          if (msg) { msg.isStreaming = false; if (usage) msg.usage = usage }
+          if (msg) {
+            msg.isStreaming = false
+            msg.runStatus = 'complete'
+            msg.updatedAt = new Date().toISOString()
+            if (usage) msg.usage = usage
+          }
           s.isStreaming = false
+          s.activeRunId = null
+          const conversation = s.conversations.find((item) => item.id === s.activeConversationId)
+          if (conversation) { conversation.messages = s.messages; conversation.updatedAt = new Date().toISOString() }
+        })
+        persistActiveConversation()
+      },
+
+      updateLifecycle: (update) => {
+        set((s) => {
+          const msg = s.messages.find((item) => item.id === update.messageId)
+          if (!msg) return
+          msg.runId = update.runId
+          msg.updatedAt = new Date().toISOString()
+          if (update.type === 'started') {
+            msg.runStatus = 'queued'
+            s.activeRunId = update.runId
+          } else if (update.type === 'phase') {
+            msg.runPhase = update.phase
+            msg.runStatus = update.status
+            msg.statusMessage = update.message
+          } else if (update.type === 'telemetry') {
+            msg.contextTelemetry = update.payload
+            msg.contextPlanVersion = typeof update.payload === 'object' && update.payload !== null && 'planVersion' in update.payload
+              ? String((update.payload as { planVersion?: unknown }).planVersion ?? '') : msg.contextPlanVersion
+          } else if (update.type === 'error') {
+            msg.error = update.error
+            msg.runPhase = update.error.phase
+            msg.runStatus = 'error'
+            msg.isStreaming = false
+            s.isStreaming = false
+            s.activeRunId = null
+          } else {
+            msg.runPhase = update.phase
+            msg.statusMessage = update.message
+            msg.runStatus = 'cancelled'
+            msg.isStreaming = false
+            s.isStreaming = false
+            s.activeRunId = null
+          }
           const conversation = s.conversations.find((item) => item.id === s.activeConversationId)
           if (conversation) { conversation.messages = s.messages; conversation.updatedAt = new Date().toISOString() }
         })
@@ -158,9 +316,13 @@ export const useChatStore = create<ChatState & ChatActions>()(
       },
 
       sendMessage: async (text: string) => {
-        const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: [{ type: 'text', text }], timestamp: new Date().toISOString() }
+        const branchId = get().messages.at(-1)?.branchId ?? get().activeConversationId
+        const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: [{ type: 'text', text }], timestamp: new Date().toISOString(), branchId }
         const assistantId = crypto.randomUUID()
-        const assistantMsg: Message = { id: assistantId, role: 'assistant', content: [], timestamp: new Date().toISOString(), isStreaming: true }
+        const assistantMsg: Message = {
+          id: assistantId, role: 'assistant', content: [], timestamp: new Date().toISOString(),
+          isStreaming: true, parentMessageId: userMsg.id, branchId, runStatus: 'queued',
+        }
         set((s) => {
           s.messages.push(userMsg, assistantMsg)
           s.isStreaming = true
@@ -175,90 +337,145 @@ export const useChatStore = create<ChatState & ChatActions>()(
 
         // Exclude both records just appended. `text` is passed separately;
         // including the new user row here would submit the prompt twice.
-        const history = get().messages.slice(0, -2).flatMap(
-          (m) => [m.role, m.content.find((b) => b.type === 'text')?.text ?? ''],
+        const history = inferenceHistory(get().messages.slice(0, -2), branchId)
+
+        await runInferenceTurn(text, assistantId, branchId, history, get().activeConversationId)
+      },
+
+      resubmitMessage: async (userMessageId: string) => {
+        if (get().isStreaming) return
+        const sourceIndex = get().messages.findIndex((message) => message.id === userMessageId && message.role === 'user')
+        if (sourceIndex < 0) return
+        const source = get().messages[sourceIndex]!
+        const text = source.content
+          .filter((block): block is Extract<ContentBlock, { type: 'text' }> => block.type === 'text')
+          .map((block) => block.text)
+          .join('')
+        if (!text.trim()) return
+        const branchId = crypto.randomUUID()
+        const clonedUser: Message = {
+          ...source,
+          id: crypto.randomUUID(),
+          branchId,
+          timestamp: new Date().toISOString(),
+          updatedAt: undefined,
+        }
+        const assistantId = crypto.randomUUID()
+        const assistant: Message = {
+          id: assistantId,
+          role: 'assistant',
+          content: [],
+          timestamp: new Date().toISOString(),
+          isStreaming: true,
+          parentMessageId: clonedUser.id,
+          branchId,
+          runStatus: 'queued',
+        }
+        const history = inferenceHistory(
+          get().messages.slice(0, sourceIndex),
+          source.branchId ?? get().activeConversationId,
         )
-
-        // Outside Tauri the Rust lane doesn't exist, so a `local` selection is
-        // fulfilled in-browser by WebLLM. Inside Tauri, lane selection lives in
-        // the Rust config DB and stream_agent_a2ui already routes accordingly —
-        // hence no lane branch on that path.
-        const lane = useLaneStore.getState().lane
-        if (!isTauri() && lane === 'local') {
-          const ready = await useLaneStore.getState().prepareLocal()
-          if (!ready) {
-            const cause = useLaneStore.getState().error ?? 'Local model could not be prepared'
-            get().streamBlock({
-              messageId: assistantId,
-              blockIndex: 0,
-              block: { type: 'text', text: `Local inference is unavailable: ${cause}` },
-            })
-            get().finalizeMessage(assistantId)
-            return
-          }
-          await streamLocalWeb(text, assistantId, history)
-          persistActiveConversation()
-          return
-        }
-
-        if (!isTauri()) {
-          const byok = getSessionByok()
-          if (!byok) {
-            get().streamBlock({
-              messageId: assistantId,
-              blockIndex: 0,
-              block: { type: 'text', text: 'Choose Local for zero-configuration chat, or add a session-only cloud provider in Settings.' },
-            })
-            get().finalizeMessage(assistantId)
-            return
-          }
-          wireAdapter.bind(assistantId)
-          const hostedHistory = history.reduce<{ role: 'user' | 'assistant'; content: string }[]>((messages, value, index, values) => {
-            if (index % 2 === 0 && (value === 'user' || value === 'assistant')) {
-              messages.push({ role: value, content: values[index + 1] ?? '' })
-            }
-            return messages
-          }, [])
-          try {
-            for await (const event of streamHostedChat(text, hostedHistory, byok)) wireAdapter.handle(event)
-          } catch (error) {
-            wireAdapter.handle({ type: 'run_error', message: error instanceof Error ? error.message : String(error) })
-          }
-          persistActiveConversation()
-          return
-        }
-
-        // Rust's events are run-scoped and carry no message id, so tell the
-        // adapter which message this turn's events belong to before starting it.
-        wireAdapter.bind(assistantId)
-        // Store calls invoke() (via the plugin's typed wrapper) — never
-        // component or hook.
-        await streamAgentA2ui(text, history).catch((e: unknown) => {
-          console.error(e)
-          // The run never started, so no run_error will arrive to close the
-          // message — finalize it here or it spins forever.
-          get().streamBlock({
-            messageId: assistantId,
-            blockIndex: 0,
-            block: { type: 'text', text: e instanceof Error ? e.message : 'Chat failed to start' },
-          })
-          get().finalizeMessage(assistantId)
+        set((state) => {
+          state.messages.push(clonedUser, assistant)
+          state.isStreaming = true
+          const conversation = state.conversations.find((item) => item.id === state.activeConversationId)
+          if (conversation) { conversation.messages = state.messages; conversation.updatedAt = new Date().toISOString() }
         })
         persistActiveConversation()
+        await runInferenceTurn(text, assistantId, branchId, history, get().activeConversationId)
+      },
+
+      deleteResponse: async (assistantMessageId: string) => {
+        if (get().isStreaming) return
+        const messages = get().messages
+        const index = messages.findIndex((message) => message.id === assistantMessageId && message.role === 'assistant')
+        if (index < 0) return
+        const branchId = messages[index]!.branchId
+        const removed = messages
+          .slice(index)
+          .filter((message) => message.branchId === branchId)
+          .map((message) => message.id)
+        if (isTauri()) await memoryDeleteMessageContext(removed)
+        await deleteMessageRecords(removed)
+        const removedSet = new Set(removed)
+        set((state) => {
+          state.messages = state.messages.filter((message) => !removedSet.has(message.id))
+          const conversation = state.conversations.find((item) => item.id === state.activeConversationId)
+          if (conversation) { conversation.messages = state.messages; conversation.updatedAt = new Date().toISOString() }
+        })
+        persistActiveConversation()
+      },
+
+      regenerateResponse: async (assistantMessageId: string) => {
+        if (get().isStreaming) return
+        const assistantIndex = get().messages.findIndex((message) => message.id === assistantMessageId && message.role === 'assistant')
+        if (assistantIndex < 0) return
+        const assistant = get().messages[assistantIndex]!
+        const userIndex = assistant.parentMessageId
+          ? get().messages.findIndex((message) => message.id === assistant.parentMessageId)
+          : assistantIndex - 1
+        const user = get().messages[userIndex]
+        if (!user || user.role !== 'user') return
+        const text = user.content
+          .filter((block): block is Extract<ContentBlock, { type: 'text' }> => block.type === 'text')
+          .map((block) => block.text)
+          .join('')
+        const branchId = assistant.branchId ?? user.branchId ?? get().activeConversationId
+        const history = inferenceHistory(get().messages.slice(0, userIndex), branchId)
+        await get().deleteResponse(assistantMessageId)
+        const replacementId = crypto.randomUUID()
+        const replacement: Message = {
+          id: replacementId,
+          role: 'assistant',
+          content: [],
+          timestamp: new Date().toISOString(),
+          isStreaming: true,
+          parentMessageId: user.id,
+          branchId,
+          runStatus: 'queued',
+        }
+        set((state) => {
+          state.messages.push(replacement)
+          state.isStreaming = true
+          const conversation = state.conversations.find((item) => item.id === state.activeConversationId)
+          if (conversation) { conversation.messages = state.messages; conversation.updatedAt = new Date().toISOString() }
+        })
+        persistActiveConversation()
+        await runInferenceTurn(text, replacementId, branchId, history, get().activeConversationId)
       },
 
       hydrateConversations: async () => {
         if (get().isHydrated) return
         const rows = await listConversationRecords(CHAT_TENANT_ID)
+        const hydrated = await Promise.all(rows.map(async (row) => {
+          const messageRows = await listMessageRecords(CHAT_TENANT_ID, row.id)
+          const messages = messageRows.length > 0 ? messageRows.map((message): Message => ({
+            id: message.id,
+            role: message.role as Message['role'],
+            content: message.blocks as Message['content'],
+            timestamp: message.created_at,
+            updatedAt: message.updated_at,
+            isStreaming: false,
+            runId: message.run_id ?? undefined,
+            parentMessageId: message.parent_message_id ?? undefined,
+            branchId: message.branch_id,
+            runStatus: message.run_status as Message['runStatus'],
+            runPhase: message.run_phase ?? undefined,
+            statusMessage: message.status_message ?? undefined,
+            error: message.error as Message['error'],
+            generationSettings: message.generation_settings as Message['generationSettings'],
+            diagnostics: message.diagnostics as Message['diagnostics'],
+            contextPlanVersion: message.context_plan_version ?? undefined,
+            contextTelemetry: message.context_telemetry,
+          })) : row.messages as Message[]
+          return {
+            id: row.id, title: row.title, messages,
+            createdAt: row.created_at, updatedAt: row.updated_at,
+          }
+        }))
         set((s) => {
-          if (rows.length > 0) {
-            s.conversations = rows.map((row) => ({
-              id: row.id,
-              title: row.title,
-              messages: row.messages as Message[],
-              createdAt: row.created_at,
-              updatedAt: row.updated_at,
-            }))
+          if (hydrated.length > 0) {
+            s.conversations = hydrated
             s.activeConversationId = s.conversations[0]!.id
             s.messages = s.conversations[0]!.messages
           }
@@ -293,6 +510,7 @@ export const useChatStore = create<ChatState & ChatActions>()(
       },
 
       deleteConversation: async (id) => {
+        if (isTauri()) await memoryDeleteConversationContext(id)
         await deleteConversationRecord(id)
         set((s) => {
           s.conversations = s.conversations.filter((item) => item.id !== id)
@@ -302,6 +520,17 @@ export const useChatStore = create<ChatState & ChatActions>()(
             s.messages = s.conversations[0]!.messages
           }
         })
+      },
+
+      cancelActiveRun: async () => {
+        const runId = get().activeRunId
+        if (!runId || !isTauri()) return
+        const message = get().messages.find((item) => item.runId === runId)
+        if (message) get().updateLifecycle({
+          type: 'phase', messageId: message.id, runId,
+          phase: message.runPhase ?? 'generation', status: 'preparing', message: 'Cancelling',
+        })
+        await cancelAgentRun(runId)
       },
 
       initListeners: () => {
@@ -320,7 +549,7 @@ export const useChatStore = create<ChatState & ChatActions>()(
             if (wire.type === 'block') {
               startedAt ??= performance.now()
               blocks += 1
-            } else if ((wire.type === 'run_finished' || wire.type === 'run_error') && startedAt !== null) {
+            } else if ((wire.type === 'run_finished' || wire.type === 'run_error' || wire.type === 'run_cancelled') && startedAt !== null) {
               useLaneStore.getState().recordThroughput(blocks, (performance.now() - startedAt) / 1000)
               startedAt = null
               blocks = 0

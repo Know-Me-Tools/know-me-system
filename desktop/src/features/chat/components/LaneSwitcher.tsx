@@ -1,6 +1,7 @@
 // TJ-ARCH-MOB-001 compliant — component imports the hook only.
 import { useEffect } from 'react'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { Button } from '@/components/ui/button'
 import { useLane } from '../hooks/useLane'
 
 /**
@@ -11,7 +12,7 @@ import { useLane } from '../hooks/useLane'
  * absent capability is better hidden than shown broken.
  */
 export function LaneSwitcher() {
-  const { lane, localAvailable, loadProgress, throughput, error, switchLane, initLane } = useLane()
+  const { lane, localAvailable, loadProgress, throughput, error, switchLane, initLane, cancelPreparation } = useLane()
 
   useEffect(() => {
     void initLane()
@@ -50,8 +51,13 @@ export function LaneSwitcher() {
           and shouldn't interrupt a screen-reader user's current context. */}
       {isLoading && (
         <span aria-live="polite" className="text-[color:var(--color-fg)] opacity-70">
-          Downloading model… {Math.round(loadProgress.progress * 100)}%
+          {loadProgress.text}{loadProgress.progress > 0 ? ` · ${Math.round(loadProgress.progress * 100)}%` : ''}
         </span>
+      )}
+      {isLoading && (
+        <Button type="button" variant="secondary" className="min-h-11 min-w-11 rounded-lg px-3" onClick={() => void cancelPreparation()}>
+          Cancel
+        </Button>
       )}
 
       {!isLoading && isLocal && throughput && (

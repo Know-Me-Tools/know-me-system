@@ -35,6 +35,22 @@ pub struct MemoryRecord {
     /// Optional owning entity record id (e.g. `entity:project_x`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub entity: Option<String>,
+    /// Origin of governed facts/chunks. Conversation-scoped records remain
+    /// traceable across branches and can be deleted without leaving ghost
+    /// context. Legacy records deserialize as unscoped memory.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provenance: Option<MemoryProvenance>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, SurrealValue)]
+#[serde(rename_all = "camelCase")]
+pub struct MemoryProvenance {
+    pub conversation_id: Option<String>,
+    pub branch_id: Option<String>,
+    pub message_id: Option<String>,
+    pub run_id: Option<String>,
+    #[serde(default)]
+    pub durable: bool,
 }
 
 fn default_kind() -> String {
@@ -50,6 +66,8 @@ pub struct MemoryHit {
     pub text: String,
     pub kind: String,
     pub score: f32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provenance: Option<MemoryProvenance>,
 }
 
 /// Which retrieval lane `memory_search` runs (C-111 T3).
@@ -152,17 +170,24 @@ impl GraphStore {
             .next()
             .ok_or_else(|| GraphError::Embedding("embedder returned no vector".into()))?;
 
+        let statement = if record.id.is_some() {
+            "UPSERT type::record('memory', $id) SET text = $text, kind = $kind, embedding = $embedding, \
+             entity = IF $entity != NONE THEN type::record($entity) ELSE NONE END, \
+             provenance = $provenance RETURN meta::id(id) AS id;"
+        } else {
+            "CREATE memory SET text = $text, kind = $kind, embedding = $embedding, \
+             entity = IF $entity != NONE THEN type::record($entity) ELSE NONE END, \
+             provenance = $provenance RETURN meta::id(id) AS id;"
+        };
         let mut res = self
             .db
-            .query(
-                "CREATE memory SET text = $text, kind = $kind, embedding = $embedding, \
-                 entity = IF $entity != NONE THEN type::record($entity) ELSE NONE END \
-                 RETURN meta::id(id) AS id;",
-            )
+            .query(statement)
+            .bind(("id", record.id))
             .bind(("text", record.text))
             .bind(("kind", record.kind))
             .bind(("embedding", embedding))
             .bind(("entity", record.entity))
+            .bind(("provenance", record.provenance))
             .await?;
         let ids: Vec<IdRow> = res.take(0)?;
         ids.into_iter()
@@ -284,6 +309,64 @@ impl GraphStore {
                 Ok(rows.into_iter().map(HitRow::into_hit).collect())
             }
         }
+    }
+
+    /// Delete non-durable context owned by a conversation. Durable records are
+    /// retained only after an explicit promotion action.
+    pub async fn delete_conversation_context(
+        &self,
+        conversation_id: &str,
+    ) -> Result<usize, GraphError> {
+        let mut response = self
+            .db
+            .query(
+                "LET $deleted = DELETE memory WHERE provenance.conversation_id = $conversation_id \
+                 AND provenance.durable = false RETURN BEFORE; RETURN array::len($deleted);",
+            )
+            .bind(("conversation_id", conversation_id.to_owned()))
+            .await?;
+        let last = response.num_statements().saturating_sub(1);
+        let count: Option<i64> = response.take(last)?;
+        Ok(count.unwrap_or_default().max(0) as usize)
+    }
+
+    /// Remove facts/chunks whose only provenance is a deleted branch tail.
+    pub async fn delete_message_context(
+        &self,
+        message_ids: &[String],
+    ) -> Result<usize, GraphError> {
+        if message_ids.is_empty() {
+            return Ok(0);
+        }
+        let mut response = self
+            .db
+            .query(
+                "LET $deleted = DELETE memory WHERE provenance.message_id IN $message_ids \
+                 AND provenance.durable = false RETURN BEFORE; RETURN array::len($deleted);",
+            )
+            .bind(("message_ids", message_ids.to_vec()))
+            .await?;
+        let last = response.num_statements().saturating_sub(1);
+        let count: Option<i64> = response.take(last)?;
+        Ok(count.unwrap_or_default().max(0) as usize)
+    }
+
+    /// Promote selected conversation chunks into durable governed knowledge.
+    pub async fn promote_context(&self, ids: &[String]) -> Result<usize, GraphError> {
+        if ids.is_empty() {
+            return Ok(0);
+        }
+        let mut response = self
+            .db
+            .query(
+                "LET $updated = UPDATE memory SET provenance.durable = true \
+                 WHERE meta::id(id) IN $ids RETURN AFTER; RETURN array::len($updated);",
+            )
+            .bind(("ids", ids.to_vec()))
+            .await?;
+        let last = response.num_statements().saturating_sub(1);
+        let count: Option<i64> = response.take(last)?;
+        Ok(count.unwrap_or_default().max(0) as usize)
     }
 
     /// INTENT: expand the graph outward from `entity_id` up to `depth` RELATE hops,
@@ -453,6 +536,7 @@ struct HitRow {
     text: String,
     kind: String,
     score: f32,
+    provenance: Option<MemoryProvenance>,
 }
 
 impl HitRow {
@@ -462,6 +546,7 @@ impl HitRow {
             text: self.text,
             kind: self.kind,
             score: self.score,
+            provenance: self.provenance,
         }
     }
 }

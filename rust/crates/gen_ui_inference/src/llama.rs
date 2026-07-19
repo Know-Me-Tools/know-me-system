@@ -5,18 +5,22 @@
 
 use std::num::NonZeroU32;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::Instant;
 
 use crate::catalog::{
-    artifact_set_for_id, ArtifactSpec, ANDROID_QWEN35_4B, ANDROID_QWEN35_4B_ID, IPHONE_QWEN35_9B_ID,
+    artifact_set_for_id, ArtifactSpec, ANDROID_QWEN3_4B, ANDROID_QWEN3_4B_ID, IPHONE_QWEN35_9B_ID,
 };
 use async_trait::async_trait;
 use futures::{StreamExt, TryStreamExt};
 use gen_ui_types::error::{CoreError, CoreResult};
 use gen_ui_types::events::StreamEvent;
-#[cfg(feature = "local-llama-mtmd")]
-use gen_ui_types::inference::InferenceRequest;
-use gen_ui_types::inference::{InferenceProvider, LocalModelSpec, SampleParams};
+use gen_ui_types::inference::{
+    GrammarConstraint, InferenceMessage, InferenceProvider, InferenceRequest, InferenceRole,
+    LocalModelSpec, SampleParams,
+};
+use gen_ui_types::lifecycle::{ModelOperationState, RunError, RunPhase, RuntimeDiagnostics};
 use llama_cpp_2::context::params::LlamaContextParams;
 use llama_cpp_2::llama_backend::LlamaBackend;
 use llama_cpp_2::llama_batch::LlamaBatch;
@@ -32,22 +36,18 @@ use reqwest::StatusCode;
 use sha2::{Digest, Sha256};
 use std::io::Read;
 use tokio::io::AsyncWriteExt;
+use tokio::sync::watch;
 use tokio::sync::RwLock;
 
 const DEFAULT_CONTEXT: u32 = 8192;
 const DEFAULT_MAX_MODEL_BYTES: u64 = 8 * 1024 * 1024 * 1024;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RuntimeDiagnostics {
-    pub model_id: String,
-    pub backend: String,
-    pub fallback_reason: Option<String>,
-}
-
 pub struct LlamaCppEngine {
     cache_dir: PathBuf,
     state: RwLock<Option<LoadedModel>>,
     diagnostics: RwLock<Option<RuntimeDiagnostics>>,
+    model_operation: watch::Sender<ModelOperationState>,
+    model_cancelled: AtomicBool,
     #[cfg(feature = "local-llama-mtmd")]
     multimodal: RwLock<Option<Arc<MtmdContext>>>,
 }
@@ -61,10 +61,13 @@ struct LoadedModel {
 
 impl LlamaCppEngine {
     pub fn new(cache_dir: impl Into<PathBuf>) -> Self {
+        let (model_operation, _) = watch::channel(ModelOperationState::NotInstalled);
         Self {
             cache_dir: cache_dir.into(),
             state: RwLock::new(None),
             diagnostics: RwLock::new(None),
+            model_operation,
+            model_cancelled: AtomicBool::new(false),
             #[cfg(feature = "local-llama-mtmd")]
             multimodal: RwLock::new(None),
         }
@@ -83,9 +86,14 @@ impl LlamaCppEngine {
                 "unknown multimodal model '{model_id}' — no projector is cataloged"
             ))
         })?;
-        preflight_artifact(set.projector)?;
-        let path = self.cache_dir.join(set.projector.file_name);
-        ensure_catalog_model(&path, set.projector).await?;
+        let projector = set.projector.ok_or_else(|| {
+            CoreError::NotFound(format!(
+                "model '{model_id}' is text-only and has no cataloged projector"
+            ))
+        })?;
+        preflight_artifact(projector)?;
+        let path = self.cache_dir.join(projector.file_name);
+        ensure_catalog_model(&path, projector).await?;
         Ok(path)
     }
 
@@ -148,14 +156,31 @@ fn resolve_model(
         return Ok((cache_dir.join(set.model.file_name), Some(set.model)));
     }
     Err(CoreError::NotFound(format!(
-        "unknown mobile model '{}' — expected a Qwen3.5 catalog id or an absolute GGUF path",
+        "unknown mobile model '{}' — expected a catalog id or an absolute GGUF path",
         spec.model,
     )))
 }
 
 async fn ensure_catalog_model(path: &Path, artifact: ArtifactSpec) -> CoreResult<()> {
-    if path.is_file() && verify_artifact(path, artifact).await.is_ok() {
-        return Ok(());
+    ensure_catalog_model_with_status(path, artifact, None, None).await
+}
+
+async fn ensure_catalog_model_with_status(
+    path: &Path,
+    artifact: ArtifactSpec,
+    status: Option<&watch::Sender<ModelOperationState>>,
+    cancelled: Option<&AtomicBool>,
+) -> CoreResult<()> {
+    if path.is_file() {
+        if let Some(status) = status {
+            let _ = status.send(ModelOperationState::Verifying);
+        }
+        if verify_artifact(path, artifact).await.is_ok() {
+            return Ok(());
+        }
+        tokio::fs::remove_file(path)
+            .await
+            .map_err(|error| terminal("remove invalid model", error))?;
     }
     let parent = path
         .parent()
@@ -168,6 +193,16 @@ async fn ensure_catalog_model(path: &Path, artifact: ArtifactSpec) -> CoreResult
         .await
         .map(|metadata| metadata.len())
         .unwrap_or(0);
+    let mut received = existing;
+    let started = Instant::now();
+    if let Some(status) = status {
+        let _ = status.send(ModelOperationState::Downloading {
+            bytes_received: received,
+            total_bytes: artifact.byte_len,
+            bytes_per_second: 0,
+            resumable: true,
+        });
+    }
     let mut request = reqwest::Client::new().get(artifact.url);
     if existing > 0 && existing < artifact.byte_len {
         request = request.header(RANGE, format!("bytes={existing}-"));
@@ -195,14 +230,30 @@ async fn ensure_catalog_model(path: &Path, artifact: ArtifactSpec) -> CoreResult
         .await
         .map_err(|error| CoreError::Transient(format!("model download stream: {error}")))?
     {
+        if cancelled.is_some_and(|token| token.load(Ordering::Acquire)) {
+            return Err(CoreError::Transient("model operation cancelled".into()));
+        }
         file.write_all(&chunk)
             .await
             .map_err(|error| terminal("model cache write", error))?;
+        received = received.saturating_add(chunk.len() as u64);
+        if let Some(status) = status {
+            let elapsed = started.elapsed().as_secs().max(1);
+            let _ = status.send(ModelOperationState::Downloading {
+                bytes_received: received,
+                total_bytes: artifact.byte_len,
+                bytes_per_second: received.saturating_sub(existing) / elapsed,
+                resumable: true,
+            });
+        }
     }
     file.flush()
         .await
         .map_err(|error| terminal("model cache flush", error))?;
     drop(file);
+    if let Some(status) = status {
+        let _ = status.send(ModelOperationState::Verifying);
+    }
     if let Err(error) = verify_artifact(&temporary, artifact).await {
         let _ = tokio::fs::remove_file(&temporary).await;
         return Err(error);
@@ -240,9 +291,12 @@ fn gpu_backend_name() -> &'static str {
     }
     #[cfg(target_os = "android")]
     {
-        return "vulkan";
+        return "opencl";
     }
-    "gpu"
+    #[cfg(not(any(target_os = "ios", target_os = "android")))]
+    {
+        "gpu"
+    }
 }
 
 fn should_append_download(existing: u64, expected: u64, status: StatusCode) -> bool {
@@ -254,8 +308,9 @@ fn load_model_with_backend(
     path: PathBuf,
     spec: LocalModelSpec,
     fallback_reason: Option<String>,
+    allow_gpu: bool,
 ) -> CoreResult<LoadedModel> {
-    let supports_gpu = backend.supports_gpu_offload();
+    let supports_gpu = allow_gpu && backend.supports_gpu_offload();
     let attempts = if supports_gpu {
         vec![true, false]
     } else {
@@ -286,7 +341,10 @@ fn load_model_with_backend(
                     diagnostics: RuntimeDiagnostics {
                         model_id: spec.model,
                         backend: backend_name,
+                        device_name: None,
+                        offloaded_layers: None,
                         fallback_reason: reason,
+                        gate_report: Vec::new(),
                     },
                 });
             }
@@ -294,6 +352,31 @@ fn load_model_with_backend(
         }
     }
     Err(terminal("GGUF load", last_error))
+}
+
+fn gpu_is_release_eligible(cache_dir: &Path) -> bool {
+    #[cfg(target_os = "android")]
+    {
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Certification {
+            correct: bool,
+            thermally_safe: bool,
+            median_improvement: f32,
+        }
+        let path = cache_dir.join("opencl-certification.json");
+        return std::fs::read(&path)
+            .ok()
+            .and_then(|bytes| serde_json::from_slice::<Certification>(&bytes).ok())
+            .is_some_and(|result| {
+                result.correct && result.thermally_safe && result.median_improvement >= 0.15
+            });
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = cache_dir;
+        true
+    }
 }
 
 async fn verify_artifact(path: &Path, artifact: ArtifactSpec) -> CoreResult<()> {
@@ -344,25 +427,69 @@ impl InferenceProvider for LlamaCppEngine {
             .as_ref()
             .is_some_and(|loaded| &loaded.spec == spec)
         {
+            if let Some(diagnostics) = self.diagnostics().await {
+                let _ = self
+                    .model_operation
+                    .send(ModelOperationState::Ready { diagnostics });
+            }
             return Ok(());
         }
+        self.model_cancelled.store(false, Ordering::Release);
         let (path, artifact) = resolve_model(spec, &self.cache_dir)?;
         if let Some(artifact) = artifact {
             preflight_artifact(artifact)?;
-            ensure_catalog_model(&path, artifact).await?;
+            if let Err(error) = ensure_catalog_model_with_status(
+                &path,
+                artifact,
+                Some(&self.model_operation),
+                Some(&self.model_cancelled),
+            )
+            .await
+            {
+                if self.model_cancelled.load(Ordering::Acquire) {
+                    let _ = self.model_operation.send(ModelOperationState::Cancelled);
+                } else {
+                    let _ = self.model_operation.send(ModelOperationState::Failed {
+                        error: RunError {
+                            code: "model_prepare_failed".into(),
+                            phase: RunPhase::ModelDownload,
+                            message: error.to_string(),
+                            retryable: true,
+                            diagnostics: None,
+                        },
+                    });
+                }
+                return Err(error);
+            }
         } else if !path.is_file() {
             return Err(CoreError::NotFound(format!(
                 "GGUF model does not exist: {}",
                 path.display()
             )));
         }
+        let _ = self.model_operation.send(ModelOperationState::Loading);
         let backend =
             Arc::new(LlamaBackend::init().map_err(|error| terminal("llama backend init", error))?);
+        let allow_gpu = gpu_is_release_eligible(&self.cache_dir);
+        #[cfg(target_os = "android")]
+        let backend_policy_reason = (!allow_gpu).then(|| {
+            "CPU selected: OpenCL requires a physical-device certification showing correctness, thermal safety, and at least 15% median improvement".to_string()
+        });
+        #[cfg(not(target_os = "android"))]
+        let backend_policy_reason = None;
         let loaded_spec = spec.clone();
         let primary_result = gen_ui_runtime::spawn_blocking({
             let backend = Arc::clone(&backend);
             let path = path.clone();
-            move || load_model_with_backend(backend, path, loaded_spec, None)
+            move || {
+                load_model_with_backend(
+                    backend,
+                    path,
+                    loaded_spec,
+                    backend_policy_reason,
+                    allow_gpu,
+                )
+            }
         })
         .await
         .map_err(|error| terminal("GGUF load task", error))?;
@@ -370,12 +497,12 @@ impl InferenceProvider for LlamaCppEngine {
         let loaded = match primary_result {
             Ok(loaded) => loaded,
             Err(primary_error) if spec.model == IPHONE_QWEN35_9B_ID => {
-                let fallback = ANDROID_QWEN35_4B;
+                let fallback = ANDROID_QWEN3_4B;
                 preflight_artifact(fallback.model)?;
                 let fallback_path = self.cache_dir.join(fallback.model.file_name);
                 ensure_catalog_model(&fallback_path, fallback.model).await?;
                 let fallback_spec = LocalModelSpec {
-                    model: ANDROID_QWEN35_4B_ID.to_string(),
+                    model: ANDROID_QWEN3_4B_ID.to_string(),
                     context_len: spec.context_len,
                 };
                 gen_ui_runtime::spawn_blocking({
@@ -389,6 +516,7 @@ impl InferenceProvider for LlamaCppEngine {
                                 "primary model {} failed: {primary_error}",
                                 primary_model
                             )),
+                            allow_gpu,
                         )
                     }
                 })
@@ -397,113 +525,133 @@ impl InferenceProvider for LlamaCppEngine {
             }
             Err(error) => return Err(error),
         };
+        if self.model_cancelled.load(Ordering::Acquire) {
+            // llama.cpp model loading is not safely interruptible on every
+            // backend. Honour cancellation at the first safe boundary and
+            // drop the newly loaded handles before they become observable.
+            drop(loaded);
+            let _ = self.model_operation.send(ModelOperationState::Cancelled);
+            return Err(CoreError::Cancelled(
+                "local model loading was cancelled".into(),
+            ));
+        }
         *self.diagnostics.write().await = Some(loaded.diagnostics.clone());
+        let _ = self.model_operation.send(ModelOperationState::Ready {
+            diagnostics: loaded.diagnostics.clone(),
+        });
         *self.state.write().await = Some(loaded);
         Ok(())
     }
 
-    async fn generate(
-        &self,
-        prompt: &str,
-        params: &SampleParams,
-    ) -> CoreResult<futures::stream::BoxStream<'static, StreamEvent>> {
-        let (backend, model, context_len) = {
-            let state = self.state.read().await;
-            let loaded = state
-                .as_ref()
-                .ok_or_else(|| terminal("mobile inference", "call load before generate"))?;
-            (
-                Arc::clone(&loaded.backend),
-                Arc::clone(&loaded.model),
-                loaded.spec.context_len.unwrap_or(DEFAULT_CONTEXT),
-            )
-        };
-        let prompt = prompt.to_owned();
-        let params = params.clone();
-        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
-        gen_ui_runtime::spawn_blocking(move || {
-            if let Err(error) =
-                generate_blocking(&backend, &model, &prompt, context_len, &params, &sender)
-            {
-                let _ = sender.send(StreamEvent::Error {
-                    message: error.to_string(),
-                });
-            }
-        });
-        Ok(tokio_stream::wrappers::UnboundedReceiverStream::new(receiver).boxed())
-    }
-
-    #[cfg(feature = "local-llama-mtmd")]
     async fn generate_request(
         &self,
         request: &InferenceRequest,
-        params: &SampleParams,
     ) -> CoreResult<futures::stream::BoxStream<'static, StreamEvent>> {
         if request.images.is_empty() {
-            return self.generate(&request.prompt, params).await;
+            let (backend, model, context_len) = {
+                let state = self.state.read().await;
+                let loaded = state
+                    .as_ref()
+                    .ok_or_else(|| terminal("mobile inference", "call load before generate"))?;
+                (
+                    Arc::clone(&loaded.backend),
+                    Arc::clone(&loaded.model),
+                    loaded.spec.context_len.unwrap_or(DEFAULT_CONTEXT),
+                )
+            };
+            let messages = messages_with_tool_context(request)?;
+            let params = request.generation_settings.clone();
+            let grammar = request.grammar.clone();
+            let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
+            gen_ui_runtime::spawn_blocking(move || {
+                if let Err(error) = generate_blocking(
+                    &backend,
+                    &model,
+                    &messages,
+                    context_len,
+                    &params,
+                    grammar.as_ref(),
+                    &sender,
+                ) {
+                    let _ = sender.send(StreamEvent::Error {
+                        message: error.to_string(),
+                    });
+                }
+            });
+            return Ok(tokio_stream::wrappers::UnboundedReceiverStream::new(receiver).boxed());
         }
-        if request.images.len() > 4 {
-            return Err(terminal(
-                "multimodal inference",
-                "at most four images are supported per turn",
-            ));
-        }
-        if request
-            .images
-            .iter()
-            .any(|image| image.bytes.len() > 25 * 1024 * 1024)
+        #[cfg(not(feature = "local-llama-mtmd"))]
         {
             return Err(terminal(
                 "multimodal inference",
-                "an image exceeds the 25 MB limit",
+                "this build is text-only; process attachments through Xberg/OCR",
             ));
         }
-        let model_id = {
-            let state = self.state.read().await;
-            let loaded = state
-                .as_ref()
-                .ok_or_else(|| terminal("multimodal inference", "call load before generate"))?;
-            loaded.spec.model.clone()
-        };
-        self.ensure_multimodal(&model_id).await?;
-        let (backend, model, mtmd, context_len) = {
-            let state = self.state.read().await;
-            let loaded = state
-                .as_ref()
-                .ok_or_else(|| terminal("multimodal inference", "call load before generate"))?;
-            let mtmd = self
-                .multimodal
-                .read()
-                .await
-                .as_ref()
-                .ok_or_else(|| terminal("multimodal inference", "MTMD is not initialized"))
-                .map(Arc::clone)?;
-            (
-                Arc::clone(&loaded.backend),
-                Arc::clone(&loaded.model),
-                mtmd,
-                loaded.spec.context_len.unwrap_or(DEFAULT_CONTEXT),
-            )
-        };
-        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
-        let request = request.clone();
-        let params = params.clone();
-        gen_ui_runtime::spawn_blocking(move || {
-            if let Err(error) = generate_multimodal_blocking(
-                &backend,
-                &model,
-                &mtmd,
-                &request,
-                context_len,
-                &params,
-                &sender,
-            ) {
-                let _ = sender.send(StreamEvent::Error {
-                    message: error.to_string(),
-                });
+        #[cfg(feature = "local-llama-mtmd")]
+        {
+            if request.images.len() > 4 {
+                return Err(terminal(
+                    "multimodal inference",
+                    "at most four images are supported per turn",
+                ));
             }
-        });
-        Ok(tokio_stream::wrappers::UnboundedReceiverStream::new(receiver).boxed())
+            if request
+                .images
+                .iter()
+                .any(|image| image.bytes.len() > 25 * 1024 * 1024)
+            {
+                return Err(terminal(
+                    "multimodal inference",
+                    "an image exceeds the 25 MB limit",
+                ));
+            }
+            let model_id = {
+                let state = self.state.read().await;
+                let loaded = state
+                    .as_ref()
+                    .ok_or_else(|| terminal("multimodal inference", "call load before generate"))?;
+                loaded.spec.model.clone()
+            };
+            self.ensure_multimodal(&model_id).await?;
+            let (backend, model, mtmd, context_len) = {
+                let state = self.state.read().await;
+                let loaded = state
+                    .as_ref()
+                    .ok_or_else(|| terminal("multimodal inference", "call load before generate"))?;
+                let mtmd = self
+                    .multimodal
+                    .read()
+                    .await
+                    .as_ref()
+                    .ok_or_else(|| terminal("multimodal inference", "MTMD is not initialized"))
+                    .map(Arc::clone)?;
+                (
+                    Arc::clone(&loaded.backend),
+                    Arc::clone(&loaded.model),
+                    mtmd,
+                    loaded.spec.context_len.unwrap_or(DEFAULT_CONTEXT),
+                )
+            };
+            let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
+            let request = request.clone();
+            let params = request.generation_settings.clone();
+            gen_ui_runtime::spawn_blocking(move || {
+                if let Err(error) = generate_multimodal_blocking(
+                    &backend,
+                    &model,
+                    &mtmd,
+                    &request,
+                    context_len,
+                    &params,
+                    &sender,
+                ) {
+                    let _ = sender.send(StreamEvent::Error {
+                        message: error.to_string(),
+                    });
+                }
+            });
+            Ok(tokio_stream::wrappers::UnboundedReceiverStream::new(receiver).boxed())
+        }
     }
 
     async fn unload(&self) -> CoreResult<()> {
@@ -514,14 +662,78 @@ impl InferenceProvider for LlamaCppEngine {
         }
         Ok(())
     }
+
+    fn model_operation_state(&self) -> ModelOperationState {
+        self.model_operation.borrow().clone()
+    }
+
+    fn watch_model_operation(&self) -> futures::stream::BoxStream<'static, ModelOperationState> {
+        let receiver = self.model_operation.subscribe();
+        futures::stream::unfold((receiver, true), |(mut receiver, first)| async move {
+            if !first && receiver.changed().await.is_err() {
+                return None;
+            }
+            let value = receiver.borrow().clone();
+            Some((value, (receiver, false)))
+        })
+        .boxed()
+    }
+
+    fn cancel_model_operation(&self) {
+        self.model_cancelled.store(true, Ordering::Release);
+        let _ = self.model_operation.send(ModelOperationState::Cancelling);
+    }
+
+    async fn runtime_diagnostics(&self) -> Option<RuntimeDiagnostics> {
+        self.diagnostics().await
+    }
+}
+
+fn messages_with_tool_context(request: &InferenceRequest) -> CoreResult<Vec<InferenceMessage>> {
+    let mut messages = request.effective_messages();
+    if messages
+        .iter()
+        .all(|message| message.content.trim().is_empty())
+    {
+        return Err(terminal(
+            "mobile inference",
+            "request contains no message content",
+        ));
+    }
+    if !request.tools.is_empty() {
+        let tool_json = serde_json::to_string(&request.tools)
+            .map_err(|error| terminal("tool schema serialize", error))?;
+        let instruction = format!(
+            "Available tools are described by this JSON. Call a tool only when needed and emit arguments that satisfy its parameters schema:\n{tool_json}"
+        );
+        if let Some(system) = messages
+            .iter_mut()
+            .find(|message| message.role == InferenceRole::System)
+        {
+            system.content.push_str("\n\n");
+            system.content.push_str(&instruction);
+        } else {
+            messages.insert(
+                0,
+                InferenceMessage {
+                    role: InferenceRole::System,
+                    content: instruction,
+                    name: None,
+                    tool_call_id: None,
+                },
+            );
+        }
+    }
+    Ok(messages)
 }
 
 fn generate_blocking(
     backend: &LlamaBackend,
     model: &LlamaModel,
-    prompt: &str,
+    messages: &[InferenceMessage],
     context_len: u32,
     params: &SampleParams,
+    grammar: Option<&GrammarConstraint>,
     sender: &tokio::sync::mpsc::UnboundedSender<StreamEvent>,
 ) -> CoreResult<()> {
     let context_len = NonZeroU32::new(context_len)
@@ -530,19 +742,21 @@ fn generate_blocking(
     let mut context = model
         .new_context(backend, context_params)
         .map_err(|error| terminal("llama context", error))?;
-    let formatted = (|| -> CoreResult<String> {
-        let template = model
-            .chat_template(None)
-            .map_err(|error| terminal("chat template", error))?;
-        let message = LlamaChatMessage::new("user".to_string(), prompt.to_string())
-            .map_err(|error| terminal("chat message", error))?;
-        model
-            .apply_chat_template(&template, &[message], true)
-            .map_err(|error| terminal("apply chat template", error))
-    })()
-    .unwrap_or_else(|_| prompt.to_string());
+    let template = model
+        .chat_template(None)
+        .map_err(|error| terminal("chat template", error))?;
+    let chat_messages = messages
+        .iter()
+        .map(|message| {
+            LlamaChatMessage::new(message.role.as_str().to_string(), message.content.clone())
+                .map_err(|error| terminal("chat message", error))
+        })
+        .collect::<CoreResult<Vec<_>>>()?;
+    let formatted = model
+        .apply_chat_template(&template, &chat_messages, true)
+        .map_err(|error| terminal("apply chat template", error))?;
     let tokens = model
-        .str_to_token(&formatted, AddBos::Always)
+        .str_to_token(&formatted, AddBos::Never)
         .map_err(|error| terminal("prompt tokenize", error))?;
     if tokens.len() + params.max_tokens as usize > context_len.get() as usize {
         return Err(terminal(
@@ -560,11 +774,22 @@ fn generate_blocking(
     context
         .decode(&mut batch)
         .map_err(|error| terminal("prompt decode", error))?;
-    let mut sampler = LlamaSampler::chain_simple([
+    let mut sampler_chain = vec![
+        LlamaSampler::top_k(params.top_k),
         LlamaSampler::top_p(params.top_p, 1),
+        LlamaSampler::min_p(params.min_p, 1),
+        LlamaSampler::penalties(-1, 1.0, 0.0, params.presence_penalty),
         LlamaSampler::temp(params.temperature),
         LlamaSampler::dist(0xC0FFEE),
-    ]);
+    ];
+    if let Some(grammar) = grammar {
+        sampler_chain.insert(
+            0,
+            LlamaSampler::llguidance(model, &grammar.kind, &grammar.data)
+                .map_err(|error| terminal("llguidance grammar", error))?,
+        );
+    }
+    let mut sampler = LlamaSampler::chain_simple(sampler_chain);
     let mut decoder = encoding_rs::UTF_8.new_decoder();
     for (position, index) in (batch.n_tokens()..).zip(0..params.max_tokens) {
         let token = sampler.sample(&context, batch.n_tokens() - 1);
@@ -636,11 +861,22 @@ fn generate_multimodal_blocking(
             "image prompt plus requested output exceeds the context length",
         ));
     }
-    let mut sampler = LlamaSampler::chain_simple([
+    let mut sampler_chain = vec![
+        LlamaSampler::top_k(params.top_k),
         LlamaSampler::top_p(params.top_p, 1),
+        LlamaSampler::min_p(params.min_p, 1),
+        LlamaSampler::penalties(-1, 1.0, 0.0, params.presence_penalty),
         LlamaSampler::temp(params.temperature),
         LlamaSampler::dist(0xC0FFEE),
-    ]);
+    ];
+    if let Some(grammar) = &request.grammar {
+        sampler_chain.insert(
+            0,
+            LlamaSampler::llguidance(model, &grammar.kind, &grammar.data)
+                .map_err(|error| terminal("llguidance grammar", error))?,
+        );
+    }
+    let mut sampler = LlamaSampler::chain_simple(sampler_chain);
     let mut decoder = encoding_rs::UTF_8.new_decoder();
     let mut batch = LlamaBatch::new(1, 1);
     for index in 0..params.max_tokens {
@@ -675,7 +911,7 @@ fn generate_multimodal_blocking(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::catalog::{ANDROID_QWEN35_4B_ID, IPHONE_QWEN35_9B_ID};
+    use crate::catalog::{ANDROID_QWEN3_4B_ID, IPHONE_QWEN35_9B_ID};
 
     #[test]
     fn resolves_each_catalog_model_to_its_pinned_file() {
@@ -693,14 +929,14 @@ mod tests {
 
         let (android, android_artifact) = resolve_model(
             &LocalModelSpec {
-                model: ANDROID_QWEN35_4B_ID.to_string(),
+                model: ANDROID_QWEN3_4B_ID.to_string(),
                 context_len: Some(8192),
             },
             temp,
         )
         .expect("Android catalog model should resolve");
-        assert!(android.ends_with("Qwen3.5-4B-Q4_K_M.gguf"));
-        assert_eq!(android_artifact.expect("artifact").byte_len, 2_740_937_888);
+        assert!(android.ends_with("Qwen_Qwen3-4B-Instruct-2507-Q5_K_M.gguf"));
+        assert_eq!(android_artifact.expect("artifact").byte_len, 2_889_513_696);
     }
 
     #[test]
@@ -719,7 +955,7 @@ mod tests {
     fn preflight_rejects_artifacts_above_configured_default_budget() {
         let oversized = ArtifactSpec {
             byte_len: DEFAULT_MAX_MODEL_BYTES + 1,
-            ..crate::catalog::ANDROID_QWEN35_4B.model
+            ..crate::catalog::ANDROID_QWEN3_4B.model
         };
         assert!(preflight_artifact(oversized).is_err());
     }

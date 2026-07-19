@@ -42,6 +42,7 @@ pub fn chat_events(run_id: String, sink: StreamSink<String>) {
             let terminal = matches!(
                 &event,
                 gen_ui_types::events::A2uiEvent::RunFinished { .. }
+                    | gen_ui_types::events::A2uiEvent::RunCancelled { .. }
                     | gen_ui_types::events::A2uiEvent::RunError { .. }
             );
             let Ok(json) = serde_json::to_string(&event) else {
@@ -67,8 +68,26 @@ pub fn chat_events(run_id: String, sink: StreamSink<String>) {
             if matches!(
                 event,
                 gen_ui_types::events::A2uiEvent::RunFinished { .. }
+                    | gen_ui_types::events::A2uiEvent::RunCancelled { .. }
                     | gen_ui_types::events::A2uiEvent::RunError { .. }
             ) {
+                break;
+            }
+        }
+    });
+}
+
+pub fn local_model_status_events(sink: StreamSink<String>) {
+    gen_ui_runtime::spawn(async move {
+        let Ok(mut stream) = gen_ui_agent::chat::watch_local_model_status() else {
+            return;
+        };
+        use futures::StreamExt;
+        while let Some(status) = stream.next().await {
+            let Ok(json) = serde_json::to_string(&status) else {
+                continue;
+            };
+            if sink.add(json).is_err() {
                 break;
             }
         }

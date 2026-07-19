@@ -15,6 +15,7 @@ pub mod tools;
 // C-106: forge-backed WriteSink. Lives here (L3) because the trait is gen_ui_db's and
 // the client is gen_ui_client's — L2 siblings that must not depend on each other.
 pub mod sync_sink;
+pub mod uar;
 
 pub use config::ConfigBackend;
 pub use error::AgentError;

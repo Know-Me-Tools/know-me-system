@@ -28,6 +28,8 @@ const _uuid = Uuid();
 @riverpod
 class ChatNotifier extends _$ChatNotifier {
   final _drivers = <String, A2uiContentDriver>{};
+  final _checkpointTimers = <String, Timer>{};
+  StreamSubscription<Map<String, dynamic>>? _modelStatusSubscription;
   bool _loaded = false;
   ChatRepository get _repository => ref.read(chatRepositoryProvider);
 
@@ -37,6 +39,10 @@ class ChatNotifier extends _$ChatNotifier {
       for (final d in _drivers.values) {
         d.dispose();
       }
+      for (final timer in _checkpointTimers.values) {
+        timer.cancel();
+      }
+      unawaited(_modelStatusSubscription?.cancel());
     });
     return const ChatState.initial();
   }
@@ -60,7 +66,32 @@ class ChatNotifier extends _$ChatNotifier {
       messages: messages,
       isLoading: false,
     );
+    _modelStatusSubscription ??= _repository.watchLocalModelStatus().listen(
+      (operation) {
+        if (!ref.mounted) return;
+        state = state.copyWith(
+          modelOperation: operation.cast<String, Object?>(),
+        );
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        if (!ref.mounted) return;
+        state = state.copyWith(
+          modelOperation: {
+            'state': 'failed',
+            'error': {
+              'code': 'model_status_stream_failed',
+              'phase': 'model_loading',
+              'message': error.toString(),
+              'retryable': true,
+              'diagnostics': stackTrace.toString(),
+            },
+          },
+        );
+      },
+    );
   }
+
+  Future<void> cancelModelOperation() => _repository.cancelModelOperation();
 
   Future<void> createConversation() async {
     final conversation = await _repository.createConversation(
@@ -116,6 +147,79 @@ class ChatNotifier extends _$ChatNotifier {
             m,
       ],
     );
+    _scheduleCheckpoint(messageId);
+  }
+
+  void updateRunPhase(String messageId, RunPhaseChanged phase) {
+    state = state.copyWith(
+      messages: [
+        for (final message in state.messages)
+          if (message.id == messageId)
+            message.copyWith(
+              runId: phase.runId,
+              runStatus: phase.status,
+              runPhase: phase.phase,
+              statusMessage: phase.message,
+              isStreaming: true,
+            )
+          else
+            message,
+      ],
+    );
+    _scheduleCheckpoint(messageId);
+  }
+
+  void markRunError(String messageId, ChatRunError error) {
+    state = state.copyWith(
+      messages: [
+        for (final message in state.messages)
+          if (message.id == messageId)
+            message.copyWith(
+              runStatus: 'error',
+              runPhase: error.phase,
+              statusMessage: error.displayMessage,
+              error: error,
+              isStreaming: false,
+            )
+          else
+            message,
+      ],
+    );
+    _checkpointNow(messageId);
+  }
+
+  void markRunCancelled(String messageId, RunCancelled event) {
+    state = state.copyWith(
+      messages: [
+        for (final message in state.messages)
+          if (message.id == messageId)
+            message.copyWith(
+              runStatus: 'cancelled',
+              runPhase: event.phase,
+              statusMessage: event.message,
+              isStreaming: false,
+            )
+          else
+            message,
+      ],
+    );
+    _checkpointNow(messageId);
+  }
+
+  void updateContextTelemetry(String messageId, ContextTelemetry event) {
+    state = state.copyWith(
+      messages: [
+        for (final message in state.messages)
+          if (message.id == messageId)
+            message.copyWith(
+              contextPlanVersion: event.payload['planVersion']?.toString(),
+              contextTelemetry: event.payload.cast<String, Object?>(),
+            )
+          else
+            message,
+      ],
+    );
+    _scheduleCheckpoint(messageId);
   }
 
   List<ContentBlock> _appendOrMerge(
@@ -151,7 +255,21 @@ class ChatNotifier extends _$ChatNotifier {
     state = state.copyWith(
       messages: [
         for (final m in state.messages)
-          if (m.id == messageId) m.copyWith(isStreaming: false) else m,
+          if (m.id == messageId)
+            m.copyWith(
+              isStreaming: false,
+              runStatus: switch (m.runStatus) {
+                'error' || 'cancelled' => m.runStatus,
+                _ => 'complete',
+              },
+              runPhase: 'persistence',
+              statusMessage: switch (m.runStatus) {
+                'error' || 'cancelled' => m.statusMessage,
+                _ => null,
+              },
+            )
+          else
+            m,
       ],
     );
     ChatMessage? message;
@@ -162,6 +280,7 @@ class ChatNotifier extends _$ChatNotifier {
       }
     }
     if (message != null && state.threadId.isNotEmpty) {
+      _checkpointTimers.remove(messageId)?.cancel();
       unawaited(_repository.saveMessage(state.threadId, message));
     }
   }
@@ -172,15 +291,18 @@ class ChatNotifier extends _$ChatNotifier {
     String text, {
     List<ContentBlock> attachments = const [],
     List<String> attachmentPaths = const [],
+    String branchId = 'main',
   }) async {
     await load();
     if (!ref.mounted || state.threadId.isEmpty) return;
-    final history = _historyForRust(state.messages);
+    final history = _historyForRust(state.messages, branchId);
     final userMsg = ChatMessage(
       id: _uuid.v4(),
       role: 'user',
       content: [...attachments, TextBlock(text)],
       createdAt: DateTime.now().toUtc(),
+      branchId: branchId,
+      attachmentPaths: attachmentPaths,
     );
     final assistantId = _uuid.v4();
     final assistantMsg = ChatMessage(
@@ -189,6 +311,11 @@ class ChatNotifier extends _$ChatNotifier {
       content: const [],
       createdAt: DateTime.now().toUtc(),
       isStreaming: true,
+      parentMessageId: userMsg.id,
+      branchId: userMsg.branchId,
+      runStatus: 'queued',
+      runPhase: 'queued',
+      statusMessage: 'Queued',
     );
     state = state.copyWith(
       messages: [...state.messages, userMsg, assistantMsg],
@@ -196,23 +323,279 @@ class ChatNotifier extends _$ChatNotifier {
     await _repository.saveMessage(state.threadId, userMsg);
     await _touchConversation(text);
 
-    final runId = await _repository.startTurn(
-      threadId: state.threadId,
-      message: text,
-      history: history,
-      attachmentPaths: attachmentPaths,
-    );
+    late final String runId;
+    try {
+      runId = await _repository.startTurn(
+        threadId: state.threadId,
+        message: text,
+        history: history,
+        attachmentPaths: attachmentPaths,
+        branchId: branchId,
+        userMessageId: userMsg.id,
+      );
+    } catch (error, stackTrace) {
+      markRunError(
+        assistantId,
+        ChatRunError(
+          code: 'run_start_failed',
+          phase: 'queued',
+          message: error.toString(),
+          retryable: true,
+          diagnostics: stackTrace.toString(),
+        ),
+      );
+      return;
+    }
     if (!ref.mounted) return; // provider paused/disposed while awaiting
+    updateRunPhase(
+      assistantId,
+      RunPhaseChanged(runId, 'queued', 'preparing', 'Preparing response'),
+    );
 
     final driver = A2uiContentDriver(
       messageId: assistantId,
       onBlock: streamBlock,
       onFinalize: finalizeMessage,
-      onError: (id, msg) =>
-          streamBlock(messageId: id, block: TextBlock('⚠️ $msg')),
+      onPhase: updateRunPhase,
+      onCancelled: markRunCancelled,
+      onTelemetry: updateContextTelemetry,
+      onError: markRunError,
     )..connect(_repository.events(runId));
     _drivers[assistantId] = driver;
     ref.onDispose(() => driver.dispose());
+  }
+
+  Future<void> resubmitMessage(String messageId) async {
+    final message = state.messages
+        .where((item) => item.id == messageId)
+        .firstOrNull;
+    if (message == null || message.role != 'user' || message.isStreaming) {
+      return;
+    }
+    final sourceIndex = state.messages.indexWhere(
+      (item) => item.id == messageId,
+    );
+    if (sourceIndex < 0) return;
+    final text = message.content
+        .whereType<TextBlock>()
+        .map((block) => block.text)
+        .join();
+    final attachments = message.content
+        .where((block) => block is! TextBlock)
+        .toList();
+    final branchId = _uuid.v4();
+    final userMsg = ChatMessage(
+      id: _uuid.v4(),
+      role: 'user',
+      content: [...attachments, TextBlock(text)],
+      createdAt: DateTime.now().toUtc(),
+      branchId: branchId,
+      attachmentPaths: message.attachmentPaths,
+    );
+    final assistantId = _uuid.v4();
+    final assistantMsg = ChatMessage(
+      id: assistantId,
+      role: 'assistant',
+      content: const [],
+      createdAt: DateTime.now().toUtc(),
+      isStreaming: true,
+      parentMessageId: userMsg.id,
+      branchId: userMsg.branchId,
+      runStatus: 'queued',
+      runPhase: 'queued',
+      statusMessage: 'Queued',
+    );
+    final history = _historyForRust(
+      state.messages.take(sourceIndex).toList(),
+      message.branchId,
+    );
+    state = state.copyWith(
+      messages: [...state.messages, userMsg, assistantMsg],
+    );
+    await _repository.saveMessage(state.threadId, userMsg);
+    late final String runId;
+    try {
+      runId = await _repository.startTurn(
+        threadId: state.threadId,
+        message: text,
+        history: history,
+        attachmentPaths: userMsg.attachmentPaths,
+        branchId: branchId,
+        userMessageId: userMsg.id,
+      );
+    } catch (error, stackTrace) {
+      markRunError(
+        assistantId,
+        ChatRunError(
+          code: 'resubmit_start_failed',
+          phase: 'queued',
+          message: error.toString(),
+          retryable: true,
+          diagnostics: stackTrace.toString(),
+        ),
+      );
+      return;
+    }
+    if (!ref.mounted) return;
+    updateRunPhase(
+      assistantId,
+      RunPhaseChanged(runId, 'queued', 'preparing', 'Preparing response'),
+    );
+    final driver = A2uiContentDriver(
+      messageId: assistantId,
+      onBlock: streamBlock,
+      onFinalize: finalizeMessage,
+      onPhase: updateRunPhase,
+      onCancelled: markRunCancelled,
+      onTelemetry: updateContextTelemetry,
+      onError: markRunError,
+    )..connect(_repository.events(runId));
+    _drivers[assistantId] = driver;
+    ref.onDispose(driver.dispose);
+  }
+
+  Future<void> cancelRun(String messageId) async {
+    final message = state.messages
+        .where((item) => item.id == messageId)
+        .firstOrNull;
+    final runId = message?.runId;
+    if (message == null || !message.isStreaming || runId == null) return;
+    updateRunPhase(
+      messageId,
+      RunPhaseChanged(
+        runId,
+        message.runPhase ?? 'generation',
+        'preparing',
+        'Cancelling',
+      ),
+    );
+    final accepted = await _repository.cancelRun(runId);
+    if (!ref.mounted || accepted) return;
+    markRunError(
+      messageId,
+      const ChatRunError(
+        code: 'run_not_active',
+        phase: 'generation',
+        message: 'This run already ended and could not be cancelled.',
+        retryable: false,
+      ),
+    );
+  }
+
+  Future<void> deleteResponse(String messageId) async {
+    final selected = state.messages
+        .where((item) => item.id == messageId)
+        .firstOrNull;
+    if (selected == null ||
+        selected.role != 'assistant' ||
+        selected.isStreaming) {
+      return;
+    }
+    final selectedIndex = state.messages.indexWhere(
+      (item) => item.id == messageId,
+    );
+    final ids = state.messages
+        .skip(selectedIndex)
+        .where((item) => item.branchId == selected.branchId)
+        .map((item) => item.id)
+        .toList(growable: false);
+    await _repository.deleteMessages(ids);
+    if (!ref.mounted) return;
+    state = state.copyWith(
+      messages: state.messages.where((item) => !ids.contains(item.id)).toList(),
+    );
+  }
+
+  Future<void> regenerateResponse(String messageId) async {
+    final assistant = state.messages
+        .where((item) => item.id == messageId)
+        .firstOrNull;
+    if (assistant == null ||
+        assistant.role != 'assistant' ||
+        assistant.isStreaming) {
+      return;
+    }
+    final user = state.messages
+        .where((item) => item.id == assistant.parentMessageId)
+        .firstOrNull;
+    if (user == null) return;
+    final text = user.content
+        .whereType<TextBlock>()
+        .map((block) => block.text)
+        .join();
+    await deleteResponse(messageId);
+    if (!ref.mounted) return;
+    await _startResponseForSavedUser(
+      user,
+      text,
+      attachmentPaths: user.attachmentPaths,
+    );
+  }
+
+  Future<void> _startResponseForSavedUser(
+    ChatMessage user,
+    String text, {
+    required List<String> attachmentPaths,
+  }) async {
+    final userIndex = state.messages.indexWhere((item) => item.id == user.id);
+    if (userIndex < 0) return;
+    final assistantId = _uuid.v4();
+    final assistant = ChatMessage(
+      id: assistantId,
+      role: 'assistant',
+      content: const [],
+      createdAt: DateTime.now().toUtc(),
+      isStreaming: true,
+      parentMessageId: user.id,
+      branchId: user.branchId,
+      runStatus: 'queued',
+      runPhase: 'queued',
+      statusMessage: 'Queued',
+    );
+    final history = _historyForRust(
+      state.messages.take(userIndex).toList(),
+      user.branchId,
+    );
+    state = state.copyWith(messages: [...state.messages, assistant]);
+    late final String runId;
+    try {
+      runId = await _repository.startTurn(
+        threadId: state.threadId,
+        message: text,
+        history: history,
+        attachmentPaths: attachmentPaths,
+        branchId: user.branchId,
+        userMessageId: user.id,
+      );
+    } catch (error, stackTrace) {
+      markRunError(
+        assistantId,
+        ChatRunError(
+          code: 'regenerate_start_failed',
+          phase: 'queued',
+          message: error.toString(),
+          retryable: true,
+          diagnostics: stackTrace.toString(),
+        ),
+      );
+      return;
+    }
+    if (!ref.mounted) return;
+    updateRunPhase(
+      assistantId,
+      RunPhaseChanged(runId, 'queued', 'preparing', 'Preparing response'),
+    );
+    final driver = A2uiContentDriver(
+      messageId: assistantId,
+      onBlock: streamBlock,
+      onFinalize: finalizeMessage,
+      onPhase: updateRunPhase,
+      onCancelled: markRunCancelled,
+      onTelemetry: updateContextTelemetry,
+      onError: markRunError,
+    )..connect(_repository.events(runId));
+    _drivers[assistantId] = driver;
+    ref.onDispose(driver.dispose);
   }
 
   /// Submit an A2UI or AG-UI confirmation interaction through the same typed
@@ -234,8 +617,13 @@ class ChatNotifier extends _$ChatNotifier {
       content: const [],
       createdAt: DateTime.now().toUtc(),
       isStreaming: true,
+      parentMessageId: userMsg.id,
+      branchId: userMsg.branchId,
+      runStatus: 'queued',
+      runPhase: 'queued',
+      statusMessage: 'Queued',
     );
-    final history = _historyForRust(state.messages);
+    final history = _historyForRust(state.messages, userMsg.branchId);
     state = state.copyWith(
       messages: [...state.messages, userMsg, assistantMsg],
     );
@@ -244,14 +632,84 @@ class ChatNotifier extends _$ChatNotifier {
       threadId: state.threadId,
       interactionJson: payload,
       history: history,
+      branchId: userMsg.branchId,
     );
     if (!ref.mounted) return;
     final driver = A2uiContentDriver(
       messageId: assistantId,
       onBlock: streamBlock,
       onFinalize: finalizeMessage,
-      onError: (id, message) =>
-          streamBlock(messageId: id, block: TextBlock('⚠️ $message')),
+      onPhase: updateRunPhase,
+      onCancelled: markRunCancelled,
+      onTelemetry: updateContextTelemetry,
+      onError: markRunError,
+    )..connect(_repository.events(runId));
+    _drivers[assistantId] = driver;
+    ref.onDispose(driver.dispose);
+  }
+
+  Future<void> approveToolConfirmation(
+    String sourceMessageId,
+    String approvalId,
+  ) async {
+    await load();
+    if (!ref.mounted || state.threadId.isEmpty || approvalId.isEmpty) return;
+    final source = state.messages
+        .where((item) => item.id == sourceMessageId)
+        .firstOrNull;
+    if (source == null || source.role != 'assistant' || source.isStreaming) {
+      return;
+    }
+
+    final assistantId = _uuid.v4();
+    final assistant = ChatMessage(
+      id: assistantId,
+      role: 'assistant',
+      content: const [],
+      createdAt: DateTime.now().toUtc(),
+      isStreaming: true,
+      parentMessageId: source.id,
+      branchId: source.branchId,
+      runStatus: 'queued',
+      runPhase: 'tool_execution',
+      statusMessage: 'Approving tool call',
+    );
+    state = state.copyWith(messages: [...state.messages, assistant]);
+
+    late final String runId;
+    try {
+      runId = await _repository.approveToolConfirmation(approvalId: approvalId);
+    } catch (error, stackTrace) {
+      markRunError(
+        assistantId,
+        ChatRunError(
+          code: 'tool_approval_start_failed',
+          phase: 'tool_execution',
+          message: error.toString(),
+          retryable: false,
+          diagnostics: stackTrace.toString(),
+        ),
+      );
+      return;
+    }
+    if (!ref.mounted) return;
+    updateRunPhase(
+      assistantId,
+      RunPhaseChanged(
+        runId,
+        'tool_execution',
+        'preparing',
+        'Executing approved tool call',
+      ),
+    );
+    final driver = A2uiContentDriver(
+      messageId: assistantId,
+      onBlock: streamBlock,
+      onFinalize: finalizeMessage,
+      onPhase: updateRunPhase,
+      onCancelled: markRunCancelled,
+      onTelemetry: updateContextTelemetry,
+      onError: markRunError,
     )..connect(_repository.events(runId));
     _drivers[assistantId] = driver;
     ref.onDispose(driver.dispose);
@@ -262,11 +720,32 @@ class ChatNotifier extends _$ChatNotifier {
     RemoteContentKind kind,
   ) => _repository.resolveRemoteContent(url, kind);
 
-  List<String> _historyForRust(List<ChatMessage> messages) => [
-    for (final message in messages) ...[
-      message.role,
-      message.content.whereType<TextBlock>().map((block) => block.text).join(),
-    ],
+  List<ChatHistoryEntry> _historyForRust(
+    List<ChatMessage> messages,
+    String branchId,
+  ) => [
+    for (final message in messages)
+      if (message.branchId == branchId) ...[
+        if (message.content
+            .whereType<TextBlock>()
+            .map((block) => block.text)
+            .join()
+            .trim()
+            .isNotEmpty)
+          ChatHistoryEntry(
+            role: message.role,
+            content: message.content
+                .whereType<TextBlock>()
+                .map((block) => block.text)
+                .join(),
+          ),
+        for (final result in message.content.whereType<ToolResultBlock>())
+          ChatHistoryEntry(
+            role: 'tool',
+            content: result.outputJson,
+            toolCallId: result.toolUseId,
+          ),
+      ],
   ];
 
   Future<void> _touchConversation(String firstMessage) async {
@@ -293,6 +772,25 @@ class ChatNotifier extends _$ChatNotifier {
           if (item.id != updated.id) item,
       ],
     );
+  }
+
+  void _scheduleCheckpoint(String messageId) {
+    _checkpointTimers.remove(messageId)?.cancel();
+    _checkpointTimers[messageId] = Timer(
+      const Duration(milliseconds: 250),
+      () => _checkpointNow(messageId),
+    );
+  }
+
+  void _checkpointNow(String messageId) {
+    _checkpointTimers.remove(messageId)?.cancel();
+    if (state.threadId.isEmpty) return;
+    final message = state.messages
+        .where((item) => item.id == messageId)
+        .firstOrNull;
+    if (message != null) {
+      unawaited(_repository.saveMessage(state.threadId, message));
+    }
   }
 
   /// Test/utility seam: fold an already-open stream (no FFI send). Used by the

@@ -35,10 +35,13 @@ pub use corpus::{corpus_len, seed_corpus};
 pub use embed::{Embedder, EmbeddingModelInfo, EMBED_DIM};
 pub use error::GraphError;
 pub use rrf::{rrf_fuse, RrfConfig};
-pub use store::{GraphStore, GraphStoreConfig, MemoryHit, MemoryRecord, RelatedEntity, SearchMode};
+pub use store::{
+    GraphStore, GraphStoreConfig, MemoryHit, MemoryProvenance, MemoryRecord, RelatedEntity,
+    SearchMode,
+};
 
 #[cfg(feature = "embed-native")]
-pub use embed::FastEmbedder;
+pub use embed::{FastEmbedder, LazyFastEmbedder};
 
 /// Result alias for graph-store operations. `GraphError` maps cleanly into the
 /// workspace-wide `gen_ui_types::CoreError` via `From`, so callers at the FFI

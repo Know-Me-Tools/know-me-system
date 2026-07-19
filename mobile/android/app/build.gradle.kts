@@ -1,5 +1,6 @@
 plugins {
     id("com.android.application")
+    id("org.jetbrains.kotlin.android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
@@ -41,6 +42,16 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
+    packaging {
+        jniLibs {
+            excludes += setOf(
+                "lib/armeabi-v7a/**",
+                "lib/x86/**",
+                "lib/x86_64/**",
+            )
+        }
+    }
 }
 
 kotlin {
@@ -51,4 +62,12 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Pinned from Google Maven metadata (latest/release 0.14.0, 2026-07-08).
+    // Rust remains the inference-policy owner; this AAR supplies the official
+    // Android LiteRT-LM classes and native JNI library that Rust calls through
+    // the JavaVM captured by gen_ui_ffi.
+    implementation("com.google.ai.edge.litertlm:litertlm-android:0.14.0")
 }

@@ -8,33 +8,41 @@ part of 'startup_notifier.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Runs migrations → seeds → shapes once, yielding each phase as it begins and
+/// Opens schema compatibility and sync once. Embedding models, demo seeds,
+/// Xberg, and inference are deliberately lazy and never block the app shell.
 /// [StartupPhase.ready] when the store is usable. A stream provider so the gate
 /// rebuilds per phase; auto-dispose by default. Retry is off — see file header.
 
 @ProviderFor(startup)
 final startupProvider = StartupProvider._();
 
-/// Runs migrations → seeds → shapes once, yielding each phase as it begins and
+/// Opens schema compatibility and sync once. Embedding models, demo seeds,
+/// Xberg, and inference are deliberately lazy and never block the app shell.
 /// [StartupPhase.ready] when the store is usable. A stream provider so the gate
 /// rebuilds per phase; auto-dispose by default. Retry is off — see file header.
 
-final class StartupProvider extends $FunctionalProvider<
-        AsyncValue<StartupPhase>, StartupPhase, Stream<StartupPhase>>
+final class StartupProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<StartupPhase>,
+          StartupPhase,
+          Stream<StartupPhase>
+        >
     with $FutureModifier<StartupPhase>, $StreamProvider<StartupPhase> {
-  /// Runs migrations → seeds → shapes once, yielding each phase as it begins and
+  /// Opens schema compatibility and sync once. Embedding models, demo seeds,
+  /// Xberg, and inference are deliberately lazy and never block the app shell.
   /// [StartupPhase.ready] when the store is usable. A stream provider so the gate
   /// rebuilds per phase; auto-dispose by default. Retry is off — see file header.
   StartupProvider._()
-      : super(
-          from: null,
-          argument: null,
-          retry: _noRetry,
-          name: r'startupProvider',
-          isAutoDispose: true,
-          dependencies: null,
-          $allTransitiveDependencies: null,
-        );
+    : super(
+        from: null,
+        argument: null,
+        retry: _noRetry,
+        name: r'startupProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
 
   @override
   String debugGetCreateSourceHash() => _$startupHash();
@@ -42,8 +50,8 @@ final class StartupProvider extends $FunctionalProvider<
   @$internal
   @override
   $StreamProviderElement<StartupPhase> $createElement(
-          $ProviderPointer pointer) =>
-      $StreamProviderElement(pointer);
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
 
   @override
   Stream<StartupPhase> create(Ref ref) {
@@ -51,4 +59,4 @@ final class StartupProvider extends $FunctionalProvider<
   }
 }
 
-String _$startupHash() => r'd5df62aed7fa44f9f95a690fdb21c6da55758d4a';
+String _$startupHash() => r'327b404b48026f4da6b7249eb528da4d820f56ae';

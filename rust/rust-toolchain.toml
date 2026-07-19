@@ -1,7 +1,7 @@
 [toolchain]
-# Rust 1.96 is the shared native/wasm floor. SurrealDB 3.2's fastnum needs
-# rustc >=1.94, and wasm32-unknown-unknown only compiled cleanly on 1.96.
-channel = "1.96"
+# Rust 1.97.1 is the shared native/wasm floor as of 2026-07-19.
+# Compatibility with older Rust is not a product constraint.
+channel = "1.97.1"
 components = ["rustfmt", "clippy", "rust-src"]
 targets = [
     "aarch64-apple-ios",

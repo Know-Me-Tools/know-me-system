@@ -18,8 +18,8 @@ futures.workspace     = true
 # `#[frb(...)]` attribute macro flutter_rust_bridge re-exports, so ChangeEvent
 # can carry `#[frb(unignore)]` without gen_ui_types depending on the full
 # flutter_rust_bridge runtime crate. Version-pinned to match gen_ui_ffi's
-# `flutter_rust_bridge = "=2.12.0"`.
-flutter_rust_bridge_macros = "=2.12.0"
+# `flutter_rust_bridge = "=2.13.0-beta.5"`.
+flutter_rust_bridge_macros = "=2.13.0-beta.5"
 
 [lints.rust]
 # `#[frb(...)]` expands to code guarded by `cfg(frb_expand)`, a cfg name that

@@ -11,5 +11,6 @@ export function useLane() {
     error: useLaneStore((state) => state.error),
     switchLane: useLaneStore((state) => state.switchLane),
     initLane: useLaneStore((state) => state.init),
+    cancelPreparation: useLaneStore((state) => state.cancelPreparation),
   }
 }

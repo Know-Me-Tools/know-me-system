@@ -77,7 +77,7 @@ class Rustup {
 
     final res = runCommand("rustup", ['toolchain', 'list']);
 
-    // Version-pinned toolchains (for example `1.96-aarch64-apple-darwin`) are
+    // Version-pinned toolchains (for example `1.97.1-aarch64-apple-darwin`) are
     // first-class rustup toolchains too. Retain them so Cargokit does not try
     // to reinstall an already-present pinned compiler on every build.
     Pattern nonCustom = RegExp(r"^(stable|beta|nightly|[0-9])");

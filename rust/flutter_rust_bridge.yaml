@@ -1,5 +1,5 @@
 # TJ-ARCH-MOB-001 compliant
-# flutter_rust_bridge 2.12 codegen. Run from a hybrid project root:
+# flutter_rust_bridge 2.13.0-beta.5 codegen. Run from a hybrid project root:
 #   flutter_rust_bridge_codegen generate --config-file rust/flutter_rust_bridge.yaml
 # Multi-crate rust_input (frb 2.x): crate::api is the codegen root; the
 # comma-separated crate::module paths that follow tell frb to ALSO cargo-expand

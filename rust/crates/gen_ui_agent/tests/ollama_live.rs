@@ -121,9 +121,14 @@ async fn chat_send_streams_a_real_ollama_response() {
         memory,
     );
 
-    let run_id = gen_ui_agent::chat::send("Say hello in exactly one word.".into(), Vec::new())
-        .await
-        .expect("chat::send should succeed against a running Ollama instance");
+    let run_id = gen_ui_agent::chat::send(
+        "Say hello in exactly one word.".into(),
+        Vec::new(),
+        "live-conversation".into(),
+        "main".into(),
+    )
+    .await
+    .expect("chat::send should succeed against a running Ollama instance");
 
     let mut rx = state::subscribe().expect("agent state should be initialised");
 
@@ -151,9 +156,12 @@ async fn chat_send_streams_a_real_ollama_response() {
                 saw_terminal = true;
                 break;
             }
-            A2uiEvent::RunError { message, .. } => {
-                panic!("chat run errored: {message}");
+            A2uiEvent::RunError { error, .. } => {
+                panic!("chat run errored: {}", error.message);
             }
+            A2uiEvent::RunPhaseChanged { .. }
+            | A2uiEvent::RunCancelled { .. }
+            | A2uiEvent::ContextTelemetry { .. } => {}
         }
     }
 

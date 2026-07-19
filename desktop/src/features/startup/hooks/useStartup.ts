@@ -6,7 +6,6 @@ import { useStartupStore, phaseProgress } from '../stores/startupStore'
 
 const PHASE_LABEL: Record<string, string> = {
   migrations: 'Applying migrations',
-  seeds: 'Loading seed data',
   shapes: 'Attaching sync shapes',
   ready: 'Ready',
 }

@@ -5,7 +5,7 @@
     ".kbd-orchestrator/phases/model-runtime-per-device/plan.md"
   ],
   "nextStage": "execute",
-  "summaryForNext": "Four ordered OpenSpec slices are ready: runtime catalog first, then vision and bounded local tools in parallel, then physical-device proof. The first implementation change is qwen35-model-runtime; Gemma/QNN is explicitly deferred.",
+  "summaryForNext": "Four ordered OpenSpec slices are ready: Android LiteRT-LM runtime baseline, LiteRT-LM native adapter, bounded local tools, then physical-device proof. The first implementation slice is android-litertlm-runtime; Gemma 4 E2B LiteRT-LM is the Android baseline and retired Android Qwen/Vulkan/OpenCL work must not be resumed.",
   "skipped": false,
   "skipReason": null
 }

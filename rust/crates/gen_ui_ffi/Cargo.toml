@@ -22,6 +22,7 @@ gen_ui_types    = { path = "../gen_ui_types" }
 gen_ui_runtime  = { path = "../gen_ui_runtime" }
 gen_ui_protocol = { path = "../gen_ui_protocol" }
 gen_ui_agent    = { path = "../gen_ui_agent" }
+gen_ui_mcp      = { path = "../gen_ui_mcp" }
 # Mobile is a native target (iOS/Android via frb) — native-http, never wasm-http.
 gen_ui_client   = { path = "../gen_ui_client", default-features = false, features = ["native-http"] }
 # gen_ui_ffi is mobile-only (Tauri desktop has its own tauri-plugin-gen-ui) —
@@ -33,12 +34,14 @@ gen_ui_client   = { path = "../gen_ui_client", default-features = false, feature
 gen_ui_db       = { path = "../gen_ui_db", features = ["sqlite"] }
 gen_ui_db_graph = { path = "../gen_ui_db_graph", features = ["embed-native"] }
 liter-llm.workspace = true
-flutter_rust_bridge = "=2.12.0"
+flutter_rust_bridge = "=2.13.0-beta.5"
 anyhow.workspace = true
 once_cell.workspace = true
 serde_json.workspace = true
+async-trait.workspace = true
 log = "0.4"
 tracing.workspace = true
+futures.workspace = true
 
 [lints.rust]
 # `#[frb(...)]` expands to code guarded by `cfg(frb_expand)`, a cfg name that only
@@ -48,7 +51,8 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }
 
 [target.'cfg(target_os = "android")'.dependencies]
 android_logger = "0.14"
-gen_ui_inference = { path = "../gen_ui_inference", features = ["local-llama-vulkan", "local-llama-mtmd"] }
+gen_ui_inference = { path = "../gen_ui_inference", features = ["local-litert-lm"] }
+jni.workspace = true
 [target.'cfg(target_os = "ios")'.dependencies]
 oslog = "0.2"
 gen_ui_inference = { path = "../gen_ui_inference", features = ["local-llama-metal", "local-llama-mtmd"] }

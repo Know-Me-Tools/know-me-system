@@ -13,6 +13,7 @@ import 'api/streams.dart' as ffi;
 import 'frb_generated.dart' show GenUiCore;
 import 'third_party/gen_ui_db_graph.dart' show MemoryHit, RelatedEntity;
 import 'third_party/gen_ui_types/transport.dart' as transport_wire;
+import 'third_party/gen_ui_types/inference.dart';
 import 'third_party/gen_ui_types/view.dart' as view_wire;
 import 'package:prometheus_entity_management/prometheus_entity_management.dart';
 
@@ -29,24 +30,52 @@ Future<void> initRustBridge({String? dataDir}) async {
 Future<String> chatSend(
   String threadId,
   String message,
-  List<String> messages,
+  List<InferenceMessage> messages,
   List<String> attachmentPaths,
+  String branchId,
+  String userMessageId,
 ) => ffi.chatSend(
   threadId: threadId,
   message: message,
   messages: messages,
   attachmentPaths: attachmentPaths,
+  branchId: branchId,
+  userMessageId: userMessageId,
 );
 
 Future<String> chatAction(
   String threadId,
   String interactionJson,
-  List<String> messages,
+  List<InferenceMessage> messages,
+  String branchId,
 ) => ffi.chatAction(
   threadId: threadId,
   interactionJson: interactionJson,
   messages: messages,
+  branchId: branchId,
 );
+
+Future<String> approveToolConfirmation(String approvalId) =>
+    ffi.chatApproveToolConfirmation(approvalId: approvalId);
+
+Future<bool> chatCancel(String runId) => ffi.chatCancel(runId: runId);
+
+Future<void> prepareLocalModel() => ffi.prepareLocalModel();
+
+Future<Map<String, dynamic>> localModelStatus() async =>
+    jsonDecode(await ffi.localModelStatus()) as Map<String, dynamic>;
+
+Stream<Map<String, dynamic>> watchLocalModelStatus() => ffi
+    .localModelStatusEvents()
+    .map((value) => jsonDecode(value) as Map<String, dynamic>);
+
+Future<void> cancelModelOperation() => ffi.cancelModelOperation();
+
+Future<Map<String, dynamic>?> localRuntimeDiagnostics() async =>
+    jsonDecode(await ffi.localRuntimeDiagnostics()) as Map<String, dynamic>?;
+
+Future<Map<String, dynamic>> uarRuntimeStatus() async =>
+    jsonDecode(await ffi.uarRuntimeStatus()) as Map<String, dynamic>;
 
 Future<String> getThemeMode() => ffi.themeMode();
 
@@ -55,20 +84,31 @@ Future<void> setThemeMode(String mode) => ffi.setThemeMode(mode: mode);
 Future<String> resolveRemoteContent(String url, String kind) =>
     ffi.resolveRemoteContent(url: url, kind: kind);
 
-/// chat_events(run_id) -> Stream<A2uiEvent>. Fold into ContentBlocks.
+Future<int> deleteConversationContext(String conversationId) async =>
+    (await ffi.memoryDeleteConversationContext(
+      conversationId: conversationId,
+    )).toInt();
+
+Future<int> deleteMessageContext(List<String> messageIds) async =>
+    (await ffi.memoryDeleteMessageContext(messageIds: messageIds)).toInt();
+
+Future<int> promoteContext(List<String> ids) async =>
+    (await ffi.memoryPromoteContext(ids: ids)).toInt();
+
+/// `chat_events(run_id) -> Stream<A2uiEvent>`. Fold into ContentBlocks.
 /// The FFI stream carries JSON (see gen_ui_ffi::api::streams's doc comment on
-/// why — frb can't mirror an enum only ever seen as a StreamSink<T> param),
+/// why — frb can't mirror an enum only ever seen as a `StreamSink<T>` param),
 /// decoded here into the app's own sealed A2uiEvent using the same serde tag
 /// shape ("type", snake_case) as gen_ui_types::events::A2uiEvent.
 Stream<bridge_events.A2uiEvent> chatEvents(String runId) => ffi
     .chatEvents(runId: runId)
     .map((json) => bridge_events.A2uiEvent.fromJson(jsonDecode(json)));
 
-/// entity_changes() -> Stream<ChangeEvent>. Bridged to ref.invalidate by PEM.
+/// `entity_changes() -> Stream<ChangeEvent>`. Bridged to ref.invalidate by PEM.
 Stream<ChangeEvent> entityChanges() =>
     ffi.entityChanges().map((json) => ChangeEvent.fromJson(jsonDecode(json)));
 
-/// sync_status() -> Stream<SyncStatus>. Drives the sync chip.
+/// `sync_status() -> Stream<SyncStatus>`. Drives the sync chip.
 Stream<SyncStatus> syncStatus() =>
     ffi.syncStatus().map((json) => SyncStatus.fromJson(jsonDecode(json)));
 

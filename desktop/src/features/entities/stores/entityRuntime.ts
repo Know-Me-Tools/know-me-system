@@ -82,16 +82,22 @@ function pgliteTransport(db: PGlite, table: string, tenantId: string): EntityTra
 }
 
 async function createEntityRuntime(tenantId: string): Promise<EntityRuntimeSession> {
-  const [projectsDdl, notesDdl, conversationsDdl] = schemaSql.split(';').filter((sql) => sql.includes('CREATE TABLE'))
-  if (!projectsDdl || !notesDdl || !conversationsDdl) throw new Error('shared entity DDL is incomplete')
+  const tableDdls = schemaSql.split(';').filter((sql) => sql.includes('CREATE TABLE'))
+  const projectsDdl = tableDdls.find((sql) => sql.includes('projects'))
+  const notesDdl = tableDdls.find((sql) => sql.includes('notes'))
+  const conversationsDdl = tableDdls.find((sql) => sql.includes('chat_conversations'))
+  const messagesDdl = tableDdls.find((sql) => sql.includes('chat_messages'))
+  if (!projectsDdl || !notesDdl || !conversationsDdl || !messagesDdl) throw new Error('shared entity DDL is incomplete')
   registerEntityFromSql({ entityType: 'Project', createTableSql: projectsDdl })
   registerEntityFromSql({ entityType: 'Note', createTableSql: notesDdl })
   registerEntityFromSql({ entityType: 'Conversation', createTableSql: conversationsDdl })
+  registerEntityFromSql({ entityType: 'Message', createTableSql: messagesDdl })
 
   if (isTauri()) {
     registerEntityTransport('Project', tauriTransport('projects', tenantId))
     registerEntityTransport('Note', tauriTransport('notes', tenantId))
     registerEntityTransport('Conversation', tauriTransport('conversations', tenantId))
+    registerEntityTransport('Message', tauriTransport('messages', tenantId))
     await entityRuntimeStart(tenantId)
     return { tenantId, dispose: () => { void entityRuntimeStop() } }
   }
@@ -107,6 +113,7 @@ async function createEntityRuntime(tenantId: string): Promise<EntityRuntimeSessi
   registerEntityTransport('Project', pgliteTransport(db, 'projects', tenantId))
   registerEntityTransport('Note', pgliteTransport(db, 'notes', tenantId))
   registerEntityTransport('Conversation', pgliteTransport(db, 'chat_conversations', tenantId))
+  registerEntityTransport('Message', pgliteTransport(db, 'chat_messages', tenantId))
   const graph = startLocalFirstGraph({
     storage: await createPGlitePersistenceAdapter(db),
     key: `tenant:${tenantId}`,
@@ -127,6 +134,29 @@ export interface ConversationRecord extends Record<string, unknown> {
   tenant_id: string
   title: string
   messages: unknown[]
+  created_at: string
+  updated_at: string
+}
+
+export interface MessageRecord extends Record<string, unknown> {
+  id: string
+  tenant_id: string
+  conversation_id: string
+  parent_message_id: string | null
+  branch_id: string
+  sequence: number
+  role: string
+  blocks: unknown[]
+  run_id: string | null
+  run_status: string | null
+  run_phase: string | null
+  status_message: string | null
+  error: unknown
+  attachments: unknown[]
+  generation_settings: unknown
+  diagnostics: unknown
+  context_plan_version: string | null
+  context_telemetry: unknown
   created_at: string
   updated_at: string
 }
@@ -171,13 +201,76 @@ export async function saveConversationRecord(row: ConversationRecord): Promise<v
   )
 }
 
+export async function listMessageRecords(tenantId: string, conversationId: string): Promise<MessageRecord[]> {
+  if (isTauri()) {
+    const result = await entityList({ entityType: 'messages', filters: [], sorts: [], limit: null, cursor: null })
+    return result.items
+      .map((record) => toEntityRow(record, tenantId) as unknown as MessageRecord)
+      .filter((row) => row.conversation_id === conversationId)
+      .sort((a, b) => a.sequence - b.sequence)
+  }
+  if (!browserDb) throw new Error('PGlite message store is not ready')
+  const result = await browserDb.query<MessageRecord>(
+    'SELECT * FROM chat_messages WHERE tenant_id = $1 AND conversation_id = $2 ORDER BY sequence ASC',
+    [tenantId, conversationId],
+  )
+  return result.rows
+}
+
+export async function saveMessageRecords(rows: MessageRecord[]): Promise<void> {
+  for (const row of rows) {
+    useGraphStore.getState().upsertEntity('Message', row.id, row)
+    if (isTauri()) {
+      const record = { id: row.id, entityType: 'messages', dataJson: JSON.stringify(row) }
+      const existing = await entityGet('messages', row.id)
+      await (existing ? entityUpdate(record) : entityCreate(record))
+      continue
+    }
+    if (!browserDb) throw new Error('PGlite message store is not ready')
+    await browserDb.query(
+      `INSERT INTO chat_messages
+       (id, tenant_id, conversation_id, parent_message_id, branch_id, sequence, role, blocks,
+        run_id, run_status, run_phase, status_message, error, attachments, generation_settings,
+        diagnostics, context_plan_version, context_telemetry, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12,$13::jsonb,$14::jsonb,$15::jsonb,$16::jsonb,$17,$18::jsonb,$19,$20)
+       ON CONFLICT (id) DO UPDATE SET blocks=EXCLUDED.blocks, run_id=EXCLUDED.run_id,
+       run_status=EXCLUDED.run_status, run_phase=EXCLUDED.run_phase, status_message=EXCLUDED.status_message,
+       error=EXCLUDED.error, generation_settings=EXCLUDED.generation_settings, diagnostics=EXCLUDED.diagnostics,
+       context_plan_version=EXCLUDED.context_plan_version, context_telemetry=EXCLUDED.context_telemetry,
+       updated_at=EXCLUDED.updated_at`,
+      [row.id, row.tenant_id, row.conversation_id, row.parent_message_id, row.branch_id, row.sequence,
+       row.role, JSON.stringify(row.blocks), row.run_id, row.run_status, row.run_phase, row.status_message,
+       JSON.stringify(row.error), JSON.stringify(row.attachments), JSON.stringify(row.generation_settings),
+       JSON.stringify(row.diagnostics), row.context_plan_version, JSON.stringify(row.context_telemetry),
+       row.created_at, row.updated_at],
+    )
+  }
+}
+
+export async function deleteMessageRecords(ids: string[]): Promise<void> {
+  if (ids.length === 0) return
+  ids.forEach((id) => useGraphStore.getState().removeEntity('Message', id))
+  if (isTauri()) {
+    await Promise.all(ids.map((id) => entityDelete('messages', id)))
+    return
+  }
+  if (!browserDb) throw new Error('PGlite message store is not ready')
+  await browserDb.query('DELETE FROM chat_messages WHERE id = ANY($1::uuid[])', [ids])
+}
+
 export async function deleteConversationRecord(id: string): Promise<void> {
   useGraphStore.getState().removeEntity(CONVERSATION_TYPE, id)
   if (isTauri()) {
+    const messages = await entityList({ entityType: 'messages', filters: [], sorts: [], limit: null, cursor: null })
+    await Promise.all(messages.items.filter((record) => {
+      const row = toEntityRow(record, '') as Record<string, unknown>
+      return row.conversation_id === id
+    }).map((record) => entityDelete('messages', record.id)))
     await entityDelete('conversations', id)
     return
   }
   if (!browserDb) throw new Error('PGlite conversation store is not ready')
+  await browserDb.query('DELETE FROM chat_messages WHERE conversation_id = $1', [id])
   await browserDb.query('DELETE FROM chat_conversations WHERE id = $1', [id])
 }
 

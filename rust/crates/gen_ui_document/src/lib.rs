@@ -7,6 +7,8 @@
 
 use std::path::Path;
 
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use thiserror::Error;
 use xberg::{extract, ExtractInput, ExtractionConfig};
 
@@ -20,6 +22,165 @@ pub struct ProcessedDocument {
     pub file_name: String,
     pub mime_type: String,
     pub text: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ChunkStrategy {
+    Atomic,
+    SemanticBoundary,
+    RecursiveOverlap { overlap_chars: usize },
+    ParentChild { child_target_chars: usize },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct DocumentProvenance {
+    pub conversation_id: String,
+    pub branch_id: String,
+    pub message_id: String,
+    pub run_id: String,
+    pub source_name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct DocumentChunk {
+    pub id: String,
+    pub parent_id: Option<String>,
+    pub text: String,
+    pub start_char: usize,
+    pub end_char: usize,
+    pub provenance: DocumentProvenance,
+}
+
+pub fn chunk_document(
+    document: &ProcessedDocument,
+    provenance: &DocumentProvenance,
+    strategy: ChunkStrategy,
+    target_chars: usize,
+) -> Vec<DocumentChunk> {
+    let target = target_chars.max(64);
+    match strategy {
+        ChunkStrategy::Atomic => vec![make_chunk(
+            document.text.clone(),
+            0,
+            document.text.chars().count(),
+            None,
+            provenance,
+        )],
+        ChunkStrategy::SemanticBoundary => semantic_chunks(&document.text, target, provenance),
+        ChunkStrategy::RecursiveOverlap { overlap_chars } => overlapping_chunks(
+            &document.text,
+            target,
+            overlap_chars.min(target / 2),
+            provenance,
+            None,
+        ),
+        ChunkStrategy::ParentChild { child_target_chars } => {
+            let parents = semantic_chunks(&document.text, target, provenance);
+            let mut output = parents.clone();
+            for parent in parents {
+                output.extend(overlapping_chunks(
+                    &parent.text,
+                    child_target_chars.max(64),
+                    child_target_chars / 8,
+                    provenance,
+                    Some(parent.id),
+                ));
+            }
+            output
+        }
+    }
+}
+
+fn semantic_chunks(
+    text: &str,
+    target_chars: usize,
+    provenance: &DocumentProvenance,
+) -> Vec<DocumentChunk> {
+    let mut output = Vec::new();
+    let mut current = String::new();
+    let mut start = 0;
+    let mut cursor = 0;
+    for paragraph in text.split_inclusive("\n\n") {
+        let length = paragraph.chars().count();
+        if !current.is_empty() && current.chars().count() + length > target_chars {
+            let end = start + current.chars().count();
+            output.push(make_chunk(current, start, end, None, provenance));
+            current = String::new();
+            start = cursor;
+        }
+        current.push_str(paragraph);
+        cursor += length;
+    }
+    if !current.trim().is_empty() {
+        output.push(make_chunk(
+            current.clone(),
+            start,
+            start + current.chars().count(),
+            None,
+            provenance,
+        ));
+    }
+    output
+}
+
+fn overlapping_chunks(
+    text: &str,
+    target_chars: usize,
+    overlap_chars: usize,
+    provenance: &DocumentProvenance,
+    parent_id: Option<String>,
+) -> Vec<DocumentChunk> {
+    let chars = text.chars().collect::<Vec<_>>();
+    let mut output = Vec::new();
+    let mut start = 0;
+    while start < chars.len() {
+        let end = (start + target_chars).min(chars.len());
+        output.push(make_chunk(
+            chars[start..end].iter().collect(),
+            start,
+            end,
+            parent_id.clone(),
+            provenance,
+        ));
+        if end == chars.len() {
+            break;
+        }
+        start = end.saturating_sub(overlap_chars);
+    }
+    output
+}
+
+fn make_chunk(
+    text: String,
+    start_char: usize,
+    end_char: usize,
+    parent_id: Option<String>,
+    provenance: &DocumentProvenance,
+) -> DocumentChunk {
+    let mut digest = Sha256::new();
+    for value in [
+        provenance.conversation_id.as_bytes(),
+        provenance.branch_id.as_bytes(),
+        provenance.message_id.as_bytes(),
+        provenance.source_name.as_bytes(),
+    ] {
+        digest.update(value);
+        digest.update([0]);
+    }
+    digest.update(start_char.to_le_bytes());
+    digest.update(end_char.to_le_bytes());
+    digest.update(text.as_bytes());
+    DocumentChunk {
+        id: format!("chunk:{:x}", digest.finalize()),
+        parent_id,
+        text,
+        start_char,
+        end_char,
+        provenance: provenance.clone(),
+    }
 }
 
 #[derive(Debug, Error)]
@@ -102,5 +263,36 @@ mod tests {
     async fn rejects_oversized_inputs_before_engine() {
         let output = process_bytes("large.bin", vec![0; MAX_INPUT_BYTES as usize + 1]).await;
         assert!(matches!(output, Err(DocumentError::InvalidFile)));
+    }
+
+    #[test]
+    fn chunks_are_unicode_safe_idempotent_and_provenanced() {
+        let document = ProcessedDocument {
+            file_name: "notes.md".into(),
+            mime_type: "text/markdown".into(),
+            text: "One paragraph.\n\nSecond 🧠 paragraph with details.\n\nThird paragraph.".into(),
+        };
+        let provenance = DocumentProvenance {
+            conversation_id: "c1".into(),
+            branch_id: "b1".into(),
+            message_id: "m1".into(),
+            run_id: "r1".into(),
+            source_name: document.file_name.clone(),
+        };
+        let first = chunk_document(
+            &document,
+            &provenance,
+            ChunkStrategy::RecursiveOverlap { overlap_chars: 16 },
+            64,
+        );
+        let second = chunk_document(
+            &document,
+            &provenance,
+            ChunkStrategy::RecursiveOverlap { overlap_chars: 16 },
+            64,
+        );
+        assert_eq!(first, second);
+        assert!(first.iter().all(|chunk| chunk.id.starts_with("chunk:")));
+        assert!(first.iter().all(|chunk| chunk.provenance.run_id == "r1"));
     }
 }

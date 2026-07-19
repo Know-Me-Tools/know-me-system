@@ -9,6 +9,7 @@ license.workspace = true
 gen_ui_types    = { path = "../gen_ui_types" }
 gen_ui_runtime  = { path = "../gen_ui_runtime" }
 gen_ui_protocol = { path = "../gen_ui_protocol" }
+gen_ui_context  = { path = "../gen_ui_context" }
 gen_ui_document = { path = "../gen_ui_document" }
 # gen_ui_agent is native-only (consumed by gen_ui_ffi mobile + tauri-plugin-gen-ui
 # desktop, never gen_ui_wasm), so native-http is unconditional here.
@@ -32,6 +33,7 @@ anyhow.workspace = true
 thiserror.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+jsonschema.workspace = true
 tokio = { workspace = true, features = ["sync", "rt", "fs", "net"] }
 once_cell.workspace = true
 tracing.workspace = true
@@ -65,6 +67,7 @@ apple-native-keyring-store.workspace = true
 # features across them.
 [target.'cfg(not(any(target_os = "ios", target_os = "android")))'.dependencies]
 gen_ui_db = { path = "../gen_ui_db", features = ["pglite"] }
+universal-agent-runtime-sdk = { path = "../../vendor/universal-agent-runtime/sdks/rust", default-features = false, features = ["http-client"] }
 [target.'cfg(any(target_os = "ios", target_os = "android"))'.dependencies]
 gen_ui_db = { path = "../gen_ui_db" }
 

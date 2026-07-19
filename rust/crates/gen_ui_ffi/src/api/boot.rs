@@ -7,10 +7,156 @@
 use std::sync::Arc;
 
 use gen_ui_agent::ConfigBackend;
-use gen_ui_db_graph::{FastEmbedder, GraphStore, GraphStoreConfig};
+use gen_ui_db_graph::{GraphStore, GraphStoreConfig, LazyFastEmbedder};
+use gen_ui_mcp::{McpServerHandle, McpTransport};
 // frb's Result<T,E> detection needs a literal `Result<...>` — see chat.rs's
 // note; CoreResult<T>'s generic alias is invisible to frb's codegen.
-use gen_ui_types::CoreError;
+use gen_ui_types::{CoreError, CoreResult};
+
+struct MobileDiagnosticsTransport;
+
+#[async_trait::async_trait]
+impl McpTransport for MobileDiagnosticsTransport {
+    async fn request(
+        &self,
+        method: &str,
+        params: Option<serde_json::Value>,
+    ) -> CoreResult<serde_json::Value> {
+        match method {
+            "tools/list" => Ok(serde_json::json!({
+                "tools": [
+                    {
+                        "name": "local_runtime_status",
+                        "title": "Local Runtime Status",
+                        "description": "Report the current KnowMe on-device runtime, platform, default local model, and safe local-tool capability status. Use this when asked to inspect the local model, runtime, device backend, or available local tools.",
+                        "inputSchema": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {}
+                        },
+                        "annotations": {
+                            "readOnlyHint": true,
+                            "destructiveHint": false,
+                            "idempotentHint": true,
+                            "openWorldHint": false
+                        },
+                        "outputSchema": {
+                            "type": "object",
+                            "required": ["ok", "runtimeKind", "platform", "defaultModel", "safeLocalTools"],
+                            "properties": {
+                                "ok": {"type": "boolean"},
+                                "runtimeKind": {"type": "string"},
+                                "platform": {"type": "string"},
+                                "defaultModel": {"type": "string"},
+                                "safeLocalTools": {"type": "boolean"}
+                            }
+                        }
+                    },
+                    {
+                        "name": "approval_required_echo",
+                        "title": "Approval Required Echo",
+                        "description": "Echo a short certification phrase only after explicit user approval. Use this only when the user asks to test or certify the local tool approval flow.",
+                        "inputSchema": {
+                            "type": "object",
+                            "required": ["phrase"],
+                            "additionalProperties": false,
+                            "properties": {
+                                "phrase": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 80
+                                }
+                            }
+                        },
+                        "annotations": {
+                            "readOnlyHint": true,
+                            "destructiveHint": false,
+                            "idempotentHint": true,
+                            "openWorldHint": true
+                        },
+                        "outputSchema": {
+                            "type": "object",
+                            "required": ["ok", "phrase", "approvalFlow"],
+                            "properties": {
+                                "ok": {"type": "boolean"},
+                                "phrase": {"type": "string"},
+                                "approvalFlow": {"type": "string"}
+                            }
+                        }
+                    }
+                ]
+            })),
+            "tools/call" => {
+                let name = params
+                    .as_ref()
+                    .and_then(|value| value.get("name"))
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or_default();
+                if name == "approval_required_echo" {
+                    let phrase = params
+                        .as_ref()
+                        .and_then(|value| value.pointer("/arguments/phrase"))
+                        .and_then(serde_json::Value::as_str)
+                        .unwrap_or_default();
+                    return Ok(serde_json::json!({
+                        "content": [{
+                            "type": "text",
+                            "text": format!("Approved diagnostic echo: {phrase}")
+                        }],
+                        "structuredContent": {
+                            "ok": true,
+                            "phrase": phrase,
+                            "approvalFlow": "approved_pending_tool_call"
+                        },
+                        "isError": false
+                    }));
+                }
+                if name != "local_runtime_status" {
+                    return Err(CoreError::Terminal(format!(
+                        "unknown diagnostics tool '{name}'"
+                    )));
+                }
+                Ok(serde_json::json!({
+                    "content": [{
+                        "type": "text",
+                        "text": "KnowMe local runtime is available with a safe read-only diagnostics tool."
+                    }],
+                    "structuredContent": {
+                        "ok": true,
+                        "runtimeKind": if cfg!(target_os = "android") {
+                            "litert-lm"
+                        } else {
+                            "llama.cpp"
+                        },
+                        "platform": std::env::consts::OS,
+                        "defaultModel": gen_ui_inference::catalog::current_mobile_platform()
+                            .map(|platform| platform.default_model().model_id)
+                            .unwrap_or(gen_ui_inference::catalog::ANDROID_GEMMA4_E2B_LITERTLM_ID),
+                        "safeLocalTools": true
+                    },
+                    "isError": false
+                }))
+            }
+            other => Err(CoreError::Terminal(format!(
+                "unsupported diagnostics MCP method '{other}'"
+            ))),
+        }
+    }
+}
+
+async fn register_mobile_diagnostics_mcp() -> Result<(), CoreError> {
+    let registry = gen_ui_agent::state::mcp()?;
+    let handle = registry.register(McpServerHandle::new_trusted_local(
+        "knowme_diagnostics",
+        Box::new(MobileDiagnosticsTransport),
+    ));
+    handle.refresh_tools().await?;
+    tracing::info!(
+        server = %handle.name,
+        "mobile diagnostics MCP tools registered"
+    );
+    Ok(())
+}
 
 /// Boot-order invariant, step 1: open the embedded SurrealDB store (config +
 /// memory/graph-RAG both live in it on mobile — see gen_ui_agent::state::init's
@@ -38,10 +184,7 @@ pub async fn run_migrations(data_dir: String) -> Result<(), CoreError> {
     let db_path = format!("{data_dir}/knowme-poc.db");
     let embed_cache = std::path::PathBuf::from(&data_dir).join("model-cache/fastembed");
     std::fs::create_dir_all(&embed_cache).map_err(|e| boot_fail("model cache create", e))?;
-    let embedder = gen_ui_runtime::spawn_blocking(move || FastEmbedder::new(embed_cache))
-        .await
-        .map_err(|e| boot_fail("embedder task join", e))?
-        .map_err(|e| boot_fail("embedder load", e))?;
+    let embedder = LazyFastEmbedder::new(embed_cache);
 
     let store = GraphStore::open(GraphStoreConfig {
         endpoint: format!("rocksdb://{db_path}"),
@@ -55,18 +198,21 @@ pub async fn run_migrations(data_dir: String) -> Result<(), CoreError> {
 
     // Resolve the default entirely in Rust so Flutter never contains device
     // or model-selection logic. Existing user-selected preferences are kept;
-    // only the old bundled Qwen2.5 default is migrated.
+    // only superseded bundled Android Qwen defaults are migrated.
     let default_model = gen_ui_inference::catalog::current_mobile_platform()
         .map(|platform| platform.default_model().model_id)
-        .unwrap_or(gen_ui_inference::catalog::ANDROID_QWEN35_4B_ID)
+        .unwrap_or(gen_ui_inference::catalog::ANDROID_GEMMA4_E2B_LITERTLM_ID)
         .to_string();
     let existing_pref = store
         .get_model_pref("chat", "local")
         .await
         .map_err(|e| boot_fail("local model preference read", e))?;
-    let migrate_legacy = existing_pref
-        .as_ref()
-        .is_none_or(|pref| pref.model_id == "qwen2.5-0.5b-instruct-q4");
+    let migrate_legacy = existing_pref.as_ref().is_none_or(|pref| {
+        matches!(
+            pref.model_id.as_str(),
+            "qwen2.5-0.5b-instruct-q4" | "qwen3.5-4b-q4-k-m" | "qwen3-4b-instruct-2507-q5-k-m"
+        )
+    });
     if migrate_legacy {
         store
             .upsert_model_pref(&gen_ui_db_graph::ModelPref {
@@ -78,13 +224,22 @@ pub async fn run_migrations(data_dir: String) -> Result<(), CoreError> {
                     "context_len": 8192,
                     "max_tokens": 1024,
                     "temperature": 0.7,
-                    "top_p": 0.95
+                    "top_p": 0.8,
+                    "top_k": 20,
+                    "min_p": 0.0,
+                    "presence_penalty": 0.0
                 }),
             })
             .await
             .map_err(|e| boot_fail("local model preference write", e))?;
     }
 
+    #[cfg(target_os = "android")]
+    let inference: Arc<dyn gen_ui_types::inference::InferenceProvider> =
+        Arc::new(gen_ui_inference::LiteRtLmEngine::new(
+            std::path::PathBuf::from(&data_dir).join("model-cache/litert-lm"),
+        ));
+    #[cfg(not(target_os = "android"))]
     let inference: Arc<dyn gen_ui_types::inference::InferenceProvider> =
         Arc::new(gen_ui_inference::LlamaCppEngine::new(
             std::path::PathBuf::from(&data_dir).join("model-cache/llama"),
@@ -94,6 +249,9 @@ pub async fn run_migrations(data_dir: String) -> Result<(), CoreError> {
         store,
         Some(inference),
     );
+    register_mobile_diagnostics_mcp()
+        .await
+        .map_err(|e| boot_fail("mobile diagnostics MCP registration", e))?;
     tracing::info!("mobile migrations ready");
     Ok(())
 }
@@ -134,4 +292,84 @@ pub async fn load_seeds() -> Result<u32, CoreError> {
 /// desktop's exactly.
 pub async fn attach_sync_shapes() -> Result<(), CoreError> {
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mobile_diagnostics_exposes_safe_and_approval_required_tools() {
+        gen_ui_runtime::init(Some(2));
+        gen_ui_runtime::handle().block_on(async {
+            let transport = MobileDiagnosticsTransport;
+            let listed = transport
+                .request("tools/list", None)
+                .await
+                .expect("tools/list succeeds");
+            let tools = listed
+                .get("tools")
+                .and_then(serde_json::Value::as_array)
+                .expect("tools array");
+
+            let safe = tools
+                .iter()
+                .find(|tool| {
+                    tool.get("name").and_then(serde_json::Value::as_str)
+                        == Some("local_runtime_status")
+                })
+                .expect("safe diagnostics tool");
+            assert_eq!(
+                safe.pointer("/annotations/openWorldHint")
+                    .and_then(serde_json::Value::as_bool),
+                Some(false)
+            );
+
+            let approval = tools
+                .iter()
+                .find(|tool| {
+                    tool.get("name").and_then(serde_json::Value::as_str)
+                        == Some("approval_required_echo")
+                })
+                .expect("approval diagnostics tool");
+            assert_eq!(
+                approval
+                    .pointer("/annotations/readOnlyHint")
+                    .and_then(serde_json::Value::as_bool),
+                Some(true)
+            );
+            assert_eq!(
+                approval
+                    .pointer("/annotations/destructiveHint")
+                    .and_then(serde_json::Value::as_bool),
+                Some(false)
+            );
+            assert_eq!(
+                approval
+                    .pointer("/annotations/openWorldHint")
+                    .and_then(serde_json::Value::as_bool),
+                Some(true),
+                "open-world annotation intentionally forces manual confirmation"
+            );
+
+            let called = transport
+                .request(
+                    "tools/call",
+                    Some(serde_json::json!({
+                        "name": "approval_required_echo",
+                        "arguments": {"phrase": "approval-ok"}
+                    })),
+                )
+                .await
+                .expect("approval echo call succeeds after host approval");
+            assert_eq!(
+                called.pointer("/structuredContent/approvalFlow"),
+                Some(&serde_json::json!("approved_pending_tool_call"))
+            );
+            assert_eq!(
+                called.pointer("/structuredContent/phrase"),
+                Some(&serde_json::json!("approval-ok"))
+            );
+        });
+    }
 }

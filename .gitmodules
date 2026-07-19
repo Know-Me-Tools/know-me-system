@@ -1,3 +1,6 @@
 [submodule "rust/vendor/librefang"]
 	path = rust/vendor/librefang
 	url = git@github.com:GQAdonis/librefang.git
+[submodule "rust/vendor/universal-agent-runtime"]
+	path = rust/vendor/universal-agent-runtime
+	url = git@github.com:Prometheus-AGS/universal-agent-runtime.git
