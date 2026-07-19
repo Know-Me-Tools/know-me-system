@@ -407,8 +407,52 @@ Verification:
 
 Remaining for `litertlm-local-tools`:
 
-- Add secure pending-tool-call approval/resume execution for mutating,
-  destructive, or open-world tools.
+- Expand prompt certification beyond the deterministic diagnostics tool.
+
+## SECURE TOOL APPROVAL / RESUME CHECKPOINT
+
+Date: 2026-07-19
+
+Implemented:
+
+- Confirmation-required local tool results now include a host-generated
+  `approvalId`.
+- Rust stores the exact validated pending tool call in process state under that
+  approval ID before returning the not-executed `ToolResult` to the model/UI.
+- Added `gen_ui_agent::chat::approve_tool_confirmation` and FRB
+  `chat_approve_tool_confirmation` so approval is a privileged host action, not
+  a normal `chatAction`/model-prose interaction.
+- Approval executes the stored MCP call arguments, publishes canonical
+  `ToolUse`/`ToolResult` events for the continuation run, and resumes the active
+  LiteRT-LM conversation through `InferenceProvider::continue_with_tool_results`.
+- Flutter renders an `Approve and run` action only when the persisted policy card
+  includes an approval ID. The chat screen routes `local_tool_approve` to the
+  dedicated notifier/repository/FFI path and leaves other interactions on the
+  generic A2UI path.
+- The six-gate Android native-inference postmortem was folded into roadmap
+  guidance as a future-backend verification standard. It does not change the
+  production Android baseline back to llama.cpp, Vulkan, or OpenCL.
+
+Verification:
+
+- `cargo test -p gen_ui_agent local_tool -- --nocapture`
+- `cargo check -p gen_ui_agent -p gen_ui_ffi`
+- `cargo test -p gen_ui_types structured_messages_preserve_roles_and_tools`
+- `cargo test -p gen_ui_inference --features local-litert-lm`
+- `flutter analyze lib ../flutter_packages/gen_ui_widgets/lib test/features/chat/theme_accessibility_test.dart`
+- `flutter test test/features/chat/theme_accessibility_test.dart`
+- `flutter build apk --debug --target-platform android-arm64`
+- `scripts/android/verify-native-inference-gates.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
+- Physical-device launch on `SM S936U`: installed the APK, launched
+  `tools.knowme.knowme`, observed `Loaded gen_ui_ffi through
+  System.loadLibrary`, `mobile diagnostics MCP tools registered
+  server=knowme_diagnostics`, and `mobile migrations ready`. No
+  `AndroidRuntime`, `FATAL EXCEPTION`, `UnsatisfiedLinkError`, or KnowMe FFI
+  `dlopen` failure was present in the launch smoke logs.
+
+Remaining for `litertlm-local-tools`:
+
+- Physically certify an approval-required local tool flow on Android hardware.
 - Expand prompt certification beyond the deterministic diagnostics tool.
 
 ## BLOCKERS

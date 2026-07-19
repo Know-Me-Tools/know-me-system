@@ -43,6 +43,14 @@ Future<String> chatAction({
   branchId: branchId,
 );
 
+/// Approve a host-owned pending local tool call by approval id and start the
+/// continuation run. This is intentionally separate from chat_action so the UI
+/// cannot spoof tool execution through arbitrary interaction text.
+Future<String> chatApproveToolConfirmation({required String approvalId}) =>
+    GenUiCore.instance.api.crateApiChatChatApproveToolConfirmation(
+      approvalId: approvalId,
+    );
+
 /// Cancel an active run. Cancellation is cooperative: already received
 /// semantic blocks remain persisted, and the stream terminates with a typed
 /// `run_cancelled` event rather than fabricated assistant text.

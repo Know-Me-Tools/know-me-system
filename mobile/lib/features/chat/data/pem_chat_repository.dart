@@ -70,6 +70,10 @@ class PemChatRepository implements ChatRepository {
     branchId,
   );
 
+  @override
+  Future<String> approveToolConfirmation({required String approvalId}) =>
+      bridge.approveToolConfirmation(approvalId);
+
   static InferenceMessage _toInferenceMessage(ChatHistoryEntry entry) =>
       InferenceMessage(
         role: switch (entry.role) {

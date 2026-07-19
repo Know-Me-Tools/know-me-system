@@ -56,6 +56,15 @@ pub async fn chat_action(
         .map_err(Into::into)
 }
 
+/// Approve a host-owned pending local tool call by approval id and start the
+/// continuation run. This is intentionally separate from chat_action so the UI
+/// cannot spoof tool execution through arbitrary interaction text.
+pub async fn chat_approve_tool_confirmation(approval_id: String) -> Result<String, CoreError> {
+    gen_ui_agent::chat::approve_tool_confirmation(approval_id)
+        .await
+        .map_err(Into::into)
+}
+
 /// Cancel an active run. Cancellation is cooperative: already received
 /// semantic blocks remain persisted, and the stream terminates with a typed
 /// `run_cancelled` event rather than fabricated assistant text.

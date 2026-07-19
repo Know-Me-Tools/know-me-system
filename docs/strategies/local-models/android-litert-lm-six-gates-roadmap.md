@@ -141,8 +141,12 @@ remain future gates.
   tool, receives the host result, and continues generation.
 - [x] Render mutating, destructive, or open-world tool candidates as explicit
   approval-required/not-executed policy cards instead of raw JSON errors.
-- [ ] Add a secure pending-tool-call resume contract for user-approved execution
-  of mutating, destructive, or open-world tools.
+- [x] Add a secure pending-tool-call resume contract for user-approved execution
+  of mutating, destructive, or open-world tools. The host stores the exact
+  validated pending call by approval ID, Flutter approval calls a dedicated FFI
+  method, Rust executes the stored call, and the result resumes the active
+  LiteRT-LM conversation. Physical-device certification of this approval UX is
+  still required before marking the product gate complete.
 - Persist tool-call and tool-result events with the same AG-UI/A2UI content-block
   contract used by other providers.
 - Require explicit confirmation before any mutating tool can execute.
@@ -177,6 +181,20 @@ remain future gates.
 - Do not submit images directly to the Android text-agent model; route
   images/PDFs/documents through Xberg/OCR/extraction first.
 - Do not claim “works on Android” from build output alone.
+
+## Relationship to the llama.cpp six-gate standard
+
+The Android six-gate postmortem remains valuable, but it does not change this
+release train back to llama.cpp, Vulkan, or OpenCL. Its rules apply in two
+places:
+
+- the static and physical verification gates for the current LiteRT-LM APK; and
+- any quarantined future native-backend experiment.
+
+Future llama.cpp/Vulkan/OpenCL lanes must ship as optional runtime-probed
+modules with no startup-critical vendor `DT_NEEDED` entries, no bundled vendor
+driver libraries, explicit physical-device smoke tests, and measured CPU
+fallback. They are not part of the production Android recovery baseline.
 
 ## Source-backed adapter constraints
 

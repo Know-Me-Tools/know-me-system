@@ -13,6 +13,7 @@ use gen_ui_mcp::McpRegistry;
 use gen_ui_types::events::A2uiEvent;
 use gen_ui_types::inference::InferenceProvider;
 use once_cell::sync::OnceCell;
+use serde_json::Value as JsonValue;
 use tokio::sync::broadcast;
 
 use crate::config::ConfigBackend;
@@ -41,6 +42,17 @@ pub struct AgentState {
     events: broadcast::Sender<A2uiEvent>,
     event_history: parking_lot::Mutex<std::collections::BTreeMap<String, Vec<A2uiEvent>>>,
     run_cancellations: parking_lot::Mutex<std::collections::BTreeMap<String, Arc<AtomicBool>>>,
+    pending_tool_confirmations:
+        parking_lot::Mutex<std::collections::BTreeMap<String, PendingToolConfirmation>>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct PendingToolConfirmation {
+    pub approval_id: String,
+    pub source_run_id: String,
+    pub tool_use_id: String,
+    pub tool_name: String,
+    pub arguments: JsonValue,
 }
 
 static STATE: OnceCell<AgentState> = OnceCell::new();
@@ -82,6 +94,7 @@ pub fn init_with_inference(
         events: tx,
         event_history: parking_lot::Mutex::new(Default::default()),
         run_cancellations: parking_lot::Mutex::new(Default::default()),
+        pending_tool_confirmations: parking_lot::Mutex::new(Default::default()),
     };
     if STATE.set(state).is_err() {
         tracing::warn!(
@@ -163,6 +176,26 @@ pub(crate) fn finish_run(run_id: &str) {
     if let Ok(state) = get() {
         state.run_cancellations.lock().remove(run_id);
     }
+}
+
+pub(crate) fn register_pending_tool_confirmation(pending: PendingToolConfirmation) {
+    if let Ok(state) = get() {
+        state
+            .pending_tool_confirmations
+            .lock()
+            .insert(pending.approval_id.clone(), pending);
+    }
+}
+
+pub(crate) fn take_pending_tool_confirmation(
+    approval_id: &str,
+) -> Result<PendingToolConfirmation, AgentError> {
+    let state = get()?;
+    state
+        .pending_tool_confirmations
+        .lock()
+        .remove(approval_id)
+        .ok_or_else(|| AgentError::Interaction(format!("no pending tool approval '{approval_id}'")))
 }
 
 pub(crate) fn config() -> Result<&'static ConfigBackend, AgentError> {

@@ -581,6 +581,73 @@ class ChatNotifier extends _$ChatNotifier {
     ref.onDispose(driver.dispose);
   }
 
+  Future<void> approveToolConfirmation(
+    String sourceMessageId,
+    String approvalId,
+  ) async {
+    await load();
+    if (!ref.mounted || state.threadId.isEmpty || approvalId.isEmpty) return;
+    final source = state.messages
+        .where((item) => item.id == sourceMessageId)
+        .firstOrNull;
+    if (source == null || source.role != 'assistant' || source.isStreaming) {
+      return;
+    }
+
+    final assistantId = _uuid.v4();
+    final assistant = ChatMessage(
+      id: assistantId,
+      role: 'assistant',
+      content: const [],
+      createdAt: DateTime.now().toUtc(),
+      isStreaming: true,
+      parentMessageId: source.id,
+      branchId: source.branchId,
+      runStatus: 'queued',
+      runPhase: 'tool_execution',
+      statusMessage: 'Approving tool call',
+    );
+    state = state.copyWith(messages: [...state.messages, assistant]);
+
+    late final String runId;
+    try {
+      runId = await _repository.approveToolConfirmation(approvalId: approvalId);
+    } catch (error, stackTrace) {
+      markRunError(
+        assistantId,
+        ChatRunError(
+          code: 'tool_approval_start_failed',
+          phase: 'tool_execution',
+          message: error.toString(),
+          retryable: false,
+          diagnostics: stackTrace.toString(),
+        ),
+      );
+      return;
+    }
+    if (!ref.mounted) return;
+    updateRunPhase(
+      assistantId,
+      RunPhaseChanged(
+        runId,
+        'tool_execution',
+        'preparing',
+        'Executing approved tool call',
+      ),
+    );
+    final driver = A2uiContentDriver(
+      messageId: assistantId,
+      onBlock: streamBlock,
+      onFinalize: finalizeMessage,
+      onPhase: updateRunPhase,
+      onCancelled: markRunCancelled,
+      onTelemetry: updateContextTelemetry,
+      onError: markRunError,
+    )..connect(_repository.events(runId));
+    _drivers[assistantId] = driver;
+    ref.onDispose(driver.dispose);
+  }
+
   Future<ResolvedRemoteContent> resolveRemoteContent(
     String url,
     RemoteContentKind kind,

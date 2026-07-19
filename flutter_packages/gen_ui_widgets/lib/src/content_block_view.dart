@@ -404,6 +404,11 @@ class _ToolConfirmationRequiredBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = shad.Theme.of(context).colorScheme;
     final tool = payload['tool']?.toString() ?? 'unknown tool';
+    final approvalId =
+        payload['approvalId']?.toString() ??
+        (payload['confirmation'] is Map
+            ? (payload['confirmation'] as Map)['approvalId']?.toString()
+            : null);
     final reasons = _toolConfirmationReasons(payload);
     final message =
         payload['message']?.toString() ??
@@ -460,22 +465,25 @@ class _ToolConfirmationRequiredBlock extends StatelessWidget {
             ],
             const SizedBox(height: 10),
             Text(
-              'Status: not executed. A future approval flow must resume this exact tool call before it can run.',
+              approvalId == null || approvalId.isEmpty
+                  ? 'Status: not executed. This saved tool policy does not include an approval id, so it cannot be resumed.'
+                  : 'Status: not executed. Approval will run this exact stored tool call and resume the model with its result.',
               style: TextStyle(color: colors.mutedForeground, fontSize: 12),
             ),
-            if (onInteraction != null) ...[
+            if (onInteraction != null &&
+                approvalId != null &&
+                approvalId.isNotEmpty) ...[
               const SizedBox(height: 10),
               Align(
                 alignment: AlignmentDirectional.centerStart,
                 child: shad.SecondaryButton(
                   onPressed: () => onInteraction?.call({
-                    'kind': 'tool_confirmation_review',
+                    'kind': 'local_tool_approve',
+                    'approvalId': approvalId,
                     'toolUseId': toolUseId,
                     'tool': tool,
-                    'approved': false,
-                    'reason': 'user_review_requested',
                   }),
-                  child: const Text('Ask agent to revise'),
+                  child: const Text('Approve and run'),
                 ),
               ),
             ],

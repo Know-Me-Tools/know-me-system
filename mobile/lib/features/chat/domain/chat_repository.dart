@@ -46,6 +46,7 @@ abstract interface class ChatRepository {
     required List<ChatHistoryEntry> history,
     required String branchId,
   });
+  Future<String> approveToolConfirmation({required String approvalId});
   Future<ResolvedRemoteContent> resolveRemoteContent(
     String url,
     RemoteContentKind kind,

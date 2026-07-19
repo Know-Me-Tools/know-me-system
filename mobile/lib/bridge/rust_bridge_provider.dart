@@ -55,6 +55,9 @@ Future<String> chatAction(
   branchId: branchId,
 );
 
+Future<String> approveToolConfirmation(String approvalId) =>
+    ffi.chatApproveToolConfirmation(approvalId: approvalId);
+
 Future<bool> chatCancel(String runId) => ffi.chatCancel(runId: runId);
 
 Future<void> prepareLocalModel() => ffi.prepareLocalModel();

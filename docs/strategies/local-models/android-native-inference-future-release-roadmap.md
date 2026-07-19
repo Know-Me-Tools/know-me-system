@@ -20,6 +20,9 @@ vendor library dependency.
   in a fleet capability record.
 - Do not allow “built successfully” to satisfy Android native-inference
   completion. Completion requires a device-side gate report.
+- Keep the current static gate strict about vendor dependencies: startup-critical
+  Android libraries may depend only on NDK/public platform libraries, not
+  device-pulled OpenCL/Vulkan/GPU driver binaries.
 
 ## Release R+2 — AgentSkills/process hardening
 
@@ -48,8 +51,10 @@ vendor library dependency.
 - Expand prompt certification beyond the embedded diagnostics MCP tool:
   office/personal task following, Mermaid, code, constrained JSON, multi-turn
   memory, cancellation, recovery after restart, and multiple safe tool calls.
-- Add confirmation UX/policy for mutating, destructive, and open-world tools
-  before any such tool can execute locally.
+- Certify the confirmation UX/policy for mutating, destructive, and open-world
+  tools on a physical device. The code path must prove that approval executes
+  only a host-stored pending call by approval ID, never arbitrary model-visible
+  interaction prose.
 - Persist tool-use, tool-result, confirmation, cancellation, and error evidence
   with the same AG-UI/A2UI content-block contract as other providers.
 

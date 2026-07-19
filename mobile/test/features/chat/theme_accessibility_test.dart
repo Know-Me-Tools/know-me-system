@@ -69,19 +69,21 @@ void main() {
   testWidgets(
     'confirmation-required tool results render as explicit policy cards',
     (tester) async {
+      Map<String, Object?>? interaction;
       await tester.pumpWidget(
         MaterialApp(
           home: shad.Theme(
             data: KnowMeTheme.dark,
-            child: const Scaffold(
+            child: Scaffold(
               body: SizedBox(
                 width: 400,
                 child: ContentBlockView(
-                  block: ToolResultBlock(
+                  block: const ToolResultBlock(
                     'tool-2',
-                    '{"ok":false,"code":"local_tool_requires_confirmation","message":"The local model produced a valid tool-call candidate, but KnowMe did not execute it because the tool is not explicitly read-only, non-destructive, and closed-world.","tool":"files__delete","requiresConfirmation":true,"executionStatus":"not_executed","reasons":["tool_may_be_destructive"],"confirmation":{"status":"required","executionStatus":"not_executed","policy":"manual_confirmation_required_for_mutating_destructive_or_open_world_tools"}}',
+                    '{"ok":false,"code":"local_tool_requires_confirmation","message":"The local model produced a valid tool-call candidate, but KnowMe did not execute it because the tool is not explicitly read-only, non-destructive, and closed-world.","tool":"files__delete","approvalId":"approval-1","requiresConfirmation":true,"executionStatus":"not_executed","reasons":["tool_may_be_destructive"],"confirmation":{"status":"required","approvalId":"approval-1","executionStatus":"not_executed","policy":"manual_confirmation_required_for_mutating_destructive_or_open_world_tools"}}',
                     true,
                   ),
+                  onInteraction: (value) => interaction = value,
                 ),
               ),
             ),
@@ -94,6 +96,11 @@ void main() {
       expect(find.text('May be destructive'), findsOneWidget);
       expect(find.textContaining('Status: not executed'), findsOneWidget);
       expect(find.byTooltip('Copy tool policy'), findsOneWidget);
+      expect(find.text('Approve and run'), findsOneWidget);
+      await tester.tap(find.text('Approve and run'));
+      expect(interaction?['kind'], 'local_tool_approve');
+      expect(interaction?['approvalId'], 'approval-1');
+      expect(interaction?['toolUseId'], 'tool-2');
     },
   );
 }

@@ -103,24 +103,42 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     padding: const EdgeInsets.fromLTRB(12, 16, 12, 24),
                     itemCount: state.messages.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 16),
-                    itemBuilder: (context, i) => _MessageBubble(
-                      message: state.messages[i],
-                      onResubmit: () => ref
-                          .read(chatProvider.notifier)
-                          .resubmitMessage(state.messages[i].id),
-                      onDelete: () => ref
-                          .read(chatProvider.notifier)
-                          .deleteResponse(state.messages[i].id),
-                      onRegenerate: () => ref
-                          .read(chatProvider.notifier)
-                          .regenerateResponse(state.messages[i].id),
-                      onInteraction: (interaction) => ref
-                          .read(chatProvider.notifier)
-                          .submitInteraction(interaction),
-                      remoteResolver: (url, kind) => ref
-                          .read(chatProvider.notifier)
-                          .resolveRemoteContent(url, kind),
-                    ),
+                    itemBuilder: (context, i) {
+                      final message = state.messages[i];
+                      return _MessageBubble(
+                        message: message,
+                        onResubmit: () => ref
+                            .read(chatProvider.notifier)
+                            .resubmitMessage(message.id),
+                        onDelete: () => ref
+                            .read(chatProvider.notifier)
+                            .deleteResponse(message.id),
+                        onRegenerate: () => ref
+                            .read(chatProvider.notifier)
+                            .regenerateResponse(message.id),
+                        onInteraction: (interaction) {
+                          if (interaction['kind'] == 'local_tool_approve') {
+                            final approvalId = interaction['approvalId']
+                                ?.toString();
+                            if (approvalId == null || approvalId.isEmpty) {
+                              return null;
+                            }
+                            return ref
+                                .read(chatProvider.notifier)
+                                .approveToolConfirmation(
+                                  message.id,
+                                  approvalId,
+                                );
+                          }
+                          return ref
+                              .read(chatProvider.notifier)
+                              .submitInteraction(interaction);
+                        },
+                        remoteResolver: (url, kind) => ref
+                            .read(chatProvider.notifier)
+                            .resolveRemoteContent(url, kind),
+                      );
+                    },
                   ),
                 if (!_isNearBottom && state.messages.isNotEmpty)
                   PositionedDirectional(

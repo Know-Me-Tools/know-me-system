@@ -30,6 +30,7 @@ use std::collections::BTreeMap;
 use std::sync::atomic::Ordering;
 
 use crate::error::AgentError;
+use crate::state::PendingToolConfirmation;
 use crate::{secrets, state};
 
 const SURFACE_CHAT: &str = "chat";
@@ -496,6 +497,125 @@ pub async fn send_interaction(
     .await
 }
 
+/// Execute a host-owned pending local tool confirmation and resume the active
+/// local conversation with the exact stored tool result. This deliberately does
+/// not route through `send_interaction`: approval is a privileged host action,
+/// not model-visible prose that could be spoofed by arbitrary UI JSON.
+pub async fn approve_tool_confirmation(approval_id: String) -> Result<String, AgentError> {
+    let pending = state::take_pending_tool_confirmation(&approval_id)?;
+    let engine = state::inference()?.clone();
+    let registry = state::mcp()?.clone();
+    let run_id = uuid::Uuid::new_v4().to_string();
+    let run_id_for_task = run_id.clone();
+    let active_run = ActiveRun::new(&run_id);
+
+    gen_ui_runtime::spawn(async move {
+        use futures::StreamExt;
+
+        let mut adapter = A2uiAdapter::new(run_id_for_task.clone());
+        for event in adapter.ingest(&StreamEvent::MessageStart) {
+            state::publish(event);
+        }
+        if active_run.cancelled() {
+            active_run.publish_cancelled(RunPhase::Queued);
+            return;
+        }
+        state::publish(A2uiEvent::RunPhaseChanged {
+            run_id: run_id_for_task.clone(),
+            phase: RunPhase::ToolExecution,
+            status: RunStatus::Preparing,
+            message: format!(
+                "Executing approved local tool call {} from run {}",
+                pending.tool_name, pending.source_run_id
+            ),
+        });
+
+        for event in adapter.ingest(&StreamEvent::ToolCallStarted {
+            id: pending.tool_use_id.clone(),
+            name: pending.tool_name.clone(),
+        }) {
+            state::publish(event);
+        }
+        let arguments_json = pending.arguments.to_string();
+        for event in adapter.ingest(&StreamEvent::ToolCallDelta {
+            id: pending.tool_use_id.clone(),
+            delta: arguments_json.clone(),
+        }) {
+            state::publish(event);
+        }
+        for event in adapter.ingest(&StreamEvent::ToolCallComplete {
+            id: pending.tool_use_id.clone(),
+        }) {
+            state::publish(event);
+        }
+
+        if active_run.cancelled() {
+            active_run.publish_cancelled(RunPhase::ToolExecution);
+            return;
+        }
+
+        let (output_json, is_error) =
+            call_approved_mcp_tool(&registry, &pending.tool_name, &pending.arguments).await;
+        for event in adapter.ingest(&StreamEvent::ToolResult {
+            tool_use_id: pending.tool_use_id.clone(),
+            output_json: output_json.clone(),
+            is_error,
+        }) {
+            state::publish(event);
+        }
+
+        if active_run.cancelled() {
+            active_run.publish_cancelled(RunPhase::ToolExecution);
+            return;
+        }
+        state::publish(A2uiEvent::RunPhaseChanged {
+            run_id: run_id_for_task.clone(),
+            phase: RunPhase::Generation,
+            status: RunStatus::Generating,
+            message: "Continuing response with approved tool result".into(),
+        });
+
+        let continuation = InferenceToolResult {
+            tool_name: pending.tool_name,
+            output_json,
+            is_error,
+        };
+        let continuation_stream = match engine.continue_with_tool_results(&[continuation]).await {
+            Ok(stream) => stream,
+            Err(error) => {
+                publish_run_error(
+                    &run_id_for_task,
+                    "approved_tool_continuation_failed",
+                    RunPhase::Generation,
+                    error.to_string(),
+                    true,
+                );
+                return;
+            }
+        };
+        let mut continuation_stream = std::pin::pin!(continuation_stream);
+        while let Some(event) = continuation_stream.next().await {
+            if active_run.cancelled() {
+                active_run.publish_cancelled(RunPhase::Generation);
+                return;
+            }
+            let terminal = matches!(event, StreamEvent::Done | StreamEvent::Error { .. });
+            for a2ui in adapter.ingest(&event) {
+                state::publish(a2ui);
+            }
+            if terminal {
+                return;
+            }
+        }
+
+        for event in adapter.ingest(&StreamEvent::Done) {
+            state::publish(event);
+        }
+    });
+
+    Ok(run_id)
+}
+
 /// Start a cloud run from request-scoped hosted-web credentials. This is the
 /// anonymous BYOK path: unlike `send`, it never reads or writes the keychain or
 /// config DB and therefore cannot retain a browser user's secret server-side.
@@ -889,8 +1009,9 @@ async fn send_local(
                     status: RunStatus::Preparing,
                     message: format!("Handling local tool call {}", call.name),
                 });
-                let (follow_up, continuation) =
-                    tool_gate.execute_or_reject(&mcp_registry, call).await;
+                let (follow_up, continuation) = tool_gate
+                    .execute_or_reject(&run_id_for_task, &mcp_registry, call)
+                    .await;
                 for a2ui in adapter.ingest(&follow_up) {
                     state::publish(a2ui);
                 }
@@ -953,8 +1074,9 @@ async fn send_local(
                         status: RunStatus::Preparing,
                         message: format!("Handling local tool call {}", call.name),
                     });
-                    let (follow_up, continuation) =
-                        tool_gate.execute_or_reject(&mcp_registry, call).await;
+                    let (follow_up, continuation) = tool_gate
+                        .execute_or_reject(&run_id_for_task, &mcp_registry, call)
+                        .await;
                     for a2ui in adapter.ingest(&follow_up) {
                         state::publish(a2ui);
                     }
@@ -1277,6 +1399,7 @@ impl LocalToolCallGate {
 
     async fn execute_or_reject(
         &mut self,
+        run_id: &str,
         registry: &gen_ui_mcp::McpRegistry,
         call: PendingLocalToolCall,
     ) -> (StreamEvent, Option<InferenceToolResult>) {
@@ -1293,16 +1416,26 @@ impl LocalToolCallGate {
                         "tool": call.name,
                     }))
                 } else if !policy.auto_execute {
+                    let approval_id = uuid::Uuid::new_v4().to_string();
+                    state::register_pending_tool_confirmation(PendingToolConfirmation {
+                        approval_id: approval_id.clone(),
+                        source_run_id: run_id.to_owned(),
+                        tool_use_id: call.id.clone(),
+                        tool_name: call.name.clone(),
+                        arguments: arguments.clone(),
+                    });
                     Err(serde_json::json!({
                         "ok": false,
                         "code": "local_tool_requires_confirmation",
                         "message": "The local model produced a valid tool-call candidate, but KnowMe did not execute it because the tool is not explicitly read-only, non-destructive, and closed-world.",
                         "tool": call.name,
+                        "approvalId": approval_id.clone(),
                         "requiresConfirmation": true,
                         "executionStatus": "not_executed",
                         "reasons": policy.confirmation_reasons,
                         "confirmation": {
                             "status": "required",
+                            "approvalId": approval_id,
                             "executionStatus": "not_executed",
                             "policy": "manual_confirmation_required_for_mutating_destructive_or_open_world_tools"
                         }
@@ -1382,29 +1515,7 @@ impl LocalToolCallGate {
         call: &PendingLocalToolCall,
         arguments: &serde_json::Value,
     ) -> (String, bool) {
-        match crate::tools::call_tool(registry, &call.name, &arguments.to_string()).await {
-            Ok(value) => {
-                let is_error = value
-                    .get("isError")
-                    .and_then(serde_json::Value::as_bool)
-                    .unwrap_or(false);
-                (
-                    serde_json::to_string(&value)
-                        .unwrap_or_else(|_| r#"{"ok":false,"code":"tool_result_invalid"}"#.into()),
-                    is_error,
-                )
-            }
-            Err(error) => (
-                serde_json::json!({
-                    "ok": false,
-                    "code": "local_tool_execution_failed",
-                    "message": error.to_string(),
-                    "tool": call.name,
-                })
-                .to_string(),
-                true,
-            ),
-        }
+        call_approved_mcp_tool(registry, &call.name, arguments).await
     }
 
     fn validate_call(
@@ -1436,6 +1547,36 @@ impl LocalToolCallGate {
             ));
         }
         Ok(arguments)
+    }
+}
+
+async fn call_approved_mcp_tool(
+    registry: &gen_ui_mcp::McpRegistry,
+    tool_name: &str,
+    arguments: &serde_json::Value,
+) -> (String, bool) {
+    match crate::tools::call_tool(registry, tool_name, &arguments.to_string()).await {
+        Ok(value) => {
+            let is_error = value
+                .get("isError")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false);
+            (
+                serde_json::to_string(&value)
+                    .unwrap_or_else(|_| r#"{"ok":false,"code":"tool_result_invalid"}"#.into()),
+                is_error,
+            )
+        }
+        Err(error) => (
+            serde_json::json!({
+                "ok": false,
+                "code": "local_tool_execution_failed",
+                "message": error.to_string(),
+                "tool": tool_name,
+            })
+            .to_string(),
+            true,
+        ),
     }
 }
 
@@ -1739,7 +1880,7 @@ mod attachment_tests {
             .expect("call completes");
 
         let (out, continuation) = gate
-            .execute_or_reject(&gen_ui_mcp::McpRegistry::new(), call)
+            .execute_or_reject("test-run", &gen_ui_mcp::McpRegistry::new(), call)
             .await;
         assert!(continuation.is_none());
         match out {
@@ -1832,7 +1973,7 @@ mod attachment_tests {
                 id: "call-1".into(),
             })
             .expect("call completes");
-        let (out, continuation) = gate.execute_or_reject(&registry, call).await;
+        let (out, continuation) = gate.execute_or_reject("test-run", &registry, call).await;
 
         match out {
             StreamEvent::ToolResult {
@@ -1897,7 +2038,7 @@ mod attachment_tests {
             })
             .expect("call completes");
         let (out, continuation) = gate
-            .execute_or_reject(&gen_ui_mcp::McpRegistry::new(), call)
+            .execute_or_reject("test-run", &gen_ui_mcp::McpRegistry::new(), call)
             .await;
         assert!(continuation.is_none());
 
@@ -1906,6 +2047,12 @@ mod attachment_tests {
                 let parsed: serde_json::Value =
                     serde_json::from_str(&output_json).expect("tool result is JSON");
                 assert_eq!(parsed["code"], "local_tool_requires_confirmation");
+                assert!(
+                    parsed["approvalId"]
+                        .as_str()
+                        .is_some_and(|value| !value.is_empty()),
+                    "confirmation-required tool results must carry a host approval id"
+                );
                 assert_eq!(parsed["requiresConfirmation"], true);
                 assert_eq!(parsed["executionStatus"], "not_executed");
                 assert_eq!(
@@ -1989,7 +2136,7 @@ mod attachment_tests {
                 arguments: r#"{"query":42}"#.into(),
             };
             let (out, continuation) = gate
-                .execute_or_reject(&gen_ui_mcp::McpRegistry::new(), call)
+                .execute_or_reject("test-run", &gen_ui_mcp::McpRegistry::new(), call)
                 .await;
             match out {
                 StreamEvent::ToolResult {
@@ -2055,7 +2202,7 @@ mod attachment_tests {
             arguments: r#"{"path":"/tmp/example"}"#.into(),
         };
         let (out, continuation) = gate
-            .execute_or_reject(&gen_ui_mcp::McpRegistry::new(), call)
+            .execute_or_reject("test-run", &gen_ui_mcp::McpRegistry::new(), call)
             .await;
         assert!(continuation.is_none());
         match out {
@@ -2063,6 +2210,12 @@ mod attachment_tests {
                 let parsed: serde_json::Value =
                     serde_json::from_str(&output_json).expect("tool result is JSON");
                 assert_eq!(parsed["code"], "local_tool_requires_confirmation");
+                assert!(
+                    parsed["approvalId"]
+                        .as_str()
+                        .is_some_and(|value| !value.is_empty()),
+                    "confirmation-required tool results must carry a host approval id"
+                );
                 assert_eq!(parsed["requiresConfirmation"], true);
                 assert_eq!(parsed["executionStatus"], "not_executed");
                 assert_eq!(
