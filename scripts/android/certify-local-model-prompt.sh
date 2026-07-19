@@ -3,7 +3,7 @@ set -euo pipefail
 
 if [[ $# -lt 1 || $# -gt 3 ]]; then
   echo "usage: $0 /path/to/app.apk [expected-visible-text] [package.name]" >&2
-  echo "env: PROMPT='Reply exactly TOKEN.' TIMEOUT_SECONDS=240 FORCE_LITERT_TOOL_RESULT_FALLBACK=1" >&2
+  echo "env: PROMPT='Reply exactly TOKEN.' TIMEOUT_SECONDS=240 FORCE_LITERT_TOOL_RESULT_FALLBACK=1 CERT_CLEAN_CHAT_STATE=1" >&2
   exit 64
 fi
 
@@ -25,6 +25,12 @@ FORCE_LITERT_TOOL_RESULT_FALLBACK_FILE="knowme-force-litertlm-tool-result-fallba
 FORCE_LITERT_TOOL_RESULT_FALLBACK_PATHS=(
   "cache/$FORCE_LITERT_TOOL_RESULT_FALLBACK_FILE"
   "app_flutter/model-cache/litert-lm/runtime-cache/$FORCE_LITERT_TOOL_RESULT_FALLBACK_FILE"
+)
+CERT_CLEAN_CHAT_STATE="${CERT_CLEAN_CHAT_STATE:-0}"
+CERT_CLEAN_CHAT_STATE_BACKUP_DIR="cache/knowme-cert-chat-state-backup-$$"
+CERT_CHAT_STATE_PATHS=(
+  "app_flutter/entity-records.sqlite3"
+  "app_flutter/knowme-poc.db"
 )
 
 if [[ ! -f "$APK" ]]; then
@@ -50,6 +56,19 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 "$SCRIPT_DIR/verify-device-runtime-gates.sh" "$APK" "$PACKAGE"
 
+cleanup_cert_clean_chat_state() {
+  if [[ "$CERT_CLEAN_CHAT_STATE" == "1" ]]; then
+    adb shell am force-stop "$PACKAGE" >/dev/null 2>&1 || true
+    for state_path in "${CERT_CHAT_STATE_PATHS[@]}"; do
+      local basename
+      basename="$(basename "$state_path")"
+      adb shell run-as "$PACKAGE" rm -rf "$state_path" >/dev/null 2>&1 || true
+      adb shell run-as "$PACKAGE" mv "$CERT_CLEAN_CHAT_STATE_BACKUP_DIR/$basename" "$state_path" >/dev/null 2>&1 || true
+    done
+    adb shell run-as "$PACKAGE" rm -rf "$CERT_CLEAN_CHAT_STATE_BACKUP_DIR" >/dev/null 2>&1 || true
+  fi
+}
+
 cleanup_force_litert_tool_result_fallback() {
   if [[ "$FORCE_LITERT_TOOL_RESULT_FALLBACK" == "1" ]]; then
     for sentinel_path in "${FORCE_LITERT_TOOL_RESULT_FALLBACK_PATHS[@]}"; do
@@ -57,7 +76,36 @@ cleanup_force_litert_tool_result_fallback() {
     done
   fi
 }
-trap cleanup_force_litert_tool_result_fallback EXIT
+cleanup_all() {
+  cleanup_force_litert_tool_result_fallback
+  cleanup_cert_clean_chat_state
+}
+trap cleanup_all EXIT
+
+if [[ "$CERT_CLEAN_CHAT_STATE" == "1" ]]; then
+  adb shell am force-stop "$PACKAGE" >/dev/null 2>&1 || true
+  if ! adb shell run-as "$PACKAGE" mkdir -p "$CERT_CLEAN_CHAT_STATE_BACKUP_DIR" >/dev/null 2>&1; then
+    echo "G6 FAIL: could not create reversible chat-state backup directory with run-as" >&2
+    echo "package must be debuggable for CERT_CLEAN_CHAT_STATE=1" >&2
+    exit 1
+  fi
+  for state_path in "${CERT_CHAT_STATE_PATHS[@]}"; do
+    if adb shell run-as "$PACKAGE" ls "$state_path" >/dev/null 2>&1; then
+      basename="$(basename "$state_path")"
+      if ! adb shell run-as "$PACKAGE" mv "$state_path" "$CERT_CLEAN_CHAT_STATE_BACKUP_DIR/$basename" >/dev/null 2>&1; then
+        echo "G6 FAIL: could not move chat-state path into backup" >&2
+        echo "path: $state_path" >&2
+        exit 1
+      fi
+    fi
+  done
+  adb shell monkey -p "$PACKAGE" -c android.intent.category.LAUNCHER 1 >/dev/null
+  sleep "${CERT_CLEAN_CHAT_RELAUNCH_WAIT_SECONDS:-8}"
+  if [[ -z "$(adb shell pidof "$PACKAGE" | tr -d '\r' || true)" ]]; then
+    echo "G6 FAIL: app process is not alive after clean chat-state relaunch" >&2
+    exit 1
+  fi
+fi
 
 if [[ "$FORCE_LITERT_TOOL_RESULT_FALLBACK" == "1" ]]; then
   if ! adb shell run-as "$PACKAGE" mkdir -p "app_flutter/model-cache/litert-lm/runtime-cache" >/dev/null 2>&1; then

@@ -23,12 +23,13 @@ if [[ ! -x "$PROMPT_GATE" ]]; then
 fi
 
 PROMPT="$PROMPT" \
-  EXPECTED_SUBSTRINGS="Tool use knowme_diagnostics__local_runtime_status|Tool completed|$MARKER" \
+  EXPECTED_SUBSTRINGS="tool_result_fallback_applied" \
   TIMEOUT_SECONDS="$TIMEOUT_SECONDS" \
   LOG_PATH="$LOG_PATH" \
   UI_XML_PATH="$UI_XML_PATH" \
+  CERT_CLEAN_CHAT_STATE=1 \
   FORCE_LITERT_TOOL_RESULT_FALLBACK=1 \
-  "$PROMPT_GATE" "$APK" "$MARKER" "$PACKAGE"
+  "$PROMPT_GATE" "$APK" "tool_result_fallback_applied" "$PACKAGE"
 
 if ! rg -q "LiteRT-LM generation produced tool call .*name=knowme_diagnostics__local_runtime_status" "$LOG_PATH"; then
   echo "FALLBACK FAIL: LiteRT-LM did not emit the expected local_runtime_status tool call" >&2

@@ -965,6 +965,10 @@ Implemented:
 - Hardened the wrapper to use a fresh `KMFALLBACK...` marker and require a
   current `LiteRT-LM generation produced tool call` log entry, preventing stale
   UI content from satisfying the gate.
+- Added reversible clean chat-state isolation for fallback certification:
+  existing `entity-records.sqlite3` and `knowme-poc.db` are moved aside after
+  install/launch, the app is relaunched for the prompt, and the original files
+  are restored on exit. The downloaded LiteRT-LM model cache is not removed.
 
 Verification:
 
@@ -972,28 +976,25 @@ Verification:
 - `bash -n scripts/android/certify-local-tool-result-fallback.sh`
 - `flutter build apk --debug --target-platform android-arm64`
 - `scripts/android/verify-native-inference-gates.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
+- `TIMEOUT_SECONDS=240 scripts/android/certify-local-tool-result-fallback.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
 
 Physical-device result:
 
 - Device: Samsung `SM S936U`, serial `R5GYB4AZD7A`, Android 16/API 36.
-- First prompt attempt: `Use the knowme_diagnostics__local_runtime_status tool to inspect this device runtime. After the tool result, answer FALLBACKOK.`
-- Result: failed. LiteRT-LM generated direct text with `tool_calls=0`, so the
-  fallback branch was not reached.
-- Second prompt attempt: `You MUST call the knowme_diagnostics__local_runtime_status tool now. Do not answer directly. After the tool result is provided, answer exactly FALLBACKOK.`
-- Result: failed for fallback certification. One run produced visible tool-use,
-  tool-result, and final answer evidence but the sentinel was initially written
-  to the wrong cache location. After fixing the sentinel location, the model
-  again generated direct text with `tool_calls=0`, so the fallback branch was
-  not reached.
+- Final prompt: `You MUST call the knowme_diagnostics__local_runtime_status tool now. Do not answer directly. After the tool result is provided, answer exactly KMFALLBACK055421.`
+- Output: `G5 PASS: LiteRT-LM generation started`, `G6 PASS: LiteRT-LM produced text`, `G6 PASS: expected visible UI text found: tool_result_fallback_applied`, and `FALLBACK PASS: forced empty-continuation fallback executed and rendered`.
+- Logcat proved `LiteRT-LM generation produced tool call ... name=knowme_diagnostics__local_runtime_status`, `LiteRT-LM tool-result continuation starting`, Android bridge acknowledgement `Forcing LiteRT-LM tool-result fallback for Android certification`, and Rust event log `LiteRT-LM tool-result fallback follow-up applied as tool_result_fallback_applied`.
+- UIAutomator proved the rendered `provider_event` artifact with
+  `eventName:"tool_result_fallback_applied"`.
+- Cleanup check found no remaining `knowme-cert-chat-state-backup` or
+  `knowme-force-litertlm-tool-result-fallback` files.
 - Logcat artifact: `/tmp/knowme-local-tool-result-fallback.log`.
 - UIAutomator artifact: `/tmp/knowme-local-tool-result-fallback.xml`.
 
 Remaining:
 
-- Add clean session/branch isolation to prompt certification wrappers so stale
-  restored messages cannot contaminate fallback proof.
-- Re-run `scripts/android/certify-local-tool-result-fallback.sh` after the
-  prompt/session path reliably emits the diagnostic tool call.
+- Generalize clean session/branch isolation across the remaining prompt
+  certification wrappers where stale restored messages can contaminate proof.
 - Add physical skill activation UI proof. Skill activations already map to
   `ContentBlock::Skill`; the remaining gate is physical evidence that a real
   activation renders and persists as its own ordered block beside thinking and

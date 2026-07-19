@@ -165,16 +165,17 @@ attached Samsung `SM S936U` running Android 16/API 36:
   `scripts/android/certify-local-tool-result-fallback.sh` writes a scoped
   sentinel into the app/LiteRT runtime cache, uses a fresh `KMFALLBACK...`
   marker, requires a current diagnostic tool call in logcat, and rejects stale
-  UI evidence. The harness is intentionally not marked passed yet: current
-  physical attempts generated direct text without a tool call, so the fallback
-  branch was not reached.
+  UI evidence. It passed on the attached Samsung with marker
+  `KMFALLBACK055421`; logcat proved the diagnostic tool call, forced fallback
+  acknowledgement, and canonical `tool_result_fallback_applied` event, while
+  UIAutomator proved the fallback event artifact rendered.
 
 This proves the CPU smoke lane and code-level tool-call candidate preservation.
 It also proves one complete safe local tool loop and one explicit
 approval-required local tool loop on a physical Android device. True
-token-level streaming callbacks, empty-continuation fallback certification,
-skill-activation UI proof, stale-card cleanup affordances, clean session/branch
-isolation for certification, and broader device coverage remain future gates.
+token-level streaming callbacks, skill-activation UI proof, stale-card cleanup
+affordances, broader clean session/branch isolation for certification, and
+broader device coverage remain future gates.
 
 ## Roadmap
 
@@ -242,7 +243,7 @@ isolation for certification, and broader device coverage remain future gates.
 - [x] Add a deterministic debug-build harness for the bounded
   empty-continuation fallback path that uses a fresh marker and rejects stale UI
   evidence.
-- [ ] Force and certify the bounded empty-continuation fallback path separately.
+- [x] Force and certify the bounded empty-continuation fallback path separately.
 - [x] Persist tool-call and tool-result events with the same AG-UI/A2UI content-block
   contract used by other providers.
 - [x] Persist skill activation events with the same AG-UI/A2UI content-block
@@ -286,9 +287,11 @@ isolation for certification, and broader device coverage remain future gates.
   cancelled bubble.
 - [x] Certify explicit safe local tool-calling with visible tool-use/tool-result
   blocks and final continuation text.
-- [ ] Certify empty-continuation fallback cases.
-- [ ] Add clean session/branch isolation to physical prompt wrappers so stale
-  restored messages cannot contaminate fallback certification.
+- [x] Certify empty-continuation fallback cases.
+- [x] Add reversible clean chat-state isolation to the fallback certification
+  wrapper so stale restored messages cannot contaminate fallback proof.
+- [ ] Generalize clean session/branch isolation across the remaining physical
+  prompt wrappers.
 - [ ] Add physical UI certification for skill activation chunks so a real
   skill activation is visible as its own ordered `ContentBlock::Skill` region,
   parallel to thinking and citation chunks.
