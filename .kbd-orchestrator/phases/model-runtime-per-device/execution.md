@@ -1046,6 +1046,59 @@ Remaining:
 - Extend skill activation certification beyond the embedded diagnostics source
   to real AgentSkills/process activations.
 
+## ANDROID CLEAN-SESSION CERTIFICATION HARNESS CHECKPOINT
+
+Date: 2026-07-19
+
+Implemented:
+
+- Extracted reversible Android chat-state isolation into
+  `scripts/android/lib-chat-state.sh`.
+- The shared harness moves only app-private conversation databases
+  (`entity-records.sqlite3` and `knowme-poc.db`) into an app-private backup
+  directory with `run-as`, leaves the downloaded LiteRT-LM model cache intact,
+  and restores the original files on exit.
+- `scripts/android/certify-local-model-prompt.sh` now consumes the shared
+  clean-session harness instead of owning duplicate backup/restore logic.
+- `scripts/android/certify-local-tool-call.sh`,
+  `scripts/android/certify-local-prompt-suite.sh`,
+  `scripts/android/certify-local-cancellation.sh`,
+  `scripts/android/certify-local-restart-recovery.sh`, and
+  `scripts/android/certify-local-multiturn-history.sh` now document
+  `CERT_CLEAN_CHAT_STATE=1` support.
+- Restart recovery and multi-turn history wrappers own the clean session across
+  the full test lifecycle and explicitly prevent the inner prompt gate from
+  restoring the database immediately after the seed turn. This keeps the
+  recovery/history assertion meaningful.
+- The explicit tool-call wrapper prompt is now stricter: the model must call
+  `knowme_diagnostics__local_runtime_status` first and only answer after the
+  tool result is provided.
+
+Verification:
+
+- `bash -n scripts/android/lib-chat-state.sh scripts/android/certify-local-model-prompt.sh scripts/android/certify-local-tool-call.sh scripts/android/certify-local-prompt-suite.sh scripts/android/certify-local-restart-recovery.sh scripts/android/certify-local-multiturn-history.sh scripts/android/certify-local-cancellation.sh`
+- `git diff --check`
+- `scripts/android/verify-native-inference-gates.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
+- `CERT_CLEAN_CHAT_STATE=1 TIMEOUT_SECONDS=240 scripts/android/certify-local-tool-call.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
+
+Physical-device evidence:
+
+- Device: Samsung `SM-S936U`, Android 16/API 36, ABI `arm64-v8a`, SoC `SM8750`.
+- Output: `G5 PASS: LiteRT-LM generation started`, `G6 PASS: LiteRT-LM produced text`, `G6 PASS: expected visible UI text found: Tool use knowme_diagnostics__local_runtime_status|Tool completed|TOOLSTATUSOK`, and `TOOL PASS: local_runtime_status tool call executed and rendered`.
+- Prompt: `You MUST call the knowme_diagnostics__local_runtime_status tool now. Do not answer directly. After the tool result is provided, answer exactly TOOLSTATUSOK.`
+- Cleanup check found no remaining `knowme-cert-chat-state-backup` or
+  `knowme-force-litertlm-tool-result-fallback` files.
+- Logcat artifact: `/tmp/knowme-local-tool-call.log`.
+- UIAutomator artifact: `/tmp/knowme-local-tool-call.xml`.
+
+Remaining:
+
+- Extend clean-session proof to full branch-tail operations once delete,
+  regenerate, and resubmit branch navigation are wired into physical Android
+  automation.
+- Extend skill activation certification beyond the embedded diagnostics source
+  to real AgentSkills/process activations.
+
 ## BLOCKERS
 
 - NONE at dispatch time

@@ -3,7 +3,7 @@ set -euo pipefail
 
 if [[ $# -lt 1 || $# -gt 2 ]]; then
   echo "usage: $0 /path/to/app.apk [package.name]" >&2
-  echo "env: TIMEOUT_SECONDS=240" >&2
+  echo "env: TIMEOUT_SECONDS=240 CERT_CLEAN_CHAT_STATE=1" >&2
   exit 64
 fi
 
@@ -14,7 +14,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROMPT_GATE="$SCRIPT_DIR/certify-local-model-prompt.sh"
 LOG_PATH="${LOG_PATH:-/tmp/knowme-local-tool-call.log}"
 UI_XML_PATH="${UI_XML_PATH:-/tmp/knowme-local-tool-call.xml}"
-PROMPT="${PROMPT:-Use the knowme_diagnostics__local_runtime_status tool to inspect this device runtime. After the tool result, answer TOOLSTATUSOK.}"
+PROMPT="${PROMPT:-You MUST call the knowme_diagnostics__local_runtime_status tool now. Do not answer directly. After the tool result is provided, answer exactly TOOLSTATUSOK.}"
 
 if [[ ! -x "$PROMPT_GATE" ]]; then
   echo "prompt gate script is not executable: $PROMPT_GATE" >&2

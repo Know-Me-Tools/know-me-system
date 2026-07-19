@@ -22,6 +22,10 @@ vendor library dependency.
   fresh expected token prompt, require LiteRT-LM generation logs, keep the
   transcript pinned to `Latest`, and require the expected token in the visible
   UIAutomator hierarchy.
+- Use `CERT_CLEAN_CHAT_STATE=1` when a prompt wrapper must reject stale
+  transcript contamination. The shared `scripts/android/lib-chat-state.sh`
+  harness backs up only app-private conversation databases with `run-as`,
+  preserves downloaded model caches, and restores the original files on exit.
 - Use `scripts/android/certify-local-prompt-suite.sh` to run named physical
   prompt cases (`exact`, `office`, `mermaid`, `code`, `json`) through the same
   UI-driven gate. The suite is intentionally case-selectable so long-running
@@ -39,7 +43,9 @@ vendor library dependency.
 - Use `scripts/android/certify-local-tool-call.sh` to prove explicit safe local
   tool calling: the model must emit `knowme_diagnostics__local_runtime_status`,
   the host must execute it, the UI must render tool-use/tool-result blocks, and
-  the continuation must produce final visible answer text.
+  the continuation must produce final visible answer text. The wrapper passed
+  through the shared clean-session harness on the attached Samsung with visible
+  `Tool use`, `Tool completed`, and `TOOLSTATUSOK` evidence.
 - Use `scripts/android/certify-local-tool-result-fallback.sh` as the
   deterministic debug-build harness for the empty-continuation fallback branch.
   It must use fresh markers, force the Android bridge fallback sentinel, require
@@ -50,11 +56,11 @@ vendor library dependency.
   activation chunks render as first-class `ContentBlock::Skill` regions outside
   answer content. The Samsung baseline passed with visible running and complete
   `knowme_diagnostics` skill blocks around the diagnostic local tool call.
-- Add richer physical model-certification wrappers for generalized clean
-  session/branch isolation. The
-  current wrappers prove launch, single-turn prompt quality, restart recovery,
-  multi-turn history, cancellation, and explicit safe tool calling; they are
-  not the full local agent certification suite.
+- Add richer physical model-certification wrappers for branch-tail isolation.
+  General clean-session isolation now exists for prompt gates, restart
+  recovery, multi-turn history, cancellation, and explicit safe tool calling;
+  delete/regenerate/resubmit branch behavior still needs its own physical
+  automation.
 - Store device identity, Android API level, ABI, SoC, backend, model artifact,
   load time, first-token latency, throughput, memory pressure, and thermal state
   in a fleet capability record.
@@ -107,11 +113,11 @@ vendor library dependency.
 ## Release R+4 — Richer local-agent certification
 
 - Expand prompt certification beyond the embedded diagnostics MCP tool:
-  generalized clean session/branch isolation and additional real-world tool and
-  skill sources. Office/personal task following, Mermaid, code, constrained
-  JSON, restart recovery, multi-turn history, cancellation, explicit safe tool
-  calling, empty-continuation fallback, and diagnostic skill activation now have
-  physical Android wrapper evidence.
+  branch-tail isolation and additional real-world tool and skill sources.
+  Office/personal task following, Mermaid, code, constrained JSON, restart
+  recovery, multi-turn history, cancellation, explicit safe tool calling,
+  empty-continuation fallback, diagnostic skill activation, and shared
+  clean-session prompt gating now have physical Android wrapper evidence.
 - Certify the confirmation UX/policy for mutating, destructive, and open-world
   tools beyond the embedded diagnostic tool. The baseline physical proof now
   exists for a read-only/open-world diagnostic: approval executes only a

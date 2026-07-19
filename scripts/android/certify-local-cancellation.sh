@@ -3,7 +3,7 @@ set -euo pipefail
 
 if [[ $# -lt 1 || $# -gt 2 ]]; then
   echo "usage: $0 /path/to/app.apk [package.name]" >&2
-  echo "env: TIMEOUT_SECONDS=180 CANCEL_AFTER_GENERATION_SECONDS=0" >&2
+  echo "env: TIMEOUT_SECONDS=180 CANCEL_AFTER_GENERATION_SECONDS=0 CERT_CLEAN_CHAT_STATE=1" >&2
   exit 64
 fi
 
@@ -37,7 +37,20 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 69
 fi
 
+source "$SCRIPT_DIR/lib-chat-state.sh"
+trap 'cert_restore_clean_chat_state "$PACKAGE"' EXIT
+
 "$SCRIPT_DIR/verify-device-runtime-gates.sh" "$APK" "$PACKAGE"
+
+if [[ "$CERT_CLEAN_CHAT_STATE" == "1" ]]; then
+  cert_prepare_clean_chat_state "$PACKAGE"
+  adb shell monkey -p "$PACKAGE" -c android.intent.category.LAUNCHER 1 >/dev/null
+  sleep "${CERT_CLEAN_CHAT_RELAUNCH_WAIT_SECONDS:-8}"
+  if [[ -z "$(adb shell pidof "$PACKAGE" | tr -d '\r' || true)" ]]; then
+    echo "CANCEL FAIL: app process is not alive after clean chat-state relaunch" >&2
+    exit 1
+  fi
+fi
 
 dump_ui() {
   adb shell uiautomator dump "$REMOTE_UI_XML" >/dev/null 2>&1

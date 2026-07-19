@@ -3,7 +3,7 @@ set -euo pipefail
 
 if [[ $# -lt 1 || $# -gt 2 ]]; then
   echo "usage: $0 /path/to/app.apk [package.name]" >&2
-  echo "env: CASES=exact,office,mermaid,code,json TIMEOUT_SECONDS=240" >&2
+  echo "env: CASES=exact,office,mermaid,code,json TIMEOUT_SECONDS=240 CERT_CLEAN_CHAT_STATE=1" >&2
   exit 64
 fi
 

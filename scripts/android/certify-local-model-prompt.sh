@@ -27,11 +27,6 @@ FORCE_LITERT_TOOL_RESULT_FALLBACK_PATHS=(
   "app_flutter/model-cache/litert-lm/runtime-cache/$FORCE_LITERT_TOOL_RESULT_FALLBACK_FILE"
 )
 CERT_CLEAN_CHAT_STATE="${CERT_CLEAN_CHAT_STATE:-0}"
-CERT_CLEAN_CHAT_STATE_BACKUP_DIR="cache/knowme-cert-chat-state-backup-$$"
-CERT_CHAT_STATE_PATHS=(
-  "app_flutter/entity-records.sqlite3"
-  "app_flutter/knowme-poc.db"
-)
 
 if [[ ! -f "$APK" ]]; then
   echo "APK not found: $APK" >&2
@@ -54,20 +49,8 @@ if ! command -v python3 >/dev/null 2>&1; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib-chat-state.sh"
 "$SCRIPT_DIR/verify-device-runtime-gates.sh" "$APK" "$PACKAGE"
-
-cleanup_cert_clean_chat_state() {
-  if [[ "$CERT_CLEAN_CHAT_STATE" == "1" ]]; then
-    adb shell am force-stop "$PACKAGE" >/dev/null 2>&1 || true
-    for state_path in "${CERT_CHAT_STATE_PATHS[@]}"; do
-      local basename
-      basename="$(basename "$state_path")"
-      adb shell run-as "$PACKAGE" rm -rf "$state_path" >/dev/null 2>&1 || true
-      adb shell run-as "$PACKAGE" mv "$CERT_CLEAN_CHAT_STATE_BACKUP_DIR/$basename" "$state_path" >/dev/null 2>&1 || true
-    done
-    adb shell run-as "$PACKAGE" rm -rf "$CERT_CLEAN_CHAT_STATE_BACKUP_DIR" >/dev/null 2>&1 || true
-  fi
-}
 
 cleanup_force_litert_tool_result_fallback() {
   if [[ "$FORCE_LITERT_TOOL_RESULT_FALLBACK" == "1" ]]; then
@@ -78,27 +61,12 @@ cleanup_force_litert_tool_result_fallback() {
 }
 cleanup_all() {
   cleanup_force_litert_tool_result_fallback
-  cleanup_cert_clean_chat_state
+  cert_restore_clean_chat_state "$PACKAGE"
 }
 trap cleanup_all EXIT
 
 if [[ "$CERT_CLEAN_CHAT_STATE" == "1" ]]; then
-  adb shell am force-stop "$PACKAGE" >/dev/null 2>&1 || true
-  if ! adb shell run-as "$PACKAGE" mkdir -p "$CERT_CLEAN_CHAT_STATE_BACKUP_DIR" >/dev/null 2>&1; then
-    echo "G6 FAIL: could not create reversible chat-state backup directory with run-as" >&2
-    echo "package must be debuggable for CERT_CLEAN_CHAT_STATE=1" >&2
-    exit 1
-  fi
-  for state_path in "${CERT_CHAT_STATE_PATHS[@]}"; do
-    if adb shell run-as "$PACKAGE" ls "$state_path" >/dev/null 2>&1; then
-      basename="$(basename "$state_path")"
-      if ! adb shell run-as "$PACKAGE" mv "$state_path" "$CERT_CLEAN_CHAT_STATE_BACKUP_DIR/$basename" >/dev/null 2>&1; then
-        echo "G6 FAIL: could not move chat-state path into backup" >&2
-        echo "path: $state_path" >&2
-        exit 1
-      fi
-    fi
-  done
+  cert_prepare_clean_chat_state "$PACKAGE"
   adb shell monkey -p "$PACKAGE" -c android.intent.category.LAUNCHER 1 >/dev/null
   sleep "${CERT_CLEAN_CHAT_RELAUNCH_WAIT_SECONDS:-8}"
   if [[ -z "$(adb shell pidof "$PACKAGE" | tr -d '\r' || true)" ]]; then

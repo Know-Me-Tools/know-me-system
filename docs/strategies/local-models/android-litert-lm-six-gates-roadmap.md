@@ -176,6 +176,17 @@ attached Samsung `SM S936U` running Android 16/API 36:
   `Skill knowme_diagnostics, complete` render as their own ordered
   `ContentBlock::Skill` regions outside the answer content. It passed on the
   attached Samsung with marker `KMSKILL060942`.
+- Clean-session certification is now shared instead of wrapper-specific:
+  `scripts/android/lib-chat-state.sh` backs up and restores only the
+  app-private conversation databases while preserving the LiteRT-LM model
+  cache. The prompt gate, prompt suite, explicit tool-call, cancellation,
+  restart-recovery, and multi-turn wrappers expose `CERT_CLEAN_CHAT_STATE=1`.
+  Restart recovery and multi-turn history own that clean session across their
+  full lifecycle so the seeded message is not restored away before the
+  assertion. A clean explicit tool-call run passed on the attached Samsung with
+  visible `Tool use knowme_diagnostics__local_runtime_status`,
+  `Tool completed`, and `TOOLSTATUSOK` evidence, and cleanup left no
+  certification backup/sentinel artifacts.
 
 This proves the CPU smoke lane and code-level tool-call candidate preservation.
 It also proves one complete safe local tool loop and one explicit

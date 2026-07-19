@@ -3,7 +3,7 @@ set -euo pipefail
 
 if [[ $# -lt 1 || $# -gt 2 ]]; then
   echo "usage: $0 /path/to/app.apk [package.name]" >&2
-  echo "env: TIMEOUT_SECONDS=180" >&2
+  echo "env: TIMEOUT_SECONDS=180 CERT_CLEAN_CHAT_STATE=1" >&2
   exit 64
 fi
 
@@ -27,6 +27,11 @@ if ! command -v adb >/dev/null 2>&1; then
   exit 69
 fi
 
+if [[ ! -f "$APK" ]]; then
+  echo "APK not found: $APK" >&2
+  exit 66
+fi
+
 if ! command -v rg >/dev/null 2>&1; then
   echo "rg not found in PATH" >&2
   exit 69
@@ -36,6 +41,14 @@ if ! command -v python3 >/dev/null 2>&1; then
   echo "python3 not found in PATH" >&2
   exit 69
 fi
+
+source "$SCRIPT_DIR/lib-chat-state.sh"
+trap 'cert_restore_clean_chat_state "$PACKAGE"' EXIT
+
+if [[ "$CERT_CLEAN_CHAT_STATE" == "1" ]]; then
+  adb install -r "$APK" >/dev/null
+fi
+cert_prepare_clean_chat_state "$PACKAGE"
 
 dump_ui() {
   adb shell uiautomator dump "$REMOTE_UI_XML" >/dev/null 2>&1
@@ -95,6 +108,7 @@ PROMPT="Reply exactly ${TOKEN}." \
   TIMEOUT_SECONDS="$TIMEOUT_SECONDS" \
   LOG_PATH="/tmp/knowme-local-restart-seed.log" \
   UI_XML_PATH="/tmp/knowme-local-restart-seed.xml" \
+  CERT_CLEAN_CHAT_STATE=0 \
   "$PROMPT_GATE" "$APK" "$TOKEN" "$PACKAGE"
 
 adb shell am force-stop "$PACKAGE" >/dev/null 2>&1 || true
