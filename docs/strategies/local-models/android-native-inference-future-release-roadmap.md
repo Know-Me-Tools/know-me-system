@@ -59,8 +59,8 @@ vendor library dependency.
 - Add richer physical model-certification wrappers for branch-tail isolation.
   General clean-session isolation now exists for prompt gates, restart
   recovery, multi-turn history, cancellation, and explicit safe tool calling;
-  delete/regenerate/resubmit branch behavior still needs its own physical
-  automation.
+  delete/regenerate/resubmit branch behavior now has physical Android
+  automation through `scripts/android/certify-local-branch-actions.sh`.
 - Store device identity, Android API level, ABI, SoC, backend, model artifact,
   load time, first-token latency, throughput, memory pressure, and thermal state
   in a fleet capability record.
@@ -113,11 +113,13 @@ vendor library dependency.
 ## Release R+4 — Richer local-agent certification
 
 - Expand prompt certification beyond the embedded diagnostics MCP tool:
-  branch-tail isolation and additional real-world tool and skill sources.
+  additional real-world tool and skill sources.
   Office/personal task following, Mermaid, code, constrained JSON, restart
   recovery, multi-turn history, cancellation, explicit safe tool calling,
   empty-continuation fallback, diagnostic skill activation, and shared
   clean-session prompt gating now have physical Android wrapper evidence.
+  Branch Resubmit/Delete/Regenerate also have physical Android evidence via
+  persisted `chat_message` record validation.
 - Certify the confirmation UX/policy for mutating, destructive, and open-world
   tools beyond the embedded diagnostic tool. The baseline physical proof now
   exists for a read-only/open-world diagnostic: approval executes only a

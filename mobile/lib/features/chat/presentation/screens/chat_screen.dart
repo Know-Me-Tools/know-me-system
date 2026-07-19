@@ -513,6 +513,7 @@ class _MessageBubble extends StatelessWidget {
                     Tooltip(
                       message: 'Resubmit message',
                       child: IconButton(
+                        tooltip: 'Resubmit message',
                         constraints: const BoxConstraints(
                           minWidth: 48,
                           minHeight: 48,
@@ -528,6 +529,7 @@ class _MessageBubble extends StatelessWidget {
                     Tooltip(
                       message: 'Copy entire message',
                       child: IconButton(
+                        tooltip: 'Copy entire message',
                         constraints: const BoxConstraints(
                           minWidth: 48,
                           minHeight: 48,

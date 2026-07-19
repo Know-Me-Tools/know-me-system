@@ -1099,6 +1099,63 @@ Remaining:
 - Extend skill activation certification beyond the embedded diagnostics source
   to real AgentSkills/process activations.
 
+## ANDROID BRANCH ACTIONS CHECKPOINT
+
+Date: 2026-07-19
+
+Implemented:
+
+- Fixed mobile Resubmit behavior so a selected user message creates a new
+  branch while sending the selected message's original branch prefix to Rust as
+  context history. The prior implementation created a new branch but assembled
+  history from the new empty branch.
+- Added notifier tests for:
+  - Resubmit preserving attachments and original prefix history while leaving
+    the original branch intact.
+  - Delete removing only the selected assistant response and later messages on
+    that branch.
+  - Regenerate deleting the old assistant response and rerunning the saved
+    parent user with prefix history and attachments.
+- Fixed Android accessibility semantics for the user-message action buttons by
+  adding explicit `IconButton.tooltip` values for `Resubmit message` and
+  `Copy entire message`. The previous wrapper tooltip did not expose a labeled
+  Android button to UIAutomator.
+- Added `scripts/android/certify-local-branch-actions.sh`. The gate seeds a
+  clean local-model turn, taps Resubmit, Delete, and Regenerate through the
+  Flutter UI, then validates persisted `chat_message` records from
+  `entity-records.sqlite3` instead of relying on ambiguous repeated marker
+  text.
+
+Verification:
+
+- `cd mobile && flutter test test/features/chat/chat_flow_test.dart`
+- `flutter build apk --debug --target-platform android-arm64`
+- `scripts/android/verify-native-inference-gates.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
+- `TIMEOUT_SECONDS=300 scripts/android/certify-local-branch-actions.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
+
+Physical-device evidence:
+
+- Device: Samsung `SM-S936U`, Android 16/API 36, ABI `arm64-v8a`, SoC `SM8750`.
+- Seed prompt: `Reply exactly KMBRANCH062624.`
+- Output: `G5 PASS: LiteRT-LM generation started`, `G6 PASS: LiteRT-LM produced text`, `G6 PASS: expected visible UI text found: KMBRANCH062624`, and `BRANCH PASS: resubmit, delete, and regenerate actions updated persisted branch records`.
+- Persisted DB evidence:
+  - Assistants after resubmit:
+    `fa5a758e-ab65-46b3-8fda-19db9e455cfd,2414ea78-90a6-4bb9-858c-d8406c0a31d8`.
+  - Assistant after delete:
+    `fa5a758e-ab65-46b3-8fda-19db9e455cfd`.
+  - Assistant after regenerate:
+    `017a2be6-05cc-46a9-b106-91210ff5f42b`.
+- Cleanup check found no remaining `knowme-cert-chat-state-backup` or
+  `knowme-force-litertlm-tool-result-fallback` files.
+- DB artifact: `/tmp/knowme-local-branch-actions.sqlite3`.
+- UIAutomator artifact: `/tmp/knowme-local-branch-actions.xml`.
+- Seed logcat artifact: `/tmp/knowme-local-branch-seed.log`.
+
+Remaining:
+
+- Extend skill activation certification beyond the embedded diagnostics source
+  to real AgentSkills/process activations.
+
 ## BLOCKERS
 
 - NONE at dispatch time

@@ -372,6 +372,10 @@ class ChatNotifier extends _$ChatNotifier {
     if (message == null || message.role != 'user' || message.isStreaming) {
       return;
     }
+    final sourceIndex = state.messages.indexWhere(
+      (item) => item.id == messageId,
+    );
+    if (sourceIndex < 0) return;
     final text = message.content
         .whereType<TextBlock>()
         .map((block) => block.text)
@@ -379,12 +383,75 @@ class ChatNotifier extends _$ChatNotifier {
     final attachments = message.content
         .where((block) => block is! TextBlock)
         .toList();
-    await sendMessage(
-      text,
-      attachments: attachments,
+    final branchId = _uuid.v4();
+    final userMsg = ChatMessage(
+      id: _uuid.v4(),
+      role: 'user',
+      content: [...attachments, TextBlock(text)],
+      createdAt: DateTime.now().toUtc(),
+      branchId: branchId,
       attachmentPaths: message.attachmentPaths,
-      branchId: _uuid.v4(),
     );
+    final assistantId = _uuid.v4();
+    final assistantMsg = ChatMessage(
+      id: assistantId,
+      role: 'assistant',
+      content: const [],
+      createdAt: DateTime.now().toUtc(),
+      isStreaming: true,
+      parentMessageId: userMsg.id,
+      branchId: userMsg.branchId,
+      runStatus: 'queued',
+      runPhase: 'queued',
+      statusMessage: 'Queued',
+    );
+    final history = _historyForRust(
+      state.messages.take(sourceIndex).toList(),
+      message.branchId,
+    );
+    state = state.copyWith(
+      messages: [...state.messages, userMsg, assistantMsg],
+    );
+    await _repository.saveMessage(state.threadId, userMsg);
+    late final String runId;
+    try {
+      runId = await _repository.startTurn(
+        threadId: state.threadId,
+        message: text,
+        history: history,
+        attachmentPaths: userMsg.attachmentPaths,
+        branchId: branchId,
+        userMessageId: userMsg.id,
+      );
+    } catch (error, stackTrace) {
+      markRunError(
+        assistantId,
+        ChatRunError(
+          code: 'resubmit_start_failed',
+          phase: 'queued',
+          message: error.toString(),
+          retryable: true,
+          diagnostics: stackTrace.toString(),
+        ),
+      );
+      return;
+    }
+    if (!ref.mounted) return;
+    updateRunPhase(
+      assistantId,
+      RunPhaseChanged(runId, 'queued', 'preparing', 'Preparing response'),
+    );
+    final driver = A2uiContentDriver(
+      messageId: assistantId,
+      onBlock: streamBlock,
+      onFinalize: finalizeMessage,
+      onPhase: updateRunPhase,
+      onCancelled: markRunCancelled,
+      onTelemetry: updateContextTelemetry,
+      onError: markRunError,
+    )..connect(_repository.events(runId));
+    _drivers[assistantId] = driver;
+    ref.onDispose(driver.dispose);
   }
 
   Future<void> cancelRun(String messageId) async {

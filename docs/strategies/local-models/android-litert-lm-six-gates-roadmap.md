@@ -187,6 +187,15 @@ attached Samsung `SM S936U` running Android 16/API 36:
   visible `Tool use knowme_diagnostics__local_runtime_status`,
   `Tool completed`, and `TOOLSTATUSOK` evidence, and cleanup left no
   certification backup/sentinel artifacts.
+- Branch action certification now has both notifier-level and physical Android
+  proof. Resubmit now sends the selected user message with its original branch
+  prefix history while creating a new branch; Delete removes only the selected
+  assistant response plus later messages on that branch; Regenerate deletes the
+  old assistant and reruns the saved parent user. The physical gate
+  `scripts/android/certify-local-branch-actions.sh` passed on the attached
+  Samsung by tapping Resubmit, Delete, and Regenerate in the Flutter UI and
+  validating persisted `chat_message` branch records in
+  `entity-records.sqlite3`.
 
 This proves the CPU smoke lane and code-level tool-call candidate preservation.
 It also proves one complete safe local tool loop and one explicit
