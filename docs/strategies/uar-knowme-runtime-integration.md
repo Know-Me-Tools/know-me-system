@@ -102,6 +102,13 @@ Provider bridge requirements:
 - Expose local backend diagnostics to UAR so routing can decide whether a run
   should stay local, fall back to cloud, or ask the user.
 
+Implementation status: `gen_ui_protocol` now contains a dependency-free local
+provider bridge that converts KnowMe `InferenceRequest` values into
+UAR-compatible driver payloads and projects local `StreamEvent`s into AG-UI
+events with the same reasoning/tool/skill/error semantics used by the UI path.
+This does not wire embedded mobile UAR yet; it makes the future UAR provider
+registration a mechanical adapter instead of a prompt-flattening rewrite.
+
 ## Event and block mapping
 
 KnowMe's content-block work remains valuable as the cross-platform projection

@@ -3,7 +3,91 @@
 //! event enums; wasm-safe (no IO, no runtime dependency).
 use gen_ui_types::content_block::ContentBlock;
 use gen_ui_types::events::{A2uiEvent, AguiEvent, StreamEvent};
+use gen_ui_types::inference::{InferenceRequest, InferenceTool};
 use gen_ui_types::lifecycle::{RunError, RunPhase};
+use serde::{Deserialize, Serialize};
+
+/// UAR-compatible provider payload derived from KnowMe's canonical local
+/// inference request.
+///
+/// This intentionally avoids depending on the UAR crate: mobile can build this
+/// bridge today, and the future embedded UAR provider can adapt the same
+/// payload into `universal_agent_runtime::llm::LlmRequest` mechanically.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct UarLlmRequestPayload {
+    pub messages: Vec<serde_json::Value>,
+    pub tools: Vec<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extra_params: Option<serde_json::Value>,
+}
+
+/// Convert KnowMe's structured local-provider request into the message/tool
+/// shape UAR's `LlmDriver` expects.
+pub fn inference_request_to_uar_llm_payload(request: &InferenceRequest) -> UarLlmRequestPayload {
+    let messages = request
+        .effective_messages()
+        .into_iter()
+        .map(|message| {
+            let mut value = serde_json::json!({
+                "role": message.role.as_str(),
+                "content": message.content,
+            });
+            if let serde_json::Value::Object(ref mut object) = value {
+                if let Some(name) = message.name {
+                    object.insert("name".into(), serde_json::Value::String(name));
+                }
+                if let Some(tool_call_id) = message.tool_call_id {
+                    object.insert(
+                        "tool_call_id".into(),
+                        serde_json::Value::String(tool_call_id),
+                    );
+                }
+            }
+            value
+        })
+        .collect();
+
+    let tools = request
+        .tools
+        .iter()
+        .map(inference_tool_to_uar_tool)
+        .collect();
+    let extra_params = Some(serde_json::json!({
+        "temperature": request.generation_settings.temperature,
+        "top_p": request.generation_settings.top_p,
+        "top_k": request.generation_settings.top_k,
+        "min_p": request.generation_settings.min_p,
+        "presence_penalty": request.generation_settings.presence_penalty,
+        "max_tokens": request.generation_settings.max_tokens,
+        "grammar": request.grammar,
+        "originating_plan": request.originating_plan,
+    }))
+    .filter(|value| {
+        value
+            .as_object()
+            .map(|object| !object.is_empty())
+            .unwrap_or(true)
+    });
+
+    UarLlmRequestPayload {
+        messages,
+        tools,
+        extra_params,
+    }
+}
+
+fn inference_tool_to_uar_tool(tool: &InferenceTool) -> serde_json::Value {
+    serde_json::json!({
+        "type": "function",
+        "function": {
+            "name": tool.name,
+            "description": tool.description,
+            "parameters": tool.parameters,
+        },
+        "annotations": tool.annotations,
+    })
+}
 
 /// Normalize a UAR `uar.agui/1` JSON event into KnowMe's provider-neutral
 /// `StreamEvent` contract.
@@ -580,6 +664,36 @@ impl AguiAdapter {
     }
 }
 
+/// Stateful local-provider bridge for the future embedded UAR provider lane.
+///
+/// Local engines already emit KnowMe `StreamEvent`s. UAR consumers need AG-UI
+/// style events. This bridge composes the existing `A2uiAdapter` and
+/// `AguiAdapter` so reasoning parsing, tool-argument accumulation, unclosed
+/// reasoning errors, and unknown-event preservation stay identical to the UI
+/// path.
+pub struct UarLocalProviderEventBridge {
+    a2ui: A2uiAdapter,
+    agui: AguiAdapter,
+}
+
+impl UarLocalProviderEventBridge {
+    pub fn new(thread_id: impl Into<String>, run_id: impl Into<String>) -> Self {
+        let run_id = run_id.into();
+        Self {
+            a2ui: A2uiAdapter::new(run_id.clone()),
+            agui: AguiAdapter::new(thread_id, run_id),
+        }
+    }
+
+    pub fn ingest(&mut self, event: &StreamEvent) -> Vec<AguiEvent> {
+        self.a2ui
+            .ingest(event)
+            .into_iter()
+            .flat_map(|event| self.agui.translate(&event))
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -961,6 +1075,128 @@ mod tests {
             AguiEvent::Custom { name, value }
                 if name == "knowme.artifact" && value["id"] == "future-1"
         ));
+    }
+
+    #[test]
+    fn inference_request_becomes_uar_driver_payload_without_flattening_roles() {
+        let request = InferenceRequest {
+            prompt: String::new(),
+            messages: vec![
+                gen_ui_types::inference::InferenceMessage {
+                    role: gen_ui_types::inference::InferenceRole::System,
+                    content: "Be concise".into(),
+                    name: None,
+                    tool_call_id: None,
+                },
+                gen_ui_types::inference::InferenceMessage {
+                    role: gen_ui_types::inference::InferenceRole::User,
+                    content: "Find tomorrow's meetings".into(),
+                    name: Some("traveler".into()),
+                    tool_call_id: None,
+                },
+                gen_ui_types::inference::InferenceMessage {
+                    role: gen_ui_types::inference::InferenceRole::Tool,
+                    content: r#"{"count":2}"#.into(),
+                    name: None,
+                    tool_call_id: Some("tool-1".into()),
+                },
+            ],
+            tools: vec![InferenceTool {
+                name: "calendar.find".into(),
+                description: "Find calendar events".into(),
+                parameters: serde_json::json!({
+                    "type": "object",
+                    "properties": {"query": {"type": "string"}},
+                    "required": ["query"]
+                }),
+                annotations: Some(gen_ui_types::inference::InferenceToolAnnotations {
+                    read_only_hint: Some(true),
+                    ..Default::default()
+                }),
+            }],
+            images: Vec::new(),
+            generation_settings: gen_ui_types::inference::SampleParams {
+                temperature: 0.2,
+                max_tokens: 256,
+                ..Default::default()
+            },
+            grammar: None,
+            originating_plan: None,
+        };
+
+        let payload = inference_request_to_uar_llm_payload(&request);
+        assert_eq!(payload.messages[0]["role"], "system");
+        assert_eq!(payload.messages[1]["role"], "user");
+        assert_eq!(payload.messages[1]["name"], "traveler");
+        assert_eq!(payload.messages[2]["role"], "tool");
+        assert_eq!(payload.messages[2]["tool_call_id"], "tool-1");
+        assert_eq!(payload.tools[0]["type"], "function");
+        assert_eq!(payload.tools[0]["function"]["name"], "calendar.find");
+        assert_eq!(
+            payload.tools[0]["function"]["parameters"]["required"][0],
+            "query"
+        );
+        assert_eq!(
+            payload.tools[0]["annotations"]["readOnlyHint"],
+            serde_json::Value::Bool(true)
+        );
+        assert!(
+            (payload.extra_params.as_ref().unwrap()["temperature"]
+                .as_f64()
+                .unwrap()
+                - 0.2)
+                .abs()
+                < 0.000_001
+        );
+        assert_eq!(payload.extra_params.as_ref().unwrap()["max_tokens"], 256);
+    }
+
+    #[test]
+    fn local_provider_event_bridge_uses_same_reasoning_and_tool_semantics() {
+        let mut bridge = UarLocalProviderEventBridge::new("thread-1", "run-1");
+        let mut output = Vec::new();
+        for event in [
+            StreamEvent::MessageStart,
+            StreamEvent::TextDelta {
+                index: 0,
+                delta: "answer<think>private".into(),
+            },
+            StreamEvent::TextDelta {
+                index: 1,
+                delta: "</think>done".into(),
+            },
+            StreamEvent::ToolCallStarted {
+                id: "tool-1".into(),
+                name: "docs.search".into(),
+            },
+            StreamEvent::ToolCallDelta {
+                id: "tool-1".into(),
+                delta: r#"{"q":"uar"}"#.into(),
+            },
+            StreamEvent::ToolCallComplete {
+                id: "tool-1".into(),
+            },
+            StreamEvent::Done,
+        ] {
+            output.extend(bridge.ingest(&event));
+        }
+
+        assert!(matches!(
+            &output[0],
+            AguiEvent::RunStarted { thread_id, run_id }
+                if thread_id == "thread-1" && run_id == "run-1"
+        ));
+        assert!(output.iter().any(|event| matches!(
+            event,
+            AguiEvent::ReasoningMessageContent { delta } if delta == "private"
+        )));
+        assert!(output.iter().any(|event| matches!(
+            event,
+            AguiEvent::ToolCallStart { id, name } if id == "tool-1" && name == "docs.search"
+        )));
+        assert!(
+            matches!(output.last(), Some(AguiEvent::RunFinished { run_id }) if run_id == "run-1")
+        );
     }
 
     #[test]
