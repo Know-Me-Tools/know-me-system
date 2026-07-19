@@ -36,6 +36,15 @@ pub enum StreamEvent {
         name: String,
         status: String,
     },
+    Citation {
+        source: String,
+        quote: String,
+    },
+    Memory {
+        operation: String,
+        key: String,
+        value: Option<String>,
+    },
     Custom {
         source: String,
         event_name: String,

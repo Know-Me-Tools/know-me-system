@@ -328,6 +328,25 @@ pub fn stream_event_to_uar_normalized_payload(event: &StreamEvent) -> serde_json
                 "status": status
             }
         }),
+        StreamEvent::Citation { source, quote } => serde_json::json!({
+            "type": "citation",
+            "data": {
+                "source": source,
+                "quote": quote
+            }
+        }),
+        StreamEvent::Memory {
+            operation,
+            key,
+            value,
+        } => serde_json::json!({
+            "type": "memory",
+            "data": {
+                "operation": operation,
+                "key": key,
+                "value": value
+            }
+        }),
         StreamEvent::Custom {
             source,
             event_name,
@@ -479,8 +498,8 @@ pub fn normalize_uar_agui_event(payload: &serde_json::Value) -> StreamEvent {
 
 fn normalize_uar_custom_event(payload: &serde_json::Value) -> StreamEvent {
     let name = json_string(payload, &["name"]).unwrap_or("CUSTOM");
+    let value = payload.get("value").unwrap_or(payload);
     if name == "uar.skill.activated" {
-        let value = payload.get("value").unwrap_or(payload);
         return StreamEvent::SkillActivation {
             name: first_json_string(
                 value,
@@ -496,6 +515,77 @@ fn normalize_uar_custom_event(payload: &serde_json::Value) -> StreamEvent {
             status: first_json_string(value, &[&["status"][..], &["phase"][..]])
                 .unwrap_or("activated")
                 .to_owned(),
+        };
+    }
+    if matches!(
+        name,
+        "uar.citation" | "uar.citation.added" | "citation" | "citation.added"
+    ) {
+        return StreamEvent::Citation {
+            source: first_json_string(
+                value,
+                &[
+                    &["source"][..],
+                    &["citation", "source"][..],
+                    &["document", "title"][..],
+                    &["uri"][..],
+                    &["url"][..],
+                ],
+            )
+            .unwrap_or("unknown")
+            .to_owned(),
+            quote: first_json_string(
+                value,
+                &[
+                    &["quote"][..],
+                    &["text"][..],
+                    &["excerpt"][..],
+                    &["citation", "quote"][..],
+                    &["citation", "text"][..],
+                ],
+            )
+            .unwrap_or_default()
+            .to_owned(),
+        };
+    }
+    if matches!(
+        name,
+        "uar.memory" | "uar.memory.updated" | "memory" | "memory.updated"
+    ) {
+        return StreamEvent::Memory {
+            operation: first_json_string(
+                value,
+                &[
+                    &["operation"][..],
+                    &["op"][..],
+                    &["action"][..],
+                    &["status"][..],
+                ],
+            )
+            .unwrap_or("recorded")
+            .to_owned(),
+            key: first_json_string(
+                value,
+                &[
+                    &["key"][..],
+                    &["memory", "key"][..],
+                    &["id"][..],
+                    &["memory", "id"][..],
+                    &["name"][..],
+                ],
+            )
+            .unwrap_or("unknown")
+            .to_owned(),
+            value: first_json_string(
+                value,
+                &[
+                    &["value"][..],
+                    &["text"][..],
+                    &["memory", "value"][..],
+                    &["memory", "text"][..],
+                ],
+            )
+            .map(str::to_owned),
         };
     }
 
@@ -842,6 +932,25 @@ impl A2uiAdapter {
                 block: ContentBlock::Skill {
                     name: name.clone(),
                     status: status.clone(),
+                },
+            }],
+            StreamEvent::Citation { source, quote } => vec![A2uiEvent::Block {
+                run_id: self.run_id.clone(),
+                block: ContentBlock::Citation {
+                    source: source.clone(),
+                    quote: quote.clone(),
+                },
+            }],
+            StreamEvent::Memory {
+                operation,
+                key,
+                value,
+            } => vec![A2uiEvent::Block {
+                run_id: self.run_id.clone(),
+                block: ContentBlock::Memory {
+                    operation: operation.clone(),
+                    key: key.clone(),
+                    value: value.clone(),
                 },
             }],
 
@@ -1753,6 +1862,61 @@ mod tests {
             &output[0],
             A2uiEvent::Block { block: ContentBlock::Skill { name, status }, .. }
                 if name == "office_writer" && status == "activated"
+        ));
+    }
+
+    #[test]
+    fn uar_citation_custom_event_maps_to_citation_block() {
+        let event = normalize_uar_agui_event(&serde_json::json!({
+            "type": "CUSTOM",
+            "profile": "uar.agui/1",
+            "name": "uar.citation.added",
+            "value": {
+                "source": "handbook.pdf",
+                "quote": "Submit receipts within 30 days."
+            },
+            "runId": "run-1",
+            "sequence": 5
+        }));
+        let mut adapter = A2uiAdapter::new("run-1");
+        let output = adapter.ingest(&event);
+        assert!(matches!(
+            &output[0],
+            A2uiEvent::Block {
+                block: ContentBlock::Citation { source, quote },
+                ..
+            } if source == "handbook.pdf" && quote == "Submit receipts within 30 days."
+        ));
+    }
+
+    #[test]
+    fn uar_memory_custom_event_maps_to_memory_block() {
+        let event = normalize_uar_agui_event(&serde_json::json!({
+            "type": "CUSTOM",
+            "profile": "uar.agui/1",
+            "name": "uar.memory.updated",
+            "value": {
+                "operation": "retrieved",
+                "key": "travel.preference",
+                "value": "aisle seat"
+            },
+            "runId": "run-1",
+            "sequence": 6
+        }));
+        let mut adapter = A2uiAdapter::new("run-1");
+        let output = adapter.ingest(&event);
+        assert!(matches!(
+            &output[0],
+            A2uiEvent::Block {
+                block: ContentBlock::Memory {
+                    operation,
+                    key,
+                    value
+                },
+                ..
+            } if operation == "retrieved"
+                && key == "travel.preference"
+                && value.as_deref() == Some("aisle seat")
         ));
     }
 
