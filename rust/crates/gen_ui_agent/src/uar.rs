@@ -51,6 +51,7 @@ pub struct UarRuntimeStatus {
     pub current_state: UarIntegrationState,
     pub local_provider_role: String,
     pub mobile_sidecar_allowed: bool,
+    pub local_provider_bridge_available: bool,
     pub service_runtime_available: bool,
     pub service_artifact_response_available: bool,
     pub embedded_kernel_available: bool,
@@ -91,6 +92,7 @@ impl UarRuntimeStatus {
             current_state: UarIntegrationState::ProjectionOnly,
             local_provider_role: "knowme_local_provider_backend".into(),
             mobile_sidecar_allowed: false,
+            local_provider_bridge_available: true,
             service_runtime_available: service_runtime_available(),
             service_artifact_response_available: service_artifact_response_available(),
             embedded_kernel_available: false,
@@ -336,6 +338,7 @@ mod tests {
         assert_eq!(status.authority, "universal-agent-runtime");
         assert_eq!(status.current_state, UarIntegrationState::ProjectionOnly);
         assert!(!status.mobile_sidecar_allowed);
+        assert!(status.local_provider_bridge_available);
         assert!(!status.embedded_kernel_available);
         assert!(status.embedded_kernel_blocker.is_some());
     }
