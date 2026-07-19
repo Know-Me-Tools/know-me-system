@@ -201,7 +201,7 @@ def uar_metadata():
     return {
         "runtimeAuthority": "universal-agent-runtime",
         "mobileModeTarget": "embedded_library",
-        "currentMobileIntegration": "not_wired",
+        "currentMobileIntegration": "projection_only",
         "desktopWebModeTarget": "http_service_or_sidecar",
         "cloudModeTarget": "http_service",
         "localModelProviderRole": "knowme_local_provider_backend",

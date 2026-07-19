@@ -92,6 +92,11 @@ pub async fn local_runtime_diagnostics() -> Result<String, CoreError> {
     serde_json::to_string(&diagnostics).map_err(|error| CoreError::Serde(error.to_string()))
 }
 
+pub fn uar_runtime_status() -> Result<String, CoreError> {
+    serde_json::to_string(&gen_ui_agent::uar::runtime_status())
+        .map_err(|error| CoreError::Serde(error.to_string()))
+}
+
 pub async fn theme_mode() -> Result<String, CoreError> {
     gen_ui_agent::chat::theme_mode().await.map_err(|error| {
         tracing::error!(%error, "theme preference read failed");

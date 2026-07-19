@@ -37,6 +37,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::local_model_status,
             commands::cancel_model_operation,
             commands::local_runtime_diagnostics,
+            commands::uar_runtime_status,
             commands::provider_catalog,
             commands::provider_list,
             commands::provider_save,

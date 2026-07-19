@@ -194,12 +194,21 @@ policy explicitly includes them.
 Before replacing the current Android local-chat path, prove the seam in a
 non-invasive way:
 
-1. Commit the UAR submodule pin.
+1. Commit the UAR submodule pin. **Done:** KnowMe pins UAR under
+   `rust/vendor/universal-agent-runtime`.
 2. Add a compile-time/offline contract test fixture that maps representative
-   UAR stream events into KnowMe content blocks.
+   UAR stream events into KnowMe content blocks. **Done:** `gen_ui_protocol`
+   normalizes UAR `uar.agui/1` reasoning, skill activation, tool lifecycle,
+   and unknown custom events into KnowMe stream/content blocks.
 3. Add Android certification report fields for `uarRuntimeMode` and
-   `uarSubmoduleCommit`.
+   `uarSubmoduleCommit`. **Done:** the local certification report records UAR
+   authority, target modes, current integration state, and submodule metadata.
 4. Keep physical local-model gates green.
 
 This preserves current Android progress while moving the architecture toward
 UAR as the real agent runtime authority.
+
+The next implementation checkpoint is the future-release roadmap in
+`docs/strategies/uar-future-release-roadmap.md`: expose the status surface in
+the UI, add more UAR golden fixtures, then wire the mobile embedded UAR kernel
+as the owner of real chat/agent execution.

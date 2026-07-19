@@ -109,6 +109,11 @@ pub async fn local_runtime_diagnostics(
 }
 
 #[tauri::command]
+pub fn uar_runtime_status() -> Result<gen_ui_agent::uar::UarRuntimeStatus> {
+    Ok(gen_ui_agent::uar::runtime_status())
+}
+
+#[tauri::command]
 pub fn provider_catalog() -> Result<Vec<gen_ui_agent::provider_admin::ProviderCatalogEntry>> {
     gen_ui_agent::provider_admin::catalog()
         .map_err(gen_ui_types::CoreError::from)
