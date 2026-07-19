@@ -14,7 +14,7 @@ use gen_ui_protocol::A2uiAdapter;
 use gen_ui_types::events::{A2uiEvent, StreamEvent};
 use gen_ui_types::inference::{
     ImageInput, InferenceMessage, InferenceRequest, InferenceRole, InferenceTool,
-    InferenceToolAnnotations, LocalModelSpec, PromptPlanOrigin, SampleParams,
+    InferenceToolAnnotations, InferenceToolResult, LocalModelSpec, PromptPlanOrigin, SampleParams,
 };
 use gen_ui_types::lifecycle::{
     ModelOperationState, RunError, RunPhase, RunStatus, RuntimeDiagnostics,
@@ -887,9 +887,56 @@ async fn send_local(
                     status: RunStatus::Preparing,
                     message: format!("Handling local tool call {}", call.name),
                 });
-                let follow_up = tool_gate.execute_or_reject(&mcp_registry, call).await;
+                let (follow_up, continuation) =
+                    tool_gate.execute_or_reject(&mcp_registry, call).await;
                 for a2ui in adapter.ingest(&follow_up) {
                     state::publish(a2ui);
+                }
+                if let Some(result) = continuation {
+                    if active_run.cancelled() {
+                        active_run.publish_cancelled(RunPhase::ToolExecution);
+                        return;
+                    }
+                    state::publish(A2uiEvent::RunPhaseChanged {
+                        run_id: run_id_for_task.clone(),
+                        phase: RunPhase::Generation,
+                        status: RunStatus::Generating,
+                        message: "Continuing response with tool result".into(),
+                    });
+                    let continuation_stream =
+                        match engine.continue_with_tool_results(&[result]).await {
+                            Ok(stream) => stream,
+                            Err(error) => {
+                                publish_run_error(
+                                    &run_id_for_task,
+                                    "tool_result_continuation_failed",
+                                    RunPhase::Generation,
+                                    error.to_string(),
+                                    true,
+                                );
+                                return;
+                            }
+                        };
+                    let mut continuation_stream = std::pin::pin!(continuation_stream);
+                    while let Some(continuation_event) = continuation_stream.next().await {
+                        if active_run.cancelled() {
+                            active_run.publish_cancelled(RunPhase::Generation);
+                            return;
+                        }
+                        for a2ui in adapter.ingest(&continuation_event) {
+                            state::publish(a2ui);
+                        }
+                        if matches!(
+                            continuation_event,
+                            StreamEvent::Done | StreamEvent::Error { .. }
+                        ) {
+                            return;
+                        }
+                    }
+                    for event in adapter.ingest(&StreamEvent::Done) {
+                        state::publish(event);
+                    }
+                    return;
                 }
             }
             if terminal {
@@ -1194,7 +1241,8 @@ impl LocalToolCallGate {
         &mut self,
         registry: &gen_ui_mcp::McpRegistry,
         call: PendingLocalToolCall,
-    ) -> StreamEvent {
+    ) -> (StreamEvent, Option<InferenceToolResult>) {
+        let tool_name = call.name.clone();
         let result = match self.validate_call(&call) {
             Ok(arguments) => {
                 let policy = self.policies.get(&call.name).copied().unwrap_or_default();
@@ -1213,24 +1261,40 @@ impl LocalToolCallGate {
                         "tool": call.name,
                     }))
                 } else {
-                    Ok(self.call_mcp_tool(registry, &call, &arguments).await)
+                    let (output_json, is_error) =
+                        self.call_mcp_tool(registry, &call, &arguments).await;
+                    Ok((
+                        output_json.clone(),
+                        is_error,
+                        Some(InferenceToolResult {
+                            tool_name,
+                            output_json,
+                            is_error,
+                        }),
+                    ))
                 }
             }
             Err(error) => Err(error),
         };
         match result {
-            Ok((output_json, is_error)) => StreamEvent::ToolResult {
-                tool_use_id: call.id,
-                output_json,
-                is_error,
-            },
-            Err(output) => StreamEvent::ToolResult {
-                tool_use_id: call.id,
-                output_json: serde_json::to_string(&output).unwrap_or_else(|_| {
-                    r#"{"ok":false,"code":"tool_result_serialization_failed"}"#.into()
-                }),
-                is_error: true,
-            },
+            Ok((output_json, is_error, continuation)) => (
+                StreamEvent::ToolResult {
+                    tool_use_id: call.id,
+                    output_json,
+                    is_error,
+                },
+                continuation,
+            ),
+            Err(output) => (
+                StreamEvent::ToolResult {
+                    tool_use_id: call.id,
+                    output_json: serde_json::to_string(&output).unwrap_or_else(|_| {
+                        r#"{"ok":false,"code":"tool_result_serialization_failed"}"#.into()
+                    }),
+                    is_error: true,
+                },
+                None,
+            ),
         }
     }
 
@@ -1641,9 +1705,10 @@ mod attachment_tests {
             })
             .expect("call completes");
 
-        let out = gate
+        let (out, continuation) = gate
             .execute_or_reject(&gen_ui_mcp::McpRegistry::new(), call)
             .await;
+        assert!(continuation.is_none());
         match out {
             StreamEvent::ToolResult {
                 tool_use_id,
@@ -1734,7 +1799,7 @@ mod attachment_tests {
                 id: "call-1".into(),
             })
             .expect("call completes");
-        let out = gate.execute_or_reject(&registry, call).await;
+        let (out, continuation) = gate.execute_or_reject(&registry, call).await;
 
         match out {
             StreamEvent::ToolResult {
@@ -1747,6 +1812,10 @@ mod attachment_tests {
                 let parsed: serde_json::Value =
                     serde_json::from_str(&output_json).expect("tool result is JSON");
                 assert_eq!(parsed["structuredContent"]["hits"], 1);
+                let continuation = continuation.expect("safe execution continues the model");
+                assert_eq!(continuation.tool_name, "memory__search");
+                assert_eq!(continuation.output_json, output_json);
+                assert!(!continuation.is_error);
             }
             other => panic!("expected ToolResult, got {other:?}"),
         }
@@ -1793,9 +1862,10 @@ mod attachment_tests {
                 id: "call-1".into(),
             })
             .expect("call completes");
-        let out = gate
+        let (out, continuation) = gate
             .execute_or_reject(&gen_ui_mcp::McpRegistry::new(), call)
             .await;
+        assert!(continuation.is_none());
 
         match out {
             StreamEvent::ToolResult { output_json, .. } => {

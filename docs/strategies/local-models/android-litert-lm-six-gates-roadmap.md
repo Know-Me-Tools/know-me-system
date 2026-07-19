@@ -65,12 +65,15 @@ attached Samsung `SM S936U` running Android 16/API 36:
   tools from a trusted-local MCP server that are explicitly read-only,
   non-destructive, and closed-world. Untrusted, mutating, destructive, or
   open-world tools produce typed `ToolResult` errors instead of running.
+- Safe MCP tool results are now sent back to the active LiteRT-LM conversation
+  using the Android API's `Content.ToolResponse` / `Message.tool` continuation
+  path, and the continuation response is normalized into the same stream.
 
 This proves the CPU smoke lane and code-level tool-call candidate preservation.
 It does not yet prove that the model reliably chooses tools for certified
-prompts or that a full local tool loop can continue generation after tool
-results. True token-level streaming callbacks, tool-result continuation/repair,
-cancellation certification, and broader device coverage remain future gates.
+prompts. True token-level streaming callbacks, full schema validation and
+repair, confirmation UX, cancellation certification, and broader device coverage
+remain future gates.
 
 ## Roadmap
 
@@ -110,9 +113,9 @@ cancellation certification, and broader device coverage remain future gates.
 - [x] Preserve MCP tool annotations in local inference tool definitions.
 - [x] Execute trusted-local read-only/non-destructive/closed-world tool calls and
   reject all other local tool calls with typed tool-result errors.
+- [x] Feed safe tool results back into LiteRT-LM and continue generation.
 - [ ] Replace shallow JSON validation with the shared full schema validator used
   by executable tool loops.
-- [ ] Feed tool results back into LiteRT-LM and continue generation.
 - [ ] Enforce user confirmation policy for mutating, destructive, or open-world
   tools before execution.
 - Allow at most two bounded repair attempts.

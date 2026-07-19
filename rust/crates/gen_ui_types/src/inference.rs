@@ -111,6 +111,14 @@ pub struct InferenceTool {
     pub annotations: Option<InferenceToolAnnotations>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct InferenceToolResult {
+    pub tool_name: String,
+    pub output_json: String,
+    pub is_error: bool,
+}
+
 /// Provider-neutral subset of MCP `ToolAnnotations`. These are advisory hints,
 /// not proof of safety; execution policy still decides whether a local model may
 /// call a tool automatically.
@@ -203,6 +211,19 @@ pub trait InferenceProvider: Send + Sync {
         &self,
         request: &InferenceRequest,
     ) -> CoreResult<BoxStream<'static, StreamEvent>>;
+
+    /// Continue a manual tool-calling conversation after the host has executed
+    /// one or more tool calls. Engines without a stateful conversation API can
+    /// keep the default error; callers must treat that as a visible protocol
+    /// limitation rather than silently dropping tool results.
+    async fn continue_with_tool_results(
+        &self,
+        _results: &[InferenceToolResult],
+    ) -> CoreResult<BoxStream<'static, StreamEvent>> {
+        Err(crate::error::CoreError::Terminal(
+            "local inference provider does not support tool-result continuation".into(),
+        ))
+    }
 
     /// Release model memory. Safe to call when nothing is loaded.
     async fn unload(&self) -> CoreResult<()>;

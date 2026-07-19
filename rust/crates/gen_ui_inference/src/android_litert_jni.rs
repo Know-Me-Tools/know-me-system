@@ -9,7 +9,7 @@ use std::path::Path;
 use std::sync::OnceLock;
 
 use gen_ui_types::error::{CoreError, CoreResult};
-use gen_ui_types::inference::InferenceRequest;
+use gen_ui_types::inference::{InferenceRequest, InferenceToolResult};
 use jni::objects::{GlobalRef, JClass, JObject, JString, JValue};
 use jni::{JNIEnv, JavaVM};
 use serde::Deserialize;
@@ -76,6 +76,26 @@ impl NativeLiteRtLmAdapter {
             "sendMessage",
             "(Ljava/lang/String;)Ljava/lang/String;",
             &[JValue::Object(&JObject::from(request_json))],
+        )?;
+        serde_json::from_str(&response)
+            .map_err(|error| CoreError::Serde(format!("LiteRT-LM response JSON: {error}")))
+    }
+
+    pub fn continue_with_tool_results(
+        &self,
+        results: &[InferenceToolResult],
+    ) -> CoreResult<NativeLiteRtLmResponse> {
+        let mut env = attach_env("LiteRT-LM JavaVM")?;
+        let results_json = serde_json::to_string(results)
+            .map_err(|error| CoreError::Serde(format!("LiteRT-LM tool results JSON: {error}")))?;
+        let results_json = env
+            .new_string(results_json)
+            .map_err(|error| jni_error(&mut env, "LiteRT-LM tool results string", error))?;
+        let response = call_static_string(
+            &mut env,
+            "sendToolResults",
+            "(Ljava/lang/String;)Ljava/lang/String;",
+            &[JValue::Object(&JObject::from(results_json))],
         )?;
         serde_json::from_str(&response)
             .map_err(|error| CoreError::Serde(format!("LiteRT-LM response JSON: {error}")))

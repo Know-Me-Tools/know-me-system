@@ -15,7 +15,9 @@ use async_trait::async_trait;
 use futures::{StreamExt, TryStreamExt};
 use gen_ui_types::error::{CoreError, CoreResult};
 use gen_ui_types::events::StreamEvent;
-use gen_ui_types::inference::{InferenceProvider, InferenceRequest, LocalModelSpec};
+use gen_ui_types::inference::{
+    InferenceProvider, InferenceRequest, InferenceToolResult, LocalModelSpec,
+};
 use gen_ui_types::lifecycle::{
     ModelOperationState, RunError, RunPhase, RuntimeDiagnostics, RuntimeGateReport,
     RuntimeGateStatus,
@@ -415,6 +417,56 @@ fn push_litert_lm_response_events(
     }
 }
 
+#[cfg(target_os = "android")]
+fn send_litert_response_events(
+    response: crate::android_litert_jni::NativeLiteRtLmResponse,
+    sender: &tokio::sync::mpsc::UnboundedSender<StreamEvent>,
+    context: &'static str,
+    backend_self_test_passed: Option<&AtomicBool>,
+) {
+    if !response.text.is_empty() || !response.tool_calls.is_empty() {
+        if let Some(flag) = backend_self_test_passed {
+            flag.store(true, Ordering::Release);
+        }
+    }
+    let response_text = response.text;
+    let response_tool_calls: Vec<_> = response
+        .tool_calls
+        .into_iter()
+        .map(|tool_call| (tool_call.name, tool_call.arguments))
+        .collect();
+    if !response_text.is_empty() {
+        tracing::info!(
+            target: "knowme_litert_lm",
+            chars = response_text.chars().count(),
+            tool_calls = response_tool_calls.len(),
+            context,
+            "LiteRT-LM generation produced text"
+        );
+    } else {
+        tracing::warn!(
+            target: "knowme_litert_lm",
+            tool_calls = response_tool_calls.len(),
+            context,
+            "LiteRT-LM generation returned empty text"
+        );
+    }
+    let mut events = Vec::new();
+    push_litert_lm_response_events(response_text, response_tool_calls, &mut events);
+    for event in events {
+        if let StreamEvent::ToolCallStarted { id, name } = &event {
+            tracing::info!(
+                target: "knowme_litert_lm",
+                id = %id,
+                name = %name,
+                context,
+                "LiteRT-LM generation produced tool call"
+            );
+        }
+        let _ = sender.send(event);
+    }
+}
+
 #[async_trait]
 impl InferenceProvider for LiteRtLmEngine {
     async fn load(&self, spec: &LocalModelSpec) -> CoreResult<()> {
@@ -596,46 +648,12 @@ impl InferenceProvider for LiteRtLmEngine {
                     );
                     match adapter.generate_text(&request) {
                         Ok(response) => {
-                            if !response.text.is_empty() || !response.tool_calls.is_empty() {
-                                backend_self_test_passed.store(true, Ordering::Release);
-                            }
-                            let response_text = response.text;
-                            let response_tool_calls: Vec<_> = response
-                                .tool_calls
-                                .into_iter()
-                                .map(|tool_call| (tool_call.name, tool_call.arguments))
-                                .collect();
-                            if !response_text.is_empty() {
-                                tracing::info!(
-                                    target: "knowme_litert_lm",
-                                    chars = response_text.chars().count(),
-                                    tool_calls = response_tool_calls.len(),
-                                    "LiteRT-LM generation produced text"
-                                );
-                            } else {
-                                tracing::warn!(
-                                    target: "knowme_litert_lm",
-                                    tool_calls = response_tool_calls.len(),
-                                    "LiteRT-LM generation returned empty text"
-                                );
-                            }
-                            let mut events = Vec::new();
-                            push_litert_lm_response_events(
-                                response_text,
-                                response_tool_calls,
-                                &mut events,
+                            send_litert_response_events(
+                                response,
+                                &sender,
+                                "initial",
+                                Some(&backend_self_test_passed),
                             );
-                            for event in events {
-                                if let StreamEvent::ToolCallStarted { id, name } = &event {
-                                    tracing::info!(
-                                        target: "knowme_litert_lm",
-                                        id = %id,
-                                            name = %name,
-                                        "LiteRT-LM generation produced tool call"
-                                    );
-                                }
-                                let _ = sender.send(event);
-                            }
                         }
                         Err(error) => {
                             tracing::error!(
@@ -665,6 +683,53 @@ impl InferenceProvider for LiteRtLmEngine {
                 .to_string()
         };
         Ok(futures::stream::iter([StreamEvent::Error { message }, StreamEvent::Done]).boxed())
+    }
+
+    async fn continue_with_tool_results(
+        &self,
+        #[cfg_attr(not(target_os = "android"), allow(unused_variables))]
+        results: &[InferenceToolResult],
+    ) -> CoreResult<futures::stream::BoxStream<'static, StreamEvent>> {
+        #[cfg(target_os = "android")]
+        {
+            if self.native.read().await.is_some() {
+                let results = results.to_vec();
+                let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
+                gen_ui_runtime::spawn_blocking(move || {
+                    let adapter = crate::android_litert_jni::NativeLiteRtLmAdapter;
+                    tracing::info!(
+                        target: "knowme_litert_lm",
+                        tool_results = results.len(),
+                        "LiteRT-LM tool-result continuation starting"
+                    );
+                    match adapter.continue_with_tool_results(&results) {
+                        Ok(response) => {
+                            send_litert_response_events(response, &sender, "tool_result", None);
+                        }
+                        Err(error) => {
+                            tracing::error!(
+                                target: "knowme_litert_lm",
+                                error = %error,
+                                "LiteRT-LM tool-result continuation failed"
+                            );
+                            let _ = sender.send(StreamEvent::Error {
+                                message: error.to_string(),
+                            });
+                        }
+                    }
+                    let _ = sender.send(StreamEvent::Done);
+                });
+                return Ok(tokio_stream::wrappers::UnboundedReceiverStream::new(receiver).boxed());
+            }
+        }
+        Ok(futures::stream::iter([
+            StreamEvent::Error {
+                message: "LiteRT-LM native adapter is not available for tool-result continuation"
+                    .into(),
+            },
+            StreamEvent::Done,
+        ])
+        .boxed())
     }
 
     async fn unload(&self) -> CoreResult<()> {

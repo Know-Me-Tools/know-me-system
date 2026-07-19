@@ -75,6 +75,26 @@ object KnowMeLiteRtLmBridge {
 
     @JvmStatic
     @Synchronized
+    fun sendToolResults(resultsJson: String): String {
+        val activeConversation = conversation ?: error("LiteRT-LM conversation is not active")
+        val results = JSONArray(resultsJson)
+        val responses = mutableListOf<Content.ToolResponse>()
+        for (index in 0 until results.length()) {
+            val item = results.optJSONObject(index) ?: continue
+            val name = item.optString("toolName")
+            if (name.isBlank()) continue
+            val output = item.optString("outputJson", "{}")
+            responses += Content.ToolResponse(name, output)
+        }
+        if (responses.isEmpty()) {
+            error("tool result continuation requires at least one named tool result")
+        }
+        val response = activeConversation.sendMessage(Message.tool(Contents.of(responses)))
+        return messageToJson(response)
+    }
+
+    @JvmStatic
+    @Synchronized
     fun cancel() {
         conversation?.cancelProcess()
     }

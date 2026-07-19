@@ -194,6 +194,9 @@ Verification:
 - `flutter analyze lib`
 - `flutter build apk --debug --target-platform android-arm64`
 - `scripts/android/verify-native-inference-gates.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
+- Physical-device no-regression smoke on `SM S936U`: installed the debug APK,
+  launched `tools.knowme.knowme`, submitted `Say only OK`, and logcat reported
+  `LiteRT-LM generation produced text chars=2 tool_calls=0 context="initial"`.
 
 ## LOCAL READ-ONLY TOOL EXECUTION CHECKPOINT
 
@@ -229,15 +232,43 @@ Verification:
 - `flutter build apk --debug --target-platform android-arm64`
 - `scripts/android/verify-native-inference-gates.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
 
+## TOOL-RESULT CONTINUATION CHECKPOINT
+
+Date: 2026-07-19
+
+Implemented:
+
+- Added shared `InferenceToolResult` records for provider-neutral manual
+  tool-result continuation.
+- Added an optional `InferenceProvider::continue_with_tool_results` hook with a
+  visible default error for providers that cannot continue a stateful local
+  conversation.
+- Implemented Android LiteRT-LM continuation through the active
+  `Conversation` using `Content.ToolResponse` inside `Message.tool`.
+- After a safe local MCP tool executes, `gen_ui_agent` publishes the
+  `ToolResult`, sends the result back to LiteRT-LM, and publishes the final
+  continuation stream into the same run.
+- Rejected/unsafe tool calls do not continue the model; they remain typed error
+  `ToolResult` blocks until confirmation UX/policy exists.
+
+Verification:
+
+- `cargo test -p gen_ui_agent local_tool_gate -- --nocapture`
+- `cargo test -p gen_ui_types structured_messages_preserve_roles_and_tools`
+- `cargo test -p gen_ui_inference --features local-litert-lm`
+- `cargo check -p gen_ui_agent`
+- `flutter analyze lib`
+- `flutter build apk --debug --target-platform android-arm64`
+- `scripts/android/verify-native-inference-gates.sh mobile/build/app/outputs/flutter-apk/app-debug.apk`
+
 Remaining for `litertlm-local-tools`:
 
-- Feed safe tool results back into LiteRT-LM and continue generation.
 - Replace shallow JSON checks with full shared JSON-schema validation.
 - Add user confirmation UX/policy for mutating, destructive, or open-world
   tools.
 - Add bounded repair attempts when validation fails.
 - Certify on physical Android prompts where LiteRT-LM actually chooses and uses
-  an allowed local tool.
+  an allowed local tool end-to-end.
 
 ## BLOCKERS
 
