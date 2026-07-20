@@ -62,12 +62,7 @@ impl Claims {
     /// Decode WITHOUT signature verification — gate/forge own verification (JWKS).
     /// We only need to read `exp`/`role`/`tenant_id` to drive the client state.
     pub fn decode_unverified(jwt: &str) -> CoreResult<Self> {
-        let mut validation = jsonwebtoken::Validation::default();
-        validation.insecure_disable_signature_validation();
-        validation.validate_exp = false;
-        validation.required_spec_claims.clear();
-        let key = jsonwebtoken::DecodingKey::from_secret(&[]);
-        jsonwebtoken::decode::<Claims>(jwt, &key, &validation)
+        jsonwebtoken::dangerous::insecure_decode::<Claims>(jwt)
             .map(|d| d.claims)
             .map_err(|e| CoreError::Terminal(format!("jwt decode: {e}")))
     }

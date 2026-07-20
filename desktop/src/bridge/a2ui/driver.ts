@@ -51,10 +51,10 @@ export type A2uiWireEvent =
 /**
  * Adapt Rust wire events into the message-addressed events the store consumes.
  *
- * Rust streams one `block` per token delta, each carrying only that delta, so
- * this accumulates them into the single growing text block the store renders
- * (blockIndex 0 = replace, not append) — which is exactly what the WebLLM lane
- * already emits. Both lanes therefore look identical from the store upward.
+ * Rust streams one `block` per token delta for text and reasoning, each carrying
+ * only that delta, so this accumulates each contiguous stream into one growing
+ * block. The store treats `blockIndex` as replace-in-place, not append. Richer
+ * semantic blocks remain atomic and are appended in order.
  *
  * Events arriving with no bound message (a stray run, or one racing ahead of the
  * caller) are dropped rather than guessed at.
@@ -64,15 +64,19 @@ export function createA2uiWireAdapter(
 ): { bind: (messageId: string) => void; handle: (wire: A2uiWireEvent) => void } {
   let messageId: string | null = null
   let text = ''
+  let thinking = ''
   let blockCount = 0
   let textBlockIndex: number | null = null
+  let thinkingBlockIndex: number | null = null
 
   return {
     bind: (id: string) => {
       messageId = id
       text = ''
+      thinking = ''
       blockCount = 0
       textBlockIndex = null
+      thinkingBlockIndex = null
     },
     handle: (wire: A2uiWireEvent) => {
       if (messageId === null) return
@@ -85,6 +89,8 @@ export function createA2uiWireAdapter(
           break
         case 'block':
           if (wire.block.type === 'text') {
+            thinking = ''
+            thinkingBlockIndex = null
             text += wire.block.text
             if (textBlockIndex === null) {
               textBlockIndex = blockCount
@@ -93,9 +99,18 @@ export function createA2uiWireAdapter(
             } else {
               emit({ type: 'contentBlock', messageId, blockIndex: textBlockIndex, block: { type: 'text', text } })
             }
+          } else if (wire.block.type === 'thinking') {
+            thinking += wire.block.text
+            if (thinkingBlockIndex === null) {
+              thinkingBlockIndex = blockCount
+              blockCount += 1
+              emit({ type: 'contentBlock', messageId, blockIndex: thinkingBlockIndex, block: { type: 'thinking', text: thinking } })
+            } else {
+              emit({ type: 'contentBlock', messageId, blockIndex: thinkingBlockIndex, block: { type: 'thinking', text: thinking } })
+            }
           } else {
-            // Richer blocks (tool use, citations) pass straight through once the
-            // core starts emitting them.
+            thinking = ''
+            thinkingBlockIndex = null
             emit({ type: 'contentBlock', messageId, block: wire.block })
             blockCount += 1
           }

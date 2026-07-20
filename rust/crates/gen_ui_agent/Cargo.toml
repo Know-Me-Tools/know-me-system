@@ -34,6 +34,9 @@ thiserror.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 jsonschema.workspace = true
+# Keep jsonschema from floating regex to 1.13 while the optional mistral.rs graph
+# is present; mistralrs-core -> serde-saphyr currently requires regex <1.13.
+regex.workspace = true
 tokio = { workspace = true, features = ["sync", "rt", "fs", "net"] }
 once_cell.workspace = true
 tracing.workspace = true
@@ -43,11 +46,12 @@ futures.workspace = true
 # C-106: assembling the forge/Quarry WriteSink here keeps the platform leaves thin —
 # they would otherwise each need these two just to construct a client. Both are already
 # in gen_ui_client's graph, so this adds no new third-party code to the build.
-reqwest = { workspace = true, default-features = false, features = ["rustls-tls", "json"] }
+reqwest = { workspace = true, default-features = false, features = ["rustls", "json"] }
 parking_lot.workspace = true
 base64.workspace = true
 sha2.workspace = true
 scraper.workspace = true
+universal-agent-runtime-sdk = { path = "../../vendor/universal-agent-runtime/sdks/rust", default-features = false, features = ["http-client"] }
 
 [target.'cfg(target_os = "ios")'.dependencies]
 # Cargo feature-unifies this into the same apple-native-keyring-store instance
@@ -67,7 +71,6 @@ apple-native-keyring-store.workspace = true
 # features across them.
 [target.'cfg(not(any(target_os = "ios", target_os = "android")))'.dependencies]
 gen_ui_db = { path = "../gen_ui_db", features = ["pglite"] }
-universal-agent-runtime-sdk = { path = "../../vendor/universal-agent-runtime/sdks/rust", default-features = false, features = ["http-client"] }
 [target.'cfg(any(target_os = "ios", target_os = "android"))'.dependencies]
 gen_ui_db = { path = "../gen_ui_db" }
 

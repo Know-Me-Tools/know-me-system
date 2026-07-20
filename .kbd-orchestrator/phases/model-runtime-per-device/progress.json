@@ -1,21 +1,23 @@
 {
   "phase": "model-runtime-per-device",
   "parentPhase": null,
-  "childPhases": [],
-  "childPointer": null,
+  "childPhases": [
+    "embedded-uar-offline-agents"
+  ],
+  "childPointer": "embedded-uar-offline-agents",
   "assessment_complete": true,
   "plan_complete": true,
   "execute_complete": false,
   "reflect_complete": false,
-  "implementation_total": 4,
-  "implementation_completed": 3,
-  "changes_total": 4,
-  "changes_completed": 1,
+  "implementation_total": 5,
+  "implementation_completed": 4,
+  "changes_total": 5,
+  "changes_completed": 4,
   "completion": {
     "primaryCounter": "implementation",
     "implementation": {
-      "completed": 3,
-      "total": 4,
+      "completed": 4,
+      "total": 5,
       "status": "IN_PROGRESS"
     },
     "evidence": {
@@ -37,13 +39,14 @@
   "completed_changes": [
     "android-litertlm-runtime",
     "litertlm-native-adapter",
-    "litertlm-device-proof"
+    "litertlm-device-proof",
+    "document-uar-karpathy-knowledge-strategy"
   ],
   "active_change": "litertlm-local-tools",
   "blocked_changes": [],
   "sourceTool": "codex",
   "last_updated_by": "codex",
-  "last_updated": "2026-07-19T02:40:24-05:00",
+  "last_updated": "2026-07-19T08:17:00-05:00",
   "createdBy": "kbd-new-phase",
-  "updatedAt": "2026-07-19T02:40:24-05:00"
+  "updatedAt": "2026-07-20T20:09:55Z"
 }

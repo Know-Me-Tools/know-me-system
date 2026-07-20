@@ -1,0 +1,44 @@
+{
+  "contradictions": [
+    {
+      "id": "X01",
+      "topic": "Browser deployment",
+      "statement_a": "An existing KnowMe agent strategy describes UAR running in browser WASM.",
+      "statement_b": "The current UAR product matrix marks arbitrary browser WASM unsupported, and the requested topology places UAR behind Axum.",
+      "resolution": "Current UAR source and the explicit requested topology control. The knowledge runtime is service-only on web; the new strategy supersedes the older browser-WASM statement for this subject.",
+      "sources": ["L13", "L02"]
+    },
+    {
+      "id": "X02",
+      "topic": "Trace capture maturity",
+      "statement_a": "Older future-work notes describe TraceCapture as missing or proposed.",
+      "statement_b": "Current source implements TraceCapture, a Claude adapter, generic adapter shells, TraceStore, and a learning command.",
+      "resolution": "Current source wins. Record the feature as partial, not missing: generic adapters return no traces and correlation fields remain incomplete.",
+      "sources": ["L07", "L08"]
+    },
+    {
+      "id": "X03",
+      "topic": "Knowledge compilation maturity",
+      "statement_a": "The knowledge compiler can convert an ExecutionTrace into a WikiEntry.",
+      "statement_b": "The learning CLI's compile block does not load traces and invoke compile_batch.",
+      "resolution": "The component exists but the user-facing end-to-end pipeline is incomplete. Service-first work must wire and test it before enabling promotion.",
+      "sources": ["L08"]
+    },
+    {
+      "id": "X04",
+      "topic": "Embedded runtime",
+      "statement_a": "The UAR Rust SDK exposes an embedded feature and RuntimeBuilder.",
+      "statement_b": "RuntimeBuilder leaves direct state handles empty and start launches the HTTP server; UAR mobile is experimental.",
+      "resolution": "Do not equate build-time embedding with a mobile-safe in-process kernel. Extract and certify a narrow kernel first.",
+      "sources": ["L02", "L04"]
+    },
+    {
+      "id": "X05",
+      "topic": "Event persistence and scheduled compression",
+      "statement_a": "Some future-work narratives describe these as unwired.",
+      "statement_b": "Current source includes event-store implementations and scheduled compression artifacts.",
+      "resolution": "Treat components as present but not certified for KnowMe. Verify scheduling installation, scope isolation, observability, and mobile-safe behavior rather than repeating stale missing-feature claims.",
+      "sources": ["L06", "L08"]
+    }
+  ]
+}

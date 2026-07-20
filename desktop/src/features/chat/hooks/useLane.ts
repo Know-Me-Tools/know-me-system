@@ -6,6 +6,9 @@ export function useLane() {
   return {
     lane: useLaneStore((state) => state.lane),
     localAvailable: useLaneStore((state) => state.localAvailable),
+    uarSupported: useLaneStore((state) => state.uarSupported),
+    uarConfigured: useLaneStore((state) => state.uarConfigured),
+    uarStatus: useLaneStore((state) => state.uarStatus),
     loadProgress: useLaneStore((state) => state.loadProgress),
     throughput: useLaneStore((state) => state.throughput),
     error: useLaneStore((state) => state.error),

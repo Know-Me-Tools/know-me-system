@@ -11,7 +11,7 @@
 //! protocol), so one impl serves both and the tests can run against either.
 use async_trait::async_trait;
 use gen_ui_types::error::{CoreError, CoreResult};
-use sqlx::PgPool;
+use sqlx::{AssertSqlSafe, PgPool};
 
 use super::seam::{LocalStore, RowChange, RowOp};
 
@@ -75,7 +75,7 @@ impl LocalStore for PgLocalStore {
                          ON CONFLICT (id) DO UPDATE SET {assignments}",
                         assignments = excluded_assignments(table),
                     );
-                    sqlx::query(&sql)
+                    sqlx::query(AssertSqlSafe(sql))
                         .bind(&change.value_json)
                         .execute(&mut *tx)
                         .await
@@ -87,7 +87,7 @@ impl LocalStore for PgLocalStore {
                 // off `key` instead.
                 RowOp::Delete => {
                     let sql = format!("UPDATE {table} SET deleted = true WHERE id = $1");
-                    sqlx::query(&sql)
+                    sqlx::query(AssertSqlSafe(sql))
                         .bind(&change.key)
                         .execute(&mut *tx)
                         .await
@@ -107,7 +107,7 @@ impl LocalStore for PgLocalStore {
     /// row is about to be replayed anyway, and TRUNCATE skips the per-row WAL churn.
     async fn truncate_shape(&self, table: &str) -> CoreResult<()> {
         let table = check_table(table)?;
-        sqlx::query(&format!("TRUNCATE TABLE {table}"))
+        sqlx::query(AssertSqlSafe(format!("TRUNCATE TABLE {table}")))
             .execute(&self.pool)
             .await
             .map(|_| ())

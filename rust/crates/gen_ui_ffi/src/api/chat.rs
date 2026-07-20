@@ -19,6 +19,13 @@ pub use gen_ui_db_graph::{MemoryHit, MemoryProvenance, RelatedEntity};
 pub use gen_ui_types::inference::{InferenceMessage, InferenceRole};
 pub use gen_ui_types::CoreError;
 
+/// Decode a typed Rust failure for Flutter's error surfaces. FRB carries
+/// workspace-owned error enums as opaque Rust objects, so Dart's default
+/// `toString()` cannot expose the safe Display message without this adapter.
+pub fn core_error_message(error: CoreError) -> String {
+    error.to_string()
+}
+
 /// Start a chat turn; returns the run_id whose events arrive on chat_events(run_id).
 /// `messages` is the selected conversation's role/text history. The thread id
 /// remains transport metadata; persistence is owned by the entity repository.
@@ -95,6 +102,177 @@ pub async fn local_runtime_diagnostics() -> Result<String, CoreError> {
 pub fn uar_runtime_status() -> Result<String, CoreError> {
     serde_json::to_string(&gen_ui_agent::uar::runtime_status())
         .map_err(|error| CoreError::Serde(error.to_string()))
+}
+
+/// Mobile/Flutter control-plane facade. JSON is intentional here: UAR owns
+/// these extensible schemas and the client must preserve fields it does not yet
+/// understand while Rust remains the only HTTP boundary.
+pub async fn active_lane() -> Result<String, CoreError> {
+    gen_ui_agent::chat::active_lane().await.map_err(Into::into)
+}
+
+pub async fn set_active_lane(lane: String) -> Result<(), CoreError> {
+    gen_ui_agent::chat::set_active_lane(&lane)
+        .await
+        .map_err(Into::into)
+}
+
+pub async fn uar_service_config() -> Result<String, CoreError> {
+    let value = gen_ui_agent::chat::uar_service_config().await?;
+    serde_json::to_string(&value).map_err(|error| CoreError::Serde(error.to_string()))
+}
+
+pub async fn uar_service_save(
+    service_url: String,
+    api_key: Option<String>,
+    session_id: Option<String>,
+) -> Result<(), CoreError> {
+    gen_ui_agent::chat::save_uar_service_config(gen_ui_agent::chat::SaveUarServiceRequest {
+        service_url,
+        api_key,
+        agent_artifact_json: String::new(),
+        session_id,
+    })
+    .await
+    .map_err(Into::into)
+}
+
+pub async fn uar_service_probe() -> Result<String, CoreError> {
+    let value = gen_ui_agent::chat::probe_uar_service_config().await?;
+    serde_json::to_string(&value).map_err(|error| CoreError::Serde(error.to_string()))
+}
+
+pub async fn chat_control_catalog() -> Result<String, CoreError> {
+    let value = gen_ui_agent::control_plane::catalog().await?;
+    serde_json::to_string(&value).map_err(|error| CoreError::Serde(error.to_string()))
+}
+
+pub async fn uar_admin_snapshot() -> Result<String, CoreError> {
+    let value = gen_ui_agent::control_plane::admin_snapshot().await?;
+    serde_json::to_string(&value).map_err(|error| CoreError::Serde(error.to_string()))
+}
+
+pub async fn provider_catalog() -> Result<String, CoreError> {
+    let value = gen_ui_agent::provider_admin::catalog().await?;
+    serde_json::to_string(&value).map_err(|error| CoreError::Serde(error.to_string()))
+}
+
+pub async fn provider_list() -> Result<String, CoreError> {
+    let value = gen_ui_agent::provider_admin::list().await?;
+    serde_json::to_string(&value).map_err(|error| CoreError::Serde(error.to_string()))
+}
+
+pub async fn provider_save(request_json: String) -> Result<(), CoreError> {
+    let request =
+        serde_json::from_str::<gen_ui_agent::provider_admin::SaveProviderRequest>(&request_json)
+            .map_err(|error| CoreError::Serde(error.to_string()))?;
+    gen_ui_agent::provider_admin::save(request)
+        .await
+        .map_err(Into::into)
+}
+
+pub async fn provider_delete(id: String) -> Result<(), CoreError> {
+    gen_ui_agent::provider_admin::delete(&id)
+        .await
+        .map_err(Into::into)
+}
+
+pub async fn provider_test(id: String, model: Option<String>) -> Result<String, CoreError> {
+    let value = gen_ui_agent::provider_admin::test(&id, model.as_deref()).await?;
+    serde_json::to_string(&value).map_err(|error| CoreError::Serde(error.to_string()))
+}
+
+pub async fn cloud_model_get() -> Result<String, CoreError> {
+    let value = gen_ui_agent::provider_admin::get_cloud_model().await?;
+    serde_json::to_string(&value).map_err(|error| CoreError::Serde(error.to_string()))
+}
+
+pub async fn cloud_model_save(provider_id: String, model_id: String) -> Result<(), CoreError> {
+    gen_ui_agent::provider_admin::save_cloud_model(
+        gen_ui_agent::provider_admin::SaveCloudModelRequest {
+            provider_id,
+            model_id,
+        },
+    )
+    .await
+    .map_err(Into::into)
+}
+
+pub async fn uar_setting_save(key: String, value_json: String) -> Result<String, CoreError> {
+    let value = parse_json(&value_json)?;
+    let saved = gen_ui_agent::control_plane::update_setting(&key, &value).await?;
+    serde_json::to_string(&saved).map_err(|error| CoreError::Serde(error.to_string()))
+}
+
+pub async fn uar_agent_save(agent_json: String) -> Result<String, CoreError> {
+    let saved = gen_ui_agent::control_plane::save_agent(&parse_json(&agent_json)?).await?;
+    serde_json::to_string(&saved).map_err(|error| CoreError::Serde(error.to_string()))
+}
+
+pub async fn uar_agent_delete(id: String) -> Result<(), CoreError> {
+    gen_ui_agent::control_plane::delete_agent(&id)
+        .await
+        .map_err(Into::into)
+}
+
+pub async fn uar_mcp_server_save(name: String, server_json: String) -> Result<String, CoreError> {
+    let saved =
+        gen_ui_agent::control_plane::save_mcp_server(&name, &parse_json(&server_json)?).await?;
+    serde_json::to_string(&saved).map_err(|error| CoreError::Serde(error.to_string()))
+}
+
+pub async fn uar_mcp_server_delete(name: String) -> Result<String, CoreError> {
+    let value = gen_ui_agent::control_plane::delete_mcp_server(&name).await?;
+    serde_json::to_string(&value).map_err(|error| CoreError::Serde(error.to_string()))
+}
+
+pub async fn uar_memory_delete(id: String) -> Result<String, CoreError> {
+    let value = gen_ui_agent::control_plane::delete_memory(&id).await?;
+    serde_json::to_string(&value).map_err(|error| CoreError::Serde(error.to_string()))
+}
+
+pub async fn uar_knowledge_base_create(request_json: String) -> Result<String, CoreError> {
+    let value =
+        gen_ui_agent::control_plane::create_knowledge_base(&parse_json(&request_json)?).await?;
+    serde_json::to_string(&value).map_err(|error| CoreError::Serde(error.to_string()))
+}
+
+pub async fn uar_knowledge_base_delete(id: String) -> Result<(), CoreError> {
+    gen_ui_agent::control_plane::delete_knowledge_base(&id)
+        .await
+        .map_err(Into::into)
+}
+
+pub async fn conversation_policy_get(conversation_id: String) -> Result<String, CoreError> {
+    let value = gen_ui_agent::control_plane::conversation_policy(&conversation_id).await?;
+    serde_json::to_string(&value).map_err(|error| CoreError::Serde(error.to_string()))
+}
+
+pub async fn conversation_policy_save(
+    conversation_id: String,
+    policy_json: String,
+) -> Result<String, CoreError> {
+    let value = gen_ui_agent::control_plane::save_conversation_policy(
+        &conversation_id,
+        &parse_json(&policy_json)?,
+    )
+    .await?;
+    serde_json::to_string(&value).map_err(|error| CoreError::Serde(error.to_string()))
+}
+
+pub async fn conversation_policy_delete(conversation_id: String) -> Result<(), CoreError> {
+    gen_ui_agent::control_plane::delete_conversation_policy(&conversation_id)
+        .await
+        .map_err(Into::into)
+}
+
+pub async fn conversation_effective_config(conversation_id: String) -> Result<String, CoreError> {
+    let value = gen_ui_agent::control_plane::effective_config(&conversation_id).await?;
+    serde_json::to_string(&value).map_err(|error| CoreError::Serde(error.to_string()))
+}
+
+fn parse_json(value: &str) -> Result<serde_json::Value, CoreError> {
+    serde_json::from_str(value).map_err(|error| CoreError::Serde(error.to_string()))
 }
 
 pub async fn theme_mode() -> Result<String, CoreError> {

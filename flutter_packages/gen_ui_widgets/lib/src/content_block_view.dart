@@ -598,13 +598,11 @@ class ContentBlockArtifact extends StatelessWidget {
               kind: 'attachment',
               content: content,
             ),
-            'a2ui' || 'application/a2ui+json' => A2uiSurfaceView(
+            'a2ui' || 'application/a2ui+json' => _A2uiArtifactPanel(
+              artifactId: id,
               source: content,
               remoteResolver: remoteResolver,
-              onAction: (action) => onInteraction?.call({
-                'kind': 'a2ui',
-                'payload': action.toJson(),
-              }),
+              onInteraction: onInteraction,
             ),
             _ => SelectableText(content),
           };
@@ -617,6 +615,122 @@ class ContentBlockArtifact extends StatelessWidget {
         copyValue: content,
       ),
       child: Padding(padding: const EdgeInsets.only(top: 8), child: child),
+    );
+  }
+}
+
+class _A2uiArtifactPanel extends StatefulWidget {
+  const _A2uiArtifactPanel({
+    required this.artifactId,
+    required this.source,
+    this.onInteraction,
+    this.remoteResolver,
+  });
+
+  final String artifactId;
+  final String source;
+  final AgentInteractionCallback? onInteraction;
+  final RemoteContentResolver? remoteResolver;
+
+  @override
+  State<_A2uiArtifactPanel> createState() => _A2uiArtifactPanelState();
+}
+
+class _A2uiArtifactPanelState extends State<_A2uiArtifactPanel> {
+  bool _showSource = false;
+  bool _adding = false;
+  bool _added = false;
+
+  Future<void> _addToLibrary() async {
+    final callback = widget.onInteraction;
+    if (callback == null || _adding || _added) return;
+    setState(() => _adding = true);
+    try {
+      await Future.sync(
+        () => callback({
+          'kind': 'a2ui_promote',
+          'payload': {
+            'title': 'Artifact ${widget.artifactId}',
+            'source': widget.source,
+            'description': 'Promoted from a KnowMe conversation',
+          },
+        }),
+      );
+      if (mounted) setState(() => _added = true);
+    } finally {
+      if (mounted) setState(() => _adding = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = shad.Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        A2uiSurfaceView(
+          source: widget.source,
+          remoteResolver: widget.remoteResolver,
+          onAction: (action) => widget.onInteraction?.call({
+            'kind': 'a2ui',
+            'sourceRunId': widget.artifactId,
+            'payload': action.toJson(),
+          }),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 4,
+          runSpacing: 4,
+          children: [
+            TextButton.icon(
+              onPressed: () => setState(() => _showSource = !_showSource),
+              icon: Icon(
+                _showSource ? Icons.expand_less : Icons.code,
+                size: 18,
+              ),
+              label: Text(_showSource ? 'Hide source' : 'View source'),
+            ),
+            TextButton.icon(
+              onPressed: () =>
+                  Clipboard.setData(ClipboardData(text: widget.source)),
+              icon: const Icon(Icons.copy_outlined, size: 18),
+              label: const Text('Copy source'),
+            ),
+            TextButton.icon(
+              onPressed: _adding || _added ? null : _addToLibrary,
+              icon: _adding
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(
+                      _added ? Icons.check : Icons.library_add_outlined,
+                      size: 18,
+                    ),
+              label: Text(
+                _added ? 'Added to UAR library' : 'Add to UAR library',
+              ),
+            ),
+          ],
+        ),
+        if (_showSource)
+          Container(
+            margin: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: colors.background,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: SelectableText(
+              widget.source,
+              style: TextStyle(
+                color: colors.mutedForeground,
+                fontFamily: 'monospace',
+                fontSize: 12,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

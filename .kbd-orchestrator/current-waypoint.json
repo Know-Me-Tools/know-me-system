@@ -1,21 +1,27 @@
 {
   "phase": "model-runtime-per-device",
   "previousPhase": "on-device-qwen35",
-  "change": "qwen35-mobile-vision",
+  "change": "embed-uar-mobile-offline",
   "status": "implementation_ready",
-  "currentTask": "apply qwen35-mobile-vision",
-  "nextPendingChange": "qwen35-mobile-vision",
+  "currentTask": "implement the shared offline embedded UAR kernel for desktop, Android, and iOS",
+  "nextPendingChange": "embed-uar-mobile-offline",
   "sourceTool": "codex",
-  "exactNextCommand": "/kbd-apply qwen35-mobile-vision",
-  "parentPhase": null,
-  "childPhases": [],
+  "exactNextCommand": "/opsx:apply embed-uar-mobile-offline",
+  "parentPhase": "model-runtime-per-device",
+  "childPhases": [
+    "embedded-uar-offline-agents"
+  ],
   "childPointer": null,
   "completionMetric": "implementation",
-  "implementationCompleted": 1,
-  "implementationTotal": 4,
+  "implementationCompleted": 0,
+  "implementationTotal": 1,
   "certificationStatus": "NOT_TRACKED",
   "publicationStatus": "NOT_TRACKED",
-  "changesCompleted": 1,
-  "changesTotal": 4,
-  "updatedAt": "2026-07-18T21:10:00Z"
+  "changesCompleted": 0,
+  "changesTotal": 1,
+  "updatedAt": "2026-07-20T20:35:00Z",
+  "path": [
+    "model-runtime-per-device",
+    "embedded-uar-offline-agents"
+  ]
 }

@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-conversation-effective-config"
+description = "Enables the conversation_effective_config command without any pre-configured scope."
+commands.allow = ["conversation_effective_config"]
+
+[[permission]]
+identifier = "deny-conversation-effective-config"
+description = "Denies the conversation_effective_config command without any pre-configured scope."
+commands.deny = ["conversation_effective_config"]

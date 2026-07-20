@@ -14,6 +14,7 @@ import '../../../../shared/widgets/knowme_screen.dart';
 import '../../../../shared/widgets/sync_chip.dart';
 import '../../domain/entities/chat_message.dart';
 import '../providers/chat_notifier.dart';
+import '../widgets/chat_policy_toolbar.dart';
 
 /// Chat surface. Renders each message's ContentBlocks with the shared
 /// ContentBlockView (exhaustive over all 11 variants — a compile-time contract).
@@ -90,6 +91,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
             ),
+          if (state.threadId.isNotEmpty)
+            ChatPolicyToolbar(conversationId: state.threadId),
           Expanded(
             child: Stack(
               children: [
@@ -302,9 +305,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           }),
         ),
     ];
-    final attachmentPaths = [
-      for (final file in _attachments) ?file.path,
-    ];
+    final attachmentPaths = [for (final file in _attachments) ?file.path];
     _controller.clear();
     setState(() {
       _attachments.clear();
@@ -326,8 +327,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Future<void> _pickAttachments() async {
-    final result = await FilePicker.platform.pickFiles(
-      allowMultiple: true,
+    final file = await FilePicker.pickFile(
       type: FileType.custom,
       allowedExtensions: const [
         'png',
@@ -345,17 +345,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         'webm',
       ],
     );
-    if (!mounted || result == null) return;
+    if (!mounted || file == null) return;
     const maxBytes = 25 * 1024 * 1024;
-    final tooLarge = result.files
+    final selectedFiles = [file];
+    final tooLarge = selectedFiles
         .where((file) => file.size > maxBytes)
         .toList();
-    final unavailable = result.files
+    final unavailable = selectedFiles
         .where((file) => file.path == null)
         .toList();
     setState(() {
       _attachments.addAll(
-        result.files
+        selectedFiles
             .where((file) => file.size <= maxBytes && file.path != null)
             .take(6 - _attachments.length),
       );

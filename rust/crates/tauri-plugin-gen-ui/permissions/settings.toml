@@ -1,0 +1,33 @@
+# TJ-ARCH-MOB-001 compliant
+"$schema" = "schemas/schema.json"
+
+[[permission]]
+identifier = "allow-settings-admin"
+description = "Allow the settings overlay to administer UAR connectivity and UAR-owned provider/model configuration."
+commands.allow = [
+    "uar_service_config",
+    "uar_service_save",
+    "uar_service_probe",
+    "provider_catalog",
+    "chat_control_catalog",
+    "conversation_policy_get",
+    "conversation_policy_save",
+    "conversation_policy_delete",
+    "conversation_effective_config",
+    "promote_a2ui_component",
+    "provider_list",
+    "provider_save",
+    "provider_delete",
+    "provider_test",
+    "cloud_model_get",
+    "cloud_model_save",
+    "uar_admin_snapshot",
+    "uar_setting_save",
+    "uar_agent_save",
+    "uar_agent_delete",
+    "uar_mcp_server_save",
+    "uar_mcp_server_delete",
+    "uar_memory_delete",
+    "uar_knowledge_base_create",
+    "uar_knowledge_base_delete",
+]

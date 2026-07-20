@@ -5,6 +5,7 @@
 
 pub mod chat;
 pub mod config;
+pub mod control_plane;
 pub mod error;
 pub mod media;
 pub mod memory;

@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-uar-admin-snapshot"
+description = "Enables the uar_admin_snapshot command without any pre-configured scope."
+commands.allow = ["uar_admin_snapshot"]
+
+[[permission]]
+identifier = "deny-uar-admin-snapshot"
+description = "Denies the uar_admin_snapshot command without any pre-configured scope."
+commands.deny = ["uar_admin_snapshot"]

@@ -1,6 +1,8 @@
 // TJ-ARCH-MOB-001 compliant
 import 'package:flutter/widgets.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
+import 'package:flutter/material.dart' show Icons;
 
 /// Flat 2.0 screen frame. Regions are separated by filled backgrounds only.
 class KnowMeScreen extends StatelessWidget {
@@ -38,6 +40,16 @@ class KnowMeScreen extends StatelessWidget {
                   ),
                 ),
                 ...trailing,
+                if (title != 'Settings')
+                  shad.GhostButton(
+                    onPressed: () => context.push('/settings'),
+                    density: shad.ButtonDensity.icon,
+                    child: Semantics(
+                      button: true,
+                      label: 'Open settings',
+                      child: const Icon(Icons.settings_outlined),
+                    ),
+                  ),
               ],
             ),
           ),

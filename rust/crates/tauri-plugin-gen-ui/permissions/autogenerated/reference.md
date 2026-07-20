@@ -5,9 +5,15 @@ Default gen-ui permissions: startup/read/chat intents. Mutating ENTITY commands 
 #### This default permission set includes the following:
 
 - `allow-stream-agent-a2ui`
+- `allow-send-agent-interaction-a2ui`
 - `allow-get-active-lane`
 - `allow-set-active-lane`
 - `allow-has-local-engine`
+- `allow-cancel-agent-run`
+- `allow-prepare-local-model`
+- `allow-local-model-status`
+- `allow-cancel-model-operation`
+- `allow-local-runtime-diagnostics`
 - `allow-uar-runtime-status`
 - `allow-run-migrations`
 - `allow-load-seeds`
@@ -53,6 +59,240 @@ Enables the attach_sync_shapes command without any pre-configured scope.
 <td>
 
 Denies the attach_sync_shapes command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:allow-cancel-agent-run`
+
+</td>
+<td>
+
+Enables the cancel_agent_run command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-cancel-agent-run`
+
+</td>
+<td>
+
+Denies the cancel_agent_run command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:allow-cancel-model-operation`
+
+</td>
+<td>
+
+Enables the cancel_model_operation command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-cancel-model-operation`
+
+</td>
+<td>
+
+Denies the cancel_model_operation command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:allow-chat-control-catalog`
+
+</td>
+<td>
+
+Enables the chat_control_catalog command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-chat-control-catalog`
+
+</td>
+<td>
+
+Denies the chat_control_catalog command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:allow-cloud-model-get`
+
+</td>
+<td>
+
+Enables the cloud_model_get command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-cloud-model-get`
+
+</td>
+<td>
+
+Denies the cloud_model_get command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:allow-cloud-model-save`
+
+</td>
+<td>
+
+Enables the cloud_model_save command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-cloud-model-save`
+
+</td>
+<td>
+
+Denies the cloud_model_save command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:allow-conversation-effective-config`
+
+</td>
+<td>
+
+Enables the conversation_effective_config command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-conversation-effective-config`
+
+</td>
+<td>
+
+Denies the conversation_effective_config command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:allow-conversation-policy-delete`
+
+</td>
+<td>
+
+Enables the conversation_policy_delete command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-conversation-policy-delete`
+
+</td>
+<td>
+
+Denies the conversation_policy_delete command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:allow-conversation-policy-get`
+
+</td>
+<td>
+
+Enables the conversation_policy_get command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-conversation-policy-get`
+
+</td>
+<td>
+
+Denies the conversation_policy_get command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:allow-conversation-policy-save`
+
+</td>
+<td>
+
+Enables the conversation_policy_save command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-conversation-policy-save`
+
+</td>
+<td>
+
+Denies the conversation_policy_save command without any pre-configured scope.
 
 </td>
 </tr>
@@ -346,6 +586,110 @@ Denies the load_seeds command without any pre-configured scope.
 <tr>
 <td>
 
+`gen-ui:allow-local-model-status`
+
+</td>
+<td>
+
+Enables the local_model_status command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-local-model-status`
+
+</td>
+<td>
+
+Denies the local_model_status command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:allow-local-runtime-diagnostics`
+
+</td>
+<td>
+
+Enables the local_runtime_diagnostics command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-local-runtime-diagnostics`
+
+</td>
+<td>
+
+Denies the local_runtime_diagnostics command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:allow-memory-delete-conversation-context`
+
+</td>
+<td>
+
+Enables the memory_delete_conversation_context command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-memory-delete-conversation-context`
+
+</td>
+<td>
+
+Denies the memory_delete_conversation_context command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:allow-memory-delete-message-context`
+
+</td>
+<td>
+
+Enables the memory_delete_message_context command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-memory-delete-message-context`
+
+</td>
+<td>
+
+Denies the memory_delete_message_context command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `gen-ui:allow-memory-ingest`
 
 </td>
@@ -372,6 +716,32 @@ Denies the memory_ingest command without any pre-configured scope.
 <tr>
 <td>
 
+`gen-ui:allow-memory-promote-context`
+
+</td>
+<td>
+
+Enables the memory_promote_context command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-memory-promote-context`
+
+</td>
+<td>
+
+Denies the memory_promote_context command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `gen-ui:allow-memory-search`
 
 </td>
@@ -391,6 +761,188 @@ Enables the memory_search command without any pre-configured scope.
 <td>
 
 Denies the memory_search command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:allow-prepare-local-model`
+
+</td>
+<td>
+
+Enables the prepare_local_model command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-prepare-local-model`
+
+</td>
+<td>
+
+Denies the prepare_local_model command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:allow-promote-a2ui-component`
+
+</td>
+<td>
+
+Enables the promote_a2ui_component command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-promote-a2ui-component`
+
+</td>
+<td>
+
+Denies the promote_a2ui_component command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:allow-provider-catalog`
+
+</td>
+<td>
+
+Enables the provider_catalog command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-provider-catalog`
+
+</td>
+<td>
+
+Denies the provider_catalog command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:allow-provider-delete`
+
+</td>
+<td>
+
+Enables the provider_delete command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-provider-delete`
+
+</td>
+<td>
+
+Denies the provider_delete command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:allow-provider-list`
+
+</td>
+<td>
+
+Enables the provider_list command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-provider-list`
+
+</td>
+<td>
+
+Denies the provider_list command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:allow-provider-save`
+
+</td>
+<td>
+
+Enables the provider_save command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-provider-save`
+
+</td>
+<td>
+
+Denies the provider_save command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:allow-provider-test`
+
+</td>
+<td>
+
+Enables the provider_test command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-provider-test`
+
+</td>
+<td>
+
+Denies the provider_test command without any pre-configured scope.
 
 </td>
 </tr>
@@ -476,6 +1028,32 @@ Denies the scribe_stop command without any pre-configured scope.
 <tr>
 <td>
 
+`gen-ui:allow-send-agent-interaction-a2ui`
+
+</td>
+<td>
+
+Enables the send_agent_interaction_a2ui command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-send-agent-interaction-a2ui`
+
+</td>
+<td>
+
+Denies the send_agent_interaction_a2ui command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `gen-ui:allow-set-active-lane`
 
 </td>
@@ -521,6 +1099,214 @@ Enables the stream_agent_a2ui command without any pre-configured scope.
 <td>
 
 Denies the stream_agent_a2ui command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:allow-uar-admin-snapshot`
+
+</td>
+<td>
+
+Enables the uar_admin_snapshot command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-uar-admin-snapshot`
+
+</td>
+<td>
+
+Denies the uar_admin_snapshot command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:allow-uar-agent-delete`
+
+</td>
+<td>
+
+Enables the uar_agent_delete command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-uar-agent-delete`
+
+</td>
+<td>
+
+Denies the uar_agent_delete command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:allow-uar-agent-save`
+
+</td>
+<td>
+
+Enables the uar_agent_save command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-uar-agent-save`
+
+</td>
+<td>
+
+Denies the uar_agent_save command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:allow-uar-knowledge-base-create`
+
+</td>
+<td>
+
+Enables the uar_knowledge_base_create command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-uar-knowledge-base-create`
+
+</td>
+<td>
+
+Denies the uar_knowledge_base_create command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:allow-uar-knowledge-base-delete`
+
+</td>
+<td>
+
+Enables the uar_knowledge_base_delete command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-uar-knowledge-base-delete`
+
+</td>
+<td>
+
+Denies the uar_knowledge_base_delete command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:allow-uar-mcp-server-delete`
+
+</td>
+<td>
+
+Enables the uar_mcp_server_delete command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-uar-mcp-server-delete`
+
+</td>
+<td>
+
+Denies the uar_mcp_server_delete command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:allow-uar-mcp-server-save`
+
+</td>
+<td>
+
+Enables the uar_mcp_server_save command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-uar-mcp-server-save`
+
+</td>
+<td>
+
+Denies the uar_mcp_server_save command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:allow-uar-memory-delete`
+
+</td>
+<td>
+
+Enables the uar_memory_delete command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-uar-memory-delete`
+
+</td>
+<td>
+
+Denies the uar_memory_delete command without any pre-configured scope.
 
 </td>
 </tr>
@@ -580,6 +1366,32 @@ Denies the uar_service_config command without any pre-configured scope.
 <tr>
 <td>
 
+`gen-ui:allow-uar-service-probe`
+
+</td>
+<td>
+
+Enables the uar_service_probe command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-uar-service-probe`
+
+</td>
+<td>
+
+Denies the uar_service_probe command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `gen-ui:allow-uar-service-save`
 
 </td>
@@ -599,6 +1411,45 @@ Enables the uar_service_save command without any pre-configured scope.
 <td>
 
 Denies the uar_service_save command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:allow-uar-setting-save`
+
+</td>
+<td>
+
+Enables the uar_setting_save command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-uar-setting-save`
+
+</td>
+<td>
+
+Denies the uar_setting_save command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:allow-settings-admin`
+
+</td>
+<td>
+
+Allow the settings overlay to administer UAR connectivity and UAR-owned provider/model configuration.
 
 </td>
 </tr>

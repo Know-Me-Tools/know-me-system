@@ -1,0 +1,101 @@
+{
+  "$schema": "https://prometheus-ags.dev/schemas/kbd/library-candidates.schema.json",
+  "phase": "model-runtime-per-device/embedded-uar-offline-agents",
+  "generated_at": "2026-07-20T20:25:13Z",
+  "research_budget": {
+    "max_queries_per_tier": 8,
+    "max_minutes": 20,
+    "queries_used": {
+      "tier_1_local_registry": 6,
+      "tier_2_official_web": 4,
+      "tier_3_ecosystem": 0,
+      "tier_4_novel": 0
+    }
+  },
+  "gaps_addressed": [
+    "embedded-uar-kernel",
+    "mobile-native-packaging",
+    "host-local-llm-provider",
+    "offline-agent-event-loop",
+    "cross-platform-mobile-parity"
+  ],
+  "candidates": [
+    {
+      "id": "cand-001",
+      "name": "Universal Agent Runtime core and Rust SDK",
+      "kind": "framework",
+      "repo_url": "https://github.com/Prometheus-AGS/universal-agent-runtime",
+      "registry": "none",
+      "fit_for_gap": "Canonical agent, skill, tool, policy, persistence, AG-UI and A2UI runtime",
+      "verdict": "adapt",
+      "coverage_estimate": 0.85,
+      "license": "AGPL-3.0-only",
+      "evidence": [
+        {"tier": 1, "source_url": "https://github.com/Prometheus-AGS/universal-agent-runtime", "claim": "The local source already provides RunManager, host LlmDriver injection, provider registry, persistence contracts, event replay, cancellation and A2UI continuation."}
+      ],
+      "risks": ["SDK embedded builder is currently a stub", "Server-only dependencies are not yet fully feature-gated"],
+      "decision_rationale": "Adapt the authoritative runtime rather than reimplementing its domain semantics in KnowMe."
+    },
+    {
+      "id": "cand-002",
+      "name": "flutter_rust_bridge",
+      "kind": "framework",
+      "repo_url": "https://github.com/fzyzcjy/flutter_rust_bridge",
+      "registry": "crates",
+      "fit_for_gap": "Shared Flutter to Rust application-library boundary on Android and iOS",
+      "verdict": "adopt",
+      "coverage_estimate": 0.95,
+      "license": "MIT",
+      "evidence": [
+        {"tier": 1, "source_url": "https://github.com/fzyzcjy/flutter_rust_bridge", "claim": "The project already packages and calls the shared Rust core through FRB on both mobile targets."}
+      ],
+      "risks": ["Generated bindings must remain synchronized"],
+      "decision_rationale": "Keep one existing FFI boundary and place UAR inside the same Rust library."
+    },
+    {
+      "id": "cand-003",
+      "name": "Android NDK JNI application-owned shared library pattern",
+      "kind": "pattern",
+      "repo_url": "https://developer.android.com/ndk/guides/jni-tips",
+      "registry": "none",
+      "fit_for_gap": "Correct native library loading and lifetime on Android",
+      "verdict": "adopt",
+      "coverage_estimate": 0.9,
+      "license": "LicenseRef-Android-Documentation",
+      "evidence": [
+        {"tier": 2, "source_url": "https://developer.android.com/ndk/guides/jni-tips", "claim": "Android recommends System.loadLibrary, JNI_OnLoad caching, and careful native-thread class-loader handling."},
+        {"tier": 2, "source_url": "https://developer.android.com/ndk/guides/prebuilts", "claim": "The NDK supports packaging native shared and static libraries into the application."}
+      ],
+      "risks": ["JNI callbacks from native-created threads need cached JVM/class references"],
+      "decision_rationale": "Package UAR into KnowMe's existing native library; do not dynamically discover or side-load it."
+    },
+    {
+      "id": "cand-004",
+      "name": "Xcode native library linking",
+      "kind": "pattern",
+      "repo_url": "https://developer.apple.com/documentation/xcode/build-settings-reference",
+      "registry": "none",
+      "fit_for_gap": "Correct native library linking for the same embedded kernel on iOS",
+      "verdict": "adopt",
+      "coverage_estimate": 0.8,
+      "license": "LicenseRef-Apple-Documentation",
+      "evidence": [
+        {"tier": 2, "source_url": "https://developer.apple.com/documentation/xcode/build-settings-reference", "claim": "Xcode exposes the native linking and interoperability controls used by the existing Flutter/Rust iOS target."}
+      ],
+      "risks": ["Simulator and device architectures require separate build artifacts"],
+      "decision_rationale": "Use the same Rust embedded runtime API on iOS and vary only the injected model driver."
+    }
+  ],
+  "build_required": [
+    {
+      "need": "Real transport-independent UAR EmbeddedRuntime and SDK facade",
+      "why_no_candidate": "The authoritative UAR SDK claims embedded support but currently constructs no runtime state; this must be fixed at the source.",
+      "capability_gap_id": "embedded-uar-kernel"
+    },
+    {
+      "need": "KnowMe host LlmDriver adapters for Android LiteRT-LM and iOS Metal providers",
+      "why_no_candidate": "These are application-specific provider bridges over KnowMe's existing inference abstractions.",
+      "capability_gap_id": "host-local-llm-provider"
+    }
+  ]
+}

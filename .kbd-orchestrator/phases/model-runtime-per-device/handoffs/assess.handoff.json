@@ -1,11 +1,11 @@
 {
   "stage": "assess",
-  "completedAt": "2026-07-18T20:30:00Z",
+  "completedAt": "2026-07-20T20:14:12Z",
   "outputs": [
-    ".kbd-orchestrator/phases/model-runtime-per-device/assessment.md"
+    "assessment.md"
   ],
   "nextStage": "analyze",
-  "summaryForNext": "The current Rust seam is llama.cpp-backed but still Qwen2.5 0.5B text-only with CPU defaults. Planning must add device-specific Qwen3.5 artifacts, resumable verification, Metal/Vulkan selection with fallback, mtmd image input, and a separate bounded tool-call continuation contract.",
+  "summaryForNext": "Mobile UAR is service-only; the SDK embedded Runtime stores state=None. Analyze a mobile-safe in-process kernel, local driver/provider registration, persistence/profile boundaries, and offline certification without weakening UAR ownership.",
   "skipped": false,
   "skipReason": null
 }

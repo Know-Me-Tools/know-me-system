@@ -97,6 +97,9 @@ class PemChatRepository implements ChatRepository {
   );
 
   @override
+  Future<String> errorMessage(Object error) => bridge.bridgeErrorMessage(error);
+
+  @override
   Future<List<ChatConversation>> listConversations() async {
     final result = await transport.list(
       const ViewDescriptor(entityType: _conversationType, limit: 1000),

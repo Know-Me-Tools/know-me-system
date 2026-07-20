@@ -116,16 +116,15 @@ const ThreadRoot: FC<{ isEmpty: boolean }> = ({ isEmpty }) => {
       className="aui-root aui-thread-root bg-background @container flex h-full flex-col"
       style={{
         ["--thread-max-width" as string]: "44rem",
-        ["--composer-bg" as string]:
-          "color-mix(in oklab, var(--color-muted) 30%, var(--color-background))",
+        ["--composer-bg" as string]: "var(--color-surface)",
         ["--composer-radius" as string]: "1.5rem",
-        ["--composer-padding" as string]: "8px",
+        ["--composer-padding" as string]: "10px",
       }}
     >
       <ThreadPrimitive.Viewport
         turnAnchor="top"
         data-slot="aui_thread-viewport"
-        className="relative flex flex-1 flex-col overflow-x-auto overflow-y-scroll scroll-smooth"
+        className="relative flex flex-1 flex-col overflow-x-hidden overflow-y-auto scroll-smooth"
       >
         <div
           className={cn(
@@ -148,7 +147,7 @@ const ThreadRoot: FC<{ isEmpty: boolean }> = ({ isEmpty }) => {
 
           <ThreadPrimitive.ViewportFooter
             className={cn(
-              "aui-thread-viewport-footer bg-background flex flex-col gap-4 overflow-visible pb-4 md:pb-6",
+              "aui-thread-viewport-footer bg-background/95 flex flex-col gap-3 overflow-visible pb-4 md:pb-6",
               !isEmpty &&
                 "sticky bottom-0 mt-auto rounded-t-(--composer-radius)",
             )}
@@ -214,9 +213,9 @@ const ThreadSuggestionItem: FC = () => {
 const Composer: FC = () => {
   return (
     <ComposerPrimitive.Root className="aui-composer-root relative flex w-full flex-col">
-      <ComposerPrimitive.AttachmentDropzone render={<div data-slot="aui_composer-shell" className="flex w-full flex-col gap-2 rounded-(--composer-radius) bg-(--composer-bg) p-(--composer-padding) shadow-none transition-colors focus-within:bg-muted data-[dragging=true]:bg-accent" />}><ComposerAttachments /><ComposerPrimitive.Input
+      <ComposerPrimitive.AttachmentDropzone render={<div data-slot="aui_composer-shell" className="flex w-full flex-col gap-2 rounded-(--composer-radius) bg-(--composer-bg) p-(--composer-padding) text-[color:var(--color-fg)] shadow-none transition-colors focus-within:bg-[color:var(--color-card-hov)] data-[dragging=true]:bg-accent" />}><ComposerAttachments /><ComposerPrimitive.Input
                       placeholder="Send a message..."
-                      className="aui-composer-input caret-primary placeholder:text-muted-foreground/80 max-h-32 min-h-10 w-full resize-none bg-transparent px-2.5 py-1 text-base outline-none"
+                      className="aui-composer-input caret-primary placeholder:text-[color:var(--color-fg-faint)] max-h-32 min-h-10 w-full resize-none bg-transparent px-2.5 py-1 text-base text-[color:var(--color-fg)] outline-none"
                       rows={1}
                       autoFocus
                       enterKeyHint="send"
@@ -412,7 +411,7 @@ const UserMessage: FC = () => {
       <UserMessageAttachments />
 
       <div className="aui-user-message-content-wrapper relative col-start-2 min-w-0">
-        <div className="aui-user-message-content peer max-w-[80%] bg-[color:var(--color-ember-soft)] text-foreground rounded-2xl rounded-ee-md px-4 py-3 wrap-break-word empty:hidden">
+        <div className="aui-user-message-content peer max-w-[80%] bg-[color:var(--color-ember-soft)] text-[color:var(--color-fg)] rounded-2xl rounded-ee-md px-4 py-3 wrap-break-word empty:hidden">
           <MessagePrimitive.Parts />
         </div>
         <div className="aui-user-action-bar-wrapper absolute start-0 top-1/2 -translate-x-full -translate-y-1/2 pe-2 peer-empty:hidden rtl:translate-x-full">

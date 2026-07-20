@@ -1,3 +1,6 @@
 allowBuilds:
   es5-ext: true
   esbuild: true
+minimumReleaseAgeExclude:
+  - '@fontsource-variable/geist@5.3.0'
+  - '@tauri-apps/plugin-store@2.4.4'

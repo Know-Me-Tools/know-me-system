@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-memory-delete-conversation-context"
+description = "Enables the memory_delete_conversation_context command without any pre-configured scope."
+commands.allow = ["memory_delete_conversation_context"]
+
+[[permission]]
+identifier = "deny-memory-delete-conversation-context"
+description = "Denies the memory_delete_conversation_context command without any pre-configured scope."
+commands.deny = ["memory_delete_conversation_context"]

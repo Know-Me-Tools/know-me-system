@@ -51,4 +51,5 @@ abstract interface class ChatRepository {
     String url,
     RemoteContentKind kind,
   );
+  Future<String> errorMessage(Object error);
 }

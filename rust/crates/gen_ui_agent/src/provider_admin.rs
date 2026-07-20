@@ -1,18 +1,13 @@
 // TJ-ARCH-MOB-001 compliant
-//! Intent-level cloud-provider administration shared by desktop and mobile.
-//! Provider metadata lives in the config store; plaintext credentials live only
-//! in platform-secure storage and are never serialized back to a caller.
+//! UAR-owned LLM provider administration.
+//!
+//! KnowMe never persists cloud-provider credentials or duplicates Liter-LLM's
+//! catalog. Every operation is delegated to the configured Universal Agent
+//! Runtime; responses are secret-free and suitable for React or Flutter.
 
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    config::{ModelPref, Provider},
-    error::AgentError,
-    secrets, state,
-};
-
-const CLOUD_SURFACE: &str = "chat";
-const CLOUD_LANE: &str = "cloud";
+use crate::{chat, error::AgentError};
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -21,17 +16,37 @@ pub struct ProviderCatalogEntry {
     pub display_name: String,
     pub default_base_url: Option<String>,
     pub requires_api_key: bool,
-    pub supports_chat: bool,
+    pub configured: bool,
+    pub enabled: bool,
+    pub models: Vec<ProviderModelEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderModelEntry {
+    pub id: String,
+    pub display_name: Option<String>,
+    pub context_window: Option<u64>,
+    pub max_output_tokens: Option<u64>,
+    pub supports_vision: bool,
+    pub supports_tools: bool,
+    pub supports_reasoning: bool,
+    pub supports_structured_output: bool,
+    pub supports_streaming: bool,
+    pub enabled: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConfiguredProvider {
     pub id: String,
-    pub kind: String,
+    pub display_name: String,
     pub base_url: Option<String>,
     pub enabled: bool,
     pub has_api_key: bool,
+    pub protocol: serde_json::Value,
+    pub default_model: Option<String>,
+    pub models: Vec<ProviderModelEntry>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -45,10 +60,19 @@ pub struct ConfiguredCloudModel {
 #[serde(rename_all = "camelCase")]
 pub struct SaveProviderRequest {
     pub id: String,
+    /// Catalog provider id retained for compatibility with the first settings UI.
     pub kind: String,
+    #[serde(default)]
+    pub display_name: Option<String>,
     pub base_url: Option<String>,
     pub api_key: Option<String>,
     pub enabled: bool,
+    #[serde(default)]
+    pub protocol: Option<serde_json::Value>,
+    #[serde(default)]
+    pub default_model: Option<String>,
+    #[serde(default)]
+    pub models: Vec<ProviderModelEntry>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -58,140 +82,353 @@ pub struct SaveCloudModelRequest {
     pub model_id: String,
 }
 
-pub fn catalog() -> Result<Vec<ProviderCatalogEntry>, AgentError> {
-    let complex = liter_llm::provider::complex_provider_names()
-        .map_err(|error| AgentError::Config(format!("Liter-LLM provider registry: {error}")))?;
-    let mut entries = liter_llm::provider::all_providers()
-        .map_err(|error| AgentError::Config(format!("Liter-LLM provider registry: {error}")))?
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderTestResult {
+    pub ok: bool,
+    pub provider_id: String,
+    pub model_id: String,
+    pub latency_ms: u128,
+    pub received_text: bool,
+}
+
+pub async fn catalog() -> Result<Vec<ProviderCatalogEntry>, AgentError> {
+    let client = chat::uar_service_client().await?;
+    let providers_api = client.providers();
+    let (catalog, configured) =
+        futures::try_join!(providers_api.catalog(), providers_api.list()).map_err(uar_error)?;
+    let configured = configured
+        .providers
+        .into_iter()
+        .map(|provider| (provider.id.clone(), provider))
+        .collect::<std::collections::HashMap<_, _>>();
+    let root = catalog.as_object().ok_or_else(|| {
+        AgentError::Client("UAR provider catalog response must be an object".into())
+    })?;
+    let mut entries = root
         .iter()
-        .filter(|provider| {
-            let supports_chat = provider
-                .endpoints
-                .as_ref()
-                .is_some_and(|endpoints| endpoints.iter().any(|endpoint| endpoint == "chat"));
-            let accepts_api_key = provider
-                .auth
-                .as_ref()
-                .is_some_and(|auth| auth.auth_type != liter_llm::provider::AuthType::None);
-            supports_chat && accepts_api_key && !complex.contains(&provider.name)
-        })
-        .map(|provider| ProviderCatalogEntry {
-            id: provider.name.clone(),
-            display_name: provider
-                .display_name
-                .clone()
-                .unwrap_or_else(|| provider.name.clone()),
-            default_base_url: provider.base_url.clone(),
-            requires_api_key: provider
-                .auth
-                .as_ref()
-                .is_some_and(|auth| auth.auth_type != liter_llm::provider::AuthType::None),
-            supports_chat: true,
+        .map(|(id, value)| {
+            let configured_provider = configured.get(id);
+            let models = value
+                .get("models")
+                .and_then(serde_json::Value::as_object)
+                .map(|models| {
+                    models
+                        .iter()
+                        .map(|(model_id, model)| model_from_catalog(model_id, model))
+                        .collect()
+                })
+                .unwrap_or_default();
+            ProviderCatalogEntry {
+                id: id.clone(),
+                display_name: value
+                    .get("display_name")
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or(id)
+                    .to_string(),
+                default_base_url: value
+                    .get("base_url")
+                    .and_then(serde_json::Value::as_str)
+                    .map(str::to_string),
+                requires_api_key: true,
+                configured: configured_provider.is_some(),
+                enabled: configured_provider.is_some_and(|provider| provider.enabled),
+                models,
+            }
         })
         .collect::<Vec<_>>();
-    entries.sort_by(|left, right| left.display_name.cmp(&right.display_name));
+    entries.sort_by(|left, right| {
+        right
+            .configured
+            .cmp(&left.configured)
+            .then_with(|| left.display_name.cmp(&right.display_name))
+    });
     Ok(entries)
 }
 
 pub async fn list() -> Result<Vec<ConfiguredProvider>, AgentError> {
-    Ok(state::config()?
-        .list_providers()
-        .await?
+    let client = chat::uar_service_client().await?;
+    let response = client.providers().list().await.map_err(uar_error)?;
+    let mut providers = response
+        .providers
         .into_iter()
-        .map(|provider| ConfiguredProvider {
-            has_api_key: provider.api_key_ref.is_some(),
-            id: provider.id,
-            kind: provider.kind,
-            base_url: provider.base_url,
-            enabled: provider.enabled,
-        })
-        .collect())
+        .map(configured_provider_from_sdk)
+        .collect::<Vec<_>>();
+    providers.sort_by(|left, right| left.display_name.cmp(&right.display_name));
+    Ok(providers)
 }
 
 pub async fn save(request: SaveProviderRequest) -> Result<(), AgentError> {
     let id = request.id.trim();
-    let kind = request.kind.trim();
-    if id.is_empty() || kind.is_empty() {
+    let catalog_id = request.kind.trim();
+    if id.is_empty() || catalog_id.is_empty() {
         return Err(AgentError::Config(
-            "provider id and provider kind are required".into(),
+            "provider id and catalog provider id are required".into(),
         ));
     }
-    let known = catalog()?.into_iter().any(|entry| entry.id == kind);
-    if !known {
-        return Err(AgentError::Config(format!(
-            "provider kind '{kind}' is not in this Liter-LLM build"
-        )));
-    }
-
-    let existing = state::config()?.get_provider(id).await?;
-    let api_key_ref = match request.api_key.as_deref().map(str::trim) {
-        Some(api_key) if !api_key.is_empty() => {
-            let reference = format!("provider:{id}");
-            secrets::store_api_key(&reference, api_key)?;
-            Some(reference)
-        }
-        _ => existing.and_then(|provider| provider.api_key_ref),
-    };
+    let client = chat::uar_service_client().await?;
+    let existing = client
+        .providers()
+        .list()
+        .await
+        .map_err(uar_error)?
+        .providers
+        .into_iter()
+        .find(|provider| provider.id == id);
+    let catalog = client.providers().catalog().await.map_err(uar_error)?;
+    let catalog_provider = catalog.get(catalog_id);
+    let display_name = request
+        .display_name
+        .filter(|value| !value.trim().is_empty())
+        .or_else(|| {
+            existing
+                .as_ref()
+                .map(|provider| provider.display_name.clone())
+        })
+        .or_else(|| {
+            catalog_provider
+                .and_then(|provider| provider.get("display_name"))
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_string)
+        })
+        .unwrap_or_else(|| id.to_string());
     let base_url = request
         .base_url
-        .map(|value| value.trim().to_owned())
-        .filter(|value| !value.is_empty());
-    state::config()?
-        .upsert_provider(&Provider {
-            id: id.to_owned(),
-            kind: kind.to_owned(),
+        .filter(|value| !value.trim().is_empty())
+        .or_else(|| existing.as_ref().map(|provider| provider.base_url.clone()))
+        .or_else(|| {
+            catalog_provider
+                .and_then(|provider| provider.get("base_url"))
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_string)
+        })
+        .unwrap_or_default();
+    let models = if request.models.is_empty() {
+        existing
+            .as_ref()
+            .map(|provider| provider.models.clone())
+            .unwrap_or_default()
+    } else {
+        request.models.into_iter().map(model_to_sdk).collect()
+    };
+    let default_model = request
+        .default_model
+        .or_else(|| {
+            existing
+                .as_ref()
+                .and_then(|provider| provider.default_model.clone())
+        })
+        .or_else(|| {
+            models
+                .iter()
+                .find(|model| model.enabled)
+                .map(|model| model.id.clone())
+        });
+    client
+        .providers()
+        .save(universal_agent_runtime_sdk::SaveProviderConfig {
+            id: id.to_string(),
+            display_name,
             base_url,
-            api_key_ref,
+            api_key: request.api_key.filter(|value| !value.trim().is_empty()),
+            protocol: request
+                .protocol
+                .or_else(|| existing.as_ref().map(|provider| provider.protocol.clone()))
+                .unwrap_or_else(|| serde_json::Value::String("auto".into())),
+            default_model,
+            models,
             enabled: request.enabled,
         })
         .await
+        .map_err(uar_error)?;
+    Ok(())
 }
 
 pub async fn delete(id: &str) -> Result<(), AgentError> {
-    let id = id.trim();
-    if let Some(provider) = state::config()?.get_provider(id).await? {
-        if let Some(reference) = provider.api_key_ref {
-            secrets::delete_api_key(&reference)?;
-        }
-    }
-    state::config()?.delete_provider(id).await
+    chat::uar_service_client()
+        .await?
+        .providers()
+        .delete(id.trim())
+        .await
+        .map_err(uar_error)
+}
+
+pub async fn test(id: &str, model: Option<&str>) -> Result<ProviderTestResult, AgentError> {
+    let result = chat::uar_service_client()
+        .await?
+        .providers()
+        .test(id.trim(), model)
+        .await
+        .map_err(uar_error)?;
+    Ok(ProviderTestResult {
+        ok: result.ok,
+        provider_id: result.provider_id,
+        model_id: result.model_id,
+        latency_ms: result.latency_ms,
+        received_text: result.received_text,
+    })
 }
 
 pub async fn get_cloud_model() -> Result<Option<ConfiguredCloudModel>, AgentError> {
-    Ok(state::config()?
-        .get_model_pref(CLOUD_SURFACE, CLOUD_LANE)
+    let response = chat::uar_service_client()
         .await?
-        .and_then(|pref| {
-            pref.provider_id.map(|provider_id| ConfiguredCloudModel {
+        .providers()
+        .list()
+        .await
+        .map_err(uar_error)?;
+    let Some(provider_id) = response.default_id else {
+        return Ok(None);
+    };
+    Ok(response
+        .providers
+        .into_iter()
+        .find(|provider| provider.id == provider_id)
+        .and_then(|provider| {
+            provider.default_model.map(|model_id| ConfiguredCloudModel {
                 provider_id,
-                model_id: pref.model_id,
+                model_id,
             })
         }))
 }
 
 pub async fn save_cloud_model(request: SaveCloudModelRequest) -> Result<(), AgentError> {
-    let provider_id = request.provider_id.trim();
-    let model_id = request.model_id.trim();
-    if provider_id.is_empty() || model_id.is_empty() {
-        return Err(AgentError::Config(
-            "provider and model identifiers are required".into(),
-        ));
-    }
-    let provider = state::config()?.get_provider(provider_id).await?;
-    if !provider.is_some_and(|provider| provider.enabled) {
+    let client = chat::uar_service_client().await?;
+    let response = client.providers().list().await.map_err(uar_error)?;
+    let provider = response
+        .providers
+        .into_iter()
+        .find(|provider| provider.id == request.provider_id)
+        .ok_or_else(|| {
+            AgentError::Config(format!(
+                "provider '{}' is not configured",
+                request.provider_id
+            ))
+        })?;
+    if !provider.enabled {
         return Err(AgentError::Config(format!(
-            "provider '{provider_id}' is missing or disabled"
+            "provider '{}' is disabled",
+            request.provider_id
         )));
     }
-    state::config()?
-        .upsert_model_pref(
-            CLOUD_SURFACE,
-            CLOUD_LANE,
-            &ModelPref {
-                provider_id: Some(provider_id.to_owned()),
-                model_id: model_id.to_owned(),
-                params: serde_json::json!({}),
-            },
-        )
+    if provider
+        .models
+        .iter()
+        .find(|model| model.id == request.model_id)
+        .is_some_and(|model| !model.enabled)
+    {
+        return Err(AgentError::Config(format!(
+            "model '{}' is disabled",
+            request.model_id
+        )));
+    }
+    client
+        .providers()
+        .save(universal_agent_runtime_sdk::SaveProviderConfig {
+            id: provider.id.clone(),
+            display_name: provider.display_name,
+            base_url: provider.base_url,
+            api_key: None,
+            protocol: provider.protocol,
+            default_model: Some(request.model_id),
+            models: provider.models,
+            enabled: provider.enabled,
+        })
         .await
+        .map_err(uar_error)?;
+    client
+        .providers()
+        .set_default(&provider.id)
+        .await
+        .map_err(uar_error)
+}
+
+fn configured_provider_from_sdk(
+    provider: universal_agent_runtime_sdk::ProviderView,
+) -> ConfiguredProvider {
+    ConfiguredProvider {
+        id: provider.id,
+        display_name: provider.display_name,
+        base_url: (!provider.base_url.is_empty()).then_some(provider.base_url),
+        enabled: provider.enabled,
+        has_api_key: provider.credential_configured,
+        protocol: provider.protocol,
+        default_model: provider.default_model,
+        models: provider.models.into_iter().map(model_from_sdk).collect(),
+    }
+}
+
+fn model_from_sdk(model: universal_agent_runtime_sdk::ProviderModelConfig) -> ProviderModelEntry {
+    ProviderModelEntry {
+        id: model.id,
+        display_name: model.display_name,
+        context_window: model.context_window.map(u64::from),
+        max_output_tokens: model.max_output_tokens.map(u64::from),
+        supports_vision: model.supports_vision,
+        supports_tools: model.supports_tools,
+        supports_reasoning: false,
+        supports_structured_output: false,
+        supports_streaming: true,
+        enabled: model.enabled,
+    }
+}
+
+fn model_to_sdk(model: ProviderModelEntry) -> universal_agent_runtime_sdk::ProviderModelConfig {
+    universal_agent_runtime_sdk::ProviderModelConfig {
+        id: model.id,
+        display_name: model.display_name,
+        context_window: model
+            .context_window
+            .and_then(|value| u32::try_from(value).ok()),
+        supports_vision: model.supports_vision,
+        supports_tools: model.supports_tools,
+        max_output_tokens: model
+            .max_output_tokens
+            .and_then(|value| u32::try_from(value).ok()),
+        enabled: model.enabled,
+    }
+}
+
+fn model_from_catalog(id: &str, value: &serde_json::Value) -> ProviderModelEntry {
+    let inputs = value
+        .pointer("/modalities/input")
+        .and_then(serde_json::Value::as_array);
+    ProviderModelEntry {
+        id: id.to_string(),
+        display_name: value
+            .get("name")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_string),
+        context_window: value
+            .pointer("/limit/context")
+            .and_then(serde_json::Value::as_u64),
+        max_output_tokens: value
+            .pointer("/limit/output")
+            .and_then(serde_json::Value::as_u64),
+        supports_vision: inputs
+            .is_some_and(|values| values.iter().any(|value| value.as_str() == Some("image"))),
+        supports_tools: value
+            .get("tool_call")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false),
+        supports_reasoning: value
+            .get("reasoning")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false),
+        supports_structured_output: value
+            .get("structured_output")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false),
+        supports_streaming: value
+            .get("streaming")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false),
+        enabled: value
+            .get("enabled")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false),
+    }
+}
+
+fn uar_error(error: universal_agent_runtime_sdk::Error) -> AgentError {
+    AgentError::Client(format!("UAR provider administration: {error}"))
 }

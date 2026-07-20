@@ -1,27 +1,39 @@
 {
   "schemaVersion": "1",
-  "updatedAt": "2026-07-18T21:18:36Z",
+  "updatedAt": "2026-07-20T22:35:03Z",
   "cursor": [
     "model-runtime-per-device",
-    "qwen35-mobile-vision"
+    "embedded-uar-offline-agents",
+    "embed-uar-mobile-offline"
   ],
   "root": {
     "type": "phase",
     "id": "model-runtime-per-device",
-    "status": "implementation_ready",
+    "status": "active-parent",
     "progress": {
-      "done": 1,
-      "total": 4
+      "done": 4,
+      "total": 5
     },
     "children": [
       {
-        "type": "change",
-        "id": "qwen35-mobile-vision",
-        "status": "PENDING",
+        "type": "phase",
+        "id": "embedded-uar-offline-agents",
+        "status": "implementation_ready",
         "progress": {
           "done": 0,
-          "total": 0
-        }
+          "total": 1
+        },
+        "children": [
+          {
+            "type": "change",
+            "id": "embed-uar-mobile-offline",
+            "status": "PENDING",
+            "progress": {
+              "done": 0,
+              "total": 0
+            }
+          }
+        ]
       }
     ],
     "annotations": []

@@ -3,6 +3,7 @@ import { AssistantRuntimeProvider } from '@assistant-ui/react'
 import { Thread } from '@/components/assistant-ui/thread'
 import { ThreadList } from '@/components/assistant-ui/thread-list'
 import { LaneSwitcher } from '../components/LaneSwitcher'
+import { ChatPolicyToolbar } from '../components/ChatPolicyToolbar'
 import { useAssistantChatRuntime } from '../hooks/useAssistantChatRuntime'
 import { RichDataRenderers } from '../components/RichDataRenderers'
 import { ChatWelcome } from '../components/ChatWelcome'
@@ -35,6 +36,7 @@ export function ChatScreen() {
             </Sheet>
           </div>
           <LaneSwitcher />
+          <ChatPolicyToolbar />
           <div className="min-h-0 flex-1"><Thread components={{ Welcome: ChatWelcome }} /></div>
         </section>
       </div>

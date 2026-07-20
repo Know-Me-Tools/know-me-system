@@ -12,6 +12,8 @@
     "shell:default",
     "store:default",
     "os:default",
-    "gen-ui:default"
+    "gen-ui:default",
+    "gen-ui:allow-write",
+    "gen-ui:allow-settings-admin"
   ]
 }

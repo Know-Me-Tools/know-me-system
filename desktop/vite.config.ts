@@ -7,6 +7,10 @@ const host = process.env.TAURI_DEV_HOST
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // This package is a workspace-local Tauri guest binding. Excluding it from
+  // Vite's dependency pre-bundle keeps newly generated Rust command wrappers
+  // available immediately instead of serving a stale cached export surface.
+  optimizeDeps: { exclude: ['@prometheus-ags/tauri-plugin-gen-ui'] },
   clearScreen: false,
   server: {
     port: 1420,
@@ -14,6 +18,12 @@ export default defineConfig({
     host: host || false,
     hmr: host ? { protocol: 'ws', host, port: 1421 } : undefined,
     watch: { ignored: ['**/src-tauri/**'] },
+    proxy: {
+      '/api': {
+        target: process.env.VITE_UAR_PROXY_TARGET || 'http://127.0.0.1:1906',
+        changeOrigin: true,
+      },
+    },
   },
   resolve: { alias: { '@': path.resolve(__dirname, './src') } },
   envPrefix: ['VITE_', 'TAURI_'],

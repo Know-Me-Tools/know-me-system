@@ -42,7 +42,6 @@ pub struct AgentState {
     events: broadcast::Sender<A2uiEvent>,
     event_history: parking_lot::Mutex<std::collections::BTreeMap<String, Vec<A2uiEvent>>>,
     run_cancellations: parking_lot::Mutex<std::collections::BTreeMap<String, Arc<AtomicBool>>>,
-    #[cfg(not(any(target_os = "ios", target_os = "android")))]
     uar_run_mappings: parking_lot::Mutex<std::collections::BTreeMap<String, UarRunMapping>>,
     pending_tool_confirmations:
         parking_lot::Mutex<std::collections::BTreeMap<String, PendingToolConfirmation>>,
@@ -57,7 +56,6 @@ pub(crate) struct PendingToolConfirmation {
     pub arguments: JsonValue,
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
 #[derive(Debug, Clone)]
 pub(crate) struct UarRunMapping {
     pub knowme_run_id: String,
@@ -103,7 +101,6 @@ pub fn init_with_inference(
         events: tx,
         event_history: parking_lot::Mutex::new(Default::default()),
         run_cancellations: parking_lot::Mutex::new(Default::default()),
-        #[cfg(not(any(target_os = "ios", target_os = "android")))]
         uar_run_mappings: parking_lot::Mutex::new(Default::default()),
         pending_tool_confirmations: parking_lot::Mutex::new(Default::default()),
     };
@@ -186,7 +183,6 @@ pub fn cancel_run(run_id: &str) -> Result<bool, AgentError> {
 pub(crate) fn finish_run(run_id: &str) {
     if let Ok(state) = get() {
         state.run_cancellations.lock().remove(run_id);
-        #[cfg(not(any(target_os = "ios", target_os = "android")))]
         state
             .uar_run_mappings
             .lock()
@@ -194,7 +190,6 @@ pub(crate) fn finish_run(run_id: &str) {
     }
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
 pub(crate) fn register_uar_run(conversation_id: &str, knowme_run_id: &str, uar_run_id: &str) {
     if let Ok(state) = get() {
         state.uar_run_mappings.lock().insert(
@@ -207,7 +202,6 @@ pub(crate) fn register_uar_run(conversation_id: &str, knowme_run_id: &str, uar_r
     }
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
 pub(crate) fn uar_run_for_conversation(
     conversation_id: &str,
 ) -> Result<Option<UarRunMapping>, AgentError> {

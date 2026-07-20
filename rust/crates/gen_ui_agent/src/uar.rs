@@ -68,12 +68,13 @@ pub struct UarRuntimeStatus {
 pub struct UarRunRequest {
     /// Compiled UAR agent artifact. UAR owns this schema; KnowMe passes it
     /// through and persists only the selected ids/provenance it needs.
-    pub artifact: serde_json::Value,
+    pub artifact: Option<serde_json::Value>,
     pub input: String,
     pub session_id: Option<String>,
+    pub agent_id: Option<String>,
+    pub run_policy: Option<serde_json::Value>,
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct UarArtifactResponse {
@@ -81,7 +82,17 @@ pub struct UarArtifactResponse {
     pub response: serde_json::Value,
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct UarA2uiAction {
+    pub surface_id: String,
+    pub name: String,
+    pub source_component_id: String,
+    pub timestamp: Option<String>,
+    pub context: serde_json::Value,
+    pub client_data_model: Option<serde_json::Value>,
+}
+
 pub struct UarProjectedRun {
     pub run_id: String,
     pub events: BoxStream<'static, Result<A2uiEvent, AgentError>>,
@@ -164,25 +175,31 @@ impl UarRuntimeStatus {
 #[async_trait::async_trait]
 pub trait UarRuntimeFacade: Send + Sync {
     fn status(&self) -> UarRuntimeStatus;
-    #[cfg(not(any(target_os = "ios", target_os = "android")))]
     async fn start_run(&self, request: UarRunRequest) -> Result<UarProjectedRun, AgentError>;
-    #[cfg(not(any(target_os = "ios", target_os = "android")))]
     async fn cancel_run(&self, run_id: &str) -> Result<bool, AgentError>;
-    #[cfg(not(any(target_os = "ios", target_os = "android")))]
     async fn submit_artifact_response(
         &self,
         run_id: &str,
         response: UarArtifactResponse,
-    ) -> Result<(), AgentError>;
+    ) -> Result<UarProjectedRun, AgentError>;
+    async fn submit_a2ui_action(
+        &self,
+        run_id: &str,
+        action: UarA2uiAction,
+    ) -> Result<UarProjectedRun, AgentError>;
+    async fn promote_a2ui_component(
+        &self,
+        title: &str,
+        source: &str,
+        description: Option<&str>,
+    ) -> Result<serde_json::Value, AgentError>;
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
 #[derive(Debug, Clone)]
 pub struct UarServiceRuntime {
     client: universal_agent_runtime_sdk::Client,
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
 impl UarServiceRuntime {
     pub fn new(base_url: impl AsRef<str>, api_key: Option<String>) -> Result<Self, AgentError> {
         let client = universal_agent_runtime_sdk::Client::new(base_url.as_ref())
@@ -195,7 +212,6 @@ impl UarServiceRuntime {
     }
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
 #[async_trait::async_trait]
 impl UarRuntimeFacade for UarServiceRuntime {
     fn status(&self) -> UarRuntimeStatus {
@@ -207,11 +223,36 @@ impl UarRuntimeFacade for UarServiceRuntime {
     }
 
     async fn start_run(&self, request: UarRunRequest) -> Result<UarProjectedRun, AgentError> {
+        if request.artifact.is_none() {
+            let session_id = request
+                .session_id
+                .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+            let stream = self
+                .client
+                .chat()
+                .stream(universal_agent_runtime_sdk::ChatCompletionRequest {
+                    messages: vec![universal_agent_runtime_sdk::ChatMessage::text(
+                        "user",
+                        request.input,
+                    )],
+                    session_id: Some(session_id.clone()),
+                    agent_id: request.agent_id,
+                    run_policy: request.run_policy,
+                    stream_mode: Some("agui".to_string()),
+                    ..Default::default()
+                })
+                .await
+                .map_err(uar_sdk_error)?;
+            return Ok(UarProjectedRun {
+                run_id: session_id.clone(),
+                events: project_sdk_stream(session_id, stream),
+            });
+        }
         let run = self
             .client
             .runs()
             .create(universal_agent_runtime_sdk::CreateRunRequest {
-                artifact: request.artifact,
+                artifact: request.artifact.expect("artifact checked above"),
                 input: request.input,
                 session_id: request.session_id,
             })
@@ -232,7 +273,7 @@ impl UarRuntimeFacade for UarServiceRuntime {
     async fn cancel_run(&self, run_id: &str) -> Result<bool, AgentError> {
         self.client
             .runs()
-            .cancel(run_id)
+            .cancel_session(run_id)
             .await
             .map(|response| response.cancelled)
             .map_err(uar_sdk_error)
@@ -242,8 +283,9 @@ impl UarRuntimeFacade for UarServiceRuntime {
         &self,
         run_id: &str,
         response: UarArtifactResponse,
-    ) -> Result<(), AgentError> {
-        self.client
+    ) -> Result<UarProjectedRun, AgentError> {
+        let ack = self
+            .client
             .runs()
             .submit_artifact_response(
                 run_id,
@@ -253,17 +295,70 @@ impl UarRuntimeFacade for UarServiceRuntime {
                 },
             )
             .await
-            .map(|_| ())
+            .map_err(uar_sdk_error)?;
+        let stream = self
+            .client
+            .runs()
+            .stream(&ack.continuation_run_id, None)
+            .await
+            .map_err(uar_sdk_error)?;
+        Ok(UarProjectedRun {
+            run_id: ack.continuation_run_id.clone(),
+            events: project_sdk_stream(ack.continuation_run_id, stream),
+        })
+    }
+
+    async fn submit_a2ui_action(
+        &self,
+        run_id: &str,
+        action: UarA2uiAction,
+    ) -> Result<UarProjectedRun, AgentError> {
+        let ack = self
+            .client
+            .runs()
+            .submit_a2ui_action(
+                run_id,
+                universal_agent_runtime_sdk::A2uiActionRequest {
+                    surface_id: action.surface_id,
+                    name: action.name,
+                    source_component_id: action.source_component_id,
+                    timestamp: action.timestamp,
+                    context: action.context,
+                    a2ui_client_data_model: action.client_data_model,
+                },
+            )
+            .await
+            .map_err(uar_sdk_error)?;
+        let stream = self
+            .client
+            .runs()
+            .stream(&ack.continuation_run_id, None)
+            .await
+            .map_err(uar_sdk_error)?;
+        Ok(UarProjectedRun {
+            run_id: ack.continuation_run_id.clone(),
+            events: project_sdk_stream(ack.continuation_run_id, stream),
+        })
+    }
+
+    async fn promote_a2ui_component(
+        &self,
+        title: &str,
+        source: &str,
+        description: Option<&str>,
+    ) -> Result<serde_json::Value, AgentError> {
+        self.client
+            .a2ui()
+            .promote_component(title, source, description)
+            .await
             .map_err(uar_sdk_error)
     }
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
 fn uar_sdk_error(error: universal_agent_runtime_sdk::Error) -> AgentError {
     AgentError::Client(format!("UAR runtime: {error}"))
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
 fn project_sdk_stream(
     run_id: String,
     stream: universal_agent_runtime_sdk::EventStream,
@@ -293,7 +388,6 @@ fn project_sdk_stream(
     .boxed()
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
 fn sdk_stream_payload_to_agui(
     event: universal_agent_runtime_sdk::StreamEvent,
 ) -> serde_json::Value {
@@ -326,7 +420,7 @@ fn sdk_stream_payload_to_agui(
 
 #[cfg(any(target_os = "ios", target_os = "android"))]
 const fn default_target_mode() -> UarDeploymentMode {
-    UarDeploymentMode::EmbeddedLibrary
+    UarDeploymentMode::CloudService
 }
 
 #[cfg(not(any(target_os = "ios", target_os = "android")))]
@@ -341,7 +435,7 @@ const fn service_runtime_available() -> bool {
 
 #[cfg(any(target_os = "ios", target_os = "android"))]
 const fn service_runtime_available() -> bool {
-    false
+    true
 }
 
 #[cfg(not(any(target_os = "ios", target_os = "android")))]
@@ -351,7 +445,7 @@ const fn service_artifact_response_available() -> bool {
 
 #[cfg(any(target_os = "ios", target_os = "android"))]
 const fn service_artifact_response_available() -> bool {
-    false
+    true
 }
 
 /// Stateful projector from UAR AG-UI payloads into KnowMe A2UI events.
@@ -375,8 +469,8 @@ impl UarEventProjector {
     }
 }
 
-/// Current user-visible UAR status. This intentionally reports projection-only
-/// until chat execution actually flows through a UAR facade.
+/// Baseline UAR capability status. Runtime-specific status can layer configured
+/// service or embedded-kernel readiness on top of this baseline.
 pub fn runtime_status() -> UarRuntimeStatus {
     UarRuntimeStatus::current()
 }
@@ -745,6 +839,18 @@ mod tests {
             }),
             Ok(universal_agent_runtime_sdk::StreamEvent {
                 id: Some("3".into()),
+                event: Some("agui.rag_citations".into()),
+                data: serde_json::json!({
+                    "citations": [{
+                        "marker": 1,
+                        "chunk_id": "chunk-a",
+                        "document_name": "handbook.pdf",
+                        "snippet": "Bring receipts."
+                    }]
+                }),
+            }),
+            Ok(universal_agent_runtime_sdk::StreamEvent {
+                id: Some("4".into()),
                 event: Some("agui.tool_call.complete".into()),
                 data: serde_json::json!({
                     "id": "call-1",
@@ -753,7 +859,7 @@ mod tests {
                 }),
             }),
             Ok(universal_agent_runtime_sdk::StreamEvent {
-                id: Some("4".into()),
+                id: Some("5".into()),
                 event: Some("agui.cancelled".into()),
                 data: serde_json::json!({"message": "User stopped"}),
             }),
@@ -784,6 +890,13 @@ mod tests {
         assert!(output.iter().any(|event| matches!(
             event,
             A2uiEvent::Block {
+                block: ContentBlock::Citation { source, quote },
+                ..
+            } if source == "[1] handbook.pdf" && quote == "Bring receipts."
+        )));
+        assert!(output.iter().any(|event| matches!(
+            event,
+            A2uiEvent::Block {
                 block: ContentBlock::ToolUse { id, name, input_json },
                 ..
             } if id == "call-1" && name == "docs.search" && input_json == "{\"q\":\"uar\"}"
@@ -792,5 +905,202 @@ mod tests {
             event,
             A2uiEvent::RunCancelled { message, .. } if message == "User stopped"
         )));
+    }
+
+    #[tokio::test]
+    #[cfg(not(any(target_os = "ios", target_os = "android")))]
+    async fn service_runtime_exercises_create_stream_and_artifact_response_over_http() {
+        use std::sync::Arc;
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        #[derive(Default)]
+        struct Captures {
+            create_body: Mutex<String>,
+            artifact_body: Mutex<String>,
+            cancel_request_line: Mutex<String>,
+        }
+
+        async fn read_request(stream: &mut tokio::net::TcpStream) -> (String, String) {
+            let mut buffer = Vec::new();
+            let mut chunk = [0_u8; 1024];
+            loop {
+                let read = stream.read(&mut chunk).await.unwrap();
+                if read == 0 {
+                    break;
+                }
+                buffer.extend_from_slice(&chunk[..read]);
+                if buffer.windows(4).any(|window| window == b"\r\n\r\n") {
+                    break;
+                }
+            }
+            let header_end = buffer
+                .windows(4)
+                .position(|window| window == b"\r\n\r\n")
+                .map(|index| index + 4)
+                .unwrap_or(buffer.len());
+            let headers = String::from_utf8_lossy(&buffer[..header_end]).to_string();
+            let content_length = headers
+                .lines()
+                .find_map(|line| {
+                    let (name, value) = line.split_once(':')?;
+                    name.eq_ignore_ascii_case("content-length")
+                        .then(|| value.trim().parse::<usize>().ok())
+                        .flatten()
+                })
+                .unwrap_or(0);
+            while buffer.len() < header_end + content_length {
+                let read = stream.read(&mut chunk).await.unwrap();
+                if read == 0 {
+                    break;
+                }
+                buffer.extend_from_slice(&chunk[..read]);
+            }
+            let request_line = headers.lines().next().unwrap_or_default().to_string();
+            let body = String::from_utf8_lossy(
+                &buffer[header_end..buffer.len().min(header_end + content_length)],
+            )
+            .to_string();
+            (request_line, body)
+        }
+
+        async fn respond(
+            stream: &mut tokio::net::TcpStream,
+            status: &str,
+            content_type: &str,
+            body: &str,
+        ) {
+            let response = format!(
+                "HTTP/1.1 {status}\r\ncontent-type: {content_type}\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                body.len()
+            );
+            stream.write_all(response.as_bytes()).await.unwrap();
+        }
+
+        let captures = Arc::new(Captures::default());
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server_captures = Arc::clone(&captures);
+        let server = tokio::spawn(async move {
+            loop {
+                let Ok((mut stream, _)) = listener.accept().await else {
+                    break;
+                };
+                let captures = Arc::clone(&server_captures);
+                tokio::spawn(async move {
+                    let (request_line, body) = read_request(&mut stream).await;
+                    if request_line.starts_with("GET /health ") {
+                        respond(
+                            &mut stream,
+                            "200 OK",
+                            "application/json",
+                            r#"{"status":"ok"}"#,
+                        )
+                        .await;
+                    } else if request_line.starts_with("POST /api/uar/runs ") {
+                        *captures.create_body.lock() = body;
+                        respond(
+                            &mut stream,
+                            "200 OK",
+                            "application/json",
+                            r#"{"run_id":"uar-run-1","stream_url":"/api/uar/runs/uar-run-1/stream"}"#,
+                        )
+                        .await;
+                    } else if request_line.starts_with("GET /api/uar/runs/uar-run-1/stream ") {
+                        let sse = concat!(
+                            "id: 1\n",
+                            "event: agui.message.delta\n",
+                            "data: {\"delta\":{\"text\":\"from fake UAR\"}}\n\n",
+                            "id: 2\n",
+                            "event: agui.done\n",
+                            "data: {}\n\n"
+                        );
+                        respond(&mut stream, "200 OK", "text/event-stream", sse).await;
+                    } else if request_line
+                        .starts_with("POST /api/uar/runs/uar-run-1/artifact-response ")
+                    {
+                        *captures.artifact_body.lock() = body;
+                        respond(
+                            &mut stream,
+                            "200 OK",
+                            "application/json",
+                            r#"{"run_id":"uar-run-1","artifact_id":"artifact-1","status":"accepted"}"#,
+                        )
+                        .await;
+                    } else if request_line.starts_with("POST /api/uar/runs/uar-run-1/cancel ") {
+                        *captures.cancel_request_line.lock() = request_line;
+                        respond(
+                            &mut stream,
+                            "200 OK",
+                            "application/json",
+                            r#"{"cancelled":true}"#,
+                        )
+                        .await;
+                    } else {
+                        respond(
+                            &mut stream,
+                            "404 Not Found",
+                            "application/json",
+                            r#"{"error":"not found"}"#,
+                        )
+                        .await;
+                    }
+                });
+            }
+        });
+
+        let runtime = UarServiceRuntime::new(format!("http://{address}"), None).unwrap();
+        let run = runtime
+            .start_run(UarRunRequest {
+                artifact: Some(serde_json::json!({"agent": "knowme"})),
+                input: "hello UAR".into(),
+                session_id: Some("session-1".into()),
+                agent_id: None,
+                run_policy: None,
+            })
+            .await
+            .unwrap();
+        assert_eq!(run.run_id, "uar-run-1");
+
+        let events: Vec<_> = run
+            .events
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .map(Result::unwrap)
+            .collect();
+        assert!(events.iter().any(|event| matches!(
+            event,
+            A2uiEvent::Block {
+                block: ContentBlock::Text { text },
+                ..
+            } if text == "from fake UAR"
+        )));
+
+        runtime
+            .submit_artifact_response(
+                "uar-run-1",
+                UarArtifactResponse {
+                    artifact_id: "artifact-1".into(),
+                    response: serde_json::json!({"approved": true}),
+                },
+            )
+            .await
+            .unwrap();
+        let cancelled = runtime.cancel_run("uar-run-1").await.unwrap();
+
+        let create_body = captures.create_body.lock().clone();
+        assert!(create_body.contains("\"input\":\"hello UAR\""));
+        assert!(create_body.contains("\"session_id\":\"session-1\""));
+        assert!(create_body.contains("\"agent\":\"knowme\""));
+        let artifact_body = captures.artifact_body.lock().clone();
+        assert!(artifact_body.contains("\"artifact_id\":\"artifact-1\""));
+        assert!(artifact_body.contains("\"approved\":true"));
+        assert!(cancelled);
+        assert_eq!(
+            captures.cancel_request_line.lock().as_str(),
+            "POST /api/uar/runs/uar-run-1/cancel HTTP/1.1"
+        );
+
+        server.abort();
     }
 }

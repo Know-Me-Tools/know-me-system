@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-promote-a2ui-component"
+description = "Enables the promote_a2ui_component command without any pre-configured scope."
+commands.allow = ["promote_a2ui_component"]
+
+[[permission]]
+identifier = "deny-promote-a2ui-component"
+description = "Denies the promote_a2ui_component command without any pre-configured scope."
+commands.deny = ["promote_a2ui_component"]

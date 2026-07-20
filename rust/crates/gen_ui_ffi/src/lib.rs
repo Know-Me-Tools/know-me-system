@@ -15,14 +15,12 @@ pub unsafe extern "system" fn JNI_OnLoad(
     vm: *mut jni::sys::JavaVM,
     _reserved: *mut std::ffi::c_void,
 ) -> jni::sys::jint {
-    match jni::JavaVM::from_raw(vm) {
-        Ok(java_vm) => {
-            gen_ui_inference::android_litert_jni::set_java_vm(java_vm);
-            jni::sys::JNI_VERSION_1_6
-        }
-        Err(error) => {
-            log::error!("failed to capture Android JavaVM for LiteRT-LM: {error}");
-            jni::sys::JNI_ERR
-        }
+    if vm.is_null() {
+        log::error!("failed to capture Android JavaVM for LiteRT-LM: null JavaVM pointer");
+        return jni::sys::JNI_ERR;
     }
+    // SAFETY: Android invokes JNI_OnLoad with its live, non-null process JavaVM.
+    let java_vm = unsafe { jni::JavaVM::from_raw(vm) };
+    gen_ui_inference::android_litert_jni::set_java_vm(java_vm);
+    jni::sys::JNI_VERSION_1_6
 }
