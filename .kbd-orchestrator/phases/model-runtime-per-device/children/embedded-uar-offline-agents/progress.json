@@ -116,6 +116,18 @@
           "verified": "tsc -b clean; eslint clean; vite build green; validate-static-bundle ok; vitest 152/153 (same pre-existing a2ui-uar failure)",
           "branch": "uar-ui-shell-navigation (uncommitted)",
           "notes": "openspec/changes/uar-ui-shell-navigation/verification-notes.md"
+        },
+        "uar-ui-a2ui-retoken": {
+          "status": "applied-pending-commit",
+          "appliedAt": "2026-07-21T15:15:00Z",
+          "by": "kimi",
+          "tasks_done": "16/17 (all but 4.4 admin fixture review)",
+          "remaining": [
+            "4.4 admin A2uiTestingPage fixture review (-> uar-ui-verify-gates)"
+          ],
+          "verified": "tsc -b clean; eslint clean; vite build green; validate-static-bundle ok; build-storybook green; vitest 153/153 (pre-existing HC failure FIXED); contrast ratios recorded",
+          "branch": "uar-ui-a2ui-retoken (uncommitted)",
+          "notes": "openspec/changes/uar-ui-a2ui-retoken/verification-notes.md; also fixed dark muted-foreground #4B6080->#A7B0BC (KnowMe fg-sub mapping) in frontend + a2ui themes"
         }
       }
     }
