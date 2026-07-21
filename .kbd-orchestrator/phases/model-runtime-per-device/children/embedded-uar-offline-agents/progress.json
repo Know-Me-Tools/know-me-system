@@ -128,6 +128,16 @@
           "verified": "tsc -b clean; eslint clean; vite build green; validate-static-bundle ok; build-storybook green; vitest 153/153 (pre-existing HC failure FIXED); contrast ratios recorded",
           "branch": "uar-ui-a2ui-retoken (uncommitted)",
           "notes": "openspec/changes/uar-ui-a2ui-retoken/verification-notes.md; also fixed dark muted-foreground #4B6080->#A7B0BC (KnowMe fg-sub mapping) in frontend + a2ui themes"
+        },
+        "uar-ui-verify-gates": {
+          "status": "complete",
+          "appliedAt": "2026-07-21T18:00:00Z",
+          "by": "kimi",
+          "tasks_done": "24/24 (6 sections incl. documented environment limits)",
+          "verified": "e2e 33 passed/3 env-limited (was 28/13); vitest 153/153; 24-screenshot matrix inspected; a11y-gate checklist complete; 2 gate-found defects fixed (theme boot init, real-server boot race)",
+          "pr": "https://github.com/Prometheus-AGS/universal-agent-runtime/pull/174 (stacked on #173)",
+          "branch": "uar-ui-verify-gates",
+          "notes": "openspec/changes/uar-ui-verify-gates/verification-notes.md + screenshots/ (24 PNG)"
         }
       }
     }
