@@ -9,12 +9,18 @@
 use futures::{stream::BoxStream, StreamExt};
 use gen_ui_protocol::{
     normalize_uar_agui_event, uar_llm_payload_to_inference_request, A2uiAdapter,
-    UarLlmRequestPayload, UarNormalizedEventAdapter,
+    UarLlmRequestPayload,
 };
 use gen_ui_types::events::A2uiEvent;
+use gen_ui_types::events::StreamEvent;
 use gen_ui_types::inference::{InferenceProvider, LocalModelSpec};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::{collections::VecDeque, sync::Arc};
+pub use universal_agent_runtime::llm::ProviderConfig as UarProviderConfig;
+use universal_agent_runtime::{
+    llm::{registry::ModelConfig, registry::ProtocolSetting, LlmDriver, LlmRequest},
+    normalized::{Citation as UarCitation, NormalizedEvent as UarNormalizedEvent},
+};
 
 use crate::error::AgentError;
 
@@ -98,14 +104,58 @@ pub struct UarProjectedRun {
     pub events: BoxStream<'static, Result<A2uiEvent, AgentError>>,
 }
 
-/// Host-side bridge that lets a future embedded UAR `ExternalLlmDriver` call
-/// KnowMe's local provider without UAR owning model catalogs or Flutter owning
-/// prompt construction.
+/// Stable UAR provider identity for Android's in-process LiteRT-LM lane.
 ///
-/// This is intentionally not the full embedded UAR kernel. It is the narrow
-/// adapter the kernel will call:
+/// The provider id names the execution boundary, not a particular accelerator.
+/// CPU, GPU, and NPU selection remain runtime diagnostics beneath the same
+/// provider/model route, so agents and persisted policies survive backend
+/// fallback without being rewritten.
+pub const ANDROID_LITERT_LM_PROVIDER_ID: &str = "knowme-local-litert-lm";
+pub const ANDROID_LITERT_LM_TRUSTED_CONTEXT_TOKENS: u32 = 8_192;
+pub const ANDROID_LITERT_LM_MAX_OUTPUT_TOKENS: u32 = 1_024;
+
+/// Build the credential-free UAR registration for Android's pinned LiteRT-LM
+/// model artifact.
 ///
-/// `UAR LlmRequest payload → KnowMe InferenceProvider → UAR NormalizedEvent payloads`.
+/// The platform leaf supplies `model_id` from `gen_ui_inference::catalog`,
+/// keeping the agent layer engine-agnostic while ensuring the exact downloaded
+/// artifact becomes UAR's enabled default model.  The capability flags describe
+/// the certified text-agent lane: native tools, explicit thinking, constrained
+/// structured output, and streaming are available; image tensors are not sent
+/// to this model and instead go through document/OCR extraction.
+#[must_use]
+pub fn android_litert_lm_provider_config(model_id: impl Into<String>) -> UarProviderConfig {
+    let model_id = model_id.into();
+    UarProviderConfig {
+        id: ANDROID_LITERT_LM_PROVIDER_ID.to_string(),
+        display_name: "KnowMe on-device · LiteRT-LM".to_string(),
+        base_url: String::new(),
+        api_key: None,
+        protocol: ProtocolSetting::Auto,
+        default_model: Some(model_id.clone()),
+        models: vec![ModelConfig {
+            id: model_id,
+            display_name: Some("Gemma 4 E2B Instruct · on-device".to_string()),
+            context_window: Some(ANDROID_LITERT_LM_TRUSTED_CONTEXT_TOKENS),
+            supports_vision: false,
+            supports_tools: true,
+            supports_reasoning: true,
+            supports_structured_output: true,
+            supports_streaming: true,
+            max_output_tokens: Some(ANDROID_LITERT_LM_MAX_OUTPUT_TOKENS),
+            enabled: true,
+        }],
+        enabled: true,
+    }
+}
+
+/// UAR host driver backed by KnowMe's platform-selected local inference
+/// provider.
+///
+/// UAR remains responsible for agent prompts, policy, tool loops, and run
+/// lifecycle.  This adapter performs only the typed engine-boundary conversion:
+///
+/// `UAR LlmRequest → KnowMe InferenceProvider → UAR NormalizedEvent`.
 #[derive(Clone)]
 pub struct UarLocalInferenceDriverBridge {
     provider: Arc<dyn InferenceProvider>,
@@ -124,29 +174,337 @@ impl UarLocalInferenceDriverBridge {
         &self,
         payload: UarLlmRequestPayload,
     ) -> Result<BoxStream<'static, Result<serde_json::Value, AgentError>>, AgentError> {
-        let request =
-            uar_llm_payload_to_inference_request(&payload).map_err(AgentError::Interaction)?;
-        self.provider.load(&self.model_spec).await?;
-        let stream = self.provider.generate_request(&request).await?;
-        let adapter = UarNormalizedEventAdapter::new();
+        let stream = self
+            .stream(LlmRequest {
+                messages: payload.messages,
+                tools: payload.tools,
+                cache_strategy: None,
+                thinking_config: None,
+                anthropic_system: None,
+                extra_params: payload.extra_params,
+            })
+            .await
+            .map_err(|error| AgentError::Interaction(error.to_string()))?;
+        Ok(stream
+            .map(|event| {
+                event
+                    .map_err(|error| AgentError::Interaction(error.to_string()))
+                    .and_then(|event| {
+                        serde_json::to_value(event)
+                            .map_err(|error| AgentError::Interaction(error.to_string()))
+                    })
+            })
+            .boxed())
+    }
+}
+
+#[async_trait::async_trait]
+impl LlmDriver for UarLocalInferenceDriverBridge {
+    async fn stream(
+        &self,
+        request: LlmRequest,
+    ) -> anyhow::Result<
+        std::pin::Pin<Box<dyn futures::Stream<Item = anyhow::Result<UarNormalizedEvent>> + Send>>,
+    > {
+        let request = uar_llm_request_to_inference_request(request)?;
+        self.provider
+            .load(&self.model_spec)
+            .await
+            .map_err(|error| anyhow::anyhow!("load local model: {error}"))?;
+        let source = self
+            .provider
+            .generate_request(&request)
+            .await
+            .map_err(|error| anyhow::anyhow!("start local inference: {error}"))?;
+        let adapter = UarNativeEventAdapter::new(format!("knowme-local-{}", uuid::Uuid::new_v4()));
+
         Ok(futures::stream::unfold(
-            (stream, adapter, Vec::<serde_json::Value>::new()),
-            |(mut stream, mut adapter, mut pending)| async move {
+            (source, adapter, VecDeque::new(), false),
+            |(mut source, mut adapter, mut pending, mut source_finished)| async move {
                 loop {
-                    if let Some(value) = pending.pop() {
-                        return Some((Ok(value), (stream, adapter, pending)));
+                    if let Some(event) = pending.pop_front() {
+                        return Some((Ok(event), (source, adapter, pending, source_finished)));
                     }
-                    match stream.next().await {
-                        Some(event) => {
-                            pending = adapter.ingest(&event);
-                            pending.reverse();
+                    if source_finished {
+                        return None;
+                    }
+                    match source.next().await {
+                        Some(event) => pending.extend(adapter.ingest(event)),
+                        None => {
+                            source_finished = true;
+                            pending.extend(adapter.finish());
                         }
-                        None => return None,
                     }
                 }
             },
         )
         .boxed())
+    }
+}
+
+fn uar_llm_request_to_inference_request(
+    request: LlmRequest,
+) -> anyhow::Result<gen_ui_types::inference::InferenceRequest> {
+    let mut messages = request.messages;
+    if let Some(system_blocks) = request.anthropic_system {
+        let has_system_message = messages.iter().any(|message| {
+            message.get("role").and_then(serde_json::Value::as_str) == Some("system")
+        });
+        if !has_system_message && !system_blocks.is_empty() {
+            messages.insert(
+                0,
+                serde_json::json!({
+                    "role": "system",
+                    "content": system_blocks,
+                }),
+            );
+        }
+    }
+    let mut extra_params = request.extra_params;
+    if let Some(thinking) = request.thinking_config {
+        let extra = extra_params.get_or_insert_with(|| serde_json::json!({}));
+        let object = extra.as_object_mut().ok_or_else(|| {
+            anyhow::anyhow!("UAR local-provider extra_params must be a JSON object")
+        })?;
+        object.insert("thinking".into(), serde_json::to_value(thinking)?);
+    }
+    uar_llm_payload_to_inference_request(&UarLlmRequestPayload {
+        messages,
+        tools: request.tools,
+        extra_params,
+    })
+    .map_err(anyhow::Error::msg)
+}
+
+#[derive(Debug)]
+struct PendingUarTool {
+    call_index: usize,
+    id: String,
+    name: String,
+    arguments: String,
+}
+
+struct UarNativeEventAdapter {
+    request_id: String,
+    stream_started: bool,
+    stream_finished: bool,
+    next_call_index: usize,
+    next_citation_index: usize,
+    pending_tools: Vec<PendingUarTool>,
+    completed_tool_names: Vec<(String, String)>,
+}
+
+impl UarNativeEventAdapter {
+    fn new(request_id: String) -> Self {
+        Self {
+            request_id,
+            stream_started: false,
+            stream_finished: false,
+            next_call_index: 0,
+            next_citation_index: 0,
+            pending_tools: Vec::new(),
+            completed_tool_names: Vec::new(),
+        }
+    }
+
+    fn ingest(&mut self, event: StreamEvent) -> Vec<UarNormalizedEvent> {
+        let mut output = Vec::new();
+        if !self.stream_started {
+            self.stream_started = true;
+            output.push(UarNormalizedEvent::StreamStart {
+                request_id: self.request_id.clone(),
+            });
+        }
+
+        match event {
+            StreamEvent::MessageStart => {}
+            StreamEvent::TextDelta { delta, .. } => {
+                output.push(UarNormalizedEvent::MessageDelta { text: delta });
+            }
+            StreamEvent::ThinkingDelta { delta, .. } => {
+                output.push(UarNormalizedEvent::ThinkingDelta { text: delta });
+            }
+            StreamEvent::ToolCallStarted { id, name } => {
+                let call_index = self.next_call_index;
+                self.next_call_index += 1;
+                self.pending_tools.push(PendingUarTool {
+                    call_index,
+                    id: id.clone(),
+                    name: name.clone(),
+                    arguments: String::new(),
+                });
+                output.push(UarNormalizedEvent::ToolCallDelta {
+                    call_index,
+                    id: Some(id),
+                    name: Some(name),
+                    arguments_delta: None,
+                });
+            }
+            StreamEvent::ToolCallDelta { id, delta } => {
+                if let Some(tool) = self.pending_tools.iter_mut().find(|tool| tool.id == id) {
+                    tool.arguments.push_str(&delta);
+                    output.push(UarNormalizedEvent::ToolCallDelta {
+                        call_index: tool.call_index,
+                        id: Some(id),
+                        name: None,
+                        arguments_delta: Some(delta),
+                    });
+                } else {
+                    output.push(UarNormalizedEvent::Error {
+                        message: format!("tool argument delta arrived before start for '{id}'"),
+                        code: Some("knowme_local_tool_state_missing".into()),
+                    });
+                }
+            }
+            StreamEvent::ToolCallComplete { id } => {
+                if let Some(index) = self.pending_tools.iter().position(|tool| tool.id == id) {
+                    let tool = self.pending_tools.remove(index);
+                    self.completed_tool_names
+                        .push((tool.id.clone(), tool.name.clone()));
+                    output.push(UarNormalizedEvent::ToolCallComplete {
+                        call_index: tool.call_index,
+                        id: tool.id,
+                        name: tool.name,
+                        arguments_json: tool.arguments,
+                    });
+                } else {
+                    output.push(UarNormalizedEvent::Error {
+                        message: format!("tool completion arrived before start for '{id}'"),
+                        code: Some("knowme_local_tool_state_missing".into()),
+                    });
+                }
+            }
+            StreamEvent::ToolCallReady {
+                id,
+                name,
+                input_json,
+            } => {
+                let call_index = self
+                    .pending_tools
+                    .iter()
+                    .position(|tool| tool.id == id)
+                    .map(|index| self.pending_tools.remove(index).call_index)
+                    .unwrap_or_else(|| {
+                        let index = self.next_call_index;
+                        self.next_call_index += 1;
+                        index
+                    });
+                self.completed_tool_names.push((id.clone(), name.clone()));
+                output.push(UarNormalizedEvent::ToolCallComplete {
+                    call_index,
+                    id,
+                    name,
+                    arguments_json: input_json,
+                });
+            }
+            StreamEvent::ToolResult {
+                tool_use_id,
+                output_json,
+                is_error,
+            } => {
+                let name = self
+                    .completed_tool_names
+                    .iter()
+                    .find(|(id, _)| id == &tool_use_id)
+                    .map(|(_, name)| name.clone())
+                    .unwrap_or_else(|| "unknown_tool".into());
+                output.push(UarNormalizedEvent::ToolResult {
+                    id: tool_use_id,
+                    name,
+                    content: output_json,
+                    success: !is_error,
+                });
+            }
+            StreamEvent::SkillActivation { name, status } => {
+                output.push(UarNormalizedEvent::SkillActivation { name, status });
+            }
+            StreamEvent::Citation { source, quote } => {
+                output.push(self.citation(source, quote));
+            }
+            StreamEvent::Citations { citations } => {
+                output.extend(
+                    citations
+                        .into_iter()
+                        .map(|citation| self.citation(citation.source, citation.quote)),
+                );
+            }
+            StreamEvent::Memory {
+                operation,
+                key,
+                value,
+            } => {
+                output.push(UarNormalizedEvent::MemoryUpdate {
+                    key,
+                    value: value.unwrap_or_default(),
+                    operation,
+                });
+            }
+            StreamEvent::Custom {
+                source,
+                event_name,
+                payload,
+            } => {
+                output.push(UarNormalizedEvent::Custom {
+                    source,
+                    event_name,
+                    payload,
+                });
+            }
+            StreamEvent::Error { message } => {
+                output.push(UarNormalizedEvent::Error {
+                    message,
+                    code: Some("knowme_local_provider_error".into()),
+                });
+            }
+            StreamEvent::Cancelled { message } => {
+                output.push(UarNormalizedEvent::Error {
+                    message,
+                    code: Some("knowme_local_cancelled".into()),
+                });
+            }
+            StreamEvent::Done => {
+                output.extend(self.finish());
+            }
+        }
+        output
+    }
+
+    fn citation(&mut self, source: String, quote: String) -> UarNormalizedEvent {
+        let index = self.next_citation_index;
+        self.next_citation_index += 1;
+        UarNormalizedEvent::CitationAdded(UarCitation {
+            index,
+            url: source.clone(),
+            title: Some(source),
+            snippet: (!quote.is_empty()).then_some(quote),
+        })
+    }
+
+    fn finish(&mut self) -> Vec<UarNormalizedEvent> {
+        if self.stream_finished {
+            return Vec::new();
+        }
+        self.stream_finished = true;
+        let mut output = Vec::new();
+        if !self.stream_started {
+            self.stream_started = true;
+            output.push(UarNormalizedEvent::StreamStart {
+                request_id: self.request_id.clone(),
+            });
+        }
+        output.extend(
+            self.pending_tools
+                .drain(..)
+                .map(|tool| UarNormalizedEvent::Error {
+                    message: format!(
+                        "local provider ended before tool '{}' ({}) completed",
+                        tool.name, tool.id
+                    ),
+                    code: Some("knowme_local_tool_incomplete".into()),
+                }),
+        );
+        output.push(UarNormalizedEvent::Done);
+        output
     }
 }
 
@@ -480,7 +838,6 @@ mod tests {
     use super::*;
     use futures::StreamExt;
     use gen_ui_types::content_block::ContentBlock;
-    use gen_ui_types::events::StreamEvent;
     use gen_ui_types::inference::{InferenceRequest, InferenceToolResult};
     use gen_ui_types::{CoreError, CoreResult};
     use parking_lot::Mutex;
@@ -489,6 +846,16 @@ mod tests {
     struct RecordingInferenceProvider {
         loads: Mutex<Vec<LocalModelSpec>>,
         requests: Mutex<Vec<InferenceRequest>>,
+        scripted_events: Mutex<Option<Vec<StreamEvent>>>,
+    }
+
+    impl RecordingInferenceProvider {
+        fn with_events(events: Vec<StreamEvent>) -> Self {
+            Self {
+                scripted_events: Mutex::new(Some(events)),
+                ..Self::default()
+            }
+        }
     }
 
     #[async_trait::async_trait]
@@ -503,30 +870,32 @@ mod tests {
             request: &InferenceRequest,
         ) -> CoreResult<BoxStream<'static, StreamEvent>> {
             self.requests.lock().push(request.clone());
-            Ok(futures::stream::iter([
-                StreamEvent::MessageStart,
-                StreamEvent::TextDelta {
-                    index: 0,
-                    delta: "before".into(),
-                },
-                StreamEvent::ToolCallStarted {
-                    id: "tool-1".into(),
-                    name: "knowme_diagnostics__local_runtime_status".into(),
-                },
-                StreamEvent::ToolCallDelta {
-                    id: "tool-1".into(),
-                    delta: r#"{"marker":"#.into(),
-                },
-                StreamEvent::ToolCallDelta {
-                    id: "tool-1".into(),
-                    delta: r#""KMUAR"}"#.into(),
-                },
-                StreamEvent::ToolCallComplete {
-                    id: "tool-1".into(),
-                },
-                StreamEvent::Done,
-            ])
-            .boxed())
+            let events = self.scripted_events.lock().take().unwrap_or_else(|| {
+                vec![
+                    StreamEvent::MessageStart,
+                    StreamEvent::TextDelta {
+                        index: 0,
+                        delta: "before".into(),
+                    },
+                    StreamEvent::ToolCallStarted {
+                        id: "tool-1".into(),
+                        name: "knowme_diagnostics__local_runtime_status".into(),
+                    },
+                    StreamEvent::ToolCallDelta {
+                        id: "tool-1".into(),
+                        delta: r#"{"marker":"#.into(),
+                    },
+                    StreamEvent::ToolCallDelta {
+                        id: "tool-1".into(),
+                        delta: r#""KMUAR"}"#.into(),
+                    },
+                    StreamEvent::ToolCallComplete {
+                        id: "tool-1".into(),
+                    },
+                    StreamEvent::Done,
+                ]
+            });
+            Ok(futures::stream::iter(events).boxed())
         }
 
         async fn continue_with_tool_results(
@@ -550,6 +919,79 @@ mod tests {
         assert!(status.local_provider_bridge_available);
         assert!(!status.embedded_kernel_available);
         assert!(status.embedded_kernel_blocker.is_some());
+    }
+
+    #[tokio::test]
+    async fn android_litert_lm_is_a_credential_free_uar_default() {
+        const PINNED_MODEL_ID: &str = "gemma-4-e2b-it-litertlm";
+        let provider = android_litert_lm_provider_config(PINNED_MODEL_ID);
+
+        assert_eq!(provider.id, ANDROID_LITERT_LM_PROVIDER_ID);
+        assert!(provider.enabled);
+        assert!(provider.api_key.is_none());
+        assert!(provider.base_url.is_empty());
+        assert_eq!(provider.default_model.as_deref(), Some(PINNED_MODEL_ID));
+        assert_eq!(provider.models.len(), 1);
+
+        let model = &provider.models[0];
+        assert_eq!(model.id, PINNED_MODEL_ID);
+        assert_eq!(
+            model.context_window,
+            Some(ANDROID_LITERT_LM_TRUSTED_CONTEXT_TOKENS)
+        );
+        assert_eq!(
+            model.max_output_tokens,
+            Some(ANDROID_LITERT_LM_MAX_OUTPUT_TOKENS)
+        );
+        assert!(!model.supports_vision);
+        assert!(model.supports_tools);
+        assert!(model.supports_reasoning);
+        assert!(model.supports_structured_output);
+        assert!(model.supports_streaming);
+        assert!(model.enabled);
+
+        let registry = Arc::new(universal_agent_runtime::llm::ProviderRegistry::new());
+        registry
+            .register_custom_provider(provider)
+            .await
+            .expect("Android local provider registers");
+        registry
+            .set_default(ANDROID_LITERT_LM_PROVIDER_ID)
+            .await
+            .expect("Android local provider becomes default");
+
+        assert_eq!(
+            registry.default_model().await,
+            Some((
+                ANDROID_LITERT_LM_PROVIDER_ID.to_string(),
+                PINNED_MODEL_ID.to_string()
+            ))
+        );
+        let resolved = registry
+            .resolve_to_llm_config(ANDROID_LITERT_LM_PROVIDER_ID, "")
+            .await
+            .expect("default local route resolves without credentials");
+        assert_eq!(
+            resolved.model,
+            format!("{ANDROID_LITERT_LM_PROVIDER_ID}/{PINNED_MODEL_ID}")
+        );
+        assert!(resolved.api_key.is_none());
+        assert!(resolved.base_url.is_none());
+
+        let routed = universal_agent_runtime::llm::router::ModelRouter::new(Arc::clone(&registry))
+            .route(&universal_agent_runtime::llm::router::RouteRequirements {
+                needs_tools: true,
+                needs_reasoning: true,
+                needs_structured_output: true,
+                min_context: Some(ANDROID_LITERT_LM_TRUSTED_CONTEXT_TOKENS.into()),
+                preferred_provider: Some(ANDROID_LITERT_LM_PROVIDER_ID.to_string()),
+                ..Default::default()
+            })
+            .await;
+        assert_eq!(
+            routed.as_deref(),
+            Some("knowme-local-litert-lm/gemma-4-e2b-it-litertlm")
+        );
     }
 
     #[tokio::test]
@@ -625,6 +1067,188 @@ mod tests {
                 .and_then(serde_json::Value::as_str),
             Some(r#"{"marker":"KMUAR"}"#)
         );
+    }
+
+    #[tokio::test]
+    async fn local_inference_bridge_is_a_native_uar_llm_driver() {
+        let provider = Arc::new(RecordingInferenceProvider::default());
+        let bridge = UarLocalInferenceDriverBridge::new(
+            provider.clone(),
+            LocalModelSpec {
+                model: "gemma-4-e2b-it-litertlm".into(),
+                context_len: Some(8192),
+            },
+        );
+
+        let events = bridge
+            .stream(LlmRequest {
+                messages: vec![serde_json::json!({
+                    "role": "user",
+                    "content": "Check status."
+                })],
+                tools: vec![serde_json::json!({
+                    "type": "function",
+                    "function": {
+                        "name": "knowme_diagnostics__local_runtime_status",
+                        "description": "Status.",
+                        "parameters": {"type": "object", "properties": {}}
+                    }
+                })],
+                cache_strategy: None,
+                thinking_config: None,
+                anthropic_system: Some(vec![serde_json::json!({
+                    "type": "text",
+                    "text": "Be concise."
+                })]),
+                extra_params: Some(serde_json::json!({
+                    "temperature": 0.2,
+                    "max_tokens": 64
+                })),
+            })
+            .await
+            .expect("native UAR driver starts")
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .map(Result::unwrap)
+            .collect::<Vec<_>>();
+
+        let request = provider.requests.lock()[0].clone();
+        assert_eq!(
+            request.messages[0].role,
+            gen_ui_types::inference::InferenceRole::System
+        );
+        assert_eq!(request.messages[0].content, "Be concise.");
+        assert_eq!(request.messages[1].content, "Check status.");
+        assert_eq!(request.generation_settings.temperature, 0.2);
+        assert_eq!(request.generation_settings.max_tokens, 64);
+
+        assert!(matches!(events[0], UarNormalizedEvent::StreamStart { .. }));
+        assert!(events.iter().any(|event| matches!(
+            event,
+            UarNormalizedEvent::MessageDelta { text } if text == "before"
+        )));
+        assert!(events.iter().any(|event| matches!(
+            event,
+            UarNormalizedEvent::ToolCallComplete {
+                id,
+                name,
+                arguments_json,
+                ..
+            } if id == "tool-1"
+                && name == "knowme_diagnostics__local_runtime_status"
+                && arguments_json == r#"{"marker":"KMUAR"}"#
+        )));
+        assert!(matches!(events.last(), Some(UarNormalizedEvent::Done)));
+    }
+
+    #[tokio::test]
+    async fn native_driver_preserves_every_local_semantic_event() {
+        let provider = Arc::new(RecordingInferenceProvider::with_events(vec![
+            StreamEvent::ThinkingDelta {
+                index: 0,
+                delta: "reason".into(),
+            },
+            StreamEvent::SkillActivation {
+                name: "meeting_summary".into(),
+                status: "activated".into(),
+            },
+            StreamEvent::Citations {
+                citations: vec![
+                    gen_ui_types::events::StreamCitation {
+                        source: "handbook.pdf".into(),
+                        quote: "Bring receipts.".into(),
+                    },
+                    gen_ui_types::events::StreamCitation {
+                        source: "notes.md".into(),
+                        quote: "Follow up Friday.".into(),
+                    },
+                ],
+            },
+            StreamEvent::Memory {
+                operation: "stored".into(),
+                key: "office.format".into(),
+                value: Some("concise".into()),
+            },
+            StreamEvent::Custom {
+                source: "litert-lm".into(),
+                event_name: "provider.metric".into(),
+                payload: serde_json::json!({"ttftMs": 42}),
+            },
+            StreamEvent::Cancelled {
+                message: "Stopped by user".into(),
+            },
+            StreamEvent::Done,
+        ]));
+        let bridge = UarLocalInferenceDriverBridge::new(
+            provider,
+            LocalModelSpec {
+                model: "local".into(),
+                context_len: None,
+            },
+        );
+
+        let events = bridge
+            .stream(LlmRequest {
+                messages: vec![serde_json::json!({"role": "user", "content": "hello"})],
+                tools: Vec::new(),
+                cache_strategy: None,
+                thinking_config: None,
+                anthropic_system: None,
+                extra_params: None,
+            })
+            .await
+            .unwrap()
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .map(Result::unwrap)
+            .collect::<Vec<_>>();
+
+        assert!(matches!(events[0], UarNormalizedEvent::StreamStart { .. }));
+        assert!(matches!(
+            &events[1],
+            UarNormalizedEvent::ThinkingDelta { text } if text == "reason"
+        ));
+        assert!(events.iter().any(|event| matches!(
+            event,
+            UarNormalizedEvent::SkillActivation { name, status }
+                if name == "meeting_summary" && status == "activated"
+        )));
+        let citations = events
+            .iter()
+            .filter_map(|event| match event {
+                UarNormalizedEvent::CitationAdded(citation) => Some(citation),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(citations.len(), 2);
+        assert_eq!(citations[0].index, 0);
+        assert_eq!(citations[1].index, 1);
+        assert!(events.iter().any(|event| matches!(
+            event,
+            UarNormalizedEvent::MemoryUpdate {
+                operation,
+                key,
+                value,
+            } if operation == "stored" && key == "office.format" && value == "concise"
+        )));
+        assert!(events.iter().any(|event| matches!(
+            event,
+            UarNormalizedEvent::Custom {
+                source,
+                event_name,
+                payload,
+            } if source == "litert-lm"
+                && event_name == "provider.metric"
+                && payload["ttftMs"] == 42
+        )));
+        assert!(events.iter().any(|event| matches!(
+            event,
+            UarNormalizedEvent::Error { code: Some(code), .. }
+                if code == "knowme_local_cancelled"
+        )));
+        assert!(matches!(events.last(), Some(UarNormalizedEvent::Done)));
     }
 
     #[test]
@@ -1023,10 +1647,10 @@ mod tests {
                             &mut stream,
                             "200 OK",
                             "application/json",
-                            r#"{"run_id":"uar-run-1","artifact_id":"artifact-1","status":"accepted"}"#,
+                            r#"{"run_id":"uar-run-1","artifact_id":"artifact-1","continuation_run_id":"uar-run-1","status":"accepted"}"#,
                         )
                         .await;
-                    } else if request_line.starts_with("POST /api/uar/runs/uar-run-1/cancel ") {
+                    } else if request_line.starts_with("POST /api/uar/sessions/uar-run-1/cancel ") {
                         *captures.cancel_request_line.lock() = request_line;
                         respond(
                             &mut stream,
@@ -1098,7 +1722,7 @@ mod tests {
         assert!(cancelled);
         assert_eq!(
             captures.cancel_request_line.lock().as_str(),
-            "POST /api/uar/runs/uar-run-1/cancel HTTP/1.1"
+            "POST /api/uar/sessions/uar-run-1/cancel HTTP/1.1"
         );
 
         server.abort();

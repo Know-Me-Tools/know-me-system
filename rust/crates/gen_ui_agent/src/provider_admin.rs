@@ -365,9 +365,9 @@ fn model_from_sdk(model: universal_agent_runtime_sdk::ProviderModelConfig) -> Pr
         max_output_tokens: model.max_output_tokens.map(u64::from),
         supports_vision: model.supports_vision,
         supports_tools: model.supports_tools,
-        supports_reasoning: false,
-        supports_structured_output: false,
-        supports_streaming: true,
+        supports_reasoning: model.supports_reasoning,
+        supports_structured_output: model.supports_structured_output,
+        supports_streaming: model.supports_streaming,
         enabled: model.enabled,
     }
 }
@@ -381,6 +381,9 @@ fn model_to_sdk(model: ProviderModelEntry) -> universal_agent_runtime_sdk::Provi
             .and_then(|value| u32::try_from(value).ok()),
         supports_vision: model.supports_vision,
         supports_tools: model.supports_tools,
+        supports_reasoning: model.supports_reasoning,
+        supports_structured_output: model.supports_structured_output,
+        supports_streaming: model.supports_streaming,
         max_output_tokens: model
             .max_output_tokens
             .and_then(|value| u32::try_from(value).ok()),

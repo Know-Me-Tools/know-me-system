@@ -203,6 +203,22 @@ pub async fn run_migrations(data_dir: String) -> Result<(), CoreError> {
         .map(|platform| platform.default_model().model_id)
         .unwrap_or(gen_ui_inference::catalog::ANDROID_GEMMA4_E2B_LITERTLM_ID)
         .to_string();
+    #[cfg(target_os = "android")]
+    {
+        let provider = crate::local_provider::android_litert_lm_uar_provider_config();
+        if provider.default_model.as_deref() != Some(default_model.as_str()) {
+            return Err(boot_fail(
+                "embedded UAR local provider registration",
+                "Android UAR default model does not match the pinned inference artifact",
+            ));
+        }
+        tracing::info!(
+            provider_id = %provider.id,
+            model_id = %default_model,
+            context_tokens = provider.models[0].context_window,
+            "Android LiteRT-LM provider metadata ready for embedded UAR"
+        );
+    }
     let existing_pref = store
         .get_model_pref("chat", "local")
         .await

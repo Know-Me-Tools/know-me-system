@@ -291,6 +291,7 @@ async fn verify_artifact(path: &Path, artifact: ArtifactSpec) -> CoreResult<()> 
     .map_err(|error| terminal("LiteRT-LM model checksum task", error))?
 }
 
+#[cfg(any(not(target_os = "android"), test))]
 fn native_adapter_unavailable() -> RunError {
     RunError {
         code: "litert_lm_native_adapter_unavailable".into(),
