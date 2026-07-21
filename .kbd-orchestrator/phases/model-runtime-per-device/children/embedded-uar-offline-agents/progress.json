@@ -103,6 +103,19 @@
           "verified": "tsc -b clean; eslint clean; vite build green; vitest 152/153 (1 pre-existing a2ui-uar pkg failure -> uar-ui-a2ui-retoken)",
           "branch": "uar-ui-chat-reskin (merged to main)",
           "notes": "openspec/changes/uar-ui-chat-reskin/verification-notes.md"
+        },
+        "uar-ui-shell-navigation": {
+          "status": "applied-pending-commit",
+          "appliedAt": "2026-07-21T14:20:00Z",
+          "by": "kimi",
+          "tasks_done": "15/16 (all but 5.3 interactive smoke)",
+          "remaining": [
+            "5.3 interactive smoke 320/1440 (-> uar-ui-verify-gates)",
+            "Tauri launch verification of decorations:false + Titlebar (-> uar-ui-verify-gates)"
+          ],
+          "verified": "tsc -b clean; eslint clean; vite build green; validate-static-bundle ok; vitest 152/153 (same pre-existing a2ui-uar failure)",
+          "branch": "uar-ui-shell-navigation (uncommitted)",
+          "notes": "openspec/changes/uar-ui-shell-navigation/verification-notes.md"
         }
       }
     }
