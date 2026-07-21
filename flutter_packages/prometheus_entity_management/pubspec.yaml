@@ -13,12 +13,25 @@ dependencies:
   flutter_riverpod: 3.3.1
   riverpod_annotation: 4.0.2
   freezed_annotation: ^3.1.0
+  # 4.12.0 requires json_serializable 6.14/analyzer >=10; see the dev
+  # dependency note below.
   json_annotation: 4.11.0
-  collection: ^1.19.0
+  collection: ^1.19.1
 
 dev_dependencies:
   flutter_lints: ^6.0.0
+  # 2.15.2 requires analyzer >=13.3; the current Riverpod generator stack is
+  # still on analyzer 12.
   build_runner: ^2.15.1
+  # Freezed 4.0.0-dev.x requires analyzer 13, while the latest Riverpod codegen
+  # line that compiles this package is still below that. Freezed 3.2.6-dev.1
+  # emits invalid `final` constructor parameters with Flutter's Dart 3.13 beta,
+  # so 3.2.5 is the latest validated compatible generator.
   freezed: 3.2.5
+  # 6.13.2+ requires analyzer >=10; Riverpod generator 4.0.3 and Freezed 3.2.5
+  # require analyzer 9. Keep this on the latest validated analyzer-9 line.
   json_serializable: 6.13.0
+  # 4.0.4 requires analyzer 12 and forces Freezed onto the invalid 3.2.6-dev.1
+  # generator; 4.0.3 is the latest Riverpod generator that resolves with
+  # Freezed 3.2.5.
   riverpod_generator: 4.0.3

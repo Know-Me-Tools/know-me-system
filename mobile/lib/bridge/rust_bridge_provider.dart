@@ -14,6 +14,7 @@ import 'frb_generated.dart' show GenUiCore;
 import 'third_party/gen_ui_db_graph.dart' show MemoryHit, RelatedEntity;
 import 'third_party/gen_ui_types/transport.dart' as transport_wire;
 import 'third_party/gen_ui_types/inference.dart';
+import 'third_party/gen_ui_types/error.dart' as error_wire;
 import 'third_party/gen_ui_types/view.dart' as view_wire;
 import 'package:prometheus_entity_management/prometheus_entity_management.dart';
 
@@ -76,6 +77,145 @@ Future<Map<String, dynamic>?> localRuntimeDiagnostics() async =>
 
 Future<Map<String, dynamic>> uarRuntimeStatus() async =>
     jsonDecode(await ffi.uarRuntimeStatus()) as Map<String, dynamic>;
+
+Future<String> activeLane() => ffi.activeLane();
+
+Future<void> setActiveLane(String lane) => ffi.setActiveLane(lane: lane);
+
+/// Resolve FRB's opaque workspace error into the safe Rust `Display` message.
+/// Generated bindings intentionally stay untouched; every feature reaches this
+/// through its repository layer.
+Future<String> bridgeErrorMessage(Object error) async {
+  if (error is error_wire.CoreError) {
+    try {
+      return await ffi.coreErrorMessage(error: error);
+    } catch (_) {
+      // Fall through to the stable generic message if the error object was
+      // already consumed by another observer.
+    }
+  }
+  final message = error.toString().replaceFirst('Exception: ', '').trim();
+  if (message == "Instance of 'CoreErrorImpl'" ||
+      message == 'Instance of CoreErrorImpl') {
+    return 'The operation failed before its diagnostic could be decoded. Retry it or review the runtime configuration.';
+  }
+  return message;
+}
+
+Future<Map<String, dynamic>> uarServiceConfig() async =>
+    jsonDecode(await ffi.uarServiceConfig()) as Map<String, dynamic>;
+
+Future<void> saveUarService({
+  required String serviceUrl,
+  String? apiKey,
+  String? sessionId,
+}) => ffi.uarServiceSave(
+  serviceUrl: serviceUrl,
+  apiKey: apiKey,
+  sessionId: sessionId,
+);
+
+Future<Map<String, dynamic>> probeUarService() async =>
+    jsonDecode(await ffi.uarServiceProbe()) as Map<String, dynamic>;
+
+Future<Map<String, dynamic>> chatControlCatalog() async =>
+    jsonDecode(await ffi.chatControlCatalog()) as Map<String, dynamic>;
+
+Future<Map<String, dynamic>> uarAdminSnapshot() async =>
+    jsonDecode(await ffi.uarAdminSnapshot()) as Map<String, dynamic>;
+
+Future<List<Map<String, dynamic>>> providerCatalog() async =>
+    (jsonDecode(await ffi.providerCatalog()) as List<dynamic>)
+        .cast<Map<String, dynamic>>();
+
+Future<List<Map<String, dynamic>>> configuredProviders() async =>
+    (jsonDecode(await ffi.providerList()) as List<dynamic>)
+        .cast<Map<String, dynamic>>();
+
+Future<void> saveProvider(Map<String, dynamic> request) =>
+    ffi.providerSave(requestJson: jsonEncode(request));
+
+Future<void> deleteProvider(String id) => ffi.providerDelete(id: id);
+
+Future<Map<String, dynamic>> testProvider(String id, String? model) async =>
+    jsonDecode(await ffi.providerTest(id: id, model: model))
+        as Map<String, dynamic>;
+
+Future<Map<String, dynamic>?> cloudModel() async {
+  final value = jsonDecode(await ffi.cloudModelGet());
+  return value is Map<String, dynamic> ? value : null;
+}
+
+Future<void> saveCloudModel(String providerId, String modelId) =>
+    ffi.cloudModelSave(providerId: providerId, modelId: modelId);
+
+Future<Map<String, dynamic>> saveUarSetting(String key, Object? value) async =>
+    jsonDecode(await ffi.uarSettingSave(key: key, valueJson: jsonEncode(value)))
+        as Map<String, dynamic>;
+
+Future<Map<String, dynamic>> saveUarAgent(Object agent) async =>
+    jsonDecode(await ffi.uarAgentSave(agentJson: jsonEncode(agent)))
+        as Map<String, dynamic>;
+
+Future<void> deleteUarAgent(String id) => ffi.uarAgentDelete(id: id);
+
+Future<Map<String, dynamic>> saveUarMcpServer(
+  String name,
+  Object server,
+) async =>
+    jsonDecode(
+          await ffi.uarMcpServerSave(
+            name: name,
+            serverJson: jsonEncode(server),
+          ),
+        )
+        as Map<String, dynamic>;
+
+Future<Map<String, dynamic>> deleteUarMcpServer(String name) async =>
+    jsonDecode(await ffi.uarMcpServerDelete(name: name))
+        as Map<String, dynamic>;
+
+Future<Map<String, dynamic>> deleteUarMemory(String id) async =>
+    jsonDecode(await ffi.uarMemoryDelete(id: id)) as Map<String, dynamic>;
+
+Future<Map<String, dynamic>> createUarKnowledgeBase(Object request) async =>
+    jsonDecode(
+          await ffi.uarKnowledgeBaseCreate(requestJson: jsonEncode(request)),
+        )
+        as Map<String, dynamic>;
+
+Future<void> deleteUarKnowledgeBase(String id) =>
+    ffi.uarKnowledgeBaseDelete(id: id);
+
+Future<Map<String, dynamic>?> conversationPolicy(String conversationId) async {
+  final value = jsonDecode(
+    await ffi.conversationPolicyGet(conversationId: conversationId),
+  );
+  return value is Map<String, dynamic> ? value : null;
+}
+
+Future<Map<String, dynamic>> saveConversationPolicy(
+  String conversationId,
+  Map<String, dynamic> policy,
+) async =>
+    jsonDecode(
+          await ffi.conversationPolicySave(
+            conversationId: conversationId,
+            policyJson: jsonEncode(policy),
+          ),
+        )
+        as Map<String, dynamic>;
+
+Future<void> deleteConversationPolicy(String conversationId) =>
+    ffi.conversationPolicyDelete(conversationId: conversationId);
+
+Future<Map<String, dynamic>> conversationEffectiveConfig(
+  String conversationId,
+) async =>
+    jsonDecode(
+          await ffi.conversationEffectiveConfig(conversationId: conversationId),
+        )
+        as Map<String, dynamic>;
 
 Future<String> getThemeMode() => ffi.themeMode();
 

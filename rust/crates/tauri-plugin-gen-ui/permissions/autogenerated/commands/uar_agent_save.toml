@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-uar-agent-save"
+description = "Enables the uar_agent_save command without any pre-configured scope."
+commands.allow = ["uar_agent_save"]
+
+[[permission]]
+identifier = "deny-uar-agent-save"
+description = "Denies the uar_agent_save command without any pre-configured scope."
+commands.deny = ["uar_agent_save"]

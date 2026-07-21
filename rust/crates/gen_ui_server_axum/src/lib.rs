@@ -10,7 +10,7 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{IntoResponse, Response};
-use axum::routing::{get, post};
+use axum::routing::{get, post, put};
 use axum::{Json, Router};
 use gen_ui_host::{AppServices, HostError};
 use gen_ui_types::events::A2uiEvent;
@@ -25,6 +25,21 @@ pub fn router(services: AppServices) -> Router {
         .route("/api/v1/ready", get(ready))
         .route("/api/v1/models/active-lane", get(active_lane))
         .route("/api/v1/providers/catalog", get(provider_catalog))
+        .route("/api/v1/providers", get(provider_list))
+        .route(
+            "/api/v1/providers/default-model",
+            get(get_default_model).put(save_default_model),
+        )
+        .route(
+            "/api/v1/providers/{id}",
+            put(save_provider).delete(delete_provider),
+        )
+        .route("/api/v1/providers/{id}/test", post(test_provider))
+        .route("/api/v1/control-plane/catalog", get(chat_control_catalog))
+        .route(
+            "/api/v1/conversations/{id}/policy",
+            get(get_conversation_policy).put(save_conversation_policy),
+        )
         .route("/api/v1/chat/runs", post(start_run))
         .route("/api/v1/chat/runs/{run_id}/events", get(run_events))
         .with_state(services)
@@ -65,7 +80,89 @@ async fn active_lane(State(services): State<AppServices>) -> Result<Json<LaneRes
 async fn provider_catalog(
     State(services): State<AppServices>,
 ) -> Result<Json<Vec<gen_ui_host::ProviderCatalogEntry>>, ApiError> {
-    Ok(Json(services.provider_catalog()?))
+    Ok(Json(services.provider_catalog().await?))
+}
+
+async fn provider_list(
+    State(services): State<AppServices>,
+) -> Result<Json<Vec<gen_ui_host::ConfiguredProvider>>, ApiError> {
+    Ok(Json(services.providers().await?))
+}
+
+async fn save_provider(
+    State(services): State<AppServices>,
+    Path(id): Path<String>,
+    Json(mut request): Json<gen_ui_host::SaveProviderRequest>,
+) -> Result<StatusCode, ApiError> {
+    if request.id != id {
+        return Err(ApiError::bad_request(
+            "provider_id_mismatch",
+            "path and body provider ids must match",
+        ));
+    }
+    request.id = id;
+    services.save_provider(request).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn delete_provider(
+    State(services): State<AppServices>,
+    Path(id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    services.delete_provider(&id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(Deserialize)]
+struct TestProviderRequest {
+    model: Option<String>,
+}
+
+async fn test_provider(
+    State(services): State<AppServices>,
+    Path(id): Path<String>,
+    Json(request): Json<TestProviderRequest>,
+) -> Result<Json<gen_ui_host::ProviderTestResult>, ApiError> {
+    Ok(Json(
+        services
+            .test_provider(&id, request.model.as_deref())
+            .await?,
+    ))
+}
+
+async fn get_default_model(
+    State(services): State<AppServices>,
+) -> Result<Json<Option<gen_ui_host::ConfiguredCloudModel>>, ApiError> {
+    Ok(Json(services.cloud_model().await?))
+}
+
+async fn save_default_model(
+    State(services): State<AppServices>,
+    Json(request): Json<gen_ui_host::SaveCloudModelRequest>,
+) -> Result<StatusCode, ApiError> {
+    services.save_cloud_model(request).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn chat_control_catalog(
+    State(services): State<AppServices>,
+) -> Result<Json<gen_ui_host::ChatControlPlaneCatalog>, ApiError> {
+    Ok(Json(services.chat_control_catalog().await?))
+}
+
+async fn get_conversation_policy(
+    State(services): State<AppServices>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    Ok(Json(services.conversation_policy(&id).await?))
+}
+
+async fn save_conversation_policy(
+    State(services): State<AppServices>,
+    Path(id): Path<String>,
+    Json(policy): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    Ok(Json(services.save_conversation_policy(&id, &policy).await?))
 }
 
 #[derive(Debug, Deserialize)]

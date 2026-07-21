@@ -12,6 +12,7 @@ class A2uiContentDriver {
     required this.messageId,
     required this.onBlock,
     required this.onFinalize,
+    this.errorMessage,
     this.onPhase,
     this.onCancelled,
     this.onTelemetry,
@@ -22,6 +23,7 @@ class A2uiContentDriver {
   final void Function({required String messageId, required ContentBlock block})
   onBlock;
   final void Function(String messageId) onFinalize;
+  final Future<String> Function(Object error)? errorMessage;
   final void Function(String messageId, RunPhaseChanged phase)? onPhase;
   final void Function(String messageId, RunCancelled event)? onCancelled;
   final void Function(String messageId, ContextTelemetry event)? onTelemetry;
@@ -59,24 +61,31 @@ class A2uiContentDriver {
         }
       },
       onError: (Object error, StackTrace stackTrace) {
-        onError?.call(
-          messageId,
-          ChatRunError(
-            code: 'event_stream_error',
-            phase: 'generation',
-            message: error.toString(),
-            retryable: true,
-            diagnostics: stackTrace.toString(),
-          ),
-        );
-        onFinalize(messageId);
-        if (!_done.isCompleted) _done.complete();
+        unawaited(_handleStreamError(error, stackTrace));
       },
       onDone: () {
         if (!_done.isCompleted) _done.complete();
       },
     );
     return _done.future;
+  }
+
+  Future<void> _handleStreamError(Object error, StackTrace stackTrace) async {
+    final message = errorMessage == null
+        ? error.toString().replaceFirst('Exception: ', '')
+        : await errorMessage!(error);
+    onError?.call(
+      messageId,
+      ChatRunError(
+        code: 'event_stream_error',
+        phase: 'generation',
+        message: message,
+        retryable: true,
+        diagnostics: stackTrace.toString(),
+      ),
+    );
+    onFinalize(messageId);
+    if (!_done.isCompleted) _done.complete();
   }
 
   Future<void> dispose() async {

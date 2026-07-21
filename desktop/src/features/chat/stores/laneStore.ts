@@ -3,17 +3,22 @@
 // Which inference lane chat runs on, and the throughput of the last local run.
 //
 // Three surfaces, one toggle:
-//   - Tauri desktop → the pinned Rust llama.cpp lane, via the plugin.
-//   - Plain web     → the WebLLM lane (webllmLane.ts), driven in-browser.
+//   - Tauri desktop → UAR/orchestrator or the pinned Rust local lane.
+//   - Plain web     → WebLLM or UAR over the host REST bridge.
 //   - Neither       → cloud only; the toggle is hidden rather than shown broken.
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { isTauri } from '@tauri-apps/api/core'
 import {
   cancelModelOperation, getActiveLane, hasLocalEngine, onLocalModelStatus,
-  prepareLocalModel, setActiveLane,
+  prepareLocalModel, setActiveLane, uarRuntimeStatus, uarServiceConfig,
 } from '@prometheus-ags/tauri-plugin-gen-ui'
-import type { ChatLane, ModelOperationState } from '@prometheus-ags/tauri-plugin-gen-ui'
+import type {
+  ChatLane,
+  ConfiguredUarService,
+  ModelOperationState,
+  UarRuntimeStatus,
+} from '@prometheus-ags/tauri-plugin-gen-ui'
 import { isWebGpuAvailable, loadWebLlm, unloadWebLlm } from '../api/webllmLane'
 
 /** Tokens/sec for a completed local run — the honest cost of on-device inference. */
@@ -31,8 +36,16 @@ export interface LaneLoadProgress {
 
 interface LaneState {
   lane: ChatLane
-  /** False when neither a Rust engine nor WebGPU is available — hide the toggle. */
+  /** False when neither a Rust engine nor WebGPU is available. */
   localAvailable: boolean
+  /** True on desktop builds that can route chat through a configured UAR service. */
+  uarSupported: boolean
+  /** True when stored/env UAR config is sufficient to send a run. */
+  uarConfigured: boolean
+  /** Current UAR integration facts surfaced by the Rust core. */
+  uarStatus: UarRuntimeStatus | null
+  /** Stored UAR service config metadata; secrets/artifacts are not echoed back. */
+  uarConfig: ConfiguredUarService | null
   /** Non-null only while the web lane is fetching/initialising weights. */
   loadProgress: LaneLoadProgress | null
   /** Last completed local run's throughput. Null on cloud or before a first run. */
@@ -45,9 +58,15 @@ interface LaneActions {
   init: () => Promise<void>
   switchLane: (lane: ChatLane) => Promise<void>
   prepareLocal: () => Promise<boolean>
+  refreshUar: () => Promise<boolean>
   recordThroughput: (tokens: number, seconds: number) => void
   clearThroughput: () => void
   cancelPreparation: () => Promise<void>
+}
+
+function isRunnableUar(status: UarRuntimeStatus | null, config: ConfiguredUarService | null): boolean {
+  return status?.currentState === 'service_runtime'
+    || Boolean(config?.serviceUrl)
 }
 
 function operationProgress(status: ModelOperationState): LaneLoadProgress | null {
@@ -67,6 +86,10 @@ export const useLaneStore = create<LaneState & LaneActions>()(
   immer((set, get) => ({
     lane: 'local',
     localAvailable: false,
+    uarSupported: false,
+    uarConfigured: false,
+    uarStatus: null,
+    uarConfig: null,
     loadProgress: null,
     throughput: null,
     error: null,
@@ -74,11 +97,34 @@ export const useLaneStore = create<LaneState & LaneActions>()(
     init: async () => {
       if (isTauri()) {
         // Store is the only layer that calls invoke().
-        const [available, lane] = await Promise.all([
+        const [available, lane, uarStatusValue, uarConfigValue] = await Promise.all([
           hasLocalEngine().catch(() => false),
           getActiveLane().catch((): ChatLane => 'cloud'),
+          uarRuntimeStatus().catch((): UarRuntimeStatus | null => null),
+          uarServiceConfig().catch((): ConfiguredUarService | null => null),
         ])
-        set((s) => { s.localAvailable = available; s.lane = lane })
+        const configured = isRunnableUar(uarStatusValue, uarConfigValue)
+        const desktopLane: ChatLane = lane === 'cloud'
+          ? (configured ? 'uar' : (available ? 'local' : 'uar'))
+          : (lane === 'uar' && !configured && available ? 'local' : lane)
+        set((s) => {
+          s.localAvailable = available
+          s.uarSupported = Boolean(uarStatusValue?.serviceRuntimeAvailable)
+          s.uarConfigured = configured
+          s.uarStatus = uarStatusValue
+          s.uarConfig = uarConfigValue
+          s.lane = desktopLane
+          if (desktopLane === 'uar' && !configured) {
+            s.error = 'Configure Universal Agent Runtime in Settings before using the UAR lane.'
+          } else if (lane === 'cloud') {
+            s.error = null
+          }
+        })
+        if (desktopLane !== lane && (desktopLane === 'local' || (desktopLane === 'uar' && configured))) {
+          void setActiveLane(desktopLane).catch((error: unknown) => set((s) => {
+            s.error = error instanceof Error ? error.message : 'failed to select desktop inference lane'
+          }))
+        }
         if (available) {
           void onLocalModelStatus((status) => set((s) => {
             s.loadProgress = operationProgress(status)
@@ -87,10 +133,32 @@ export const useLaneStore = create<LaneState & LaneActions>()(
         }
         return
       }
-      // Plain web: use the keyless local WebLLM lane whenever WebGPU exists.
-      // Cloud remains an explicit BYOK choice, never the broken first-run path.
+      // Plain web: use local WebLLM when available, otherwise the UAR HTTP bridge.
       const available = isWebGpuAvailable()
-      set((s) => { s.localAvailable = available; s.lane = available ? 'local' : 'cloud' })
+      set((s) => {
+        s.localAvailable = available
+        s.uarSupported = true
+        s.uarConfigured = true
+        s.uarStatus = null
+        s.uarConfig = null
+        s.lane = available ? 'local' : 'uar'
+      })
+    },
+
+    refreshUar: async () => {
+      if (!isTauri()) return true
+      const [status, config] = await Promise.all([
+        uarRuntimeStatus().catch((): UarRuntimeStatus | null => null),
+        uarServiceConfig().catch((): ConfiguredUarService | null => null),
+      ])
+      const configured = isRunnableUar(status, config)
+      set((s) => {
+        s.uarSupported = Boolean(status?.serviceRuntimeAvailable)
+        s.uarConfigured = configured
+        s.uarStatus = status
+        s.uarConfig = config
+      })
+      return configured
     },
 
     prepareLocal: async () => {
@@ -120,7 +188,16 @@ export const useLaneStore = create<LaneState & LaneActions>()(
       if (lane === 'local') {
         const ready = await get().prepareLocal()
         if (!ready) return
-      } else if (!isTauri()) {
+      } else if (lane === 'uar') {
+        const ready = await get().refreshUar()
+        if (!ready) {
+          set((s) => { s.error = 'Configure Universal Agent Runtime in Settings before using the UAR lane.' })
+          return
+        }
+      } else if (isTauri()) {
+        set((s) => { s.error = 'Desktop chat uses UAR or Local. Configure Liter-LLM providers under UAR settings.' })
+        return
+      } else if (lane === 'cloud') {
         await unloadWebLlm()
       }
       try {

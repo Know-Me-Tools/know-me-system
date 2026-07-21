@@ -5,7 +5,8 @@
 /// there is no hand-built Dart graph store. All FFI-backed providers opt out of
 /// Riverpod 3 auto-retry via `_noRetry`: a Rust domain error is a terminal
 /// result, and silent re-invocation would re-run the whole Rust operation.
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+library;
+
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'entity.dart';

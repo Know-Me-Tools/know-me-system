@@ -2,7 +2,7 @@
 //! gen_ui_protocol (L1) — A2UI/AG-UI adapters. Pure transformation over the L0
 //! event enums; wasm-safe (no IO, no runtime dependency).
 use gen_ui_types::content_block::ContentBlock;
-use gen_ui_types::events::{A2uiEvent, AguiEvent, StreamEvent};
+use gen_ui_types::events::{A2uiEvent, AguiEvent, StreamCitation, StreamEvent};
 use gen_ui_types::inference::{
     GrammarConstraint, InferenceMessage, InferenceRequest, InferenceRole, InferenceTool,
     InferenceToolAnnotations, PromptPlanOrigin, SampleParams,
@@ -348,6 +348,12 @@ pub fn stream_event_to_uar_normalized_payload(event: &StreamEvent) -> serde_json
                 "quote": quote
             }
         }),
+        StreamEvent::Citations { citations } => serde_json::json!({
+            "type": "citations",
+            "data": {
+                "citations": citations
+            }
+        }),
         StreamEvent::Memory {
             operation,
             key,
@@ -400,9 +406,27 @@ pub fn stream_event_to_uar_normalized_payload(event: &StreamEvent) -> serde_json
 /// rather than dropped.
 pub fn normalize_uar_agui_event(payload: &serde_json::Value) -> StreamEvent {
     let event_type = json_string(payload, &["type"]).unwrap_or("CUSTOM");
+    let data = payload.get("data").unwrap_or(payload);
     match event_type {
+        "stream.start" => StreamEvent::MessageStart,
         "agui.stream.start" => StreamEvent::MessageStart,
         "RUN_STARTED" => StreamEvent::MessageStart,
+        "message.delta" => StreamEvent::TextDelta {
+            index: json_u32(data, &["index"])
+                .or_else(|| json_u32(payload, &["index"]))
+                .unwrap_or(0),
+            delta: first_json_string(
+                data,
+                &[
+                    &["text"][..],
+                    &["delta", "text"][..],
+                    &["delta"][..],
+                    &["content"][..],
+                ],
+            )
+            .unwrap_or_default()
+            .to_owned(),
+        },
         "agui.message.delta" => StreamEvent::TextDelta {
             index: json_u32(payload, &["index"])
                 .or_else(|| json_u32(payload, &["message", "index"]))
@@ -429,6 +453,23 @@ pub fn normalize_uar_agui_event(payload: &serde_json::Value) -> StreamEvent {
                     &["content"][..],
                     &["text"][..],
                     &["message", "content"][..],
+                ],
+            )
+            .unwrap_or_default()
+            .to_owned(),
+        },
+        "thinking.delta" | "reasoning.delta" => StreamEvent::ThinkingDelta {
+            index: json_u32(data, &["index"])
+                .or_else(|| json_u32(payload, &["index"]))
+                .unwrap_or(0),
+            delta: first_json_string(
+                data,
+                &[
+                    &["text"][..],
+                    &["delta", "text"][..],
+                    &["delta"][..],
+                    &["content"][..],
+                    &["reasoning"][..],
                 ],
             )
             .unwrap_or_default()
@@ -476,6 +517,27 @@ pub fn normalize_uar_agui_event(payload: &serde_json::Value) -> StreamEvent {
             )
             .unwrap_or("unknown_tool")
             .to_owned(),
+        },
+        "tool_call.delta" => StreamEvent::ToolCallDelta {
+            id: first_json_string(
+                data,
+                &[&["id"][..], &["toolCallId"][..], &["tool_call_id"][..]],
+            )
+            .unwrap_or("unknown-tool-call")
+            .to_owned(),
+            delta: first_json_string(
+                data,
+                &[
+                    &["arguments_delta"][..],
+                    &["argumentsDelta"][..],
+                    &["delta", "arguments"][..],
+                    &["delta"][..],
+                    &["args"][..],
+                    &["arguments"][..],
+                ],
+            )
+            .map(str::to_owned)
+            .unwrap_or_default(),
         },
         "agui.tool_call.delta" => StreamEvent::ToolCallDelta {
             id: first_json_string(
@@ -529,6 +591,36 @@ pub fn normalize_uar_agui_event(payload: &serde_json::Value) -> StreamEvent {
             .unwrap_or("unknown-tool-call")
             .to_owned(),
         },
+        "tool_call.complete" => StreamEvent::ToolCallReady {
+            id: first_json_string(
+                data,
+                &[&["id"][..], &["toolCallId"][..], &["tool_call_id"][..]],
+            )
+            .unwrap_or("unknown-tool-call")
+            .to_owned(),
+            name: first_json_string(
+                data,
+                &[&["name"][..], &["toolName"][..], &["tool", "name"][..]],
+            )
+            .unwrap_or("unknown_tool")
+            .to_owned(),
+            input_json: first_json_string(
+                data,
+                &[
+                    &["arguments_json"][..],
+                    &["input_json"][..],
+                    &["arguments"][..],
+                    &["input"][..],
+                ],
+            )
+            .map(str::to_owned)
+            .unwrap_or_else(|| {
+                data.get("arguments")
+                    .or_else(|| data.get("input"))
+                    .map(json_payload_to_string)
+                    .unwrap_or_default()
+            }),
+        },
         "agui.tool_call.complete" => StreamEvent::ToolCallReady {
             id: first_json_string(
                 payload,
@@ -577,6 +669,21 @@ pub fn normalize_uar_agui_event(payload: &serde_json::Value) -> StreamEvent {
                 .or_else(|| json_bool(payload, &["is_error"]))
                 .unwrap_or(false),
         },
+        "tool_result" => StreamEvent::ToolResult {
+            tool_use_id: first_json_string(
+                data,
+                &[&["id"][..], &["toolCallId"][..], &["tool_call_id"][..]],
+            )
+            .unwrap_or("unknown-tool-call")
+            .to_owned(),
+            output_json: data
+                .get("content")
+                .or_else(|| data.get("result"))
+                .or_else(|| data.get("output"))
+                .map(json_payload_to_string)
+                .unwrap_or_else(|| "{}".to_owned()),
+            is_error: !json_bool(data, &["success"]).unwrap_or(true),
+        },
         "agui.tool_result" => StreamEvent::ToolResult {
             tool_use_id: first_json_string(
                 payload,
@@ -592,30 +699,19 @@ pub fn normalize_uar_agui_event(payload: &serde_json::Value) -> StreamEvent {
                 .unwrap_or_else(|| "{}".to_owned()),
             is_error: !json_bool(payload, &["success"]).unwrap_or(true),
         },
-        "agui.citation.added" => StreamEvent::Citation {
-            source: first_json_string(
-                payload,
-                &[
-                    &["citation", "title"][..],
-                    &["citation", "url"][..],
-                    &["source"][..],
-                    &["url"][..],
-                ],
-            )
-            .unwrap_or("unknown")
-            .to_owned(),
-            quote: first_json_string(
-                payload,
-                &[
-                    &["citation", "snippet"][..],
-                    &["citation", "quote"][..],
-                    &["quote"][..],
-                    &["snippet"][..],
-                    &["text"][..],
-                ],
-            )
-            .unwrap_or_default()
-            .to_owned(),
+        "citation.added" => normalize_citation_event(data),
+        "agui.citation.added" => normalize_citation_event(payload),
+        "citations" => normalize_citations_array_event(data),
+        "agui.rag_citations" => normalize_citations_array_event(payload),
+        "memory.update" => StreamEvent::Memory {
+            operation: first_json_string(data, &[&["operation"][..], &["phase"][..]])
+                .unwrap_or("set")
+                .to_owned(),
+            key: first_json_string(data, &[&["key"][..], &["memory", "key"][..]])
+                .unwrap_or("unknown")
+                .to_owned(),
+            value: first_json_string(data, &[&["value"][..], &["memory", "value"][..]])
+                .map(str::to_owned),
         },
         "agui.memory.update" => StreamEvent::Memory {
             operation: first_json_string(payload, &[&["operation"][..], &["phase"][..]])
@@ -631,6 +727,22 @@ pub fn normalize_uar_agui_event(payload: &serde_json::Value) -> StreamEvent {
             operation: "recall".to_owned(),
             key: "memory_context".to_owned(),
             value: payload.get("items").map(json_payload_to_string),
+        },
+        "skill.activation" => StreamEvent::SkillActivation {
+            name: first_json_string(
+                data,
+                &[
+                    &["name"][..],
+                    &["skill", "id"][..],
+                    &["skill", "title"][..],
+                    &["skill", "name"][..],
+                ],
+            )
+            .unwrap_or("unknown_skill")
+            .to_owned(),
+            status: first_json_string(data, &[&["status"][..], &["phase"][..]])
+                .unwrap_or("activated")
+                .to_owned(),
         },
         "agui.skill.activated" => StreamEvent::SkillActivation {
             name: first_json_string(
@@ -648,13 +760,35 @@ pub fn normalize_uar_agui_event(payload: &serde_json::Value) -> StreamEvent {
                 .unwrap_or("activated")
                 .to_owned(),
         },
-        "CUSTOM" => normalize_uar_custom_event(payload),
+        "custom" => StreamEvent::Custom {
+            source: first_json_string(data, &[&["source"][..]])
+                .unwrap_or("uar")
+                .to_owned(),
+            event_name: first_json_string(data, &[&["event_name"][..], &["eventName"][..]])
+                .unwrap_or("custom")
+                .to_owned(),
+            payload: data.get("payload").cloned().unwrap_or_else(|| data.clone()),
+        },
+        "CUSTOM" | "agui.custom" => normalize_uar_custom_event(payload),
+        "done" => StreamEvent::Done,
         "agui.done" => StreamEvent::Done,
         "RUN_FINISHED" => StreamEvent::Done,
         "agui.cancelled" => StreamEvent::Cancelled {
             message: first_json_string(payload, &[&["message"][..], &["reason"][..]])
                 .unwrap_or("Run cancelled")
                 .to_owned(),
+        },
+        "error" => StreamEvent::Error {
+            message: first_json_string(
+                data,
+                &[
+                    &["message"][..],
+                    &["error", "message"][..],
+                    &["value", "message"][..],
+                ],
+            )
+            .unwrap_or("UAR run failed")
+            .to_owned(),
         },
         "agui.error" => StreamEvent::Error {
             message: first_json_string(
@@ -713,6 +847,14 @@ fn normalize_uar_custom_event(payload: &serde_json::Value) -> StreamEvent {
         name,
         "uar.citation" | "uar.citation.added" | "citation" | "citation.added"
     ) {
+        if let Some(citations) = citations_from_array(
+            value
+                .get("citations")
+                .or_else(|| value.get("citation"))
+                .or_else(|| payload.get("citations")),
+        ) {
+            return StreamEvent::Citations { citations };
+        }
         return StreamEvent::Citation {
             source: first_json_string(
                 value,
@@ -740,9 +882,16 @@ fn normalize_uar_custom_event(payload: &serde_json::Value) -> StreamEvent {
             .to_owned(),
         };
     }
+    if matches!(name, "uar.rag_citations" | "rag_citations") {
+        if let Some(citations) =
+            citations_from_array(value.get("citations").or_else(|| payload.get("citations")))
+        {
+            return StreamEvent::Citations { citations };
+        }
+    }
     if matches!(
         name,
-        "uar.memory" | "uar.memory.updated" | "memory" | "memory.updated"
+        "uar.memory" | "uar.memory.updated" | "uar.memory.recall" | "memory" | "memory.updated"
     ) {
         return StreamEvent::Memory {
             operation: first_json_string(
@@ -752,9 +901,14 @@ fn normalize_uar_custom_event(payload: &serde_json::Value) -> StreamEvent {
                     &["op"][..],
                     &["action"][..],
                     &["status"][..],
+                    &["phase"][..],
                 ],
             )
-            .unwrap_or("recorded")
+            .unwrap_or(if name == "uar.memory.recall" {
+                "recall"
+            } else {
+                "recorded"
+            })
             .to_owned(),
             key: first_json_string(
                 value,
@@ -766,7 +920,11 @@ fn normalize_uar_custom_event(payload: &serde_json::Value) -> StreamEvent {
                     &["name"][..],
                 ],
             )
-            .unwrap_or("unknown")
+            .unwrap_or(if name == "uar.memory.recall" {
+                "memory_context"
+            } else {
+                "unknown"
+            })
             .to_owned(),
             value: first_json_string(
                 value,
@@ -777,7 +935,8 @@ fn normalize_uar_custom_event(payload: &serde_json::Value) -> StreamEvent {
                     &["memory", "text"][..],
                 ],
             )
-            .map(str::to_owned),
+            .map(str::to_owned)
+            .or_else(|| value.get("items").map(json_payload_to_string)),
         };
     }
 
@@ -798,6 +957,95 @@ fn json_string<'a>(value: &'a serde_json::Value, path: &[&str]) -> Option<&'a st
 
 fn first_json_string<'a>(value: &'a serde_json::Value, paths: &[&[&str]]) -> Option<&'a str> {
     paths.iter().find_map(|path| json_string(value, path))
+}
+
+fn normalize_citation_event(payload: &serde_json::Value) -> StreamEvent {
+    if let Some(citations) = citations_from_array(payload.get("citations")) {
+        return StreamEvent::Citations { citations };
+    }
+    StreamEvent::Citation {
+        source: first_json_string(
+            payload,
+            &[
+                &["citation", "title"][..],
+                &["citation", "url"][..],
+                &["title"][..],
+                &["source"][..],
+                &["url"][..],
+            ],
+        )
+        .unwrap_or("unknown")
+        .to_owned(),
+        quote: first_json_string(
+            payload,
+            &[
+                &["citation", "snippet"][..],
+                &["citation", "quote"][..],
+                &["quote"][..],
+                &["snippet"][..],
+                &["text"][..],
+            ],
+        )
+        .unwrap_or_default()
+        .to_owned(),
+    }
+}
+
+fn normalize_citations_array_event(payload: &serde_json::Value) -> StreamEvent {
+    citations_from_array(payload.get("citations"))
+        .map(|citations| StreamEvent::Citations { citations })
+        .unwrap_or_else(|| StreamEvent::Custom {
+            source: "uar".into(),
+            event_name: "agui.rag_citations".into(),
+            payload: payload.clone(),
+        })
+}
+
+fn citations_from_array(value: Option<&serde_json::Value>) -> Option<Vec<StreamCitation>> {
+    let citations = value?
+        .as_array()?
+        .iter()
+        .map(stream_citation_from_value)
+        .collect::<Vec<_>>();
+    (!citations.is_empty()).then_some(citations)
+}
+
+fn stream_citation_from_value(value: &serde_json::Value) -> StreamCitation {
+    let marker = value
+        .get("marker")
+        .and_then(serde_json::Value::as_u64)
+        .map(|marker| format!("[{marker}] "));
+    let source = first_json_string(
+        value,
+        &[
+            &["document_name"][..],
+            &["documentName"][..],
+            &["title"][..],
+            &["url"][..],
+            &["document_id"][..],
+            &["documentId"][..],
+            &["chunk_id"][..],
+            &["chunkId"][..],
+            &["source"][..],
+        ],
+    )
+    .unwrap_or("unknown");
+    let quote = first_json_string(
+        value,
+        &[
+            &["snippet"][..],
+            &["quote"][..],
+            &["text"][..],
+            &["content"][..],
+        ],
+    )
+    .unwrap_or_default();
+    StreamCitation {
+        source: marker
+            .map(|marker| format!("{marker}{source}"))
+            .unwrap_or_else(|| source.to_owned()),
+        quote: quote.to_owned(),
+    }
 }
 
 fn json_bool(value: &serde_json::Value, path: &[&str]) -> Option<bool> {
@@ -1148,6 +1396,16 @@ impl A2uiAdapter {
                     quote: quote.clone(),
                 },
             }],
+            StreamEvent::Citations { citations } => citations
+                .iter()
+                .map(|citation| A2uiEvent::Block {
+                    run_id: self.run_id.clone(),
+                    block: ContentBlock::Citation {
+                        source: citation.source.clone(),
+                        quote: citation.quote.clone(),
+                    },
+                })
+                .collect(),
             StreamEvent::Memory {
                 operation,
                 key,
@@ -1167,16 +1425,7 @@ impl A2uiAdapter {
                 payload,
             } => vec![A2uiEvent::Block {
                 run_id: self.run_id.clone(),
-                block: ContentBlock::Artifact {
-                    id: format!("{source}:{event_name}"),
-                    kind: artifact_kind_for_custom_event(source, event_name).into(),
-                    content: serde_json::json!({
-                        "source": source,
-                        "eventName": event_name,
-                        "payload": payload,
-                    })
-                    .to_string(),
-                },
+                block: custom_event_artifact(source, event_name, payload),
             }],
             StreamEvent::Done => {
                 let unclosed = self.reasoning.is_thinking();
@@ -1225,6 +1474,161 @@ impl A2uiAdapter {
     }
 }
 
+fn custom_event_artifact(
+    source: &str,
+    event_name: &str,
+    payload: &serde_json::Value,
+) -> ContentBlock {
+    let default_id = format!("{source}:{event_name}");
+
+    // In official AG-UI mode UAR transports display artifacts as CUSTOM
+    // events. Unwrap complete A2UI artifacts exactly as the legacy
+    // `agui.artifact` envelope does, and persist the producing run rather than
+    // the random document ID so actions still work after hydration/restart.
+    if source == "uar" && event_name == "uar.artifact.available" {
+        let value = payload.get("value").unwrap_or(payload);
+        let artifact_type = first_json_string(
+            value,
+            &[
+                &["artifactType"][..],
+                &["artifact_type"][..],
+                &["language"][..],
+            ],
+        )
+        .unwrap_or_default();
+        let language = json_string(value, &["language"]).unwrap_or_default();
+        let is_a2ui = artifact_type == "a2ui"
+            || language == "application/a2ui+json"
+            || artifact_type == "application/a2ui+json";
+        if is_a2ui {
+            if let Some(content) = json_string(value, &["content"]) {
+                return ContentBlock::Artifact {
+                    id: first_json_string(value, &[&["sourceRunId"][..], &["source_run_id"][..]])
+                        .or_else(|| {
+                            first_json_string(
+                                payload,
+                                &[&["runId"][..], &["run_id"][..], &["request_id"][..]],
+                            )
+                        })
+                        .or_else(|| {
+                            first_json_string(value, &[&["artifactId"][..], &["artifact_id"][..]])
+                        })
+                        .unwrap_or(&default_id)
+                        .to_owned(),
+                    kind: "a2ui".into(),
+                    content: content.to_owned(),
+                };
+            }
+        }
+    }
+
+    // UAR's AG-UI artifact envelope intentionally carries metadata alongside
+    // the artifact source. Renderers consume the source itself, not the
+    // envelope. Passing the envelope made valid A2UI appear as escaped JSON in
+    // every client even though UAR had already validated the surface.
+    if source == "uar" && event_name == "agui.artifact" {
+        let artifact_type = first_json_string(
+            payload,
+            &[
+                &["artifact_type"][..],
+                &["artifactType"][..],
+                &["language"][..],
+            ],
+        )
+        .unwrap_or_default();
+        let language = json_string(payload, &["language"]).unwrap_or_default();
+        let is_a2ui = artifact_type == "a2ui"
+            || language == "application/a2ui+json"
+            || artifact_type == "application/a2ui+json";
+        if is_a2ui {
+            if let Some(content) = json_string(payload, &["content"]) {
+                return ContentBlock::Artifact {
+                    // A2UI actions are submitted after the producing run has
+                    // completed. Keep the UAR run that owns the live surface
+                    // on the persisted block so any client can route an action
+                    // without relying on ephemeral "latest run" state.
+                    id: first_json_string(payload, &[&["request_id"][..], &["requestId"][..]])
+                        .or_else(|| {
+                            first_json_string(
+                                payload,
+                                &[&["artifact_id"][..], &["artifactId"][..], &["id"][..]],
+                            )
+                        })
+                        .unwrap_or(&default_id)
+                        .to_owned(),
+                    kind: "a2ui".into(),
+                    content: content.to_owned(),
+                };
+            }
+        }
+
+        return ContentBlock::Artifact {
+            id: first_json_string(
+                payload,
+                &[&["artifact_id"][..], &["artifactId"][..], &["id"][..]],
+            )
+            .unwrap_or(&default_id)
+            .to_owned(),
+            kind: "agui_artifact".into(),
+            content: payload.to_string(),
+        };
+    }
+
+    // State patches remain visible and inspectable, but are lifecycle data,
+    // not standalone A2UI source documents. The actual complete surface is
+    // delivered by `agui.artifact` above.
+    if source == "uar" && event_name == "agui.state.patch" {
+        return ContentBlock::Artifact {
+            id: default_id,
+            kind: "agui_state_delta".into(),
+            content: payload
+                .get("patch")
+                .cloned()
+                .unwrap_or_else(|| payload.clone())
+                .to_string(),
+        };
+    }
+
+    // UAR runtime entity events are useful conversation evidence, but their
+    // full transport envelope must not become a multi-screen raw JSON block.
+    // Preserve the complete payload in a compact, expandable AG-UI activity
+    // card; the client can still copy or inspect every field.
+    if source == "uar" && is_uar_activity_event(event_name) {
+        return ContentBlock::Artifact {
+            id: default_id,
+            kind: format!("agui_activity_{event_name}"),
+            content: payload.to_string(),
+        };
+    }
+
+    ContentBlock::Artifact {
+        id: default_id,
+        kind: artifact_kind_for_custom_event(source, event_name).into(),
+        content: serde_json::json!({
+            "source": source,
+            "eventName": event_name,
+            "payload": payload,
+        })
+        .to_string(),
+    }
+}
+
+fn is_uar_activity_event(event_name: &str) -> bool {
+    matches!(
+        event_name,
+        "run_started"
+            | "run_finished"
+            | "run_failed"
+            | "step_started"
+            | "step_finished"
+            | "tool_call_started"
+            | "tool_call_finished"
+            | "tool_call_failed"
+            | "approval_requested"
+            | "approval_denied"
+    )
+}
+
 fn artifact_kind_for_custom_event(source: &str, event_name: &str) -> &'static str {
     if source == "uar"
         && matches!(
@@ -1245,6 +1649,9 @@ fn artifact_kind_for_custom_event(source: &str, event_name: &str) -> &'static st
                 | "agui.quality.sycophancy_corrected"
                 | "agui.guardrail"
                 | "agui.context.update"
+                | "agui.step"
+                | "agui.sandbox.output"
+                | "agui.usage"
                 | "agui.tool_call.approval_required"
                 | "agui.tool_call.denied"
                 | "agui.memory.mutation"
@@ -1256,6 +1663,8 @@ fn artifact_kind_for_custom_event(source: &str, event_name: &str) -> &'static st
                 | "uar.quality.sycophancy_corrected"
                 | "uar.guardrail.flagged"
                 | "uar.context.updated"
+                | "uar.tool.approval_required"
+                | "uar.tool.denied"
         )
     {
         "lifecycle"
@@ -2100,6 +2509,129 @@ mod tests {
     }
 
     #[test]
+    fn uar_native_normalized_events_map_to_semantic_blocks() {
+        let events = [
+            normalize_uar_agui_event(&serde_json::json!({
+                "type": "stream.start",
+                "data": {"request_id": "run-1"}
+            })),
+            normalize_uar_agui_event(&serde_json::json!({
+                "type": "message.delta",
+                "data": {"text": "hello"}
+            })),
+            normalize_uar_agui_event(&serde_json::json!({
+                "type": "thinking.delta",
+                "data": {"text": "reason"}
+            })),
+            normalize_uar_agui_event(&serde_json::json!({
+                "type": "citation.added",
+                "data": {
+                    "index": 0,
+                    "url": "https://example.test/source",
+                    "title": "Source",
+                    "snippet": "Native citation."
+                }
+            })),
+            normalize_uar_agui_event(&serde_json::json!({
+                "type": "memory.update",
+                "data": {
+                    "operation": "set",
+                    "key": "preference",
+                    "value": "brief"
+                }
+            })),
+            normalize_uar_agui_event(&serde_json::json!({
+                "type": "skill.activation",
+                "data": {
+                    "name": "office_writer",
+                    "status": "activated"
+                }
+            })),
+            normalize_uar_agui_event(&serde_json::json!({
+                "type": "tool_call.complete",
+                "data": {
+                    "call_index": 0,
+                    "id": "call-1",
+                    "name": "calendar.create",
+                    "arguments_json": "{\"title\":\"Planning\"}"
+                }
+            })),
+            normalize_uar_agui_event(&serde_json::json!({
+                "type": "tool_result",
+                "data": {
+                    "id": "call-1",
+                    "name": "calendar.create",
+                    "content": "{\"ok\":true}",
+                    "success": true
+                }
+            })),
+            normalize_uar_agui_event(&serde_json::json!({
+                "type": "done"
+            })),
+        ];
+
+        let mut adapter = A2uiAdapter::new("run-1");
+        let output = events
+            .iter()
+            .flat_map(|event| adapter.ingest(event))
+            .collect::<Vec<_>>();
+
+        assert!(matches!(&output[0], A2uiEvent::RunStarted { .. }));
+        assert!(output.iter().any(|event| matches!(
+            event,
+            A2uiEvent::Block { block: ContentBlock::Text { text }, .. } if text == "hello"
+        )));
+        assert!(output.iter().any(|event| matches!(
+            event,
+            A2uiEvent::Block { block: ContentBlock::Thinking { text }, .. } if text == "reason"
+        )));
+        assert!(output.iter().any(|event| matches!(
+            event,
+            A2uiEvent::Block {
+                block: ContentBlock::Citation { source, quote },
+                ..
+            } if source == "Source" && quote == "Native citation."
+        )));
+        assert!(output.iter().any(|event| matches!(
+            event,
+            A2uiEvent::Block {
+                block: ContentBlock::Memory {
+                    operation,
+                    key,
+                    value
+                },
+                ..
+            } if operation == "set" && key == "preference" && value.as_deref() == Some("brief")
+        )));
+        assert!(output.iter().any(|event| matches!(
+            event,
+            A2uiEvent::Block { block: ContentBlock::Skill { name, status }, .. }
+                if name == "office_writer" && status == "activated"
+        )));
+        assert!(output.iter().any(|event| matches!(
+            event,
+            A2uiEvent::Block {
+                block: ContentBlock::ToolUse { id, name, input_json },
+                ..
+            } if id == "call-1"
+                && name == "calendar.create"
+                && input_json == "{\"title\":\"Planning\"}"
+        )));
+        assert!(output.iter().any(|event| matches!(
+            event,
+            A2uiEvent::Block {
+                block: ContentBlock::ToolResult {
+                    tool_use_id,
+                    output_json,
+                    is_error
+                },
+                ..
+            } if tool_use_id == "call-1" && output_json == "{\"ok\":true}" && !is_error
+        )));
+        assert!(matches!(output.last(), Some(A2uiEvent::RunFinished { .. })));
+    }
+
+    #[test]
     fn uar_skill_activation_maps_to_skill_block() {
         let event = normalize_uar_agui_event(&serde_json::json!({
             "type": "CUSTOM",
@@ -2118,6 +2650,27 @@ mod tests {
             &output[0],
             A2uiEvent::Block { block: ContentBlock::Skill { name, status }, .. }
                 if name == "office_writer" && status == "activated"
+        ));
+    }
+
+    #[test]
+    fn uar_agui_custom_skill_activation_maps_to_skill_block() {
+        let event = normalize_uar_agui_event(&serde_json::json!({
+            "type": "agui.custom",
+            "kind": "custom",
+            "request_id": "run-1",
+            "name": "uar.skill.activated",
+            "value": {
+                "skill": {"id": "office_writer", "name": "Office Writer"},
+                "status": "running"
+            }
+        }));
+        let mut adapter = A2uiAdapter::new("run-1");
+        let output = adapter.ingest(&event);
+        assert!(matches!(
+            &output[0],
+            A2uiEvent::Block { block: ContentBlock::Skill { name, status }, .. }
+                if name == "office_writer" && status == "running"
         ));
     }
 
@@ -2142,6 +2695,81 @@ mod tests {
                 block: ContentBlock::Citation { source, quote },
                 ..
             } if source == "handbook.pdf" && quote == "Submit receipts within 30 days."
+        ));
+    }
+
+    #[test]
+    fn uar_rag_citations_custom_event_maps_to_multiple_citation_blocks() {
+        let event = normalize_uar_agui_event(&serde_json::json!({
+            "type": "CUSTOM",
+            "profile": "uar.agui/1",
+            "name": "uar.rag_citations",
+            "value": {
+                "citations": [
+                    {
+                        "marker": 1,
+                        "chunk_id": "chunk-a",
+                        "document_name": "handbook.pdf",
+                        "snippet": "Bring receipts."
+                    },
+                    {
+                        "marker": 2,
+                        "chunk_id": "chunk-b",
+                        "document_name": "policy.md",
+                        "snippet": "Ask approval."
+                    }
+                ]
+            },
+            "runId": "run-1",
+            "sequence": 6
+        }));
+        let mut adapter = A2uiAdapter::new("run-1");
+        let output = adapter.ingest(&event);
+
+        assert_eq!(output.len(), 2);
+        assert!(matches!(
+            &output[0],
+            A2uiEvent::Block {
+                block: ContentBlock::Citation { source, quote },
+                ..
+            } if source == "[1] handbook.pdf" && quote == "Bring receipts."
+        ));
+        assert!(matches!(
+            &output[1],
+            A2uiEvent::Block {
+                block: ContentBlock::Citation { source, quote },
+                ..
+            } if source == "[2] policy.md" && quote == "Ask approval."
+        ));
+    }
+
+    #[test]
+    fn uar_agui_custom_rag_citations_maps_to_multiple_citation_blocks() {
+        let event = normalize_uar_agui_event(&serde_json::json!({
+            "type": "agui.custom",
+            "kind": "custom",
+            "request_id": "run-1",
+            "name": "uar.rag_citations",
+            "value": {
+                "citations": [
+                    {
+                        "marker": 1,
+                        "document_name": "context.md",
+                        "snippet": "Use the context fabric."
+                    }
+                ]
+            }
+        }));
+        let mut adapter = A2uiAdapter::new("run-1");
+        let output = adapter.ingest(&event);
+
+        assert_eq!(output.len(), 1);
+        assert!(matches!(
+            &output[0],
+            A2uiEvent::Block {
+                block: ContentBlock::Citation { source, quote },
+                ..
+            } if source == "[1] context.md" && quote == "Use the context fabric."
         ));
     }
 
@@ -2177,6 +2805,71 @@ mod tests {
     }
 
     #[test]
+    fn uar_agui_custom_tool_approval_preserves_lifecycle_artifact() {
+        let event = normalize_uar_agui_event(&serde_json::json!({
+            "type": "agui.custom",
+            "kind": "custom",
+            "request_id": "run-1",
+            "name": "uar.tool.approval_required",
+            "value": {
+                "tool": {"name": "calendar.create"},
+                "reason": "mutating tool requires confirmation"
+            }
+        }));
+        let mut adapter = A2uiAdapter::new("run-1");
+        let output = adapter.ingest(&event);
+
+        assert!(matches!(
+            &output[0],
+            A2uiEvent::Block {
+                block: ContentBlock::Artifact { id, kind, content },
+                ..
+            } if id == "uar:uar.tool.approval_required"
+                && kind == "lifecycle"
+                && content.contains("calendar.create")
+        ));
+    }
+
+    #[test]
+    fn uar_memory_recall_custom_event_maps_items_to_memory_block() {
+        let event = normalize_uar_agui_event(&serde_json::json!({
+            "type": "CUSTOM",
+            "profile": "uar.agui/1",
+            "name": "uar.memory.recall",
+            "value": {
+                "items": [
+                    {
+                        "key": "travel.preference",
+                        "value": "aisle seat",
+                        "score": 0.91
+                    }
+                ],
+                "count": 1
+            },
+            "runId": "run-1",
+            "sequence": 7
+        }));
+        let mut adapter = A2uiAdapter::new("run-1");
+        let output = adapter.ingest(&event);
+        assert!(matches!(
+            &output[0],
+            A2uiEvent::Block {
+                block: ContentBlock::Memory {
+                    operation,
+                    key,
+                    value
+                },
+                ..
+            } if operation == "recall"
+                && key == "memory_context"
+                && value
+                    .as_deref()
+                    .is_some_and(|value| value.contains("travel.preference")
+                        && value.contains("aisle seat"))
+        ));
+    }
+
+    #[test]
     fn uar_artifact_custom_event_maps_to_a2ui_artifact_block() {
         let event = normalize_uar_agui_event(&serde_json::json!({
             "type": "CUSTOM",
@@ -2207,7 +2900,35 @@ mod tests {
     }
 
     #[test]
-    fn uar_agui_state_patch_maps_to_a2ui_artifact_block() {
+    fn uar_display_artifact_custom_event_keeps_source_run_and_unwraps_a2ui() {
+        let event = normalize_uar_agui_event(&serde_json::json!({
+            "type": "CUSTOM",
+            "profile": "uar.agui/1",
+            "name": "uar.artifact.available",
+            "value": {
+                "artifactId": "a2ui:random-document",
+                "artifactType": "a2ui",
+                "language": "application/a2ui+json",
+                "content": "{\"version\":\"v0.9\"}",
+                "sourceRunId": "run-1"
+            },
+            "runId": "run-1"
+        }));
+        let mut adapter = A2uiAdapter::new("client-run");
+        let output = adapter.ingest(&event);
+        assert!(matches!(
+            &output[0],
+            A2uiEvent::Block {
+                block: ContentBlock::Artifact { id, kind, content },
+                ..
+            } if id == "run-1"
+                && kind == "a2ui"
+                && content == "{\"version\":\"v0.9\"}"
+        ));
+    }
+
+    #[test]
+    fn uar_agui_state_patch_maps_to_structured_lifecycle_block() {
         let event = normalize_uar_agui_event(&serde_json::json!({
             "type": "agui.state.patch",
             "kind": "state",
@@ -2226,9 +2947,64 @@ mod tests {
             A2uiEvent::Block {
                 block: ContentBlock::Artifact { kind, content, .. },
                 ..
-            } if kind == "a2ui"
-                && content.contains("agui.state.patch")
+            } if kind == "agui_state_delta"
                 && content.contains("/a2ui/surfaces/surface-1")
+        ));
+    }
+
+    #[test]
+    fn uar_complete_a2ui_artifact_unwraps_canonical_surface_source() {
+        let source = concat!(
+            r#"{"version":"v0.9","createSurface":{"surfaceId":"mobile-proof","catalogId":"https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"}}"#,
+            "\n",
+            r#"{"version":"v0.9","updateComponents":{"surfaceId":"mobile-proof","components":[{"id":"message","component":"Text","text":"Ready"}]}}"#,
+        );
+        let event = normalize_uar_agui_event(&serde_json::json!({
+            "type": "agui.artifact",
+            "kind": "artifact",
+            "phase": "complete",
+            "request_id": "run-1",
+            "artifact_id": "a2ui:artifact-1",
+            "artifact_type": "a2ui",
+            "title": "Interactive UI",
+            "content": source,
+            "language": "application/a2ui+json"
+        }));
+        let mut adapter = A2uiAdapter::new("run-1");
+        let output = adapter.ingest(&event);
+        assert!(matches!(
+            &output[0],
+            A2uiEvent::Block {
+                block: ContentBlock::Artifact { id, kind, content },
+                ..
+            } if id == "run-1"
+                && kind == "a2ui"
+                && content == source
+                && !content.contains("eventName")
+        ));
+    }
+
+    #[test]
+    fn uar_runtime_entities_become_compact_agui_activity_blocks() {
+        let mut adapter = A2uiAdapter::new("run-1");
+        let output = adapter.ingest(&StreamEvent::Custom {
+            source: "uar".into(),
+            event_name: "step_started".into(),
+            payload: serde_json::json!({
+                "run_id": "run-1",
+                "step": 2,
+                "status": "started"
+            }),
+        });
+
+        assert!(matches!(
+            &output[0],
+            A2uiEvent::Block {
+                block: ContentBlock::Artifact { kind, content, .. },
+                ..
+            } if kind == "agui_activity_step_started"
+                && content.contains("\"step\":2")
+                && !content.contains("eventName")
         ));
     }
 
@@ -2256,6 +3032,26 @@ mod tests {
                     "title": "Policy",
                     "snippet": "Use approval gates."
                 }
+            })),
+            normalize_uar_agui_event(&serde_json::json!({
+                "type": "agui.rag_citations",
+                "kind": "rag_citations",
+                "phase": "added",
+                "request_id": "run-1",
+                "citations": [
+                    {
+                        "marker": 1,
+                        "chunk_id": "chunk-a",
+                        "document_name": "handbook.pdf",
+                        "snippet": "Bring receipts."
+                    },
+                    {
+                        "marker": 2,
+                        "chunk_id": "chunk-b",
+                        "document_name": "policy.md",
+                        "snippet": "Ask approval."
+                    }
+                ]
             })),
             normalize_uar_agui_event(&serde_json::json!({
                 "type": "agui.memory.update",
@@ -2308,6 +3104,20 @@ mod tests {
                 block: ContentBlock::Citation { source, quote },
                 ..
             } if source == "Policy" && quote == "Use approval gates."
+        )));
+        assert!(output.iter().any(|event| matches!(
+            event,
+            A2uiEvent::Block {
+                block: ContentBlock::Citation { source, quote },
+                ..
+            } if source == "[1] handbook.pdf" && quote == "Bring receipts."
+        )));
+        assert!(output.iter().any(|event| matches!(
+            event,
+            A2uiEvent::Block {
+                block: ContentBlock::Citation { source, quote },
+                ..
+            } if source == "[2] policy.md" && quote == "Ask approval."
         )));
         assert!(output.iter().any(|event| matches!(
             event,

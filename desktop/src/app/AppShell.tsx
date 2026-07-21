@@ -13,6 +13,8 @@ import {
   SidebarProvider,
 } from '@/components/ui/sidebar'
 import { KnowMeLogo, KnowMeWordmark } from '@/shared/components/KnowMeLogo'
+import { SettingsScreen } from '@/features/settings/screens/SettingsScreen'
+import { useSettingsOverlay } from '@/features/settings/hooks/useSettingsOverlay'
 import { DESTINATIONS } from './navigation'
 
 function useIsActive(path: string): boolean {
@@ -55,6 +57,7 @@ function MobileDestination({ path, label, icon: Icon }: (typeof DESTINATIONS)[nu
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const { open, closeSettings } = useSettingsOverlay()
   return (
     <SidebarProvider defaultOpen className="h-[calc(100dvh-2.25rem)] min-h-0">
       <div className="flex h-full min-h-0 w-full flex-col overflow-hidden">
@@ -80,7 +83,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className="flex items-center gap-2 font-semibold text-[color:var(--color-fg)]">
               <span className="size-2 rounded-full bg-[color:var(--color-green)]" /> Ready
             </div>
-            <p className="mt-1">On-device · local first</p>
+            <p className="mt-1">UAR · local fallback</p>
           </div>
         </Sidebar>
 
@@ -91,6 +94,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {DESTINATIONS.map((destination) => <MobileDestination key={destination.path} {...destination} />)}
       </nav>
       </div>
+      {open ? <SettingsScreen overlay onClose={closeSettings} /> : null}
     </SidebarProvider>
   )
 }

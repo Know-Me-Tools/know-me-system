@@ -1,0 +1,93 @@
+{
+  "phase": "embedded-uar-offline-agents",
+  "parentPhase": "model-runtime-per-device",
+  "childPhases": [],
+  "childPointer": null,
+  "assessment_complete": true,
+  "plan_complete": true,
+  "execute_complete": false,
+  "reflect_complete": false,
+  "implementation_total": 1,
+  "implementation_completed": 0,
+  "changes_total": 1,
+  "changes_completed": 0,
+  "completion": {
+    "primaryCounter": "implementation",
+    "implementation": {
+      "completed": 0,
+      "total": 1,
+      "status": "PENDING"
+    },
+    "evidence": {
+      "status": "NOT_TRACKED",
+      "summary": null,
+      "blockers": []
+    },
+    "certification": {
+      "status": "NOT_TRACKED",
+      "summary": null,
+      "blockers": []
+    },
+    "publication": {
+      "status": "NOT_TRACKED",
+      "summary": null,
+      "blockers": []
+    }
+  },
+  "completed_changes": [],
+  "active_change": "embed-uar-mobile-offline",
+  "blocked_changes": [],
+  "sourceTool": "codex",
+  "last_updated_by": "kimi",
+  "last_updated": "2026-07-21T12:10:28Z",
+  "createdBy": "kbd-new-child",
+  "updatedAt": "2026-07-21T12:10:28Z",
+  "scoped_assessments": [
+    {
+      "id": "uar-ui-knowme-redesign",
+      "file": "assessment-uar-ui-knowme-redesign.md",
+      "completedAt": "2026-07-21T12:10:28Z",
+      "by": "kimi",
+      "note": "New-scope assess: UAR submodule web UI -> KnowMe React 19 UI convergence; proposes change uar-ui-knowme-convergence"
+    }
+  ],
+  "scoped_plans": [
+    {
+      "id": "uar-ui-knowme-redesign",
+      "file": "plan-uar-ui-knowme-redesign.md",
+      "completedAt": "2026-07-21T12:14:00Z",
+      "by": "kimi",
+      "changes": [
+        "uar-ui-token-convergence",
+        "uar-ui-chat-reskin",
+        "uar-ui-shell-navigation",
+        "uar-ui-a2ui-retoken",
+        "uar-ui-verify-gates"
+      ],
+      "operator_decisions": [
+        "port token values, keep Tailwind 3.4",
+        "scoped TanStack Query exemption for vendored submodule",
+        "admin console keeps scoped CRT theme"
+      ],
+      "change_status": {
+        "uar-ui-token-convergence": {
+          "status": "applied-pending-live-verification",
+          "appliedAt": "2026-07-21T12:45:00Z",
+          "by": "kimi",
+          "tasks_done": "18/21",
+          "remaining": [
+            "5.3 Playwright e2e + screenshot regeneration (needs running Axum backend)",
+            "5.5 browser/Docker/Tauri serve parity (needs running backend)"
+          ],
+          "verified": "tsc -b clean; vite build green; validate-static-bundle ok; build-storybook green; eslint clean; AA ratios computed",
+          "commits": {
+            "submodule": ["4b664f8 token convergence (kimi)", "ac8959e ui primitive sweep (concurrent claude session)"],
+            "pushed_to": "origin/uar-ui-token-convergence",
+            "parent": "6eb81d9 on codex/android-litert-lm-recovery (pointer bump + KBD artifacts)",
+            "note": "light muted-foreground AA defect (#9AA3B0 -> #4B5563) found by concurrent session and included in 4b664f8"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -8,7 +8,7 @@ use std::path::Path;
 #[cfg(feature = "pglite")]
 use std::sync::Arc;
 
-use sqlx::{postgres::PgPoolOptions, PgPool};
+use sqlx::{postgres::PgPoolOptions, AssertSqlSafe, PgPool};
 
 #[cfg(feature = "pglite")]
 use tokio::sync::OnceCell;
@@ -39,7 +39,9 @@ impl StartupStore for PostgresStore {
         MIGRATOR.run(&self.pool).await.map_err(Into::into)
     }
     async fn execute_seed(&self, sql: &str) -> RelationalResult<()> {
-        sqlx::raw_sql(sql).execute(&self.pool).await?;
+        sqlx::raw_sql(AssertSqlSafe(sql.to_owned()))
+            .execute(&self.pool)
+            .await?;
         Ok(())
     }
 }

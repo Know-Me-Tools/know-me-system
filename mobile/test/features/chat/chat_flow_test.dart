@@ -18,6 +18,19 @@ Stream<A2uiEvent> _cannedRun() async* {
   yield const RunFinished('run-1');
 }
 
+Stream<A2uiEvent> _semanticRun() async* {
+  yield const RunStarted('run-semantic');
+  yield const BlockEvent('run-semantic', ThinkingBlock('reason '));
+  yield const BlockEvent('run-semantic', ThinkingBlock('continues'));
+  yield const BlockEvent(
+    'run-semantic',
+    CitationBlock('policy.md', 'Keep reasoning out of answers.'),
+  );
+  yield const BlockEvent('run-semantic', TextBlock('Final '));
+  yield const BlockEvent('run-semantic', TextBlock('answer'));
+  yield const RunFinished('run-semantic');
+}
+
 void main() {
   test(
     'legacy persisted stream deltas coalesce without crossing rich blocks',
@@ -51,6 +64,29 @@ void main() {
     expect(msg.content, hasLength(1));
     expect((msg.content.single as TextBlock).text, 'Hello world');
   });
+
+  test(
+    'ChatNotifier folds reasoning, citation, and answer chunks without flattening semantics',
+    () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final notifier = container.read(chatProvider.notifier);
+      await notifier.foldStream('msg-semantic', _semanticRun());
+
+      final ChatState state = container.read(chatProvider);
+      final msg = state.messages.firstWhere((m) => m.id == 'msg-semantic');
+      expect(msg.isStreaming, isFalse);
+      expect(msg.content, hasLength(3));
+      expect((msg.content[0] as ThinkingBlock).text, 'reason continues');
+      expect((msg.content[1] as CitationBlock).source, 'policy.md');
+      expect(
+        (msg.content[1] as CitationBlock).quote,
+        'Keep reasoning out of answers.',
+      );
+      expect((msg.content[2] as TextBlock).text, 'Final answer');
+    },
+  );
 
   test(
     'resubmit creates a new branch with the selected prefix history',
@@ -284,6 +320,9 @@ class _FakeChatRepository implements ChatRepository {
     BlockEvent(runId, TextBlock('response $runId')),
     RunFinished(runId),
   ]);
+
+  @override
+  Future<String> errorMessage(Object error) async => error.toString();
 
   @override
   Future<List<ChatConversation>> listConversations() async => [_conversation];

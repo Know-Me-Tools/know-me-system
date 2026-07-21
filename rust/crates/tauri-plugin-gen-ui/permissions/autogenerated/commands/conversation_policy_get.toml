@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-conversation-policy-get"
+description = "Enables the conversation_policy_get command without any pre-configured scope."
+commands.allow = ["conversation_policy_get"]
+
+[[permission]]
+identifier = "deny-conversation-policy-get"
+description = "Denies the conversation_policy_get command without any pre-configured scope."
+commands.deny = ["conversation_policy_get"]

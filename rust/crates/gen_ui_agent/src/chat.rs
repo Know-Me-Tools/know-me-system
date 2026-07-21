@@ -5,6 +5,7 @@
 //! transport (StreamSink vs Tauri emit); this module owns everything else:
 //! provider/model selection from the config DB, the liter-llm call, and
 //! adapting the response stream into ContentBlocks.
+use futures::StreamExt;
 use gen_ui_context::{
     presets, resolve_capabilities, AssembleRequest, CharsHeuristic, ContextBuilder, ContextError,
     ContextSources, EstimatorKind, RankedItem, SemanticKind, SessionEnvelope, StrategyConfig,
@@ -48,14 +49,11 @@ const LANE_UAR: &str = "uar";
 /// default. Builds without a local engine still fall back to cloud visibly.
 const SETTING_ACTIVE_LANE: &str = "active_lane";
 const SETTING_THEME_MODE: &str = "theme_mode";
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
 const SETTING_UAR_SERVICE_URL: &str = "uar_service_url";
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
 const SETTING_UAR_SERVICE_API_KEY_REF: &str = "uar_service_api_key_ref";
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
 const SETTING_UAR_AGENT_ARTIFACT: &str = "uar_agent_artifact";
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
 const SETTING_UAR_SESSION_ID: &str = "uar_session_id";
+const SETTING_UAR_DEPLOYMENT_MODE: &str = "uar_deployment_mode";
 #[cfg(target_os = "ios")]
 const DEFAULT_LOCAL_MODEL: &str = "qwen3.5-9b-q4-k-m";
 #[cfg(target_os = "android")]
@@ -99,6 +97,16 @@ pub struct SaveUarServiceRequest {
     pub api_key: Option<String>,
     pub agent_artifact_json: String,
     pub session_id: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UarServiceProbeResult {
+    pub service_url: String,
+    pub ok: bool,
+    pub http_status: Option<u16>,
+    pub runtime_status: Option<String>,
+    pub message: String,
 }
 
 struct ActiveRun {
@@ -184,7 +192,7 @@ pub async fn send(
         .await;
     }
     if lane == LANE_UAR {
-        return send_uar_service(user_message, conversation_id, run_id).await;
+        return send_uar(user_message, conversation_id, run_id).await;
     }
 
     let pref = state::config()?
@@ -342,7 +350,7 @@ pub async fn send_with_attachments(
             parts.push(ContentPart::Document {
                 document: DocumentContent {
                     data: encoded,
-                    media_type: attachment.mime.into(),
+                    media_type: attachment.mime,
                 },
             });
         } else {
@@ -472,7 +480,7 @@ async fn send_content(
         .await;
     }
     if lane == LANE_UAR {
-        return send_uar_service(local_fallback, conversation_id, run_id).await;
+        return send_uar(local_fallback, conversation_id, run_id).await;
     }
     let pref = state::config()?
         .get_model_pref(SURFACE_CHAT, LANE_CLOUD)
@@ -542,7 +550,6 @@ pub async fn send_interaction(
     .await
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
 async fn submit_uar_interaction(
     run_id: String,
     conversation_id: String,
@@ -551,8 +558,6 @@ async fn submit_uar_interaction(
     let run_id_for_task = run_id.clone();
     let active_run = ActiveRun::new(&run_id);
     gen_ui_runtime::spawn(async move {
-        use crate::uar::UarRuntimeFacade;
-
         let mut adapter = A2uiAdapter::new(run_id_for_task.clone());
         for event in adapter.ingest(&StreamEvent::MessageStart) {
             state::publish(event);
@@ -569,22 +574,81 @@ async fn submit_uar_interaction(
             message: "Submitting A2UI response to Universal Agent Runtime".into(),
         });
 
-        let response = match uar_artifact_response_from_interaction(&interaction) {
-            Some(response) => response,
-            None => {
+        let (runtime, _runtime_config, runtime_mode) = match selected_uar_runtime().await {
+            Ok(runtime) => runtime,
+            Err(error) => {
                 publish_run_error(
                     &run_id_for_task,
-                    "uar_interaction_not_a2ui_response",
+                    "uar_runtime_not_configured",
                     RunPhase::ToolExecution,
-                    "The UAR lane only accepts typed A2UI artifact responses through chat_action; no artifact id was present in the interaction payload.",
-                    false,
+                    error.to_string(),
+                    true,
                 );
                 return;
             }
         };
-        let mapping = match state::uar_run_for_conversation(&conversation_id) {
-            Ok(Some(mapping)) => mapping,
-            Ok(None) => {
+
+        if let Some((title, source, description)) =
+            uar_a2ui_promotion_from_interaction(&interaction)
+        {
+            match runtime
+                .promote_a2ui_component(&title, &source, description.as_deref())
+                .await
+            {
+                Ok(component) => {
+                    state::publish(A2uiEvent::ContextTelemetry {
+                        run_id: run_id_for_task.clone(),
+                        payload: serde_json::json!({
+                            "runtime": "universal-agent-runtime",
+                            "mode": runtime_mode,
+                            "operation": "a2ui_component_promoted",
+                            "component": component,
+                        }),
+                    });
+                    for event in adapter.ingest(&StreamEvent::Done) {
+                        state::publish(event);
+                    }
+                }
+                Err(error) => publish_run_error(
+                    &run_id_for_task,
+                    "uar_a2ui_promotion_failed",
+                    RunPhase::Persistence,
+                    error.to_string(),
+                    true,
+                ),
+            }
+            return;
+        }
+
+        let action = uar_a2ui_action_from_interaction(&interaction);
+        let response = if action.is_none() {
+            match uar_artifact_response_from_interaction(&interaction) {
+                Some(response) => Some(response),
+                None => {
+                    publish_run_error(
+                        &run_id_for_task,
+                        "uar_interaction_not_a2ui_response",
+                        RunPhase::ToolExecution,
+                        "The UAR lane only accepts typed A2UI actions or artifact responses through chat_action.",
+                        false,
+                    );
+                    return;
+                }
+            }
+        } else {
+            None
+        };
+        let explicit_source_run_id = uar_source_run_id_from_interaction(&interaction);
+        let mapping = match (
+            explicit_source_run_id,
+            state::uar_run_for_conversation(&conversation_id),
+        ) {
+            (Some(uar_run_id), _) => state::UarRunMapping {
+                knowme_run_id: "persisted-a2ui-surface".to_owned(),
+                uar_run_id,
+            },
+            (None, Ok(Some(mapping))) => mapping,
+            (None, Ok(None)) => {
                 publish_run_error(
                     &run_id_for_task,
                     "uar_run_not_found",
@@ -594,7 +658,7 @@ async fn submit_uar_interaction(
                 );
                 return;
             }
-            Err(error) => {
+            (None, Err(error)) => {
                 publish_run_error(
                     &run_id_for_task,
                     "uar_run_lookup_failed",
@@ -606,53 +670,67 @@ async fn submit_uar_interaction(
             }
         };
 
-        let config = match load_uar_service_chat_config().await {
-            Ok(config) => config,
-            Err(error) => {
-                publish_run_error(
-                    &run_id_for_task,
-                    "uar_service_not_configured",
-                    RunPhase::ToolExecution,
-                    error.to_string(),
-                    true,
-                );
-                return;
-            }
-        };
-        let runtime = match crate::uar::UarServiceRuntime::new(&config.service_url, config.api_key)
-        {
-            Ok(runtime) => runtime,
-            Err(error) => {
-                publish_run_error(
-                    &run_id_for_task,
-                    "uar_service_client_failed",
-                    RunPhase::ToolExecution,
-                    error.to_string(),
-                    true,
-                );
-                return;
-            }
-        };
         if active_run.cancelled() {
             active_run.publish_cancelled(RunPhase::ToolExecution);
             return;
         }
-        match runtime
-            .submit_artifact_response(&mapping.uar_run_id, response.clone())
-            .await
-        {
-            Ok(()) => {
+        let interaction_id = action
+            .as_ref()
+            .map(|value| value.surface_id.clone())
+            .or_else(|| response.as_ref().map(|value| value.artifact_id.clone()))
+            .unwrap_or_else(|| "a2ui".to_string());
+        let continuation = match action {
+            Some(action) => {
+                runtime
+                    .submit_a2ui_action(&mapping.uar_run_id, action)
+                    .await
+            }
+            None => {
+                runtime
+                    .submit_artifact_response(
+                        &mapping.uar_run_id,
+                        response.expect("response checked when action is absent"),
+                    )
+                    .await
+            }
+        };
+        match continuation {
+            Ok(projected) => {
+                let continuation_run_id = projected.run_id.clone();
+                state::register_uar_run(&conversation_id, &run_id_for_task, &continuation_run_id);
                 state::publish(A2uiEvent::ContextTelemetry {
                     run_id: run_id_for_task.clone(),
                     payload: serde_json::json!({
                         "runtime": "universal-agent-runtime",
-                        "mode": "http_service",
+                        "mode": runtime_mode,
                         "uarRunId": mapping.uar_run_id,
                         "sourceKnowmeRunId": mapping.knowme_run_id,
-                        "artifactId": response.artifact_id,
+                        "continuationRunId": continuation_run_id,
+                        "interactionId": interaction_id,
                         "operation": "artifact_response_submitted",
                     }),
                 });
+                let mut events = std::pin::pin!(projected.events);
+                while let Some(event) = events.next().await {
+                    if active_run.cancelled() {
+                        let _ = runtime.cancel_run(&continuation_run_id).await;
+                        active_run.publish_cancelled(RunPhase::Generation);
+                        return;
+                    }
+                    match event {
+                        Ok(event) => state::publish(event_with_run_id(event, &run_id_for_task)),
+                        Err(error) => {
+                            publish_run_error(
+                                &run_id_for_task,
+                                "uar_interaction_stream_failed",
+                                RunPhase::Generation,
+                                error.to_string(),
+                                true,
+                            );
+                            return;
+                        }
+                    }
+                }
                 for event in adapter.ingest(&StreamEvent::Done) {
                     state::publish(event);
                 }
@@ -667,29 +745,6 @@ async fn submit_uar_interaction(
                 );
             }
         }
-    });
-    Ok(run_id)
-}
-
-#[cfg(any(target_os = "ios", target_os = "android"))]
-async fn submit_uar_interaction(
-    run_id: String,
-    _conversation_id: String,
-    _interaction: serde_json::Value,
-) -> Result<String, AgentError> {
-    let run_id_for_task = run_id.clone();
-    gen_ui_runtime::spawn(async move {
-        let mut adapter = A2uiAdapter::new(run_id_for_task.clone());
-        for event in adapter.ingest(&StreamEvent::MessageStart) {
-            state::publish(event);
-        }
-        publish_run_error(
-            &run_id_for_task,
-            "uar_embedded_mobile_not_wired",
-            RunPhase::ToolExecution,
-            "UAR mobile A2UI actions require embedded-library mode; local sidecars are not allowed.",
-            false,
-        );
     });
     Ok(run_id)
 }
@@ -961,7 +1016,6 @@ pub async fn set_theme_mode(mode: &str) -> Result<(), AgentError> {
         .await
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
 pub async fn uar_service_config() -> Result<ConfiguredUarService, AgentError> {
     Ok(ConfiguredUarService {
         service_url: string_setting(SETTING_UAR_SERVICE_URL).await?,
@@ -971,22 +1025,24 @@ pub async fn uar_service_config() -> Result<ConfiguredUarService, AgentError> {
         has_agent_artifact: state::config()?
             .get_setting(SETTING_UAR_AGENT_ARTIFACT)
             .await?
-            .is_some(),
+            .is_some_and(|value| !value.is_null()),
         session_id: string_setting(SETTING_UAR_SESSION_ID).await?,
     })
 }
 
-#[cfg(any(target_os = "ios", target_os = "android"))]
-pub async fn uar_service_config() -> Result<ConfiguredUarService, AgentError> {
-    Ok(ConfiguredUarService {
-        service_url: None,
-        has_api_key: false,
-        has_agent_artifact: false,
-        session_id: None,
-    })
+pub async fn uar_runtime_status() -> Result<crate::uar::UarRuntimeStatus, AgentError> {
+    use crate::uar::UarRuntimeFacade;
+
+    match selected_uar_deployment_mode().await? {
+        crate::uar::UarDeploymentMode::EmbeddedLibrary => Ok(state::embedded_uar()?.status()),
+        crate::uar::UarDeploymentMode::HttpService
+        | crate::uar::UarDeploymentMode::CloudService => {
+            let config = load_uar_service_chat_config().await?;
+            Ok(crate::uar::UarServiceRuntime::new(&config.service_url, config.api_key)?.status())
+        }
+    }
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
 pub async fn save_uar_service_config(request: SaveUarServiceRequest) -> Result<(), AgentError> {
     let service_url = request.service_url.trim();
     if service_url.is_empty() {
@@ -994,7 +1050,11 @@ pub async fn save_uar_service_config(request: SaveUarServiceRequest) -> Result<(
     }
     crate::uar::UarServiceRuntime::new(service_url, None)?;
 
-    let artifact = artifact_from_string_or_path(&request.agent_artifact_json).await?;
+    let artifact = if request.agent_artifact_json.trim().is_empty() {
+        None
+    } else {
+        Some(artifact_from_string_or_path(&request.agent_artifact_json).await?)
+    };
     let existing_key_ref = string_setting(SETTING_UAR_SERVICE_API_KEY_REF).await?;
     let api_key_ref = match request.api_key.as_deref().map(str::trim) {
         Some(api_key) if !api_key.is_empty() => {
@@ -1013,7 +1073,10 @@ pub async fn save_uar_service_config(request: SaveUarServiceRequest) -> Result<(
         )
         .await?;
     config
-        .set_setting(SETTING_UAR_AGENT_ARTIFACT, artifact)
+        .set_setting(
+            SETTING_UAR_AGENT_ARTIFACT,
+            artifact.unwrap_or(serde_json::Value::Null),
+        )
         .await?;
     config
         .set_setting(
@@ -1033,17 +1096,84 @@ pub async fn save_uar_service_config(request: SaveUarServiceRequest) -> Result<(
                 .map(serde_json::Value::String)
                 .unwrap_or(serde_json::Value::Null),
         )
+        .await?;
+    config
+        .set_setting(
+            SETTING_UAR_DEPLOYMENT_MODE,
+            serde_json::Value::String(
+                if cfg!(any(target_os = "ios", target_os = "android")) {
+                    "cloud_service"
+                } else {
+                    "http_service"
+                }
+                .to_owned(),
+            ),
+        )
         .await
 }
 
-#[cfg(any(target_os = "ios", target_os = "android"))]
-pub async fn save_uar_service_config(_request: SaveUarServiceRequest) -> Result<(), AgentError> {
-    Err(AgentError::Config(
-        "UAR mobile configuration must target embedded-library mode, not a local service".into(),
-    ))
+pub async fn probe_uar_service_config() -> Result<UarServiceProbeResult, AgentError> {
+    let config = load_uar_service_chat_config().await?;
+    let base_url = reqwest::Url::parse(&config.service_url)
+        .map_err(|error| AgentError::Client(format!("UAR service URL: {error}")))?;
+    let health_url = base_url
+        .join("/health")
+        .map_err(|error| AgentError::Client(format!("UAR health URL: {error}")))?;
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .map_err(|error| AgentError::Client(format!("UAR health client: {error}")))?;
+    let mut request = client.get(health_url);
+    if let Some(api_key) = config.api_key {
+        request = request.bearer_auth(api_key);
+    }
+    let response = request
+        .send()
+        .await
+        .map_err(|error| AgentError::Client(format!("UAR health request: {error}")))?;
+    let http_status = response.status();
+    let status_code = http_status.as_u16();
+    let body = response.text().await.unwrap_or_default();
+    let body_json = serde_json::from_str::<serde_json::Value>(&body).ok();
+    let runtime_status = body_json
+        .as_ref()
+        .and_then(|value| value.get("status"))
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_owned);
+    let ok = http_status.is_success()
+        && runtime_status
+            .as_deref()
+            .map(|status| matches!(status, "ok" | "ready"))
+            .unwrap_or(true);
+    let message = if ok {
+        format!(
+            "UAR service reachable{}",
+            runtime_status
+                .as_deref()
+                .map(|status| format!(" · status {status}"))
+                .unwrap_or_default()
+        )
+    } else if let Some(status) = runtime_status.as_deref() {
+        format!("UAR service returned HTTP {status_code} · status {status}")
+    } else if body.trim().is_empty() {
+        format!("UAR service returned HTTP {status_code}")
+    } else {
+        format!("UAR service returned HTTP {status_code}: {}", body.trim())
+    };
+    Ok(UarServiceProbeResult {
+        service_url: config.service_url,
+        ok,
+        http_status: Some(status_code),
+        runtime_status,
+        message,
+    })
 }
 
 fn default_lane() -> String {
+    #[cfg(any(target_os = "ios", target_os = "android"))]
+    if state::embedded_uar().is_ok() {
+        return LANE_UAR.to_string();
+    }
     if has_local_engine() {
         LANE_LOCAL.to_string()
     } else {
@@ -1080,29 +1210,91 @@ pub async fn set_active_lane(lane: &str) -> Result<(), AgentError> {
         .await
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
 async fn ensure_uar_lane_supported() -> Result<(), AgentError> {
-    Ok(())
+    selected_uar_runtime().await.map(|_| ())
 }
 
-#[cfg(any(target_os = "ios", target_os = "android"))]
-async fn ensure_uar_lane_supported() -> Result<(), AgentError> {
-    Err(AgentError::Config(
-        "the UAR chat lane on mobile requires embedded-library mode; local sidecars are not allowed"
-            .into(),
-    ))
-}
-
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
-struct UarServiceChatConfig {
-    service_url: String,
-    api_key: Option<String>,
-    artifact: serde_json::Value,
+#[derive(Clone)]
+struct UarRunConfig {
+    artifact: Option<serde_json::Value>,
     session_id: Option<String>,
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
-async fn send_uar_service(
+struct UarServiceChatConfig {
+    service_url: String,
+    api_key: Option<String>,
+    artifact: Option<serde_json::Value>,
+    session_id: Option<String>,
+}
+
+async fn selected_uar_deployment_mode() -> Result<crate::uar::UarDeploymentMode, AgentError> {
+    let configured = string_setting(SETTING_UAR_DEPLOYMENT_MODE)
+        .await?
+        .or_else(|| std::env::var("KNOWME_UAR_DEPLOYMENT_MODE").ok());
+    match configured.as_deref() {
+        Some("embedded") | Some("embedded_library") => {
+            Ok(crate::uar::UarDeploymentMode::EmbeddedLibrary)
+        }
+        Some("service") | Some("http") | Some("http_service") => {
+            Ok(crate::uar::UarDeploymentMode::HttpService)
+        }
+        Some("cloud") | Some("cloud_service") => Ok(crate::uar::UarDeploymentMode::CloudService),
+        Some(other) => Err(AgentError::Config(format!(
+            "unknown UAR deployment mode '{other}'"
+        ))),
+        None if cfg!(any(target_os = "ios", target_os = "android")) => {
+            Ok(crate::uar::UarDeploymentMode::EmbeddedLibrary)
+        }
+        None => Ok(crate::uar::UarDeploymentMode::HttpService),
+    }
+}
+
+async fn selected_uar_runtime() -> Result<
+    (
+        std::sync::Arc<dyn crate::uar::UarRuntimeFacade>,
+        UarRunConfig,
+        &'static str,
+    ),
+    AgentError,
+> {
+    let deployment_mode = selected_uar_deployment_mode().await?;
+    match deployment_mode {
+        crate::uar::UarDeploymentMode::EmbeddedLibrary => {
+            let runtime: std::sync::Arc<dyn crate::uar::UarRuntimeFacade> =
+                state::embedded_uar()?.clone();
+            Ok((
+                runtime,
+                UarRunConfig {
+                    artifact: load_optional_uar_artifact().await?,
+                    session_id: string_setting(SETTING_UAR_SESSION_ID).await?,
+                },
+                "embedded_library",
+            ))
+        }
+        crate::uar::UarDeploymentMode::HttpService
+        | crate::uar::UarDeploymentMode::CloudService => {
+            let config = load_uar_service_chat_config().await?;
+            let runtime: std::sync::Arc<dyn crate::uar::UarRuntimeFacade> = std::sync::Arc::new(
+                crate::uar::UarServiceRuntime::new(&config.service_url, config.api_key)?,
+            );
+            let mode = if matches!(deployment_mode, crate::uar::UarDeploymentMode::CloudService) {
+                "cloud_service"
+            } else {
+                "http_service"
+            };
+            Ok((
+                runtime,
+                UarRunConfig {
+                    artifact: config.artifact,
+                    session_id: config.session_id,
+                },
+                mode,
+            ))
+        }
+    }
+}
+
+async fn send_uar(
     user_message: String,
     conversation_id: String,
     run_id: String,
@@ -1110,7 +1302,6 @@ async fn send_uar_service(
     let run_id_for_task = run_id.clone();
     let active_run = ActiveRun::new(&run_id);
     gen_ui_runtime::spawn(async move {
-        use crate::uar::UarRuntimeFacade;
         use futures::StreamExt;
 
         let mut adapter = A2uiAdapter::new(run_id_for_task.clone());
@@ -1129,12 +1320,12 @@ async fn send_uar_service(
             message: "Delegating agent definition, skills, tools, and A2UI selection to UAR".into(),
         });
 
-        let config = match load_uar_service_chat_config().await {
-            Ok(config) => config,
+        let (runtime, config, runtime_mode) = match selected_uar_runtime().await {
+            Ok(runtime) => runtime,
             Err(error) => {
                 publish_run_error(
                     &run_id_for_task,
-                    "uar_service_not_configured",
+                    "uar_runtime_not_configured",
                     RunPhase::ContextAssembly,
                     error.to_string(),
                     true,
@@ -1147,20 +1338,6 @@ async fn send_uar_service(
             return;
         }
 
-        let runtime = match crate::uar::UarServiceRuntime::new(&config.service_url, config.api_key)
-        {
-            Ok(runtime) => runtime,
-            Err(error) => {
-                publish_run_error(
-                    &run_id_for_task,
-                    "uar_service_client_failed",
-                    RunPhase::ContextAssembly,
-                    error.to_string(),
-                    true,
-                );
-                return;
-            }
-        };
         state::publish(A2uiEvent::RunPhaseChanged {
             run_id: run_id_for_task.clone(),
             phase: RunPhase::Generation,
@@ -1173,6 +1350,8 @@ async fn send_uar_service(
                 artifact: config.artifact,
                 input: user_message,
                 session_id: config.session_id.or(Some(conversation_id.clone())),
+                agent_id: None,
+                run_policy: None,
             })
             .await
         {
@@ -1193,7 +1372,7 @@ async fn send_uar_service(
             run_id: run_id_for_task.clone(),
             payload: serde_json::json!({
                 "runtime": "universal-agent-runtime",
-                "mode": "http_service",
+                "mode": runtime_mode,
                 "uarRunId": projected.run_id,
             }),
         });
@@ -1228,35 +1407,6 @@ async fn send_uar_service(
     Ok(run_id)
 }
 
-#[cfg(any(target_os = "ios", target_os = "android"))]
-async fn send_uar_service(
-    _user_message: String,
-    _conversation_id: String,
-    run_id: String,
-) -> Result<String, AgentError> {
-    let run_id_for_task = run_id.clone();
-    let active_run = ActiveRun::new(&run_id);
-    gen_ui_runtime::spawn(async move {
-        let mut adapter = A2uiAdapter::new(run_id_for_task.clone());
-        for event in adapter.ingest(&StreamEvent::MessageStart) {
-            state::publish(event);
-        }
-        if active_run.cancelled() {
-            active_run.publish_cancelled(RunPhase::Queued);
-            return;
-        }
-        publish_run_error(
-            &run_id_for_task,
-            "uar_embedded_mobile_not_wired",
-            RunPhase::ContextAssembly,
-            "UAR mobile execution must be embedded as a library; local sidecars are not allowed and the embedded facade is not wired yet.",
-            false,
-        );
-    });
-    Ok(run_id)
-}
-
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
 async fn load_uar_service_chat_config() -> Result<UarServiceChatConfig, AgentError> {
     let service_url = string_setting(SETTING_UAR_SERVICE_URL)
         .await?
@@ -1272,13 +1422,7 @@ async fn load_uar_service_chat_config() -> Result<UarServiceChatConfig, AgentErr
         .transpose()?
         .or_else(|| std::env::var("KNOWME_UAR_API_KEY").ok());
     let session_id = string_setting(SETTING_UAR_SESSION_ID).await?;
-    let artifact = match state::config()?
-        .get_setting(SETTING_UAR_AGENT_ARTIFACT)
-        .await?
-    {
-        Some(value) => artifact_from_setting_value(value).await?,
-        None => load_uar_artifact_from_env().await?,
-    };
+    let artifact = load_optional_uar_artifact().await?;
     Ok(UarServiceChatConfig {
         service_url,
         api_key,
@@ -1287,7 +1431,44 @@ async fn load_uar_service_chat_config() -> Result<UarServiceChatConfig, AgentErr
     })
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
+async fn load_optional_uar_artifact() -> Result<Option<serde_json::Value>, AgentError> {
+    Ok(
+        match state::config()?
+            .get_setting(SETTING_UAR_AGENT_ARTIFACT)
+            .await?
+        {
+            Some(serde_json::Value::Null) | None => load_uar_artifact_from_env().await.ok(),
+            Some(value) => Some(artifact_from_setting_value(value).await?),
+        },
+    )
+}
+
+/// Validate and persist an A2UI surface in the UAR-owned component library.
+///
+/// This is a settings/artifact operation rather than a conversation turn, so
+/// it deliberately avoids creating a synthetic assistant message or run.
+pub async fn promote_a2ui_component(
+    title: String,
+    source: String,
+    description: Option<String>,
+) -> Result<serde_json::Value, AgentError> {
+    let (runtime, _, _) = selected_uar_runtime().await?;
+    runtime
+        .promote_a2ui_component(&title, &source, description.as_deref())
+        .await
+}
+
+pub(crate) async fn uar_service_client() -> Result<universal_agent_runtime_sdk::Client, AgentError>
+{
+    let config = load_uar_service_chat_config().await?;
+    let client = universal_agent_runtime_sdk::Client::new(&config.service_url)
+        .map_err(|error| AgentError::Client(format!("UAR client: {error}")))?;
+    Ok(match config.api_key {
+        Some(api_key) if !api_key.is_empty() => client.with_api_key(api_key),
+        _ => client,
+    })
+}
+
 async fn string_setting(key: &str) -> Result<Option<String>, AgentError> {
     Ok(state::config()?
         .get_setting(key)
@@ -1296,7 +1477,6 @@ async fn string_setting(key: &str) -> Result<Option<String>, AgentError> {
         .filter(|value| !value.trim().is_empty()))
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
 async fn artifact_from_setting_value(
     value: serde_json::Value,
 ) -> Result<serde_json::Value, AgentError> {
@@ -1309,7 +1489,6 @@ async fn artifact_from_setting_value(
     }
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
 async fn load_uar_artifact_from_env() -> Result<serde_json::Value, AgentError> {
     if let Ok(json) = std::env::var("KNOWME_UAR_AGENT_ARTIFACT_JSON") {
         return artifact_from_string_or_path(&json).await;
@@ -1322,7 +1501,6 @@ async fn load_uar_artifact_from_env() -> Result<serde_json::Value, AgentError> {
     )))
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
 async fn artifact_from_string_or_path(value: &str) -> Result<serde_json::Value, AgentError> {
     let trimmed = value.trim();
     let json = if trimmed.starts_with('{') {
@@ -1342,10 +1520,10 @@ async fn artifact_from_string_or_path(value: &str) -> Result<serde_json::Value, 
     Ok(artifact)
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
 fn uar_artifact_response_from_interaction(
     value: &serde_json::Value,
 ) -> Option<crate::uar::UarArtifactResponse> {
+    let value = value.get("payload").unwrap_or(value);
     if let Some(response) = value
         .get("a2uiResponse")
         .and_then(serde_json::Value::as_object)
@@ -1403,7 +1581,53 @@ fn uar_artifact_response_from_interaction(
     })
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
+fn uar_a2ui_action_from_interaction(
+    value: &serde_json::Value,
+) -> Option<crate::uar::UarA2uiAction> {
+    let value = value.get("payload").unwrap_or(value);
+    let action = value.get("action")?.as_object()?;
+    Some(crate::uar::UarA2uiAction {
+        surface_id: action.get("surfaceId")?.as_str()?.to_owned(),
+        name: action.get("name")?.as_str()?.to_owned(),
+        source_component_id: action.get("sourceComponentId")?.as_str()?.to_owned(),
+        timestamp: action
+            .get("timestamp")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_owned),
+        context: action
+            .get("context")
+            .cloned()
+            .unwrap_or_else(|| serde_json::json!({})),
+        client_data_model: value.get("a2uiClientDataModel").cloned(),
+    })
+}
+
+fn uar_source_run_id_from_interaction(value: &serde_json::Value) -> Option<String> {
+    value
+        .get("sourceRunId")
+        .or_else(|| value.get("source_run_id"))
+        .and_then(serde_json::Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .map(str::to_owned)
+}
+
+fn uar_a2ui_promotion_from_interaction(
+    value: &serde_json::Value,
+) -> Option<(String, String, Option<String>)> {
+    if value.get("kind")?.as_str()? != "a2ui_promote" {
+        return None;
+    }
+    let payload = value.get("payload")?.as_object()?;
+    Some((
+        payload.get("title")?.as_str()?.to_owned(),
+        payload.get("source")?.as_str()?.to_owned(),
+        payload
+            .get("description")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_owned),
+    ))
+}
+
 fn event_with_run_id(event: A2uiEvent, run_id: &str) -> A2uiEvent {
     match event {
         A2uiEvent::RunStarted { .. } => A2uiEvent::RunStarted {
@@ -2549,6 +2773,33 @@ mod attachment_tests {
         Embedder, EmbeddingModelInfo, GraphError, GraphStore, GraphStoreConfig, EMBED_DIM,
     };
 
+    #[test]
+    fn a2ui_interaction_keeps_the_completed_source_uar_run() {
+        let interaction = serde_json::json!({
+            "kind": "a2ui",
+            "sourceRunId": "uar-source-run-42",
+            "payload": {
+                "action": {
+                    "surfaceId": "surface-1",
+                    "name": "continue",
+                    "sourceComponentId": "continue-button",
+                    "context": {}
+                }
+            }
+        });
+
+        assert_eq!(
+            uar_source_run_id_from_interaction(&interaction).as_deref(),
+            Some("uar-source-run-42")
+        );
+        assert_eq!(
+            uar_a2ui_action_from_interaction(&interaction)
+                .expect("typed action")
+                .name,
+            "continue"
+        );
+    }
+
     struct ZeroEmbedder;
     impl Embedder for ZeroEmbedder {
         fn model_info(&self) -> EmbeddingModelInfo {
@@ -2717,6 +2968,23 @@ mod attachment_tests {
                 block: gen_ui_types::content_block::ContentBlock::Skill { name, status },
             } if run_id == "knowme-run" && name == "calendar" && status == "running"
         ));
+    }
+
+    #[cfg(not(any(target_os = "ios", target_os = "android")))]
+    #[test]
+    fn configured_uar_service_reports_service_runtime_status() {
+        use crate::uar::UarRuntimeFacade;
+        let runtime = crate::uar::UarServiceRuntime::new("http://127.0.0.1:9999", None)
+            .expect("valid service URL");
+        let status = runtime.status();
+        assert_eq!(
+            status.target_mode,
+            crate::uar::UarDeploymentMode::HttpService
+        );
+        assert_eq!(
+            status.current_state,
+            crate::uar::UarIntegrationState::ServiceRuntime
+        );
     }
 
     #[cfg(not(any(target_os = "ios", target_os = "android")))]

@@ -9,6 +9,14 @@ import '../third_party/gen_ui_types/error.dart';
 import '../third_party/gen_ui_types/inference.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
+// These functions are ignored because they are not marked as `pub`: `parse_json`
+
+/// Decode a typed Rust failure for Flutter's error surfaces. FRB carries
+/// workspace-owned error enums as opaque Rust objects, so Dart's default
+/// `toString()` cannot expose the safe Display message without this adapter.
+Future<String> coreErrorMessage({required CoreError error}) =>
+    GenUiCore.instance.api.crateApiChatCoreErrorMessage(error: error);
+
 /// Start a chat turn; returns the run_id whose events arrive on chat_events(run_id).
 /// `messages` is the selected conversation's role/text history. The thread id
 /// remains transport metadata; persistence is owned by the entity repository.
@@ -71,6 +79,121 @@ Future<String> localRuntimeDiagnostics() =>
 
 Future<String> uarRuntimeStatus() =>
     GenUiCore.instance.api.crateApiChatUarRuntimeStatus();
+
+/// Mobile/Flutter control-plane facade. JSON is intentional here: UAR owns
+/// these extensible schemas and the client must preserve fields it does not yet
+/// understand while Rust remains the only HTTP boundary.
+Future<String> activeLane() => GenUiCore.instance.api.crateApiChatActiveLane();
+
+Future<void> setActiveLane({required String lane}) =>
+    GenUiCore.instance.api.crateApiChatSetActiveLane(lane: lane);
+
+Future<String> uarServiceConfig() =>
+    GenUiCore.instance.api.crateApiChatUarServiceConfig();
+
+Future<void> uarServiceSave({
+  required String serviceUrl,
+  String? apiKey,
+  String? sessionId,
+}) => GenUiCore.instance.api.crateApiChatUarServiceSave(
+  serviceUrl: serviceUrl,
+  apiKey: apiKey,
+  sessionId: sessionId,
+);
+
+Future<String> uarServiceProbe() =>
+    GenUiCore.instance.api.crateApiChatUarServiceProbe();
+
+Future<String> chatControlCatalog() =>
+    GenUiCore.instance.api.crateApiChatChatControlCatalog();
+
+Future<String> uarAdminSnapshot() =>
+    GenUiCore.instance.api.crateApiChatUarAdminSnapshot();
+
+Future<String> providerCatalog() =>
+    GenUiCore.instance.api.crateApiChatProviderCatalog();
+
+Future<String> providerList() =>
+    GenUiCore.instance.api.crateApiChatProviderList();
+
+Future<void> providerSave({required String requestJson}) =>
+    GenUiCore.instance.api.crateApiChatProviderSave(requestJson: requestJson);
+
+Future<void> providerDelete({required String id}) =>
+    GenUiCore.instance.api.crateApiChatProviderDelete(id: id);
+
+Future<String> providerTest({required String id, String? model}) =>
+    GenUiCore.instance.api.crateApiChatProviderTest(id: id, model: model);
+
+Future<String> cloudModelGet() =>
+    GenUiCore.instance.api.crateApiChatCloudModelGet();
+
+Future<void> cloudModelSave({
+  required String providerId,
+  required String modelId,
+}) => GenUiCore.instance.api.crateApiChatCloudModelSave(
+  providerId: providerId,
+  modelId: modelId,
+);
+
+Future<String> uarSettingSave({
+  required String key,
+  required String valueJson,
+}) => GenUiCore.instance.api.crateApiChatUarSettingSave(
+  key: key,
+  valueJson: valueJson,
+);
+
+Future<String> uarAgentSave({required String agentJson}) =>
+    GenUiCore.instance.api.crateApiChatUarAgentSave(agentJson: agentJson);
+
+Future<void> uarAgentDelete({required String id}) =>
+    GenUiCore.instance.api.crateApiChatUarAgentDelete(id: id);
+
+Future<String> uarMcpServerSave({
+  required String name,
+  required String serverJson,
+}) => GenUiCore.instance.api.crateApiChatUarMcpServerSave(
+  name: name,
+  serverJson: serverJson,
+);
+
+Future<String> uarMcpServerDelete({required String name}) =>
+    GenUiCore.instance.api.crateApiChatUarMcpServerDelete(name: name);
+
+Future<String> uarMemoryDelete({required String id}) =>
+    GenUiCore.instance.api.crateApiChatUarMemoryDelete(id: id);
+
+Future<String> uarKnowledgeBaseCreate({required String requestJson}) =>
+    GenUiCore.instance.api.crateApiChatUarKnowledgeBaseCreate(
+      requestJson: requestJson,
+    );
+
+Future<void> uarKnowledgeBaseDelete({required String id}) =>
+    GenUiCore.instance.api.crateApiChatUarKnowledgeBaseDelete(id: id);
+
+Future<String> conversationPolicyGet({required String conversationId}) =>
+    GenUiCore.instance.api.crateApiChatConversationPolicyGet(
+      conversationId: conversationId,
+    );
+
+Future<String> conversationPolicySave({
+  required String conversationId,
+  required String policyJson,
+}) => GenUiCore.instance.api.crateApiChatConversationPolicySave(
+  conversationId: conversationId,
+  policyJson: policyJson,
+);
+
+Future<void> conversationPolicyDelete({required String conversationId}) =>
+    GenUiCore.instance.api.crateApiChatConversationPolicyDelete(
+      conversationId: conversationId,
+    );
+
+Future<String> conversationEffectiveConfig({required String conversationId}) =>
+    GenUiCore.instance.api.crateApiChatConversationEffectiveConfig(
+      conversationId: conversationId,
+    );
 
 Future<String> themeMode() => GenUiCore.instance.api.crateApiChatThemeMode();
 

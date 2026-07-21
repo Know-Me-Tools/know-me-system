@@ -16,13 +16,13 @@ class SyncChip extends ConsumerWidget {
     final status = ref.watch(syncStatusProvider);
     final colors = KnowMePalette.of(context);
     final (label, color) = switch (status.value) {
-      SyncOffline() || null => ('offline', colors.faintText),
+      SyncOffline() || null => ('peer sync off', colors.faintText),
       SyncSyncing(:final pendingWrites) => (
-          'syncing · $pendingWrites',
-          colors.warning
-        ),
-      SyncLive() => ('live', colors.success),
-      SyncError() => ('error', colors.destructive),
+        'peer sync · $pendingWrites',
+        colors.warning,
+      ),
+      SyncLive() => ('peer sync live', colors.success),
+      SyncError() => ('sync error', colors.destructive),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),

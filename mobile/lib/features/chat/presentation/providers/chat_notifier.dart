@@ -73,7 +73,8 @@ class ChatNotifier extends _$ChatNotifier {
           modelOperation: operation.cast<String, Object?>(),
         );
       },
-      onError: (Object error, StackTrace stackTrace) {
+      onError: (Object error, StackTrace stackTrace) async {
+        final message = await _repository.errorMessage(error);
         if (!ref.mounted) return;
         state = state.copyWith(
           modelOperation: {
@@ -81,7 +82,7 @@ class ChatNotifier extends _$ChatNotifier {
             'error': {
               'code': 'model_status_stream_failed',
               'phase': 'model_loading',
-              'message': error.toString(),
+              'message': message,
               'retryable': true,
               'diagnostics': stackTrace.toString(),
             },
@@ -334,12 +335,13 @@ class ChatNotifier extends _$ChatNotifier {
         userMessageId: userMsg.id,
       );
     } catch (error, stackTrace) {
+      final message = await _repository.errorMessage(error);
       markRunError(
         assistantId,
         ChatRunError(
           code: 'run_start_failed',
           phase: 'queued',
-          message: error.toString(),
+          message: message,
           retryable: true,
           diagnostics: stackTrace.toString(),
         ),
@@ -356,6 +358,7 @@ class ChatNotifier extends _$ChatNotifier {
       messageId: assistantId,
       onBlock: streamBlock,
       onFinalize: finalizeMessage,
+      errorMessage: _repository.errorMessage,
       onPhase: updateRunPhase,
       onCancelled: markRunCancelled,
       onTelemetry: updateContextTelemetry,
@@ -424,12 +427,13 @@ class ChatNotifier extends _$ChatNotifier {
         userMessageId: userMsg.id,
       );
     } catch (error, stackTrace) {
+      final message = await _repository.errorMessage(error);
       markRunError(
         assistantId,
         ChatRunError(
           code: 'resubmit_start_failed',
           phase: 'queued',
-          message: error.toString(),
+          message: message,
           retryable: true,
           diagnostics: stackTrace.toString(),
         ),
@@ -445,6 +449,7 @@ class ChatNotifier extends _$ChatNotifier {
       messageId: assistantId,
       onBlock: streamBlock,
       onFinalize: finalizeMessage,
+      errorMessage: _repository.errorMessage,
       onPhase: updateRunPhase,
       onCancelled: markRunCancelled,
       onTelemetry: updateContextTelemetry,
@@ -568,12 +573,13 @@ class ChatNotifier extends _$ChatNotifier {
         userMessageId: user.id,
       );
     } catch (error, stackTrace) {
+      final message = await _repository.errorMessage(error);
       markRunError(
         assistantId,
         ChatRunError(
           code: 'regenerate_start_failed',
           phase: 'queued',
-          message: error.toString(),
+          message: message,
           retryable: true,
           diagnostics: stackTrace.toString(),
         ),
@@ -589,6 +595,7 @@ class ChatNotifier extends _$ChatNotifier {
       messageId: assistantId,
       onBlock: streamBlock,
       onFinalize: finalizeMessage,
+      errorMessage: _repository.errorMessage,
       onPhase: updateRunPhase,
       onCancelled: markRunCancelled,
       onTelemetry: updateContextTelemetry,
@@ -639,6 +646,7 @@ class ChatNotifier extends _$ChatNotifier {
       messageId: assistantId,
       onBlock: streamBlock,
       onFinalize: finalizeMessage,
+      errorMessage: _repository.errorMessage,
       onPhase: updateRunPhase,
       onCancelled: markRunCancelled,
       onTelemetry: updateContextTelemetry,
@@ -680,12 +688,13 @@ class ChatNotifier extends _$ChatNotifier {
     try {
       runId = await _repository.approveToolConfirmation(approvalId: approvalId);
     } catch (error, stackTrace) {
+      final message = await _repository.errorMessage(error);
       markRunError(
         assistantId,
         ChatRunError(
           code: 'tool_approval_start_failed',
           phase: 'tool_execution',
-          message: error.toString(),
+          message: message,
           retryable: false,
           diagnostics: stackTrace.toString(),
         ),
@@ -706,6 +715,7 @@ class ChatNotifier extends _$ChatNotifier {
       messageId: assistantId,
       onBlock: streamBlock,
       onFinalize: finalizeMessage,
+      errorMessage: _repository.errorMessage,
       onPhase: updateRunPhase,
       onCancelled: markRunCancelled,
       onTelemetry: updateContextTelemetry,

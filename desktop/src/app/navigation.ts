@@ -1,6 +1,6 @@
 // TJ-ARCH-MOB-001 compliant
 import type { ComponentType, SVGProps } from 'react'
-import { BrainCircuit, Grid2X2, Layers3, MessageSquare, SlidersHorizontal, Zap } from 'lucide-react'
+import { BrainCircuit, Grid2X2, Layers3, MessageSquare, Zap } from 'lucide-react'
 
 export interface Destination {
   path: string
@@ -15,5 +15,4 @@ export const DESTINATIONS: readonly Destination[] = [
   { path: '/hands', label: 'Hands', icon: Zap },
   { path: '/memory', label: 'Memory', icon: BrainCircuit },
   { path: '/models', label: 'Models', icon: Layers3 },
-  { path: '/settings', label: 'Settings', icon: SlidersHorizontal },
 ] as const

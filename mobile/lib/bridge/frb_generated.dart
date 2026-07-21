@@ -77,7 +77,7 @@ class GenUiCore
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => -1649705225;
+  int get rustContentHash => 1249055622;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -159,6 +159,8 @@ abstract class GenUiCoreApi extends BaseApi {
     required String to,
   });
 
+  Future<String> crateApiChatActiveLane();
+
   Future<void> crateApiBootAttachSyncShapes();
 
   Future<void> crateApiChatCancelModelOperation();
@@ -176,6 +178,8 @@ abstract class GenUiCoreApi extends BaseApi {
 
   Future<bool> crateApiChatChatCancel({required String runId});
 
+  Future<String> crateApiChatChatControlCatalog();
+
   Stream<String> crateApiStreamsChatEvents({required String runId});
 
   Future<String> crateApiChatChatSend({
@@ -186,6 +190,32 @@ abstract class GenUiCoreApi extends BaseApi {
     required String branchId,
     required String userMessageId,
   });
+
+  Future<String> crateApiChatCloudModelGet();
+
+  Future<void> crateApiChatCloudModelSave({
+    required String providerId,
+    required String modelId,
+  });
+
+  Future<String> crateApiChatConversationEffectiveConfig({
+    required String conversationId,
+  });
+
+  Future<void> crateApiChatConversationPolicyDelete({
+    required String conversationId,
+  });
+
+  Future<String> crateApiChatConversationPolicyGet({
+    required String conversationId,
+  });
+
+  Future<String> crateApiChatConversationPolicySave({
+    required String conversationId,
+    required String policyJson,
+  });
+
+  Future<String> crateApiChatCoreErrorMessage({required CoreError error});
 
   Stream<String> crateApiStreamsEntityChanges();
 
@@ -251,6 +281,16 @@ abstract class GenUiCoreApi extends BaseApi {
 
   Future<void> crateApiChatPrepareLocalModel();
 
+  Future<String> crateApiChatProviderCatalog();
+
+  Future<void> crateApiChatProviderDelete({required String id});
+
+  Future<String> crateApiChatProviderList();
+
+  Future<void> crateApiChatProviderSave({required String requestJson});
+
+  Future<String> crateApiChatProviderTest({required String id, String? model});
+
   Future<String> crateApiChatResolveRemoteContent({
     required String url,
     required String kind,
@@ -260,13 +300,51 @@ abstract class GenUiCoreApi extends BaseApi {
 
   Future<SearchMode> genUiDbGraphSearchModeDefault();
 
+  Future<void> crateApiChatSetActiveLane({required String lane});
+
   Future<void> crateApiChatSetThemeMode({required String mode});
 
   Stream<String> crateApiStreamsSyncStatus();
 
   Future<String> crateApiChatThemeMode();
 
+  Future<String> crateApiChatUarAdminSnapshot();
+
+  Future<void> crateApiChatUarAgentDelete({required String id});
+
+  Future<String> crateApiChatUarAgentSave({required String agentJson});
+
+  Future<String> crateApiChatUarKnowledgeBaseCreate({
+    required String requestJson,
+  });
+
+  Future<void> crateApiChatUarKnowledgeBaseDelete({required String id});
+
+  Future<String> crateApiChatUarMcpServerDelete({required String name});
+
+  Future<String> crateApiChatUarMcpServerSave({
+    required String name,
+    required String serverJson,
+  });
+
+  Future<String> crateApiChatUarMemoryDelete({required String id});
+
   Future<String> crateApiChatUarRuntimeStatus();
+
+  Future<String> crateApiChatUarServiceConfig();
+
+  Future<String> crateApiChatUarServiceProbe();
+
+  Future<void> crateApiChatUarServiceSave({
+    required String serviceUrl,
+    String? apiKey,
+    String? sessionId,
+  });
+
+  Future<String> crateApiChatUarSettingSave({
+    required String key,
+    required String valueJson,
+  });
 
   RustArcIncrementStrongCountFnType
   get rust_arc_increment_strong_count_A2UiEvent;
@@ -849,7 +927,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
       );
 
   @override
-  Future<void> crateApiBootAttachSyncShapes() {
+  Future<String> crateApiChatActiveLane() {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
@@ -858,6 +936,34 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
             generalizedFrbRustBinding,
             serializer,
             funcId: 15,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatActiveLaneConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatActiveLaneConstMeta =>
+      const TaskConstMeta(debugName: "active_lane", argNames: []);
+
+  @override
+  Future<void> crateApiBootAttachSyncShapes() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 16,
             port: port_,
           );
         },
@@ -885,7 +991,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 16,
+            funcId: 17,
             port: port_,
           );
         },
@@ -922,7 +1028,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 17,
+            funcId: 18,
             port: port_,
           );
         },
@@ -955,7 +1061,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 18,
+            funcId: 19,
             port: port_,
           );
         },
@@ -987,7 +1093,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 19,
+            funcId: 20,
             port: port_,
           );
         },
@@ -1007,6 +1113,34 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
       const TaskConstMeta(debugName: "chat_cancel", argNames: ["runId"]);
 
   @override
+  Future<String> crateApiChatChatControlCatalog() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 21,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatChatControlCatalogConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatChatControlCatalogConstMeta =>
+      const TaskConstMeta(debugName: "chat_control_catalog", argNames: []);
+
+  @override
   Stream<String> crateApiStreamsChatEvents({required String runId}) {
     final sink = RustStreamSink<String>();
     unawaited(
@@ -1019,7 +1153,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 20,
+              funcId: 22,
               port: port_,
             );
           },
@@ -1063,7 +1197,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 21,
+            funcId: 23,
             port: port_,
           );
         },
@@ -1099,6 +1233,238 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
   );
 
   @override
+  Future<String> crateApiChatCloudModelGet() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 24,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatCloudModelGetConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatCloudModelGetConstMeta =>
+      const TaskConstMeta(debugName: "cloud_model_get", argNames: []);
+
+  @override
+  Future<void> crateApiChatCloudModelSave({
+    required String providerId,
+    required String modelId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(providerId, serializer);
+          sse_encode_String(modelId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 25,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatCloudModelSaveConstMeta,
+        argValues: [providerId, modelId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatCloudModelSaveConstMeta => const TaskConstMeta(
+    debugName: "cloud_model_save",
+    argNames: ["providerId", "modelId"],
+  );
+
+  @override
+  Future<String> crateApiChatConversationEffectiveConfig({
+    required String conversationId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(conversationId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 26,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatConversationEffectiveConfigConstMeta,
+        argValues: [conversationId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatConversationEffectiveConfigConstMeta =>
+      const TaskConstMeta(
+        debugName: "conversation_effective_config",
+        argNames: ["conversationId"],
+      );
+
+  @override
+  Future<void> crateApiChatConversationPolicyDelete({
+    required String conversationId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(conversationId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 27,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatConversationPolicyDeleteConstMeta,
+        argValues: [conversationId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatConversationPolicyDeleteConstMeta =>
+      const TaskConstMeta(
+        debugName: "conversation_policy_delete",
+        argNames: ["conversationId"],
+      );
+
+  @override
+  Future<String> crateApiChatConversationPolicyGet({
+    required String conversationId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(conversationId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 28,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatConversationPolicyGetConstMeta,
+        argValues: [conversationId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatConversationPolicyGetConstMeta =>
+      const TaskConstMeta(
+        debugName: "conversation_policy_get",
+        argNames: ["conversationId"],
+      );
+
+  @override
+  Future<String> crateApiChatConversationPolicySave({
+    required String conversationId,
+    required String policyJson,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(conversationId, serializer);
+          sse_encode_String(policyJson, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 29,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatConversationPolicySaveConstMeta,
+        argValues: [conversationId, policyJson],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatConversationPolicySaveConstMeta =>
+      const TaskConstMeta(
+        debugName: "conversation_policy_save",
+        argNames: ["conversationId", "policyJson"],
+      );
+
+  @override
+  Future<String> crateApiChatCoreErrorMessage({required CoreError error}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError(
+            error,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 30,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiChatCoreErrorMessageConstMeta,
+        argValues: [error],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatCoreErrorMessageConstMeta =>
+      const TaskConstMeta(debugName: "core_error_message", argNames: ["error"]);
+
+  @override
   Stream<String> crateApiStreamsEntityChanges() {
     final sink = RustStreamSink<String>();
     unawaited(
@@ -1110,7 +1476,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 22,
+              funcId: 31,
               port: port_,
             );
           },
@@ -1142,7 +1508,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 23,
+            funcId: 32,
             port: port_,
           );
         },
@@ -1175,7 +1541,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 24,
+            funcId: 33,
             port: port_,
           );
         },
@@ -1210,7 +1576,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 25,
+            funcId: 34,
             port: port_,
           );
         },
@@ -1241,7 +1607,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 26,
+            funcId: 35,
             port: port_,
           );
         },
@@ -1272,7 +1638,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 27,
+            funcId: 36,
             port: port_,
           );
         },
@@ -1305,7 +1671,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 28,
+            funcId: 37,
             port: port_,
           );
         },
@@ -1336,7 +1702,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 29,
+            funcId: 38,
             port: port_,
           );
         },
@@ -1363,7 +1729,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 30,
+            funcId: 39,
             port: port_,
           );
         },
@@ -1391,7 +1757,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 31,
+            funcId: 40,
             port: port_,
           );
         },
@@ -1422,7 +1788,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 32,
+              funcId: 41,
               port: port_,
             );
           },
@@ -1454,7 +1820,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 33,
+            funcId: 42,
             port: port_,
           );
         },
@@ -1485,7 +1851,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 34,
+            funcId: 43,
             port: port_,
           );
         },
@@ -1519,7 +1885,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 35,
+            funcId: 44,
             port: port_,
           );
         },
@@ -1551,7 +1917,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 36,
+            funcId: 45,
             port: port_,
           );
         },
@@ -1580,7 +1946,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 37,
+            funcId: 46,
             port: port_,
           );
         },
@@ -1614,7 +1980,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 38,
+            funcId: 47,
             port: port_,
           );
         },
@@ -1646,7 +2012,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 39,
+            funcId: 48,
             port: port_,
           );
         },
@@ -1677,7 +2043,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 40,
+            funcId: 49,
             port: port_,
           );
         },
@@ -1709,7 +2075,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 41,
+            funcId: 50,
             port: port_,
           );
         },
@@ -1737,7 +2103,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 42,
+            funcId: 51,
             port: port_,
           );
         },
@@ -1757,6 +2123,154 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
       const TaskConstMeta(debugName: "prepare_local_model", argNames: []);
 
   @override
+  Future<String> crateApiChatProviderCatalog() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 52,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatProviderCatalogConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatProviderCatalogConstMeta =>
+      const TaskConstMeta(debugName: "provider_catalog", argNames: []);
+
+  @override
+  Future<void> crateApiChatProviderDelete({required String id}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(id, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 53,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatProviderDeleteConstMeta,
+        argValues: [id],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatProviderDeleteConstMeta =>
+      const TaskConstMeta(debugName: "provider_delete", argNames: ["id"]);
+
+  @override
+  Future<String> crateApiChatProviderList() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 54,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatProviderListConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatProviderListConstMeta =>
+      const TaskConstMeta(debugName: "provider_list", argNames: []);
+
+  @override
+  Future<void> crateApiChatProviderSave({required String requestJson}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(requestJson, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 55,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatProviderSaveConstMeta,
+        argValues: [requestJson],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatProviderSaveConstMeta => const TaskConstMeta(
+    debugName: "provider_save",
+    argNames: ["requestJson"],
+  );
+
+  @override
+  Future<String> crateApiChatProviderTest({required String id, String? model}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(id, serializer);
+          sse_encode_opt_String(model, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 56,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatProviderTestConstMeta,
+        argValues: [id, model],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatProviderTestConstMeta => const TaskConstMeta(
+    debugName: "provider_test",
+    argNames: ["id", "model"],
+  );
+
+  @override
   Future<String> crateApiChatResolveRemoteContent({
     required String url,
     required String kind,
@@ -1770,7 +2284,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 43,
+            funcId: 57,
             port: port_,
           );
         },
@@ -1802,7 +2316,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 44,
+            funcId: 58,
             port: port_,
           );
         },
@@ -1830,7 +2344,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 45,
+            funcId: 59,
             port: port_,
           );
         },
@@ -1849,6 +2363,35 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
       const TaskConstMeta(debugName: "search_mode_default", argNames: []);
 
   @override
+  Future<void> crateApiChatSetActiveLane({required String lane}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(lane, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 60,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatSetActiveLaneConstMeta,
+        argValues: [lane],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatSetActiveLaneConstMeta =>
+      const TaskConstMeta(debugName: "set_active_lane", argNames: ["lane"]);
+
+  @override
   Future<void> crateApiChatSetThemeMode({required String mode}) {
     return handler.executeNormal(
       NormalTask(
@@ -1858,7 +2401,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 46,
+            funcId: 61,
             port: port_,
           );
         },
@@ -1889,7 +2432,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 47,
+              funcId: 62,
               port: port_,
             );
           },
@@ -1918,7 +2461,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 48,
+            funcId: 63,
             port: port_,
           );
         },
@@ -1938,6 +2481,255 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
       const TaskConstMeta(debugName: "theme_mode", argNames: []);
 
   @override
+  Future<String> crateApiChatUarAdminSnapshot() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 64,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatUarAdminSnapshotConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatUarAdminSnapshotConstMeta =>
+      const TaskConstMeta(debugName: "uar_admin_snapshot", argNames: []);
+
+  @override
+  Future<void> crateApiChatUarAgentDelete({required String id}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(id, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 65,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatUarAgentDeleteConstMeta,
+        argValues: [id],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatUarAgentDeleteConstMeta =>
+      const TaskConstMeta(debugName: "uar_agent_delete", argNames: ["id"]);
+
+  @override
+  Future<String> crateApiChatUarAgentSave({required String agentJson}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(agentJson, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 66,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatUarAgentSaveConstMeta,
+        argValues: [agentJson],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatUarAgentSaveConstMeta =>
+      const TaskConstMeta(debugName: "uar_agent_save", argNames: ["agentJson"]);
+
+  @override
+  Future<String> crateApiChatUarKnowledgeBaseCreate({
+    required String requestJson,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(requestJson, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 67,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatUarKnowledgeBaseCreateConstMeta,
+        argValues: [requestJson],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatUarKnowledgeBaseCreateConstMeta =>
+      const TaskConstMeta(
+        debugName: "uar_knowledge_base_create",
+        argNames: ["requestJson"],
+      );
+
+  @override
+  Future<void> crateApiChatUarKnowledgeBaseDelete({required String id}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(id, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 68,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatUarKnowledgeBaseDeleteConstMeta,
+        argValues: [id],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatUarKnowledgeBaseDeleteConstMeta =>
+      const TaskConstMeta(
+        debugName: "uar_knowledge_base_delete",
+        argNames: ["id"],
+      );
+
+  @override
+  Future<String> crateApiChatUarMcpServerDelete({required String name}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(name, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 69,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatUarMcpServerDeleteConstMeta,
+        argValues: [name],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatUarMcpServerDeleteConstMeta =>
+      const TaskConstMeta(
+        debugName: "uar_mcp_server_delete",
+        argNames: ["name"],
+      );
+
+  @override
+  Future<String> crateApiChatUarMcpServerSave({
+    required String name,
+    required String serverJson,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(name, serializer);
+          sse_encode_String(serverJson, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 70,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatUarMcpServerSaveConstMeta,
+        argValues: [name, serverJson],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatUarMcpServerSaveConstMeta =>
+      const TaskConstMeta(
+        debugName: "uar_mcp_server_save",
+        argNames: ["name", "serverJson"],
+      );
+
+  @override
+  Future<String> crateApiChatUarMemoryDelete({required String id}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(id, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 71,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatUarMemoryDeleteConstMeta,
+        argValues: [id],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatUarMemoryDeleteConstMeta =>
+      const TaskConstMeta(debugName: "uar_memory_delete", argNames: ["id"]);
+
+  @override
   Future<String> crateApiChatUarRuntimeStatus() {
     return handler.executeNormal(
       NormalTask(
@@ -1946,7 +2738,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 49,
+            funcId: 72,
             port: port_,
           );
         },
@@ -1964,6 +2756,134 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
 
   TaskConstMeta get kCrateApiChatUarRuntimeStatusConstMeta =>
       const TaskConstMeta(debugName: "uar_runtime_status", argNames: []);
+
+  @override
+  Future<String> crateApiChatUarServiceConfig() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 73,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatUarServiceConfigConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatUarServiceConfigConstMeta =>
+      const TaskConstMeta(debugName: "uar_service_config", argNames: []);
+
+  @override
+  Future<String> crateApiChatUarServiceProbe() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 74,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatUarServiceProbeConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatUarServiceProbeConstMeta =>
+      const TaskConstMeta(debugName: "uar_service_probe", argNames: []);
+
+  @override
+  Future<void> crateApiChatUarServiceSave({
+    required String serviceUrl,
+    String? apiKey,
+    String? sessionId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(serviceUrl, serializer);
+          sse_encode_opt_String(apiKey, serializer);
+          sse_encode_opt_String(sessionId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 75,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatUarServiceSaveConstMeta,
+        argValues: [serviceUrl, apiKey, sessionId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatUarServiceSaveConstMeta => const TaskConstMeta(
+    debugName: "uar_service_save",
+    argNames: ["serviceUrl", "apiKey", "sessionId"],
+  );
+
+  @override
+  Future<String> crateApiChatUarSettingSave({
+    required String key,
+    required String valueJson,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(key, serializer);
+          sse_encode_String(valueJson, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 76,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatUarSettingSaveConstMeta,
+        argValues: [key, valueJson],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatUarSettingSaveConstMeta => const TaskConstMeta(
+    debugName: "uar_setting_save",
+    argNames: ["key", "valueJson"],
+  );
 
   RustArcIncrementStrongCountFnType
   get rust_arc_increment_strong_count_A2UiEvent => wire

@@ -22,6 +22,12 @@ class ThemeModeNotifier extends Notifier<shad.ThemeMode> {
 
   @override
   shad.ThemeMode build() {
+    const skipMobileBootForDemo = bool.fromEnvironment(
+      'KNOWME_DEMO_SKIP_MOBILE_BOOT',
+      defaultValue: false,
+    );
+    if (skipMobileBootForDemo) return shad.ThemeMode.system;
+
     final startup = ref.watch(startupProvider);
     if (!_loaded && startup.value == StartupPhase.ready) {
       _loaded = true;

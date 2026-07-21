@@ -1,0 +1,12 @@
+{
+  "stage": "execute",
+  "completedAt": "2026-07-20T20:33:47Z",
+  "outputs": [
+    "execution.md",
+    "progress.json"
+  ],
+  "nextStage": "reflect",
+  "summaryForNext": "OpenSpec via KBD apply; Codex self-executes 24 tasks; first pending task is UAR EmbeddedRuntimeBuilder",
+  "skipped": false,
+  "skipReason": null
+}

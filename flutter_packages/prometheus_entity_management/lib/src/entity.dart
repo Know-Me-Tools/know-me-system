@@ -3,6 +3,8 @@
 /// the entity payload as JSON so the transport stays schema-agnostic; features
 /// decode it into their own freezed models. ChangeEvent is the Rust-emitted
 /// invalidation signal the bridge folds into `ref.invalidate`.
+library;
+
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'entity.freezed.dart';

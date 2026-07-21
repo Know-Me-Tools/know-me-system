@@ -3,6 +3,8 @@
 /// gen_ui_types::view (ViewDescriptor / FilterSpec / SortSpec). Compiled to SQL
 /// clauses in Rust (gen_ui_db); the UI only ever constructs these. JSON is
 /// snake_case to match the Rust serde wire format 1:1.
+library;
+
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'view.freezed.dart';

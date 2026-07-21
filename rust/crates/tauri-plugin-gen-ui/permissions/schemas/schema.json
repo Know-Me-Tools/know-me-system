@@ -307,6 +307,114 @@
           "markdownDescription": "Denies the attach_sync_shapes command without any pre-configured scope."
         },
         {
+          "description": "Enables the cancel_agent_run command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-cancel-agent-run",
+          "markdownDescription": "Enables the cancel_agent_run command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the cancel_agent_run command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-cancel-agent-run",
+          "markdownDescription": "Denies the cancel_agent_run command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the cancel_model_operation command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-cancel-model-operation",
+          "markdownDescription": "Enables the cancel_model_operation command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the cancel_model_operation command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-cancel-model-operation",
+          "markdownDescription": "Denies the cancel_model_operation command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the chat_control_catalog command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-chat-control-catalog",
+          "markdownDescription": "Enables the chat_control_catalog command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the chat_control_catalog command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-chat-control-catalog",
+          "markdownDescription": "Denies the chat_control_catalog command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the cloud_model_get command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-cloud-model-get",
+          "markdownDescription": "Enables the cloud_model_get command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the cloud_model_get command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-cloud-model-get",
+          "markdownDescription": "Denies the cloud_model_get command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the cloud_model_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-cloud-model-save",
+          "markdownDescription": "Enables the cloud_model_save command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the cloud_model_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-cloud-model-save",
+          "markdownDescription": "Denies the cloud_model_save command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the conversation_effective_config command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-conversation-effective-config",
+          "markdownDescription": "Enables the conversation_effective_config command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the conversation_effective_config command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-conversation-effective-config",
+          "markdownDescription": "Denies the conversation_effective_config command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the conversation_policy_delete command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-conversation-policy-delete",
+          "markdownDescription": "Enables the conversation_policy_delete command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the conversation_policy_delete command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-conversation-policy-delete",
+          "markdownDescription": "Denies the conversation_policy_delete command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the conversation_policy_get command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-conversation-policy-get",
+          "markdownDescription": "Enables the conversation_policy_get command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the conversation_policy_get command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-conversation-policy-get",
+          "markdownDescription": "Denies the conversation_policy_get command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the conversation_policy_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-conversation-policy-save",
+          "markdownDescription": "Enables the conversation_policy_save command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the conversation_policy_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-conversation-policy-save",
+          "markdownDescription": "Denies the conversation_policy_save command without any pre-configured scope."
+        },
+        {
           "description": "Enables the entity_create command without any pre-configured scope.",
           "type": "string",
           "const": "allow-entity-create",
@@ -439,6 +547,54 @@
           "markdownDescription": "Denies the load_seeds command without any pre-configured scope."
         },
         {
+          "description": "Enables the local_model_status command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-local-model-status",
+          "markdownDescription": "Enables the local_model_status command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the local_model_status command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-local-model-status",
+          "markdownDescription": "Denies the local_model_status command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the local_runtime_diagnostics command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-local-runtime-diagnostics",
+          "markdownDescription": "Enables the local_runtime_diagnostics command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the local_runtime_diagnostics command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-local-runtime-diagnostics",
+          "markdownDescription": "Denies the local_runtime_diagnostics command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the memory_delete_conversation_context command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-memory-delete-conversation-context",
+          "markdownDescription": "Enables the memory_delete_conversation_context command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the memory_delete_conversation_context command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-memory-delete-conversation-context",
+          "markdownDescription": "Denies the memory_delete_conversation_context command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the memory_delete_message_context command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-memory-delete-message-context",
+          "markdownDescription": "Enables the memory_delete_message_context command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the memory_delete_message_context command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-memory-delete-message-context",
+          "markdownDescription": "Denies the memory_delete_message_context command without any pre-configured scope."
+        },
+        {
           "description": "Enables the memory_ingest command without any pre-configured scope.",
           "type": "string",
           "const": "allow-memory-ingest",
@@ -451,6 +607,18 @@
           "markdownDescription": "Denies the memory_ingest command without any pre-configured scope."
         },
         {
+          "description": "Enables the memory_promote_context command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-memory-promote-context",
+          "markdownDescription": "Enables the memory_promote_context command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the memory_promote_context command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-memory-promote-context",
+          "markdownDescription": "Denies the memory_promote_context command without any pre-configured scope."
+        },
+        {
           "description": "Enables the memory_search command without any pre-configured scope.",
           "type": "string",
           "const": "allow-memory-search",
@@ -461,6 +629,90 @@
           "type": "string",
           "const": "deny-memory-search",
           "markdownDescription": "Denies the memory_search command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the prepare_local_model command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-prepare-local-model",
+          "markdownDescription": "Enables the prepare_local_model command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the prepare_local_model command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-prepare-local-model",
+          "markdownDescription": "Denies the prepare_local_model command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the promote_a2ui_component command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-promote-a2ui-component",
+          "markdownDescription": "Enables the promote_a2ui_component command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the promote_a2ui_component command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-promote-a2ui-component",
+          "markdownDescription": "Denies the promote_a2ui_component command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the provider_catalog command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-provider-catalog",
+          "markdownDescription": "Enables the provider_catalog command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the provider_catalog command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-provider-catalog",
+          "markdownDescription": "Denies the provider_catalog command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the provider_delete command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-provider-delete",
+          "markdownDescription": "Enables the provider_delete command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the provider_delete command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-provider-delete",
+          "markdownDescription": "Denies the provider_delete command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the provider_list command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-provider-list",
+          "markdownDescription": "Enables the provider_list command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the provider_list command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-provider-list",
+          "markdownDescription": "Denies the provider_list command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the provider_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-provider-save",
+          "markdownDescription": "Enables the provider_save command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the provider_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-provider-save",
+          "markdownDescription": "Denies the provider_save command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the provider_test command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-provider-test",
+          "markdownDescription": "Enables the provider_test command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the provider_test command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-provider-test",
+          "markdownDescription": "Denies the provider_test command without any pre-configured scope."
         },
         {
           "description": "Enables the run_migrations command without any pre-configured scope.",
@@ -499,6 +751,18 @@
           "markdownDescription": "Denies the scribe_stop command without any pre-configured scope."
         },
         {
+          "description": "Enables the send_agent_interaction_a2ui command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-send-agent-interaction-a2ui",
+          "markdownDescription": "Enables the send_agent_interaction_a2ui command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the send_agent_interaction_a2ui command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-send-agent-interaction-a2ui",
+          "markdownDescription": "Denies the send_agent_interaction_a2ui command without any pre-configured scope."
+        },
+        {
           "description": "Enables the set_active_lane command without any pre-configured scope.",
           "type": "string",
           "const": "allow-set-active-lane",
@@ -521,6 +785,102 @@
           "type": "string",
           "const": "deny-stream-agent-a2ui",
           "markdownDescription": "Denies the stream_agent_a2ui command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the uar_admin_snapshot command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-uar-admin-snapshot",
+          "markdownDescription": "Enables the uar_admin_snapshot command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the uar_admin_snapshot command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-uar-admin-snapshot",
+          "markdownDescription": "Denies the uar_admin_snapshot command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the uar_agent_delete command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-uar-agent-delete",
+          "markdownDescription": "Enables the uar_agent_delete command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the uar_agent_delete command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-uar-agent-delete",
+          "markdownDescription": "Denies the uar_agent_delete command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the uar_agent_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-uar-agent-save",
+          "markdownDescription": "Enables the uar_agent_save command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the uar_agent_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-uar-agent-save",
+          "markdownDescription": "Denies the uar_agent_save command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the uar_knowledge_base_create command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-uar-knowledge-base-create",
+          "markdownDescription": "Enables the uar_knowledge_base_create command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the uar_knowledge_base_create command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-uar-knowledge-base-create",
+          "markdownDescription": "Denies the uar_knowledge_base_create command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the uar_knowledge_base_delete command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-uar-knowledge-base-delete",
+          "markdownDescription": "Enables the uar_knowledge_base_delete command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the uar_knowledge_base_delete command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-uar-knowledge-base-delete",
+          "markdownDescription": "Denies the uar_knowledge_base_delete command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the uar_mcp_server_delete command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-uar-mcp-server-delete",
+          "markdownDescription": "Enables the uar_mcp_server_delete command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the uar_mcp_server_delete command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-uar-mcp-server-delete",
+          "markdownDescription": "Denies the uar_mcp_server_delete command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the uar_mcp_server_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-uar-mcp-server-save",
+          "markdownDescription": "Enables the uar_mcp_server_save command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the uar_mcp_server_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-uar-mcp-server-save",
+          "markdownDescription": "Denies the uar_mcp_server_save command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the uar_memory_delete command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-uar-memory-delete",
+          "markdownDescription": "Enables the uar_memory_delete command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the uar_memory_delete command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-uar-memory-delete",
+          "markdownDescription": "Denies the uar_memory_delete command without any pre-configured scope."
         },
         {
           "description": "Enables the uar_runtime_status command without any pre-configured scope.",
@@ -547,6 +907,18 @@
           "markdownDescription": "Denies the uar_service_config command without any pre-configured scope."
         },
         {
+          "description": "Enables the uar_service_probe command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-uar-service-probe",
+          "markdownDescription": "Enables the uar_service_probe command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the uar_service_probe command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-uar-service-probe",
+          "markdownDescription": "Denies the uar_service_probe command without any pre-configured scope."
+        },
+        {
           "description": "Enables the uar_service_save command without any pre-configured scope.",
           "type": "string",
           "const": "allow-uar-service-save",
@@ -559,10 +931,28 @@
           "markdownDescription": "Denies the uar_service_save command without any pre-configured scope."
         },
         {
-          "description": "Default gen-ui permissions: startup/read/chat intents. Mutating ENTITY commands require the gen-ui:allow-write set explicitly. set-active-lane writes an app setting (a user preference), not entity data, so it belongs here alongside the other chat intents — same category as memory-ingest.\n#### This default permission set includes:\n\n- `allow-stream-agent-a2ui`\n- `allow-get-active-lane`\n- `allow-set-active-lane`\n- `allow-has-local-engine`\n- `allow-uar-runtime-status`\n- `allow-run-migrations`\n- `allow-load-seeds`\n- `allow-attach-sync-shapes`\n- `allow-memory-ingest`\n- `allow-entity-runtime-start`\n- `allow-entity-runtime-stop`\n- `allow-entity-list`\n- `allow-entity-get`\n- `allow-memory-search`\n- `allow-graph-expand`\n- `allow-scribe-start`\n- `allow-scribe-stop`",
+          "description": "Enables the uar_setting_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-uar-setting-save",
+          "markdownDescription": "Enables the uar_setting_save command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the uar_setting_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-uar-setting-save",
+          "markdownDescription": "Denies the uar_setting_save command without any pre-configured scope."
+        },
+        {
+          "description": "Default gen-ui permissions: startup/read/chat intents. Mutating ENTITY commands require the gen-ui:allow-write set explicitly. set-active-lane writes an app setting (a user preference), not entity data, so it belongs here alongside the other chat intents — same category as memory-ingest.\n#### This default permission set includes:\n\n- `allow-stream-agent-a2ui`\n- `allow-send-agent-interaction-a2ui`\n- `allow-get-active-lane`\n- `allow-set-active-lane`\n- `allow-has-local-engine`\n- `allow-cancel-agent-run`\n- `allow-prepare-local-model`\n- `allow-local-model-status`\n- `allow-cancel-model-operation`\n- `allow-local-runtime-diagnostics`\n- `allow-uar-runtime-status`\n- `allow-run-migrations`\n- `allow-load-seeds`\n- `allow-attach-sync-shapes`\n- `allow-memory-ingest`\n- `allow-entity-runtime-start`\n- `allow-entity-runtime-stop`\n- `allow-entity-list`\n- `allow-entity-get`\n- `allow-memory-search`\n- `allow-graph-expand`\n- `allow-scribe-start`\n- `allow-scribe-stop`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Default gen-ui permissions: startup/read/chat intents. Mutating ENTITY commands require the gen-ui:allow-write set explicitly. set-active-lane writes an app setting (a user preference), not entity data, so it belongs here alongside the other chat intents — same category as memory-ingest.\n#### This default permission set includes:\n\n- `allow-stream-agent-a2ui`\n- `allow-get-active-lane`\n- `allow-set-active-lane`\n- `allow-has-local-engine`\n- `allow-uar-runtime-status`\n- `allow-run-migrations`\n- `allow-load-seeds`\n- `allow-attach-sync-shapes`\n- `allow-memory-ingest`\n- `allow-entity-runtime-start`\n- `allow-entity-runtime-stop`\n- `allow-entity-list`\n- `allow-entity-get`\n- `allow-memory-search`\n- `allow-graph-expand`\n- `allow-scribe-start`\n- `allow-scribe-stop`"
+          "markdownDescription": "Default gen-ui permissions: startup/read/chat intents. Mutating ENTITY commands require the gen-ui:allow-write set explicitly. set-active-lane writes an app setting (a user preference), not entity data, so it belongs here alongside the other chat intents — same category as memory-ingest.\n#### This default permission set includes:\n\n- `allow-stream-agent-a2ui`\n- `allow-send-agent-interaction-a2ui`\n- `allow-get-active-lane`\n- `allow-set-active-lane`\n- `allow-has-local-engine`\n- `allow-cancel-agent-run`\n- `allow-prepare-local-model`\n- `allow-local-model-status`\n- `allow-cancel-model-operation`\n- `allow-local-runtime-diagnostics`\n- `allow-uar-runtime-status`\n- `allow-run-migrations`\n- `allow-load-seeds`\n- `allow-attach-sync-shapes`\n- `allow-memory-ingest`\n- `allow-entity-runtime-start`\n- `allow-entity-runtime-stop`\n- `allow-entity-list`\n- `allow-entity-get`\n- `allow-memory-search`\n- `allow-graph-expand`\n- `allow-scribe-start`\n- `allow-scribe-stop`"
+        },
+        {
+          "description": "Allow the settings overlay to administer UAR connectivity and UAR-owned provider/model configuration.",
+          "type": "string",
+          "const": "allow-settings-admin",
+          "markdownDescription": "Allow the settings overlay to administer UAR connectivity and UAR-owned provider/model configuration."
         },
         {
           "description": "Allow entity create/update/delete. Grant only to capabilities that own writes.",

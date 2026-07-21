@@ -1,0 +1,22 @@
+{
+  "question": "How should KnowMe use UAR for cross-platform RAG and Karpathy learning loops?",
+  "stages": [
+    {"id": 1, "name": "frame", "status": "complete"},
+    {"id": 2, "name": "discover", "status": "complete"},
+    {"id": 3, "name": "retrieve", "status": "complete"},
+    {"id": 4, "name": "evaluate_sources", "status": "complete"},
+    {"id": 5, "name": "extract_claims", "status": "complete"},
+    {"id": 6, "name": "map_evidence", "status": "complete"},
+    {"id": 7, "name": "resolve_contradictions", "status": "complete"},
+    {"id": 8, "name": "synthesize", "status": "complete"},
+    {"id": 9, "name": "quality_gate", "status": "complete", "note": "Strict sycophancy check passed; learn-grade tool unavailable."},
+    {"id": 10, "name": "publish", "status": "complete"}
+  ],
+  "constraints": [
+    "Architecture and document artifacts only",
+    "Networking, persistence, LLM, and agent execution remain in Rust",
+    "Mobile uses embedded library through FFI",
+    "Desktop uses supervised sidecar topology",
+    "Web uses UAR behind Axum"
+  ]
+}

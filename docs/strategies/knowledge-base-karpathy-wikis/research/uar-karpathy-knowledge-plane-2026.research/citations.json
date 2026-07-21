@@ -1,0 +1,15 @@
+{
+  "claims": [
+    {"id": "C01", "sources": ["L01", "L02", "L03"], "confidence": "high"},
+    {"id": "C02", "sources": ["L02", "L04", "L10"], "confidence": "high"},
+    {"id": "C03", "sources": ["L11", "W12"], "confidence": "high"},
+    {"id": "C04", "sources": ["L06", "L07", "L08"], "confidence": "high"},
+    {"id": "C05", "sources": ["W01", "W02", "L06"], "confidence": "high"},
+    {"id": "C06", "sources": ["L11", "L12", "W12"], "confidence": "high"},
+    {"id": "C07", "sources": ["L03", "W08"], "confidence": "high"},
+    {"id": "C08", "sources": ["L02", "W09", "W10"], "confidence": "high"},
+    {"id": "C09", "sources": ["L08", "W02"], "confidence": "medium-high"},
+    {"id": "C10", "label": "Mobile jobs require checkpointing and opportunistic scheduling", "sources": ["W06", "W07"], "confidence": "high"},
+    {"id": "C11", "label": "Graph retrieval complements rather than replaces local retrieval", "sources": ["W04", "W03"], "confidence": "high"}
+  ]
+}

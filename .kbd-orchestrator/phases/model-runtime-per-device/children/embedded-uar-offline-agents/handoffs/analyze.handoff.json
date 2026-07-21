@@ -1,0 +1,12 @@
+{
+  "stage": "analyze",
+  "completedAt": "2026-07-20T20:27:29Z",
+  "outputs": [
+    "analysis.md",
+    "library-candidates.json"
+  ],
+  "nextStage": "spec",
+  "summaryForNext": "4 candidates; adapt UAR core, adopt FRB and platform-native packaging; build real embedded kernel plus Android/iOS host drivers",
+  "skipped": false,
+  "skipReason": null
+}

@@ -66,9 +66,35 @@ describe('createA2uiWireAdapter', () => {
     adapter.handle({ type: 'block', block: { type: 'text', text: 'answer' } })
     adapter.handle({ type: 'block', block: { type: 'text', text: ' done' } })
     expect(events).toEqual([
-      { type: 'contentBlock', messageId: 'msg-reasoning', block: { type: 'thinking', text: 'reason' } },
+      { type: 'contentBlock', messageId: 'msg-reasoning', blockIndex: 0, block: { type: 'thinking', text: 'reason' } },
       { type: 'contentBlock', messageId: 'msg-reasoning', blockIndex: 1, block: { type: 'text', text: 'answer' } },
       { type: 'contentBlock', messageId: 'msg-reasoning', blockIndex: 1, block: { type: 'text', text: 'answer done' } },
+    ])
+  })
+
+  it('accumulates contiguous thinking deltas into one reasoning block', () => {
+    const { events, adapter } = collect()
+    adapter.bind('msg-thinking')
+    adapter.handle({ type: 'block', block: { type: 'thinking', text: 'first ' } })
+    adapter.handle({ type: 'block', block: { type: 'thinking', text: 'second' } })
+
+    expect(events).toEqual([
+      { type: 'contentBlock', messageId: 'msg-thinking', blockIndex: 0, block: { type: 'thinking', text: 'first ' } },
+      { type: 'contentBlock', messageId: 'msg-thinking', blockIndex: 0, block: { type: 'thinking', text: 'first second' } },
+    ])
+  })
+
+  it('starts a new thinking block after another semantic block boundary', () => {
+    const { events, adapter } = collect()
+    adapter.bind('msg-thinking-boundary')
+    adapter.handle({ type: 'block', block: { type: 'thinking', text: 'first' } })
+    adapter.handle({ type: 'block', block: { type: 'citation', source: 'doc', quote: 'quote' } })
+    adapter.handle({ type: 'block', block: { type: 'thinking', text: 'second' } })
+
+    expect(events).toEqual([
+      { type: 'contentBlock', messageId: 'msg-thinking-boundary', blockIndex: 0, block: { type: 'thinking', text: 'first' } },
+      { type: 'contentBlock', messageId: 'msg-thinking-boundary', block: { type: 'citation', source: 'doc', quote: 'quote' } },
+      { type: 'contentBlock', messageId: 'msg-thinking-boundary', blockIndex: 2, block: { type: 'thinking', text: 'second' } },
     ])
   })
 

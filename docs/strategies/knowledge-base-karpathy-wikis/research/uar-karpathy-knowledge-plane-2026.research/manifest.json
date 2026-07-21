@@ -1,0 +1,64 @@
+{
+  "schema_version": "1.0",
+  "package_type": "deep-research",
+  "id": "uar-karpathy-knowledge-plane-2026",
+  "title": "UAR knowledge plane, RAG, and Karpathy wiki architecture",
+  "created_at": "2026-07-19T12:25:15Z",
+  "updated_at": "2026-07-19T13:15:00Z",
+  "status": "complete",
+  "source_snapshot": {
+    "uar_submodule_commit": "9bee88d9745f82d7a63445c36e5e4c6a42048fd5",
+    "verified_at": "2026-07-19T13:15:00Z",
+    "knowme_worktree": "concurrent; claims verified from files listed in the source registry"
+  },
+  "research_question": "How should KnowMe use the UAR submodule for RAG, Karpathy wikis, and evaluated learning loops across embedded mobile, supervised desktop, and Axum-served web environments?",
+  "scope": {
+    "included": [
+      "UAR and Prometheus knowledge capabilities and maturity",
+      "KnowMe integration seams and existing graph retrieval",
+      "mobile, desktop, and web placement",
+      "artifact authority, synchronization, security, evaluation, and delivery gates"
+    ],
+    "excluded": [
+      "runtime implementation",
+      "code changes",
+      "provider/model benchmark execution",
+      "legal opinion"
+    ]
+  },
+  "artifacts": {
+    "index": "index.md",
+    "plan_markdown": "plan.md",
+    "plan_json": "plan.json",
+    "source_registry": "sources/registry.json",
+    "evidence_graph": "graph.json",
+    "citations": "citations.json",
+    "contradictions": "contradictions.json",
+    "report": "report.md",
+    "published_strategy": "../../README.md"
+  },
+  "quality": {
+    "primary_sources_only_for_external_technical_claims": true,
+    "assessment_thesis_sycophancy_score": 0.0,
+    "final_strategy_sycophancy_score": 0.01785714365541935,
+    "final_strategy_sycophancy_result": {
+      "strictness": "strict",
+      "correction_mandatory": false,
+      "patterns": [
+        {
+          "id": "S-07",
+          "severity": "low",
+          "disposition": "accepted: length reflects three platform contracts, loop governance, evaluation, and auditable evidence"
+        }
+      ]
+    },
+    "feynman_grade": null,
+    "feynman_grade_status": "unavailable",
+    "known_limitations": [
+      "No physical-device measurements were run",
+      "No live UAR service was started",
+      "Repository source may change after the pinned submodule revision",
+      "Licensing observations require qualified review"
+    ]
+  }
+}

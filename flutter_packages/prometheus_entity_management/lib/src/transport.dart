@@ -2,6 +2,8 @@
 /// EntityTransport — the entity data-access seam. Implemented by the host app as
 /// a thin adapter over the frb-generated gen_ui_flutter bindings; it delegates
 /// straight to gen_ui_core. Nothing above this layer talks to the FFI directly.
+library;
+
 import 'entity.dart';
 import 'view.dart';
 

@@ -15,7 +15,7 @@ evidence.
 |---|---|---|
 | Agent definitions and execution | UAR | Render, select, configure, and invoke through the Rust boundary |
 | Skill definitions, storage, routing, and eval fixtures | UAR | Surface activations as `ContentBlock::Skill` and persist projected blocks |
-| A2UI component catalog and registry | UAR | Provide compliant renderers and reject unknown/unsafe components |
+| A2UI execution loop, component catalog, and registry | UAR | Render approved surfaces, preserve source-run provenance, and return typed user actions |
 | General LLM/provider access | UAR | Offer local-device providers and expose user-safe backend status |
 | Tool governance and approvals | UAR policy/runtime | Preserve visible approval/cancellation/error semantics in chat |
 | Mobile local inference | KnowMe local provider, exposed to UAR | LiteRT-LM/Gemma 4 E2B on Android; iOS local lane separately certified |
@@ -132,13 +132,40 @@ layer for UAR events.
 | text deltas | Markdown/text answer blocks |
 | tool call lifecycle/result | `ToolUseBlock` / `ToolResultBlock` |
 | `uar.skill.activated` and process lifecycle | `SkillBlock` outside the answer bubble, parallel to thinking/citation chunks |
-| memory/retrieval/citation events | `MemoryBlock` / `CitationBlock` |
+| memory/retrieval/citation events | `MemoryBlock` / `CitationBlock`; RAG citation arrays expand into ordered citation blocks and memory recall items remain inspectable as recall blocks |
 | A2UI surface/state events | `ArtifactBlock(type: a2ui)` rendered through A2UI |
 | unknown/custom provider payloads | `ArtifactBlock` with source/event/payload |
 | cancellation/error | terminal run status bubbles, not fake assistant prose |
 
 The rule stays strict: no UAR event is silently dropped. Unknown payloads become
 inspectable artifacts.
+
+## AG-UI/A2UI execution ownership
+
+UAR owns the complete live artifact loop, not only the component registry. For
+every A2UI-producing turn UAR must:
+
+- create and persist the source run;
+- emit the official AG-UI run, step, text, reasoning, tool, state, artifact,
+  error, cancellation, and completion events;
+- validate and publish A2UI surface messages and state patches;
+- retain surface replay data for reconnect/restart recovery;
+- accept typed A2UI actions against the durable source run;
+- merge the submitted client data model and action context under UAR policy;
+- create and stream the continuation run through the same AG-UI protocol; and
+- own component-library promotion, versioning, and governance.
+
+React and Flutter are deliberately thin clients in this loop. They render the
+approved catalog, maintain only transient form state, persist the projected
+conversation blocks, and send a typed action envelope containing
+`sourceRunId`, `surfaceId`, `sourceComponentId`, action name/context, timestamp,
+and the client data model. They do not synthesize continuation prompts, execute
+agent logic, or guess which UAR run owns a restored surface.
+
+The acceptance gate is an actual prompt → UAR run → A2UI surface → client
+restart/reload → restored surface → typed action → UAR continuation → AG-UI
+completion sequence. A display-only fixture or client-local callback does not
+qualify.
 
 ## A2UI catalog integration
 
@@ -150,6 +177,8 @@ rendering conformance:
 - Unknown catalog ids or component names fail closed.
 - Component registry updates come from UAR, but mobile can cache approved
   profiles for offline rendering.
+- A component action always targets the persisted UAR source run; an ephemeral
+  client run map may be used only as a same-session fallback.
 - Renderer tests should use UAR golden fixtures where available, not
   hand-authored one-off examples only.
 
@@ -184,7 +213,12 @@ policy explicitly includes them.
   keychain-backed API key reference, compiled agent artifact, and optional
   session id; `gen_ui_agent::chat` routes that lane through `UarServiceRuntime`
   and submits A2UI action responses back through UAR's artifact-response
-  endpoint.
+  endpoint. The Tauri UAR runtime-status command now reports `service_runtime`
+  once the effective service config can load. The React desktop Settings screen
+  now saves this config, while the Chat lane switcher and Models screen expose
+  the `uar` lane only as a visible, guarded option until the service is runnable.
+  Settings can also run a non-destructive `/health` probe against the saved UAR
+  service config and show the result before a chat run is attempted.
 - Define event mapping tests from UAR stream payloads to KnowMe `ContentBlock`
   variants.
 - Keep the existing local LiteRT-LM path active while the facade is introduced.
@@ -225,9 +259,11 @@ non-invasive way:
 2. Add a compile-time/offline contract test fixture that maps representative
    UAR stream events into KnowMe content blocks. **Done:** `gen_ui_protocol`
    normalizes UAR `uar.agui/1` reasoning, skill activation, tool lifecycle,
-   and unknown custom events into KnowMe stream/content blocks.
-   `gen_ui_agent::uar` also projects UAR SDK SSE stream events through the same
-   adapter while preserving order.
+   direct citations, RAG citation arrays, memory updates, memory recall, and
+   unknown custom events into KnowMe stream/content blocks.
+   `gen_ui_agent::uar` also projects UAR SDK SSE stream events, including direct
+   `agui.rag_citations`, `agui.custom` envelopes, and native normalized SSE
+   events, through the same adapter while preserving order.
 3. Add the inverse local-provider driver seam. **Done:** UAR `LlmRequest`-shaped
    message/tool/settings payloads convert into KnowMe `InferenceRequest`, and
    local provider `StreamEvent`s convert back into UAR `NormalizedEvent`-shaped
@@ -240,15 +276,30 @@ non-invasive way:
    `Orchestrator::from_driver(...)` and `RunManager::with_llm_driver(...)`, so
    a host-provided `ExternalLlmDriver` can become the primary model stream for
    a run.
-6. Add Android certification report fields for `uarRuntimeMode` and
+6. Exercise the desktop/web service facade against a deterministic
+   UAR-compatible HTTP/SSE surface. **Done:** the local harness creates a run,
+   streams events through the UAR SDK, projects them into KnowMe A2UI events,
+   submits an artifact response to the UAR artifact-response endpoint, and
+   verifies the UAR cancel endpoint.
+7. Add a React desktop artifact-response bridge. **Done minimally:** A2UI/input
+   artifacts can collect a JSON object response and submit it through the chat
+   hook/store layer to the typed Tauri interaction command. Full UAR
+   component-registry rendering remains future work owned by the UAR integration.
+8. Add Android certification report fields for `uarRuntimeMode` and
    `uarSubmoduleCommit`. **Done:** the local certification report records UAR
    authority, target modes, current integration state, and submodule metadata.
-7. Keep physical local-model gates green.
+9. Keep physical local-model gates green.
 
 This preserves current Android progress while moving the architecture toward
 UAR as the real agent runtime authority.
 
 The next implementation checkpoint is the future-release roadmap in
 `docs/strategies/uar-future-release-roadmap.md`: certify the desktop/web `uar`
-lane against a live UAR service, add more UAR golden fixtures, then wire the
-mobile embedded UAR kernel as the owner of real chat/agent execution.
+lane against a live UAR service from the React UI, starting with the saved
+service health probe, then lane switching, streaming, cancellation, and A2UI
+artifact responses. The deterministic local HTTP/SSE harness has already proven
+the KnowMe protocol path, including cancellation and the minimal React artifact
+response bridge, so the remaining work is external service/runtime
+certification, more UAR golden fixtures, the final UAR component-registry
+renderer, and then the mobile embedded UAR kernel as the owner of real
+chat/agent execution.

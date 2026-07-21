@@ -21,6 +21,15 @@ Duration? _noRetry(int retryCount, Object error) => null;
 /// rebuilds per phase; auto-dispose by default. Retry is off — see file header.
 @Riverpod(retry: _noRetry)
 Stream<StartupPhase> startup(Ref ref) async* {
+  const skipMobileBootForDemo = bool.fromEnvironment(
+    'KNOWME_DEMO_SKIP_MOBILE_BOOT',
+    defaultValue: false,
+  );
+  if (skipMobileBootForDemo) {
+    yield StartupPhase.ready;
+    return;
+  }
+
   yield StartupPhase.migrations;
   await bridge.runMigrations(dataDir: dataDirOverride);
   yield StartupPhase.shapes;

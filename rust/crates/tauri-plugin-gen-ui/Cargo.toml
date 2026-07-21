@@ -15,7 +15,7 @@ gen_ui_agent    = { path = "../gen_ui_agent" }
 gen_ui_host     = { path = "../gen_ui_host" }
 gen_ui_db       = { path = "../gen_ui_db", features = ["pglite"] }
 gen_ui_db_graph = { path = "../gen_ui_db_graph", features = ["embed-native"] }
-gen_ui_audio    = { path = "../gen_ui_audio" }
+gen_ui_audio    = { path = "../gen_ui_audio", optional = true }
 # Desktop and mobile use the same pinned/checksummed llama.cpp catalog model for
 # a genuinely zero-configuration local lane. Mistral remains an optional engine
 # in gen_ui_inference, but it is not allowed to block the reference app's first run.
@@ -29,12 +29,20 @@ keyring.workspace = true
 log = "0.4"
 tracing.workspace = true
 futures.workspace = true
-tauri = { version = "2", default-features = false }
+tauri = { version = "2.11.5", default-features = false }
 tokio = { workspace = true, features = ["time"] }
 sqlx.workspace = true
 
+[features]
+default = []
+# whisper.cpp and llama.cpp both export GGML globals. Linking both archives into
+# one desktop process produces duplicate symbol interposition and an unsafe ABI.
+# Scribe remains an explicit build lane until audio is isolated in a framework
+# or helper process; normal desktop builds keep the fully functional local LLM.
+scribe = ["dep:gen_ui_audio"]
+
 [build-dependencies]
-tauri-plugin = { version = "2", features = ["build"] }
+tauri-plugin = { version = "2.6.3", features = ["build"] }
 
 [package.metadata.docs.rs]
 # Desktop plugin: never built for mobile/wasm targets.

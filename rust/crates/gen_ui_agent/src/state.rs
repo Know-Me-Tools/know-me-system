@@ -34,6 +34,9 @@ pub struct AgentState {
     /// a user who asked for on-device inference must never be quietly switched
     /// to a network provider.
     pub inference: Option<Arc<dyn InferenceProvider>>,
+    /// Complete in-process UAR kernel for transport-free mobile agent runs.
+    /// Desktop/web may intentionally leave this absent and use the HTTP facade.
+    pub embedded_uar: Option<Arc<crate::uar::UarEmbeddedRuntime>>,
     /// Registered MCP servers (C-108). Empty is the normal state — an install with no
     /// MCP server configured sends the model no tool definitions and behaves exactly as
     /// it did before tools existed. Always present (not Option) because "no servers" and
@@ -42,7 +45,6 @@ pub struct AgentState {
     events: broadcast::Sender<A2uiEvent>,
     event_history: parking_lot::Mutex<std::collections::BTreeMap<String, Vec<A2uiEvent>>>,
     run_cancellations: parking_lot::Mutex<std::collections::BTreeMap<String, Arc<AtomicBool>>>,
-    #[cfg(not(any(target_os = "ios", target_os = "android")))]
     uar_run_mappings: parking_lot::Mutex<std::collections::BTreeMap<String, UarRunMapping>>,
     pending_tool_confirmations:
         parking_lot::Mutex<std::collections::BTreeMap<String, PendingToolConfirmation>>,
@@ -57,7 +59,6 @@ pub(crate) struct PendingToolConfirmation {
     pub arguments: JsonValue,
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
 #[derive(Debug, Clone)]
 pub(crate) struct UarRunMapping {
     pub knowme_run_id: String,
@@ -94,16 +95,28 @@ pub fn init_with_inference(
     memory: Arc<GraphStore>,
     inference: Option<Arc<dyn InferenceProvider>>,
 ) {
+    init_with_inference_and_uar(config, memory, inference, None)
+}
+
+/// `init_with_inference`, plus a fully constructed embedded UAR kernel.
+/// Mobile boot uses this composition root so chat never has to discover or
+/// construct runtime dependencies after a user submits a message.
+pub fn init_with_inference_and_uar(
+    config: ConfigBackend,
+    memory: Arc<GraphStore>,
+    inference: Option<Arc<dyn InferenceProvider>>,
+    embedded_uar: Option<Arc<crate::uar::UarEmbeddedRuntime>>,
+) {
     let (tx, _rx) = broadcast::channel(EVENT_CHANNEL_CAPACITY);
     let state = AgentState {
         config,
         memory,
         inference,
+        embedded_uar,
         mcp: McpRegistry::new(),
         events: tx,
         event_history: parking_lot::Mutex::new(Default::default()),
         run_cancellations: parking_lot::Mutex::new(Default::default()),
-        #[cfg(not(any(target_os = "ios", target_os = "android")))]
         uar_run_mappings: parking_lot::Mutex::new(Default::default()),
         pending_tool_confirmations: parking_lot::Mutex::new(Default::default()),
     };
@@ -186,7 +199,6 @@ pub fn cancel_run(run_id: &str) -> Result<bool, AgentError> {
 pub(crate) fn finish_run(run_id: &str) {
     if let Ok(state) = get() {
         state.run_cancellations.lock().remove(run_id);
-        #[cfg(not(any(target_os = "ios", target_os = "android")))]
         state
             .uar_run_mappings
             .lock()
@@ -194,7 +206,6 @@ pub(crate) fn finish_run(run_id: &str) {
     }
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
 pub(crate) fn register_uar_run(conversation_id: &str, knowme_run_id: &str, uar_run_id: &str) {
     if let Ok(state) = get() {
         state.uar_run_mappings.lock().insert(
@@ -207,7 +218,6 @@ pub(crate) fn register_uar_run(conversation_id: &str, knowme_run_id: &str, uar_r
     }
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
 pub(crate) fn uar_run_for_conversation(
     conversation_id: &str,
 ) -> Result<Option<UarRunMapping>, AgentError> {
@@ -247,6 +257,14 @@ pub(crate) fn memory() -> Result<&'static Arc<GraphStore>, AgentError> {
 /// `inference` field's doc comment.
 pub(crate) fn inference() -> Result<&'static Arc<dyn InferenceProvider>, AgentError> {
     get()?.inference.as_ref().ok_or(AgentError::NoLocalEngine)
+}
+
+/// The transport-free embedded UAR kernel registered by the platform leaf.
+pub(crate) fn embedded_uar() -> Result<&'static Arc<crate::uar::UarEmbeddedRuntime>, AgentError> {
+    get()?
+        .embedded_uar
+        .as_ref()
+        .ok_or_else(|| AgentError::Config("embedded UAR runtime is not available".into()))
 }
 
 /// The MCP registry. Always present; empty until a server is registered.

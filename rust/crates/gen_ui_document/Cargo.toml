@@ -11,7 +11,7 @@ thiserror.workspace = true
 serde.workspace = true
 sha2.workspace = true
 tokio = { workspace = true, features = ["fs"] }
-xberg = { version = "1.0.0-rc.17", default-features = false, features = [
+xberg = { version = "=1.0.0-rc.17", default-features = false, features = [
     "pdf",
     "excel",
     "office",
@@ -31,7 +31,7 @@ xberg = { version = "1.0.0-rc.17", default-features = false, features = [
 # and desktop, while the iOS lane uses the same xberg extraction engine for
 # every document format that does not require the incompatible native OCR lib.
 [target.'cfg(not(target_os = "ios"))'.dependencies]
-xberg = { version = "1.0.0-rc.17", default-features = false, features = [
+xberg = { version = "=1.0.0-rc.17", default-features = false, features = [
     "ocr",
     "bundle-tessdata-eng",
 ] }

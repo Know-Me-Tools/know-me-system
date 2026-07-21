@@ -4,17 +4,23 @@
 //! UAR owns real agent execution, skills, A2UI registry management, tool
 //! governance, and general provider routing. KnowMe owns the product shell,
 //! local-device provider adapters, and the local conversation projection. This
-//! module captures that boundary without linking the full UAR runtime yet.
+//! module exposes the same facade for the linked mobile kernel and service UAR.
 
 use futures::{stream::BoxStream, StreamExt};
 use gen_ui_protocol::{
     normalize_uar_agui_event, uar_llm_payload_to_inference_request, A2uiAdapter,
-    UarLlmRequestPayload, UarNormalizedEventAdapter,
+    UarLlmRequestPayload,
 };
 use gen_ui_types::events::A2uiEvent;
+use gen_ui_types::events::StreamEvent;
 use gen_ui_types::inference::{InferenceProvider, LocalModelSpec};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::{collections::VecDeque, sync::Arc};
+pub use universal_agent_runtime::llm::ProviderConfig as UarProviderConfig;
+use universal_agent_runtime::{
+    llm::{registry::ModelConfig, registry::ProtocolSetting, LlmDriver, LlmRequest},
+    normalized::{Citation as UarCitation, NormalizedEvent as UarNormalizedEvent},
+};
 
 use crate::error::AgentError;
 
@@ -38,9 +44,9 @@ pub enum UarIntegrationState {
     NotWired,
     /// UAR event payloads can be projected into KnowMe content blocks.
     ProjectionOnly,
-    /// Future state: in-process UAR kernel owns mobile agent execution.
+    /// An in-process UAR kernel owns mobile agent execution.
     EmbeddedKernel,
-    /// Future state: HTTP/service UAR owns web/desktop agent execution.
+    /// An HTTP/service UAR owns web/desktop agent execution.
     ServiceRuntime,
 }
 
@@ -68,12 +74,13 @@ pub struct UarRuntimeStatus {
 pub struct UarRunRequest {
     /// Compiled UAR agent artifact. UAR owns this schema; KnowMe passes it
     /// through and persists only the selected ids/provenance it needs.
-    pub artifact: serde_json::Value,
+    pub artifact: Option<serde_json::Value>,
     pub input: String,
     pub session_id: Option<String>,
+    pub agent_id: Option<String>,
+    pub run_policy: Option<serde_json::Value>,
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct UarArtifactResponse {
@@ -81,20 +88,114 @@ pub struct UarArtifactResponse {
     pub response: serde_json::Value,
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct UarA2uiAction {
+    pub surface_id: String,
+    pub name: String,
+    pub source_component_id: String,
+    pub timestamp: Option<String>,
+    pub context: serde_json::Value,
+    pub client_data_model: Option<serde_json::Value>,
+}
+
 pub struct UarProjectedRun {
     pub run_id: String,
     pub events: BoxStream<'static, Result<A2uiEvent, AgentError>>,
 }
 
-/// Host-side bridge that lets a future embedded UAR `ExternalLlmDriver` call
-/// KnowMe's local provider without UAR owning model catalogs or Flutter owning
-/// prompt construction.
+/// Stable UAR provider identity for Android's in-process LiteRT-LM lane.
 ///
-/// This is intentionally not the full embedded UAR kernel. It is the narrow
-/// adapter the kernel will call:
+/// The provider id names the execution boundary, not a particular accelerator.
+/// CPU, GPU, and NPU selection remain runtime diagnostics beneath the same
+/// provider/model route, so agents and persisted policies survive backend
+/// fallback without being rewritten.
+pub const ANDROID_LITERT_LM_PROVIDER_ID: &str = "knowme-local-litert-lm";
+pub const ANDROID_LITERT_LM_TRUSTED_CONTEXT_TOKENS: u32 = 8_192;
+pub const ANDROID_LITERT_LM_MAX_OUTPUT_TOKENS: u32 = 1_024;
+
+/// Build the credential-free UAR registration for Android's pinned LiteRT-LM
+/// model artifact.
 ///
-/// `UAR LlmRequest payload → KnowMe InferenceProvider → UAR NormalizedEvent payloads`.
+/// The platform leaf supplies `model_id` from `gen_ui_inference::catalog`,
+/// keeping the agent layer engine-agnostic while ensuring the exact downloaded
+/// artifact becomes UAR's enabled default model.  The capability flags describe
+/// the certified text-agent lane: native tools, explicit thinking, constrained
+/// structured output, and streaming are available; image tensors are not sent
+/// to this model and instead go through document/OCR extraction.
+#[must_use]
+pub fn android_litert_lm_provider_config(model_id: impl Into<String>) -> UarProviderConfig {
+    let model_id = model_id.into();
+    UarProviderConfig {
+        id: ANDROID_LITERT_LM_PROVIDER_ID.to_string(),
+        display_name: "KnowMe on-device · LiteRT-LM".to_string(),
+        base_url: String::new(),
+        api_key: None,
+        protocol: ProtocolSetting::Auto,
+        default_model: Some(model_id.clone()),
+        models: vec![ModelConfig {
+            id: model_id,
+            display_name: Some("Gemma 4 E2B Instruct · on-device".to_string()),
+            context_window: Some(ANDROID_LITERT_LM_TRUSTED_CONTEXT_TOKENS),
+            supports_vision: false,
+            supports_tools: true,
+            supports_reasoning: true,
+            supports_structured_output: true,
+            supports_streaming: true,
+            max_output_tokens: Some(ANDROID_LITERT_LM_MAX_OUTPUT_TOKENS),
+            enabled: true,
+        }],
+        enabled: true,
+    }
+}
+
+/// Stable UAR provider identity for iOS's in-process llama.cpp/Metal lane.
+///
+/// Metal offload, CPU fallback, and MTMD projector loading are runtime details
+/// beneath this route. Agent policies therefore keep referring to the same
+/// provider and model when the backend changes or vision is initialized lazily.
+pub const IOS_LLAMA_METAL_PROVIDER_ID: &str = "knowme-local-llama-metal";
+pub const IOS_QWEN35_TRUSTED_CONTEXT_TOKENS: u32 = 8_192;
+pub const IOS_QWEN35_MAX_OUTPUT_TOKENS: u32 = 1_024;
+
+/// Build the credential-free UAR registration for iOS's pinned Qwen3.5 model.
+///
+/// The platform leaf supplies the immutable catalog id. The model's paired
+/// projector is loaded by the local inference adapter only when an image is
+/// present, while UAR owns agent orchestration, tool policy, and run events.
+#[must_use]
+pub fn ios_qwen35_metal_provider_config(model_id: impl Into<String>) -> UarProviderConfig {
+    let model_id = model_id.into();
+    UarProviderConfig {
+        id: IOS_LLAMA_METAL_PROVIDER_ID.to_string(),
+        display_name: "KnowMe on-device · llama.cpp Metal".to_string(),
+        base_url: String::new(),
+        api_key: None,
+        protocol: ProtocolSetting::Auto,
+        default_model: Some(model_id.clone()),
+        models: vec![ModelConfig {
+            id: model_id,
+            display_name: Some("Qwen3.5 9B Vision · on-device".to_string()),
+            context_window: Some(IOS_QWEN35_TRUSTED_CONTEXT_TOKENS),
+            supports_vision: true,
+            supports_tools: true,
+            supports_reasoning: true,
+            supports_structured_output: true,
+            supports_streaming: true,
+            max_output_tokens: Some(IOS_QWEN35_MAX_OUTPUT_TOKENS),
+            enabled: true,
+        }],
+        enabled: true,
+    }
+}
+
+/// UAR host driver backed by KnowMe's platform-selected local inference
+/// provider.
+///
+/// UAR remains responsible for agent prompts, policy, tool loops, and run
+/// lifecycle.  This adapter performs only the typed engine-boundary conversion:
+///
+/// `UAR LlmRequest → KnowMe InferenceProvider → UAR NormalizedEvent`.
 #[derive(Clone)]
 pub struct UarLocalInferenceDriverBridge {
     provider: Arc<dyn InferenceProvider>,
@@ -113,24 +214,66 @@ impl UarLocalInferenceDriverBridge {
         &self,
         payload: UarLlmRequestPayload,
     ) -> Result<BoxStream<'static, Result<serde_json::Value, AgentError>>, AgentError> {
-        let request =
-            uar_llm_payload_to_inference_request(&payload).map_err(AgentError::Interaction)?;
-        self.provider.load(&self.model_spec).await?;
-        let stream = self.provider.generate_request(&request).await?;
-        let adapter = UarNormalizedEventAdapter::new();
+        let stream = self
+            .stream(LlmRequest {
+                messages: payload.messages,
+                tools: payload.tools,
+                cache_strategy: None,
+                thinking_config: None,
+                anthropic_system: None,
+                extra_params: payload.extra_params,
+            })
+            .await
+            .map_err(|error| AgentError::Interaction(error.to_string()))?;
+        Ok(stream
+            .map(|event| {
+                event
+                    .map_err(|error| AgentError::Interaction(error.to_string()))
+                    .and_then(|event| {
+                        serde_json::to_value(event)
+                            .map_err(|error| AgentError::Interaction(error.to_string()))
+                    })
+            })
+            .boxed())
+    }
+}
+
+#[async_trait::async_trait]
+impl LlmDriver for UarLocalInferenceDriverBridge {
+    async fn stream(
+        &self,
+        request: LlmRequest,
+    ) -> anyhow::Result<
+        std::pin::Pin<Box<dyn futures::Stream<Item = anyhow::Result<UarNormalizedEvent>> + Send>>,
+    > {
+        let request = uar_llm_request_to_inference_request(request)?;
+        self.provider
+            .load(&self.model_spec)
+            .await
+            .map_err(|error| anyhow::anyhow!("load local model: {error}"))?;
+        let source = self
+            .provider
+            .generate_request(&request)
+            .await
+            .map_err(|error| anyhow::anyhow!("start local inference: {error}"))?;
+        let adapter = UarNativeEventAdapter::new(format!("knowme-local-{}", uuid::Uuid::new_v4()));
+
         Ok(futures::stream::unfold(
-            (stream, adapter, Vec::<serde_json::Value>::new()),
-            |(mut stream, mut adapter, mut pending)| async move {
+            (source, adapter, VecDeque::new(), false),
+            |(mut source, mut adapter, mut pending, mut source_finished)| async move {
                 loop {
-                    if let Some(value) = pending.pop() {
-                        return Some((Ok(value), (stream, adapter, pending)));
+                    if let Some(event) = pending.pop_front() {
+                        return Some((Ok(event), (source, adapter, pending, source_finished)));
                     }
-                    match stream.next().await {
-                        Some(event) => {
-                            pending = adapter.ingest(&event);
-                            pending.reverse();
+                    if source_finished {
+                        return None;
+                    }
+                    match source.next().await {
+                        Some(event) => pending.extend(adapter.ingest(event)),
+                        None => {
+                            source_finished = true;
+                            pending.extend(adapter.finish());
                         }
-                        None => return None,
                     }
                 }
             },
@@ -139,22 +282,293 @@ impl UarLocalInferenceDriverBridge {
     }
 }
 
+fn uar_llm_request_to_inference_request(
+    request: LlmRequest,
+) -> anyhow::Result<gen_ui_types::inference::InferenceRequest> {
+    let mut messages = request.messages;
+    if let Some(system_blocks) = request.anthropic_system {
+        let has_system_message = messages.iter().any(|message| {
+            message.get("role").and_then(serde_json::Value::as_str) == Some("system")
+        });
+        if !has_system_message && !system_blocks.is_empty() {
+            messages.insert(
+                0,
+                serde_json::json!({
+                    "role": "system",
+                    "content": system_blocks,
+                }),
+            );
+        }
+    }
+    let mut extra_params = request.extra_params;
+    if let Some(thinking) = request.thinking_config {
+        let extra = extra_params.get_or_insert_with(|| serde_json::json!({}));
+        let object = extra.as_object_mut().ok_or_else(|| {
+            anyhow::anyhow!("UAR local-provider extra_params must be a JSON object")
+        })?;
+        object.insert("thinking".into(), serde_json::to_value(thinking)?);
+    }
+    uar_llm_payload_to_inference_request(&UarLlmRequestPayload {
+        messages,
+        tools: request.tools,
+        extra_params,
+    })
+    .map_err(anyhow::Error::msg)
+}
+
+#[derive(Debug)]
+struct PendingUarTool {
+    call_index: usize,
+    id: String,
+    name: String,
+    arguments: String,
+}
+
+struct UarNativeEventAdapter {
+    request_id: String,
+    stream_started: bool,
+    stream_finished: bool,
+    next_call_index: usize,
+    next_citation_index: usize,
+    pending_tools: Vec<PendingUarTool>,
+    completed_tool_names: Vec<(String, String)>,
+}
+
+impl UarNativeEventAdapter {
+    fn new(request_id: String) -> Self {
+        Self {
+            request_id,
+            stream_started: false,
+            stream_finished: false,
+            next_call_index: 0,
+            next_citation_index: 0,
+            pending_tools: Vec::new(),
+            completed_tool_names: Vec::new(),
+        }
+    }
+
+    fn ingest(&mut self, event: StreamEvent) -> Vec<UarNormalizedEvent> {
+        let mut output = Vec::new();
+        if !self.stream_started {
+            self.stream_started = true;
+            output.push(UarNormalizedEvent::StreamStart {
+                request_id: self.request_id.clone(),
+            });
+        }
+
+        match event {
+            StreamEvent::MessageStart => {}
+            StreamEvent::TextDelta { delta, .. } => {
+                output.push(UarNormalizedEvent::MessageDelta { text: delta });
+            }
+            StreamEvent::ThinkingDelta { delta, .. } => {
+                output.push(UarNormalizedEvent::ThinkingDelta { text: delta });
+            }
+            StreamEvent::ToolCallStarted { id, name } => {
+                let call_index = self.next_call_index;
+                self.next_call_index += 1;
+                self.pending_tools.push(PendingUarTool {
+                    call_index,
+                    id: id.clone(),
+                    name: name.clone(),
+                    arguments: String::new(),
+                });
+                output.push(UarNormalizedEvent::ToolCallDelta {
+                    call_index,
+                    id: Some(id),
+                    name: Some(name),
+                    arguments_delta: None,
+                });
+            }
+            StreamEvent::ToolCallDelta { id, delta } => {
+                if let Some(tool) = self.pending_tools.iter_mut().find(|tool| tool.id == id) {
+                    tool.arguments.push_str(&delta);
+                    output.push(UarNormalizedEvent::ToolCallDelta {
+                        call_index: tool.call_index,
+                        id: Some(id),
+                        name: None,
+                        arguments_delta: Some(delta),
+                    });
+                } else {
+                    output.push(UarNormalizedEvent::Error {
+                        message: format!("tool argument delta arrived before start for '{id}'"),
+                        code: Some("knowme_local_tool_state_missing".into()),
+                    });
+                }
+            }
+            StreamEvent::ToolCallComplete { id } => {
+                if let Some(index) = self.pending_tools.iter().position(|tool| tool.id == id) {
+                    let tool = self.pending_tools.remove(index);
+                    self.completed_tool_names
+                        .push((tool.id.clone(), tool.name.clone()));
+                    output.push(UarNormalizedEvent::ToolCallComplete {
+                        call_index: tool.call_index,
+                        id: tool.id,
+                        name: tool.name,
+                        arguments_json: tool.arguments,
+                    });
+                } else {
+                    output.push(UarNormalizedEvent::Error {
+                        message: format!("tool completion arrived before start for '{id}'"),
+                        code: Some("knowme_local_tool_state_missing".into()),
+                    });
+                }
+            }
+            StreamEvent::ToolCallReady {
+                id,
+                name,
+                input_json,
+            } => {
+                let call_index = self
+                    .pending_tools
+                    .iter()
+                    .position(|tool| tool.id == id)
+                    .map(|index| self.pending_tools.remove(index).call_index)
+                    .unwrap_or_else(|| {
+                        let index = self.next_call_index;
+                        self.next_call_index += 1;
+                        index
+                    });
+                self.completed_tool_names.push((id.clone(), name.clone()));
+                output.push(UarNormalizedEvent::ToolCallComplete {
+                    call_index,
+                    id,
+                    name,
+                    arguments_json: input_json,
+                });
+            }
+            StreamEvent::ToolResult {
+                tool_use_id,
+                output_json,
+                is_error,
+            } => {
+                let name = self
+                    .completed_tool_names
+                    .iter()
+                    .find(|(id, _)| id == &tool_use_id)
+                    .map(|(_, name)| name.clone())
+                    .unwrap_or_else(|| "unknown_tool".into());
+                output.push(UarNormalizedEvent::ToolResult {
+                    id: tool_use_id,
+                    name,
+                    content: output_json,
+                    success: !is_error,
+                });
+            }
+            StreamEvent::SkillActivation { name, status } => {
+                output.push(UarNormalizedEvent::SkillActivation { name, status });
+            }
+            StreamEvent::Citation { source, quote } => {
+                output.push(self.citation(source, quote));
+            }
+            StreamEvent::Citations { citations } => {
+                output.extend(
+                    citations
+                        .into_iter()
+                        .map(|citation| self.citation(citation.source, citation.quote)),
+                );
+            }
+            StreamEvent::Memory {
+                operation,
+                key,
+                value,
+            } => {
+                output.push(UarNormalizedEvent::MemoryUpdate {
+                    key,
+                    value: value.unwrap_or_default(),
+                    operation,
+                });
+            }
+            StreamEvent::Custom {
+                source,
+                event_name,
+                payload,
+            } => {
+                output.push(UarNormalizedEvent::Custom {
+                    source,
+                    event_name,
+                    payload,
+                });
+            }
+            StreamEvent::Error { message } => {
+                output.push(UarNormalizedEvent::Error {
+                    message,
+                    code: Some("knowme_local_provider_error".into()),
+                });
+            }
+            StreamEvent::Cancelled { message } => {
+                output.push(UarNormalizedEvent::Error {
+                    message,
+                    code: Some("knowme_local_cancelled".into()),
+                });
+            }
+            StreamEvent::Done => {
+                output.extend(self.finish());
+            }
+        }
+        output
+    }
+
+    fn citation(&mut self, source: String, quote: String) -> UarNormalizedEvent {
+        let index = self.next_citation_index;
+        self.next_citation_index += 1;
+        UarNormalizedEvent::CitationAdded(UarCitation {
+            index,
+            url: source.clone(),
+            title: Some(source),
+            snippet: (!quote.is_empty()).then_some(quote),
+        })
+    }
+
+    fn finish(&mut self) -> Vec<UarNormalizedEvent> {
+        if self.stream_finished {
+            return Vec::new();
+        }
+        self.stream_finished = true;
+        let mut output = Vec::new();
+        if !self.stream_started {
+            self.stream_started = true;
+            output.push(UarNormalizedEvent::StreamStart {
+                request_id: self.request_id.clone(),
+            });
+        }
+        output.extend(
+            self.pending_tools
+                .drain(..)
+                .map(|tool| UarNormalizedEvent::Error {
+                    message: format!(
+                        "local provider ended before tool '{}' ({}) completed",
+                        tool.name, tool.id
+                    ),
+                    code: Some("knowme_local_tool_incomplete".into()),
+                }),
+        );
+        output.push(UarNormalizedEvent::Done);
+        output
+    }
+}
+
 impl UarRuntimeStatus {
     pub fn current() -> Self {
+        let embedded_mobile = cfg!(any(target_os = "ios", target_os = "android"));
         Self {
             authority: "universal-agent-runtime".into(),
             target_mode: default_target_mode(),
-            current_state: UarIntegrationState::ProjectionOnly,
+            current_state: if embedded_mobile {
+                UarIntegrationState::EmbeddedKernel
+            } else {
+                UarIntegrationState::ProjectionOnly
+            },
             local_provider_role: "knowme_local_provider_backend".into(),
             mobile_sidecar_allowed: false,
             local_provider_bridge_available: true,
             service_runtime_available: service_runtime_available(),
             service_artifact_response_available: service_artifact_response_available(),
-            embedded_kernel_available: false,
-            embedded_kernel_blocker: Some(
-                "The current UAR SDK embedded feature links the broad server runtime and does not yet expose a populated mobile-safe in-process kernel/AppState."
-                    .into(),
-            ),
+            embedded_kernel_available: embedded_mobile,
+            embedded_kernel_blocker: (!embedded_mobile).then(|| {
+                "This target did not register an in-process UAR kernel; use its service facade."
+                    .into()
+            }),
             submodule_path: "rust/vendor/universal-agent-runtime".into(),
             submodule_commit: option_env!("KNOWME_UAR_SUBMODULE_COMMIT").map(str::to_owned),
         }
@@ -164,25 +578,439 @@ impl UarRuntimeStatus {
 #[async_trait::async_trait]
 pub trait UarRuntimeFacade: Send + Sync {
     fn status(&self) -> UarRuntimeStatus;
-    #[cfg(not(any(target_os = "ios", target_os = "android")))]
     async fn start_run(&self, request: UarRunRequest) -> Result<UarProjectedRun, AgentError>;
-    #[cfg(not(any(target_os = "ios", target_os = "android")))]
     async fn cancel_run(&self, run_id: &str) -> Result<bool, AgentError>;
-    #[cfg(not(any(target_os = "ios", target_os = "android")))]
     async fn submit_artifact_response(
         &self,
         run_id: &str,
         response: UarArtifactResponse,
-    ) -> Result<(), AgentError>;
+    ) -> Result<UarProjectedRun, AgentError>;
+    async fn submit_a2ui_action(
+        &self,
+        run_id: &str,
+        action: UarA2uiAction,
+    ) -> Result<UarProjectedRun, AgentError>;
+    async fn promote_a2ui_component(
+        &self,
+        title: &str,
+        source: &str,
+        description: Option<&str>,
+    ) -> Result<serde_json::Value, AgentError>;
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
+/// Complete transport-free UAR kernel hosted inside the mobile process.
+///
+/// KnowMe supplies the platform inference driver and model metadata; UAR owns
+/// agent resolution, skills, tools, policy, run lifecycle, and canonical
+/// events. No listener, sidecar, loopback socket, or network discovery is used.
+#[derive(Clone)]
+pub struct UarEmbeddedRuntime {
+    runtime: universal_agent_runtime_sdk::Runtime,
+}
+
+impl std::fmt::Debug for UarEmbeddedRuntime {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("UarEmbeddedRuntime")
+            .field("mode", &"embedded_library")
+            .finish_non_exhaustive()
+    }
+}
+
+impl UarEmbeddedRuntime {
+    /// Build a ready embedded runtime around the platform's local model.
+    ///
+    /// The process-local persistence supplied here is intentionally isolated
+    /// behind UAR's `PersistenceLayer`; the next persistence milestone swaps
+    /// it for the mobile durable adapter without changing this facade or chat.
+    pub async fn build_local(
+        provider: Arc<dyn InferenceProvider>,
+        model_spec: LocalModelSpec,
+        provider_config: UarProviderConfig,
+    ) -> Result<Self, AgentError> {
+        let driver: Arc<dyn LlmDriver> =
+            Arc::new(UarLocalInferenceDriverBridge::new(provider, model_spec));
+        let persistence: Arc<dyn universal_agent_runtime::uar::persistence::PersistenceLayer> =
+            Arc::new(
+                universal_agent_runtime::uar::persistence::providers::memory::InMemoryProvider::new(
+                ),
+            );
+        let runtime = universal_agent_runtime_sdk::Runtime::builder()
+            .local_provider(driver, provider_config)
+            .persistence(persistence)
+            .seed_defaults(true)
+            .build()
+            .await
+            .map_err(|error| AgentError::Config(format!("embedded UAR: {error}")))?;
+        Ok(Self { runtime })
+    }
+
+    fn projected_run(
+        &self,
+        run_id: String,
+        history: Vec<universal_agent_runtime::uar::runtime::manager::StreamEvent>,
+        receiver: tokio::sync::broadcast::Receiver<
+            universal_agent_runtime::uar::runtime::manager::StreamEvent,
+        >,
+    ) -> UarProjectedRun {
+        UarProjectedRun {
+            run_id: run_id.clone(),
+            events: project_embedded_stream(run_id, history, receiver),
+        }
+    }
+
+    async fn subscribe_projected(&self, run_id: String) -> Result<UarProjectedRun, AgentError> {
+        // Subscribe first, then snapshot history. The projector skips receiver
+        // events already represented by the snapshot, closing the run-start
+        // race without duplicating any semantic event.
+        let receiver = self
+            .runtime
+            .subscribe(&run_id)
+            .await
+            .map_err(embedded_sdk_error)?;
+        let history = self
+            .runtime
+            .history_since(&run_id, None)
+            .await
+            .map_err(embedded_sdk_error)?;
+        Ok(self.projected_run(run_id, history, receiver))
+    }
+}
+
+#[async_trait::async_trait]
+impl UarRuntimeFacade for UarEmbeddedRuntime {
+    fn status(&self) -> UarRuntimeStatus {
+        UarRuntimeStatus {
+            target_mode: UarDeploymentMode::EmbeddedLibrary,
+            current_state: UarIntegrationState::EmbeddedKernel,
+            embedded_kernel_available: true,
+            embedded_kernel_blocker: None,
+            ..UarRuntimeStatus::current()
+        }
+    }
+
+    async fn start_run(&self, request: UarRunRequest) -> Result<UarProjectedRun, AgentError> {
+        let conversation_id = request.session_id;
+        let run_id = if let Some(artifact) = request.artifact {
+            let artifact = serde_json::from_value(artifact)
+                .map_err(|error| AgentError::Config(format!("UAR agent artifact: {error}")))?;
+            self.runtime
+                .start_run(artifact, request.input, conversation_id, None, Vec::new())
+                .await
+        } else {
+            self.runtime
+                .start_agent_run(
+                    request.agent_id.as_deref().unwrap_or("orchestrator-agent"),
+                    request.input,
+                    conversation_id,
+                    None,
+                    Vec::new(),
+                )
+                .await
+                .map_err(embedded_sdk_error)?
+        };
+        self.subscribe_projected(run_id).await
+    }
+
+    async fn cancel_run(&self, run_id: &str) -> Result<bool, AgentError> {
+        Ok(self.runtime.cancel_run(run_id).await)
+    }
+
+    async fn submit_artifact_response(
+        &self,
+        run_id: &str,
+        response: UarArtifactResponse,
+    ) -> Result<UarProjectedRun, AgentError> {
+        let continuation = self
+            .runtime
+            .continue_with_a2ui_interaction(
+                run_id,
+                serde_json::json!({
+                    "artifactId": response.artifact_id,
+                    "response": response.response,
+                }),
+            )
+            .await
+            .map_err(embedded_sdk_error)?;
+        self.subscribe_projected(continuation).await
+    }
+
+    async fn submit_a2ui_action(
+        &self,
+        run_id: &str,
+        action: UarA2uiAction,
+    ) -> Result<UarProjectedRun, AgentError> {
+        let continuation = self
+            .runtime
+            .continue_with_a2ui_interaction(
+                run_id,
+                serde_json::json!({
+                    "surfaceId": action.surface_id,
+                    "name": action.name,
+                    "sourceComponentId": action.source_component_id,
+                    "timestamp": action.timestamp,
+                    "context": action.context,
+                    "a2uiClientDataModel": action.client_data_model,
+                }),
+            )
+            .await
+            .map_err(embedded_sdk_error)?;
+        self.subscribe_projected(continuation).await
+    }
+
+    async fn promote_a2ui_component(
+        &self,
+        title: &str,
+        source: &str,
+        description: Option<&str>,
+    ) -> Result<serde_json::Value, AgentError> {
+        use universal_agent_runtime::uar::a2ui::schema::{ArtifactSchema, ArtifactType};
+
+        let parsed = serde_json::from_str::<serde_json::Value>(source).unwrap_or_else(|_| {
+            serde_json::json!({
+                "type": "object",
+                "description": "Host-provided A2UI component source",
+                "properties": { "source": { "type": "string" } }
+            })
+        });
+        let slug = title
+            .chars()
+            .map(|character| {
+                if character.is_ascii_alphanumeric() {
+                    character.to_ascii_lowercase()
+                } else {
+                    '-'
+                }
+            })
+            .collect::<String>()
+            .trim_matches('-')
+            .to_owned();
+        let schema = ArtifactSchema {
+            schema_id: format!("knowme/{slug}"),
+            title: title.to_owned(),
+            description: description
+                .unwrap_or("User-promoted A2UI component")
+                .to_owned(),
+            artifact_type: ArtifactType::Display,
+            json_schema: parsed,
+            render_hint: Some("inline".into()),
+            builtin: false,
+        };
+        self.runtime.a2ui_registry().register(schema.clone()).await;
+        serde_json::to_value(schema)
+            .map_err(|error| AgentError::Interaction(format!("A2UI component: {error}")))
+    }
+}
+
+fn embedded_sdk_error(error: universal_agent_runtime_sdk::Error) -> AgentError {
+    AgentError::Interaction(format!("embedded UAR: {error}"))
+}
+
+fn project_embedded_stream(
+    run_id: String,
+    history: Vec<universal_agent_runtime::uar::runtime::manager::StreamEvent>,
+    receiver: tokio::sync::broadcast::Receiver<
+        universal_agent_runtime::uar::runtime::manager::StreamEvent,
+    >,
+) -> BoxStream<'static, Result<A2uiEvent, AgentError>> {
+    let last_history_id = history.last().map(|event| event.id).unwrap_or(0);
+    let pending = history.into_iter().collect::<VecDeque<_>>();
+    futures::stream::unfold(
+        (
+            receiver,
+            UarEventProjector::new(run_id),
+            pending,
+            VecDeque::<A2uiEvent>::new(),
+            last_history_id,
+        ),
+        |(mut receiver, mut projector, mut source, mut projected, last_history_id)| async move {
+            loop {
+                if let Some(event) = projected.pop_front() {
+                    return Some((
+                        Ok(event),
+                        (receiver, projector, source, projected, last_history_id),
+                    ));
+                }
+                let event = if let Some(event) = source.pop_front() {
+                    event
+                } else {
+                    match receiver.recv().await {
+                        Ok(event) if event.id > last_history_id => event,
+                        Ok(_) => continue,
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
+                            return Some((
+                                Err(AgentError::Interaction(format!(
+                                    "embedded UAR event stream lagged by {skipped} events"
+                                ))),
+                                (receiver, projector, source, projected, last_history_id),
+                            ));
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Closed) => return None,
+                    }
+                };
+                let payload = embedded_stream_payload(event);
+                projected.extend(projector.ingest_agui_payload(&payload));
+            }
+        },
+    )
+    .boxed()
+}
+
+fn embedded_stream_payload(
+    event: universal_agent_runtime::uar::runtime::manager::StreamEvent,
+) -> serde_json::Value {
+    use universal_agent_runtime::uar::domain::events::NormalizedEvent;
+
+    let event_id = event.id.to_string();
+    let custom = |name: &str, run_id: Option<&str>, value: serde_json::Value| {
+        serde_json::json!({
+            "type": "CUSTOM",
+            "profile": "uar.agui/1",
+            "name": name,
+            "value": value,
+            "runId": run_id,
+            "threadId": run_id,
+            "eventId": event_id,
+        })
+    };
+    match event.event {
+        NormalizedEvent::RunStart { run_id, agent_id } => serde_json::json!({
+            "type": "RUN_STARTED", "profile": "uar.agui/1", "eventId": event_id,
+            "threadId": run_id, "runId": run_id, "input": { "agentId": agent_id }
+        }),
+        NormalizedEvent::ChatDelta { run_id, text_delta } => serde_json::json!({
+            "type": "TEXT_MESSAGE_CONTENT", "profile": "uar.agui/1", "eventId": event_id,
+            "messageId": format!("{run_id}:assistant"), "delta": text_delta,
+            "threadId": run_id, "runId": run_id
+        }),
+        NormalizedEvent::ThinkingDelta { run_id, text_delta }
+        | NormalizedEvent::ReasoningDelta { run_id, text_delta } => serde_json::json!({
+            "type": "REASONING_MESSAGE_CONTENT", "profile": "uar.agui/1", "eventId": event_id,
+            "messageId": format!("{run_id}:reasoning"), "delta": text_delta,
+            "threadId": run_id, "runId": run_id
+        }),
+        NormalizedEvent::Citation { run_id, sources } => serde_json::json!({
+            "type": "agui.citation.added", "eventId": event_id,
+            "request_id": run_id, "citations": sources
+        }),
+        NormalizedEvent::RagCitations { run_id, citations } => serde_json::json!({
+            "type": "agui.rag_citations", "eventId": event_id,
+            "request_id": run_id, "citations": citations
+        }),
+        NormalizedEvent::MemoryRecall { run_id, items } => serde_json::json!({
+            "type": "agui.memory.recall", "eventId": event_id,
+            "request_id": run_id, "items": items
+        }),
+        NormalizedEvent::SkillActivated {
+            run_id,
+            skill_id,
+            title,
+            selection_method,
+        } => serde_json::json!({
+            "type": "agui.skill.activated", "eventId": event_id,
+            "request_id": run_id, "skill": { "id": skill_id, "title": title },
+            "selection_method": selection_method, "phase": "activated"
+        }),
+        NormalizedEvent::ToolDelta {
+            run_id,
+            call_index,
+            tool_call_id,
+            delta,
+        } => serde_json::json!({
+            "type": "agui.tool_call.delta", "eventId": event_id,
+            "request_id": run_id, "call_index": call_index, "id": tool_call_id,
+            "delta": { "arguments": delta.to_string() }
+        }),
+        NormalizedEvent::ToolStart {
+            run_id,
+            call_index,
+            tool_call_id,
+            tool,
+            input,
+        } => serde_json::json!({
+            "type": "agui.tool_call.complete", "eventId": event_id,
+            "request_id": run_id, "call_index": call_index, "id": tool_call_id,
+            "name": tool, "arguments_json": input.to_string()
+        }),
+        NormalizedEvent::ToolEnd {
+            run_id,
+            call_index,
+            tool_call_id,
+            tool,
+            output,
+            ok,
+        } => serde_json::json!({
+            "type": "agui.tool_result", "eventId": event_id,
+            "request_id": run_id, "call_index": call_index, "id": tool_call_id,
+            "name": tool, "content": output.to_string(), "success": ok
+        }),
+        NormalizedEvent::Artifact { run_id, artifact }
+        | NormalizedEvent::ArtifactDisplay { run_id, artifact } => custom(
+            "uar.artifact.available",
+            Some(&run_id),
+            serde_json::json!({
+                "artifactId": artifact.artifact_id,
+                "artifactType": artifact.artifact_type,
+                "title": artifact.title,
+                "content": artifact.content,
+                "language": artifact.language,
+                "metadata": artifact.metadata,
+                "sourceRunId": run_id,
+            }),
+        ),
+        NormalizedEvent::ArtifactInputRequest { run_id, artifact } => custom(
+            "uar.artifact.input_required",
+            Some(&run_id),
+            serde_json::json!({
+                "artifactId": artifact.artifact_id,
+                "artifactType": artifact.artifact_type,
+                "title": artifact.title,
+                "content": artifact.content,
+                "metadata": artifact.metadata,
+                "sourceRunId": run_id,
+            }),
+        ),
+        NormalizedEvent::Error {
+            run_id,
+            code,
+            message,
+        } => serde_json::json!({
+            "type": "RUN_ERROR", "profile": "uar.agui/1", "eventId": event_id,
+            "threadId": run_id, "runId": run_id, "code": code, "message": message
+        }),
+        NormalizedEvent::Cancelled { run_id } => serde_json::json!({
+            "type": "agui.cancelled", "eventId": event_id, "request_id": run_id,
+            "message": "Run cancelled"
+        }),
+        NormalizedEvent::RunDone { run_id } | NormalizedEvent::RunDoneWithUsage { run_id, .. } => {
+            serde_json::json!({
+                "type": "RUN_FINISHED", "profile": "uar.agui/1", "eventId": event_id,
+                "threadId": run_id, "runId": run_id
+            })
+        }
+        NormalizedEvent::StatePatch { run_id, patch } => serde_json::json!({
+            "type": "CUSTOM", "profile": "uar.agui/1", "eventId": event_id,
+            "name": "agui.state.patch", "runId": run_id, "threadId": run_id,
+            "value": { "patch": patch }
+        }),
+        other => {
+            let value = serde_json::to_value(&other).unwrap_or_else(
+                |error| serde_json::json!({ "serializationError": error.to_string() }),
+            );
+            let name = value
+                .get("type")
+                .and_then(serde_json::Value::as_str)
+                .map(|kind| format!("uar.{}", kind.to_ascii_lowercase()))
+                .unwrap_or_else(|| "uar.unknown".into());
+            custom(&name, None, value)
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct UarServiceRuntime {
     client: universal_agent_runtime_sdk::Client,
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
 impl UarServiceRuntime {
     pub fn new(base_url: impl AsRef<str>, api_key: Option<String>) -> Result<Self, AgentError> {
         let client = universal_agent_runtime_sdk::Client::new(base_url.as_ref())
@@ -195,7 +1023,6 @@ impl UarServiceRuntime {
     }
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
 #[async_trait::async_trait]
 impl UarRuntimeFacade for UarServiceRuntime {
     fn status(&self) -> UarRuntimeStatus {
@@ -207,11 +1034,36 @@ impl UarRuntimeFacade for UarServiceRuntime {
     }
 
     async fn start_run(&self, request: UarRunRequest) -> Result<UarProjectedRun, AgentError> {
+        if request.artifact.is_none() {
+            let session_id = request
+                .session_id
+                .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+            let stream = self
+                .client
+                .chat()
+                .stream(universal_agent_runtime_sdk::ChatCompletionRequest {
+                    messages: vec![universal_agent_runtime_sdk::ChatMessage::text(
+                        "user",
+                        request.input,
+                    )],
+                    session_id: Some(session_id.clone()),
+                    agent_id: request.agent_id,
+                    run_policy: request.run_policy,
+                    stream_mode: Some("agui".to_string()),
+                    ..Default::default()
+                })
+                .await
+                .map_err(uar_sdk_error)?;
+            return Ok(UarProjectedRun {
+                run_id: session_id.clone(),
+                events: project_sdk_stream(session_id, stream),
+            });
+        }
         let run = self
             .client
             .runs()
             .create(universal_agent_runtime_sdk::CreateRunRequest {
-                artifact: request.artifact,
+                artifact: request.artifact.expect("artifact checked above"),
                 input: request.input,
                 session_id: request.session_id,
             })
@@ -232,7 +1084,7 @@ impl UarRuntimeFacade for UarServiceRuntime {
     async fn cancel_run(&self, run_id: &str) -> Result<bool, AgentError> {
         self.client
             .runs()
-            .cancel(run_id)
+            .cancel_session(run_id)
             .await
             .map(|response| response.cancelled)
             .map_err(uar_sdk_error)
@@ -242,8 +1094,9 @@ impl UarRuntimeFacade for UarServiceRuntime {
         &self,
         run_id: &str,
         response: UarArtifactResponse,
-    ) -> Result<(), AgentError> {
-        self.client
+    ) -> Result<UarProjectedRun, AgentError> {
+        let ack = self
+            .client
             .runs()
             .submit_artifact_response(
                 run_id,
@@ -253,17 +1106,70 @@ impl UarRuntimeFacade for UarServiceRuntime {
                 },
             )
             .await
-            .map(|_| ())
+            .map_err(uar_sdk_error)?;
+        let stream = self
+            .client
+            .runs()
+            .stream(&ack.continuation_run_id, None)
+            .await
+            .map_err(uar_sdk_error)?;
+        Ok(UarProjectedRun {
+            run_id: ack.continuation_run_id.clone(),
+            events: project_sdk_stream(ack.continuation_run_id, stream),
+        })
+    }
+
+    async fn submit_a2ui_action(
+        &self,
+        run_id: &str,
+        action: UarA2uiAction,
+    ) -> Result<UarProjectedRun, AgentError> {
+        let ack = self
+            .client
+            .runs()
+            .submit_a2ui_action(
+                run_id,
+                universal_agent_runtime_sdk::A2uiActionRequest {
+                    surface_id: action.surface_id,
+                    name: action.name,
+                    source_component_id: action.source_component_id,
+                    timestamp: action.timestamp,
+                    context: action.context,
+                    a2ui_client_data_model: action.client_data_model,
+                },
+            )
+            .await
+            .map_err(uar_sdk_error)?;
+        let stream = self
+            .client
+            .runs()
+            .stream(&ack.continuation_run_id, None)
+            .await
+            .map_err(uar_sdk_error)?;
+        Ok(UarProjectedRun {
+            run_id: ack.continuation_run_id.clone(),
+            events: project_sdk_stream(ack.continuation_run_id, stream),
+        })
+    }
+
+    async fn promote_a2ui_component(
+        &self,
+        title: &str,
+        source: &str,
+        description: Option<&str>,
+    ) -> Result<serde_json::Value, AgentError> {
+        self.client
+            .a2ui()
+            .promote_component(title, source, description)
+            .await
             .map_err(uar_sdk_error)
     }
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
 fn uar_sdk_error(error: universal_agent_runtime_sdk::Error) -> AgentError {
     AgentError::Client(format!("UAR runtime: {error}"))
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
 fn project_sdk_stream(
     run_id: String,
     stream: universal_agent_runtime_sdk::EventStream,
@@ -293,7 +1199,6 @@ fn project_sdk_stream(
     .boxed()
 }
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
 fn sdk_stream_payload_to_agui(
     event: universal_agent_runtime_sdk::StreamEvent,
 ) -> serde_json::Value {
@@ -341,7 +1246,7 @@ const fn service_runtime_available() -> bool {
 
 #[cfg(any(target_os = "ios", target_os = "android"))]
 const fn service_runtime_available() -> bool {
-    false
+    true
 }
 
 #[cfg(not(any(target_os = "ios", target_os = "android")))]
@@ -351,7 +1256,7 @@ const fn service_artifact_response_available() -> bool {
 
 #[cfg(any(target_os = "ios", target_os = "android"))]
 const fn service_artifact_response_available() -> bool {
-    false
+    true
 }
 
 /// Stateful projector from UAR AG-UI payloads into KnowMe A2UI events.
@@ -375,8 +1280,8 @@ impl UarEventProjector {
     }
 }
 
-/// Current user-visible UAR status. This intentionally reports projection-only
-/// until chat execution actually flows through a UAR facade.
+/// Baseline UAR capability status. Runtime-specific status can layer configured
+/// service or embedded-kernel readiness on top of this baseline.
 pub fn runtime_status() -> UarRuntimeStatus {
     UarRuntimeStatus::current()
 }
@@ -386,7 +1291,6 @@ mod tests {
     use super::*;
     use futures::StreamExt;
     use gen_ui_types::content_block::ContentBlock;
-    use gen_ui_types::events::StreamEvent;
     use gen_ui_types::inference::{InferenceRequest, InferenceToolResult};
     use gen_ui_types::{CoreError, CoreResult};
     use parking_lot::Mutex;
@@ -395,6 +1299,16 @@ mod tests {
     struct RecordingInferenceProvider {
         loads: Mutex<Vec<LocalModelSpec>>,
         requests: Mutex<Vec<InferenceRequest>>,
+        scripted_events: Mutex<Option<Vec<StreamEvent>>>,
+    }
+
+    impl RecordingInferenceProvider {
+        fn with_events(events: Vec<StreamEvent>) -> Self {
+            Self {
+                scripted_events: Mutex::new(Some(events)),
+                ..Self::default()
+            }
+        }
     }
 
     #[async_trait::async_trait]
@@ -409,30 +1323,32 @@ mod tests {
             request: &InferenceRequest,
         ) -> CoreResult<BoxStream<'static, StreamEvent>> {
             self.requests.lock().push(request.clone());
-            Ok(futures::stream::iter([
-                StreamEvent::MessageStart,
-                StreamEvent::TextDelta {
-                    index: 0,
-                    delta: "before".into(),
-                },
-                StreamEvent::ToolCallStarted {
-                    id: "tool-1".into(),
-                    name: "knowme_diagnostics__local_runtime_status".into(),
-                },
-                StreamEvent::ToolCallDelta {
-                    id: "tool-1".into(),
-                    delta: r#"{"marker":"#.into(),
-                },
-                StreamEvent::ToolCallDelta {
-                    id: "tool-1".into(),
-                    delta: r#""KMUAR"}"#.into(),
-                },
-                StreamEvent::ToolCallComplete {
-                    id: "tool-1".into(),
-                },
-                StreamEvent::Done,
-            ])
-            .boxed())
+            let events = self.scripted_events.lock().take().unwrap_or_else(|| {
+                vec![
+                    StreamEvent::MessageStart,
+                    StreamEvent::TextDelta {
+                        index: 0,
+                        delta: "before".into(),
+                    },
+                    StreamEvent::ToolCallStarted {
+                        id: "tool-1".into(),
+                        name: "knowme_diagnostics__local_runtime_status".into(),
+                    },
+                    StreamEvent::ToolCallDelta {
+                        id: "tool-1".into(),
+                        delta: r#"{"marker":"#.into(),
+                    },
+                    StreamEvent::ToolCallDelta {
+                        id: "tool-1".into(),
+                        delta: r#""KMUAR"}"#.into(),
+                    },
+                    StreamEvent::ToolCallComplete {
+                        id: "tool-1".into(),
+                    },
+                    StreamEvent::Done,
+                ]
+            });
+            Ok(futures::stream::iter(events).boxed())
         }
 
         async fn continue_with_tool_results(
@@ -456,6 +1372,150 @@ mod tests {
         assert!(status.local_provider_bridge_available);
         assert!(!status.embedded_kernel_available);
         assert!(status.embedded_kernel_blocker.is_some());
+    }
+
+    #[tokio::test]
+    async fn android_litert_lm_is_a_credential_free_uar_default() {
+        const PINNED_MODEL_ID: &str = "gemma-4-e2b-it-litertlm";
+        let provider = android_litert_lm_provider_config(PINNED_MODEL_ID);
+
+        assert_eq!(provider.id, ANDROID_LITERT_LM_PROVIDER_ID);
+        assert!(provider.enabled);
+        assert!(provider.api_key.is_none());
+        assert!(provider.base_url.is_empty());
+        assert_eq!(provider.default_model.as_deref(), Some(PINNED_MODEL_ID));
+        assert_eq!(provider.models.len(), 1);
+
+        let model = &provider.models[0];
+        assert_eq!(model.id, PINNED_MODEL_ID);
+        assert_eq!(
+            model.context_window,
+            Some(ANDROID_LITERT_LM_TRUSTED_CONTEXT_TOKENS)
+        );
+        assert_eq!(
+            model.max_output_tokens,
+            Some(ANDROID_LITERT_LM_MAX_OUTPUT_TOKENS)
+        );
+        assert!(!model.supports_vision);
+        assert!(model.supports_tools);
+        assert!(model.supports_reasoning);
+        assert!(model.supports_structured_output);
+        assert!(model.supports_streaming);
+        assert!(model.enabled);
+
+        let registry = Arc::new(universal_agent_runtime::llm::ProviderRegistry::new());
+        registry
+            .register_custom_provider(provider)
+            .await
+            .expect("Android local provider registers");
+        registry
+            .set_default(ANDROID_LITERT_LM_PROVIDER_ID)
+            .await
+            .expect("Android local provider becomes default");
+
+        assert_eq!(
+            registry.default_model().await,
+            Some((
+                ANDROID_LITERT_LM_PROVIDER_ID.to_string(),
+                PINNED_MODEL_ID.to_string()
+            ))
+        );
+        let resolved = registry
+            .resolve_to_llm_config(ANDROID_LITERT_LM_PROVIDER_ID, "")
+            .await
+            .expect("default local route resolves without credentials");
+        assert_eq!(
+            resolved.model,
+            format!("{ANDROID_LITERT_LM_PROVIDER_ID}/{PINNED_MODEL_ID}")
+        );
+        assert!(resolved.api_key.is_none());
+        assert!(resolved.base_url.is_none());
+
+        let routed = universal_agent_runtime::llm::router::ModelRouter::new(Arc::clone(&registry))
+            .route(&universal_agent_runtime::llm::router::RouteRequirements {
+                needs_tools: true,
+                needs_reasoning: true,
+                needs_structured_output: true,
+                min_context: Some(ANDROID_LITERT_LM_TRUSTED_CONTEXT_TOKENS.into()),
+                preferred_provider: Some(ANDROID_LITERT_LM_PROVIDER_ID.to_string()),
+                ..Default::default()
+            })
+            .await;
+        assert_eq!(
+            routed.as_deref(),
+            Some("knowme-local-litert-lm/gemma-4-e2b-it-litertlm")
+        );
+    }
+
+    #[tokio::test]
+    async fn ios_qwen35_metal_is_a_credential_free_multimodal_uar_default() {
+        const PINNED_MODEL_ID: &str = "qwen3.5-9b-q4-k-m";
+        let provider = ios_qwen35_metal_provider_config(PINNED_MODEL_ID);
+
+        assert_eq!(provider.id, IOS_LLAMA_METAL_PROVIDER_ID);
+        assert!(provider.enabled);
+        assert!(provider.api_key.is_none());
+        assert!(provider.base_url.is_empty());
+        assert_eq!(provider.default_model.as_deref(), Some(PINNED_MODEL_ID));
+        assert_eq!(provider.models.len(), 1);
+
+        let model = &provider.models[0];
+        assert_eq!(model.id, PINNED_MODEL_ID);
+        assert_eq!(
+            model.context_window,
+            Some(IOS_QWEN35_TRUSTED_CONTEXT_TOKENS)
+        );
+        assert_eq!(model.max_output_tokens, Some(IOS_QWEN35_MAX_OUTPUT_TOKENS));
+        assert!(model.supports_vision);
+        assert!(model.supports_tools);
+        assert!(model.supports_reasoning);
+        assert!(model.supports_structured_output);
+        assert!(model.supports_streaming);
+        assert!(model.enabled);
+
+        let registry = Arc::new(universal_agent_runtime::llm::ProviderRegistry::new());
+        registry
+            .register_custom_provider(provider)
+            .await
+            .expect("iOS local provider registers");
+        registry
+            .set_default(IOS_LLAMA_METAL_PROVIDER_ID)
+            .await
+            .expect("iOS local provider becomes default");
+
+        assert_eq!(
+            registry.default_model().await,
+            Some((
+                IOS_LLAMA_METAL_PROVIDER_ID.to_string(),
+                PINNED_MODEL_ID.to_string()
+            ))
+        );
+        let resolved = registry
+            .resolve_to_llm_config(IOS_LLAMA_METAL_PROVIDER_ID, "")
+            .await
+            .expect("default local route resolves without credentials");
+        assert_eq!(
+            resolved.model,
+            format!("{IOS_LLAMA_METAL_PROVIDER_ID}/{PINNED_MODEL_ID}")
+        );
+        assert!(resolved.api_key.is_none());
+        assert!(resolved.base_url.is_none());
+
+        let routed = universal_agent_runtime::llm::router::ModelRouter::new(Arc::clone(&registry))
+            .route(&universal_agent_runtime::llm::router::RouteRequirements {
+                needs_vision: true,
+                needs_tools: true,
+                needs_reasoning: true,
+                needs_structured_output: true,
+                min_context: Some(IOS_QWEN35_TRUSTED_CONTEXT_TOKENS.into()),
+                preferred_provider: Some(IOS_LLAMA_METAL_PROVIDER_ID.to_string()),
+                ..Default::default()
+            })
+            .await;
+        assert_eq!(
+            routed.as_deref(),
+            Some("knowme-local-llama-metal/qwen3.5-9b-q4-k-m")
+        );
     }
 
     #[tokio::test]
@@ -531,6 +1591,257 @@ mod tests {
                 .and_then(serde_json::Value::as_str),
             Some(r#"{"marker":"KMUAR"}"#)
         );
+    }
+
+    #[tokio::test]
+    async fn local_inference_bridge_is_a_native_uar_llm_driver() {
+        let provider = Arc::new(RecordingInferenceProvider::default());
+        let bridge = UarLocalInferenceDriverBridge::new(
+            provider.clone(),
+            LocalModelSpec {
+                model: "gemma-4-e2b-it-litertlm".into(),
+                context_len: Some(8192),
+            },
+        );
+
+        let events = bridge
+            .stream(LlmRequest {
+                messages: vec![serde_json::json!({
+                    "role": "user",
+                    "content": "Check status."
+                })],
+                tools: vec![serde_json::json!({
+                    "type": "function",
+                    "function": {
+                        "name": "knowme_diagnostics__local_runtime_status",
+                        "description": "Status.",
+                        "parameters": {"type": "object", "properties": {}}
+                    }
+                })],
+                cache_strategy: None,
+                thinking_config: None,
+                anthropic_system: Some(vec![serde_json::json!({
+                    "type": "text",
+                    "text": "Be concise."
+                })]),
+                extra_params: Some(serde_json::json!({
+                    "temperature": 0.2,
+                    "max_tokens": 64
+                })),
+            })
+            .await
+            .expect("native UAR driver starts")
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .map(Result::unwrap)
+            .collect::<Vec<_>>();
+
+        let request = provider.requests.lock()[0].clone();
+        assert_eq!(
+            request.messages[0].role,
+            gen_ui_types::inference::InferenceRole::System
+        );
+        assert_eq!(request.messages[0].content, "Be concise.");
+        assert_eq!(request.messages[1].content, "Check status.");
+        assert_eq!(request.generation_settings.temperature, 0.2);
+        assert_eq!(request.generation_settings.max_tokens, 64);
+
+        assert!(matches!(events[0], UarNormalizedEvent::StreamStart { .. }));
+        assert!(events.iter().any(|event| matches!(
+            event,
+            UarNormalizedEvent::MessageDelta { text } if text == "before"
+        )));
+        assert!(events.iter().any(|event| matches!(
+            event,
+            UarNormalizedEvent::ToolCallComplete {
+                id,
+                name,
+                arguments_json,
+                ..
+            } if id == "tool-1"
+                && name == "knowme_diagnostics__local_runtime_status"
+                && arguments_json == r#"{"marker":"KMUAR"}"#
+        )));
+        assert!(matches!(events.last(), Some(UarNormalizedEvent::Done)));
+    }
+
+    #[tokio::test]
+    async fn embedded_uar_runs_the_seeded_orchestrator_on_the_local_provider() {
+        let provider = Arc::new(RecordingInferenceProvider::with_events(vec![
+            StreamEvent::MessageStart,
+            StreamEvent::ThinkingDelta {
+                index: 0,
+                delta: "checking".into(),
+            },
+            StreamEvent::TextDelta {
+                index: 0,
+                delta: "Offline UAR is ready.".into(),
+            },
+            StreamEvent::Done,
+        ]));
+        let runtime = UarEmbeddedRuntime::build_local(
+            provider.clone(),
+            LocalModelSpec {
+                model: "gemma-4-e2b-it-litertlm".into(),
+                context_len: Some(8_192),
+            },
+            android_litert_lm_provider_config("gemma-4-e2b-it-litertlm"),
+        )
+        .await
+        .expect("embedded UAR builds without a transport");
+
+        let projected = runtime
+            .start_run(UarRunRequest {
+                artifact: None,
+                input: "Confirm offline operation.".into(),
+                session_id: Some("offline-test-conversation".into()),
+                agent_id: None,
+                run_policy: None,
+            })
+            .await
+            .expect("seeded orchestrator run starts");
+        assert_eq!(
+            runtime.status().current_state,
+            UarIntegrationState::EmbeddedKernel
+        );
+
+        let mut events = projected.events;
+        let mut saw_thinking = false;
+        let mut saw_answer = false;
+        let mut saw_finished = false;
+        while !saw_finished {
+            let event = tokio::time::timeout(std::time::Duration::from_secs(5), events.next())
+                .await
+                .expect("embedded run event arrives")
+                .expect("embedded run stream remains open")
+                .expect("embedded event projects");
+            match event {
+                A2uiEvent::Block {
+                    block: ContentBlock::Thinking { .. },
+                    ..
+                } => saw_thinking = true,
+                A2uiEvent::Block {
+                    block: ContentBlock::Text { text },
+                    ..
+                } if text.contains("Offline UAR is ready") => saw_answer = true,
+                A2uiEvent::RunFinished { .. } => saw_finished = true,
+                _ => {}
+            }
+        }
+
+        assert!(saw_thinking, "reasoning must survive UAR projection");
+        assert!(saw_answer, "answer text must survive UAR projection");
+        assert_eq!(provider.requests.lock().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn native_driver_preserves_every_local_semantic_event() {
+        let provider = Arc::new(RecordingInferenceProvider::with_events(vec![
+            StreamEvent::ThinkingDelta {
+                index: 0,
+                delta: "reason".into(),
+            },
+            StreamEvent::SkillActivation {
+                name: "meeting_summary".into(),
+                status: "activated".into(),
+            },
+            StreamEvent::Citations {
+                citations: vec![
+                    gen_ui_types::events::StreamCitation {
+                        source: "handbook.pdf".into(),
+                        quote: "Bring receipts.".into(),
+                    },
+                    gen_ui_types::events::StreamCitation {
+                        source: "notes.md".into(),
+                        quote: "Follow up Friday.".into(),
+                    },
+                ],
+            },
+            StreamEvent::Memory {
+                operation: "stored".into(),
+                key: "office.format".into(),
+                value: Some("concise".into()),
+            },
+            StreamEvent::Custom {
+                source: "litert-lm".into(),
+                event_name: "provider.metric".into(),
+                payload: serde_json::json!({"ttftMs": 42}),
+            },
+            StreamEvent::Cancelled {
+                message: "Stopped by user".into(),
+            },
+            StreamEvent::Done,
+        ]));
+        let bridge = UarLocalInferenceDriverBridge::new(
+            provider,
+            LocalModelSpec {
+                model: "local".into(),
+                context_len: None,
+            },
+        );
+
+        let events = bridge
+            .stream(LlmRequest {
+                messages: vec![serde_json::json!({"role": "user", "content": "hello"})],
+                tools: Vec::new(),
+                cache_strategy: None,
+                thinking_config: None,
+                anthropic_system: None,
+                extra_params: None,
+            })
+            .await
+            .unwrap()
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .map(Result::unwrap)
+            .collect::<Vec<_>>();
+
+        assert!(matches!(events[0], UarNormalizedEvent::StreamStart { .. }));
+        assert!(matches!(
+            &events[1],
+            UarNormalizedEvent::ThinkingDelta { text } if text == "reason"
+        ));
+        assert!(events.iter().any(|event| matches!(
+            event,
+            UarNormalizedEvent::SkillActivation { name, status }
+                if name == "meeting_summary" && status == "activated"
+        )));
+        let citations = events
+            .iter()
+            .filter_map(|event| match event {
+                UarNormalizedEvent::CitationAdded(citation) => Some(citation),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(citations.len(), 2);
+        assert_eq!(citations[0].index, 0);
+        assert_eq!(citations[1].index, 1);
+        assert!(events.iter().any(|event| matches!(
+            event,
+            UarNormalizedEvent::MemoryUpdate {
+                operation,
+                key,
+                value,
+            } if operation == "stored" && key == "office.format" && value == "concise"
+        )));
+        assert!(events.iter().any(|event| matches!(
+            event,
+            UarNormalizedEvent::Custom {
+                source,
+                event_name,
+                payload,
+            } if source == "litert-lm"
+                && event_name == "provider.metric"
+                && payload["ttftMs"] == 42
+        )));
+        assert!(events.iter().any(|event| matches!(
+            event,
+            UarNormalizedEvent::Error { code: Some(code), .. }
+                if code == "knowme_local_cancelled"
+        )));
+        assert!(matches!(events.last(), Some(UarNormalizedEvent::Done)));
     }
 
     #[test]
@@ -745,6 +2056,18 @@ mod tests {
             }),
             Ok(universal_agent_runtime_sdk::StreamEvent {
                 id: Some("3".into()),
+                event: Some("agui.rag_citations".into()),
+                data: serde_json::json!({
+                    "citations": [{
+                        "marker": 1,
+                        "chunk_id": "chunk-a",
+                        "document_name": "handbook.pdf",
+                        "snippet": "Bring receipts."
+                    }]
+                }),
+            }),
+            Ok(universal_agent_runtime_sdk::StreamEvent {
+                id: Some("4".into()),
                 event: Some("agui.tool_call.complete".into()),
                 data: serde_json::json!({
                     "id": "call-1",
@@ -753,7 +2076,7 @@ mod tests {
                 }),
             }),
             Ok(universal_agent_runtime_sdk::StreamEvent {
-                id: Some("4".into()),
+                id: Some("5".into()),
                 event: Some("agui.cancelled".into()),
                 data: serde_json::json!({"message": "User stopped"}),
             }),
@@ -784,6 +2107,13 @@ mod tests {
         assert!(output.iter().any(|event| matches!(
             event,
             A2uiEvent::Block {
+                block: ContentBlock::Citation { source, quote },
+                ..
+            } if source == "[1] handbook.pdf" && quote == "Bring receipts."
+        )));
+        assert!(output.iter().any(|event| matches!(
+            event,
+            A2uiEvent::Block {
                 block: ContentBlock::ToolUse { id, name, input_json },
                 ..
             } if id == "call-1" && name == "docs.search" && input_json == "{\"q\":\"uar\"}"
@@ -792,5 +2122,202 @@ mod tests {
             event,
             A2uiEvent::RunCancelled { message, .. } if message == "User stopped"
         )));
+    }
+
+    #[tokio::test]
+    #[cfg(not(any(target_os = "ios", target_os = "android")))]
+    async fn service_runtime_exercises_create_stream_and_artifact_response_over_http() {
+        use std::sync::Arc;
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        #[derive(Default)]
+        struct Captures {
+            create_body: Mutex<String>,
+            artifact_body: Mutex<String>,
+            cancel_request_line: Mutex<String>,
+        }
+
+        async fn read_request(stream: &mut tokio::net::TcpStream) -> (String, String) {
+            let mut buffer = Vec::new();
+            let mut chunk = [0_u8; 1024];
+            loop {
+                let read = stream.read(&mut chunk).await.unwrap();
+                if read == 0 {
+                    break;
+                }
+                buffer.extend_from_slice(&chunk[..read]);
+                if buffer.windows(4).any(|window| window == b"\r\n\r\n") {
+                    break;
+                }
+            }
+            let header_end = buffer
+                .windows(4)
+                .position(|window| window == b"\r\n\r\n")
+                .map(|index| index + 4)
+                .unwrap_or(buffer.len());
+            let headers = String::from_utf8_lossy(&buffer[..header_end]).to_string();
+            let content_length = headers
+                .lines()
+                .find_map(|line| {
+                    let (name, value) = line.split_once(':')?;
+                    name.eq_ignore_ascii_case("content-length")
+                        .then(|| value.trim().parse::<usize>().ok())
+                        .flatten()
+                })
+                .unwrap_or(0);
+            while buffer.len() < header_end + content_length {
+                let read = stream.read(&mut chunk).await.unwrap();
+                if read == 0 {
+                    break;
+                }
+                buffer.extend_from_slice(&chunk[..read]);
+            }
+            let request_line = headers.lines().next().unwrap_or_default().to_string();
+            let body = String::from_utf8_lossy(
+                &buffer[header_end..buffer.len().min(header_end + content_length)],
+            )
+            .to_string();
+            (request_line, body)
+        }
+
+        async fn respond(
+            stream: &mut tokio::net::TcpStream,
+            status: &str,
+            content_type: &str,
+            body: &str,
+        ) {
+            let response = format!(
+                "HTTP/1.1 {status}\r\ncontent-type: {content_type}\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                body.len()
+            );
+            stream.write_all(response.as_bytes()).await.unwrap();
+        }
+
+        let captures = Arc::new(Captures::default());
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server_captures = Arc::clone(&captures);
+        let server = tokio::spawn(async move {
+            loop {
+                let Ok((mut stream, _)) = listener.accept().await else {
+                    break;
+                };
+                let captures = Arc::clone(&server_captures);
+                tokio::spawn(async move {
+                    let (request_line, body) = read_request(&mut stream).await;
+                    if request_line.starts_with("GET /health ") {
+                        respond(
+                            &mut stream,
+                            "200 OK",
+                            "application/json",
+                            r#"{"status":"ok"}"#,
+                        )
+                        .await;
+                    } else if request_line.starts_with("POST /api/uar/runs ") {
+                        *captures.create_body.lock() = body;
+                        respond(
+                            &mut stream,
+                            "200 OK",
+                            "application/json",
+                            r#"{"run_id":"uar-run-1","stream_url":"/api/uar/runs/uar-run-1/stream"}"#,
+                        )
+                        .await;
+                    } else if request_line.starts_with("GET /api/uar/runs/uar-run-1/stream ") {
+                        let sse = concat!(
+                            "id: 1\n",
+                            "event: agui.message.delta\n",
+                            "data: {\"delta\":{\"text\":\"from fake UAR\"}}\n\n",
+                            "id: 2\n",
+                            "event: agui.done\n",
+                            "data: {}\n\n"
+                        );
+                        respond(&mut stream, "200 OK", "text/event-stream", sse).await;
+                    } else if request_line
+                        .starts_with("POST /api/uar/runs/uar-run-1/artifact-response ")
+                    {
+                        *captures.artifact_body.lock() = body;
+                        respond(
+                            &mut stream,
+                            "200 OK",
+                            "application/json",
+                            r#"{"run_id":"uar-run-1","artifact_id":"artifact-1","continuation_run_id":"uar-run-1","status":"accepted"}"#,
+                        )
+                        .await;
+                    } else if request_line.starts_with("POST /api/uar/sessions/uar-run-1/cancel ") {
+                        *captures.cancel_request_line.lock() = request_line;
+                        respond(
+                            &mut stream,
+                            "200 OK",
+                            "application/json",
+                            r#"{"cancelled":true}"#,
+                        )
+                        .await;
+                    } else {
+                        respond(
+                            &mut stream,
+                            "404 Not Found",
+                            "application/json",
+                            r#"{"error":"not found"}"#,
+                        )
+                        .await;
+                    }
+                });
+            }
+        });
+
+        let runtime = UarServiceRuntime::new(format!("http://{address}"), None).unwrap();
+        let run = runtime
+            .start_run(UarRunRequest {
+                artifact: Some(serde_json::json!({"agent": "knowme"})),
+                input: "hello UAR".into(),
+                session_id: Some("session-1".into()),
+                agent_id: None,
+                run_policy: None,
+            })
+            .await
+            .unwrap();
+        assert_eq!(run.run_id, "uar-run-1");
+
+        let events: Vec<_> = run
+            .events
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .map(Result::unwrap)
+            .collect();
+        assert!(events.iter().any(|event| matches!(
+            event,
+            A2uiEvent::Block {
+                block: ContentBlock::Text { text },
+                ..
+            } if text == "from fake UAR"
+        )));
+
+        runtime
+            .submit_artifact_response(
+                "uar-run-1",
+                UarArtifactResponse {
+                    artifact_id: "artifact-1".into(),
+                    response: serde_json::json!({"approved": true}),
+                },
+            )
+            .await
+            .unwrap();
+        let cancelled = runtime.cancel_run("uar-run-1").await.unwrap();
+
+        let create_body = captures.create_body.lock().clone();
+        assert!(create_body.contains("\"input\":\"hello UAR\""));
+        assert!(create_body.contains("\"session_id\":\"session-1\""));
+        assert!(create_body.contains("\"agent\":\"knowme\""));
+        let artifact_body = captures.artifact_body.lock().clone();
+        assert!(artifact_body.contains("\"artifact_id\":\"artifact-1\""));
+        assert!(artifact_body.contains("\"approved\":true"));
+        assert!(cancelled);
+        assert_eq!(
+            captures.cancel_request_line.lock().as_str(),
+            "POST /api/uar/sessions/uar-run-1/cancel HTTP/1.1"
+        );
+
+        server.abort();
     }
 }

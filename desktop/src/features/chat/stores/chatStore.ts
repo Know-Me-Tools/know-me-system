@@ -8,15 +8,15 @@ import {
   memoryDeleteConversationContext,
   memoryDeleteMessageContext,
   onChatEvent,
+  sendAgentInteractionA2ui,
   streamAgentA2ui,
 } from '@prometheus-ags/tauri-plugin-gen-ui'
 import type { InferenceHistoryMessage } from '@prometheus-ags/tauri-plugin-gen-ui'
 import type { ContentBlock, Message, MessageUsage } from '@/bridge/a2ui/types'
 import { applyA2uiEvent, createA2uiWireAdapter, type A2uiWireEvent, type RunLifecycleUpdate } from '@/bridge/a2ui/driver'
 import { streamWebLlm } from '../api/webllmLane'
-import { streamHostedChat } from '../api/hostedLane'
+import { cancelHostedChat, streamHostedA2uiAction, streamHostedChat } from '../api/hostedLane'
 import { useLaneStore } from './laneStore'
-import { getSessionByok } from '@/features/settings/stores/providerStore'
 import {
   deleteConversationRecord,
   deleteMessageRecords,
@@ -142,10 +142,21 @@ function inferenceHistory(messages: Message[], branchId: string): InferenceHisto
     if (answer.trim()) history.push({ role: message.role, content: answer })
     for (const block of message.content) {
       if (block.type !== 'toolResult') continue
+      // Older persisted Rust wire blocks used snake_case field names. Keep
+      // those conversations resumable while the canonical contract uses
+      // camelCase on every client.
+      const legacy = block as unknown as Record<string, unknown>
+      const output = typeof block.outputJson === 'string'
+        ? block.outputJson
+        : typeof legacy.output_json === 'string' ? legacy.output_json : ''
+      const toolCallId = typeof block.toolUseId === 'string'
+        ? block.toolUseId
+        : typeof legacy.tool_use_id === 'string' ? legacy.tool_use_id : ''
+      if (!output.trim()) continue
       history.push({
         role: 'tool',
-        content: block.outputJson,
-        tool_call_id: block.toolUseId,
+        content: output,
+        ...(toolCallId ? { tool_call_id: toolCallId } : {}),
       })
     }
   }
@@ -160,7 +171,7 @@ async function runInferenceTurn(
   conversationId: string,
 ): Promise<void> {
   const store = useChatStore.getState()
-  const lane = useLaneStore.getState().lane
+  let lane = useLaneStore.getState().lane
   if (!isTauri() && lane === 'local') {
     const ready = await useLaneStore.getState().prepareLocal()
     if (!ready) {
@@ -175,19 +186,13 @@ async function runInferenceTurn(
   }
 
   if (!isTauri()) {
-    const byok = getSessionByok()
-    if (!byok) {
-      store.updateLifecycle({ type: 'error', messageId: assistantId, runId: assistantId,
-        error: { code: 'cloud_provider_missing', phase: 'generation', message: 'Choose Local for zero-configuration chat, or add a session-only cloud provider in Settings.', retryable: false } })
-      return
-    }
     wireAdapter.bind(assistantId)
     const hostedHistory = history
       .filter((entry): entry is InferenceHistoryMessage & { role: 'user' | 'assistant' } =>
         entry.role === 'user' || entry.role === 'assistant')
       .map((entry) => ({ role: entry.role, content: entry.content }))
     try {
-      for await (const event of streamHostedChat(text, hostedHistory, byok, conversationId, branchId)) {
+      for await (const event of streamHostedChat(text, hostedHistory, null, conversationId, branchId)) {
         wireAdapter.handle(event)
       }
     } catch (error) {
@@ -198,6 +203,27 @@ async function runInferenceTurn(
     }
     persistActiveConversation()
     return
+  }
+
+  if (isTauri()) {
+    await useLaneStore.getState().init()
+    lane = useLaneStore.getState().lane
+    const laneState = useLaneStore.getState()
+    if (lane === 'cloud') {
+      store.updateLifecycle({ type: 'error', messageId: assistantId, runId: assistantId,
+        error: { code: 'desktop_cloud_lane_removed', phase: 'queued', message: 'Desktop chat now uses UAR or Local. Configure Liter-LLM providers under UAR settings, then select UAR.', retryable: false } })
+      return
+    }
+    if (lane === 'uar' && !laneState.uarConfigured) {
+      store.updateLifecycle({ type: 'error', messageId: assistantId, runId: assistantId,
+        error: { code: 'uar_not_configured', phase: 'queued', message: 'Configure Universal Agent Runtime in Settings before using the UAR lane.', retryable: true } })
+      return
+    }
+    if (lane === 'local' && !laneState.localAvailable) {
+      store.updateLifecycle({ type: 'error', messageId: assistantId, runId: assistantId,
+        error: { code: 'local_runtime_unavailable', phase: 'queued', message: 'Local desktop inference is not available in this build. Select UAR after configuring it in Settings.', retryable: false } })
+      return
+    }
   }
 
   wireAdapter.bind(assistantId)
@@ -220,6 +246,7 @@ interface ChatState {
 
 interface ChatActions {
   sendMessage: (text: string) => Promise<void>
+  submitInteraction: (interaction: unknown) => Promise<void>
   resubmitMessage: (userMessageId: string) => Promise<void>
   deleteResponse: (assistantMessageId: string) => Promise<void>
   regenerateResponse: (assistantMessageId: string) => Promise<void>
@@ -340,6 +367,99 @@ export const useChatStore = create<ChatState & ChatActions>()(
         const history = inferenceHistory(get().messages.slice(0, -2), branchId)
 
         await runInferenceTurn(text, assistantId, branchId, history, get().activeConversationId)
+      },
+
+      submitInteraction: async (interaction: unknown) => {
+        const parent = get().messages.at(-1)
+        const sourceRunId = typeof interaction === 'object' && interaction !== null && !Array.isArray(interaction)
+          && typeof (interaction as Record<string, unknown>).sourceRunId === 'string'
+          ? (interaction as Record<string, unknown>).sourceRunId as string
+          : parent?.runId
+        const branchId = parent?.branchId ?? get().activeConversationId
+        const assistantId = crypto.randomUUID()
+        const assistantMsg: Message = {
+          id: assistantId,
+          role: 'assistant',
+          content: [],
+          timestamp: new Date().toISOString(),
+          isStreaming: true,
+          parentMessageId: parent?.id,
+          branchId,
+          runStatus: 'queued',
+        }
+        const history = inferenceHistory(get().messages, branchId)
+        set((s) => {
+          s.messages.push(assistantMsg)
+          s.isStreaming = true
+          const conversation = s.conversations.find((item) => item.id === s.activeConversationId)
+          if (conversation) { conversation.messages = s.messages; conversation.updatedAt = new Date().toISOString() }
+        })
+        persistActiveConversation()
+
+        let interactionJson: string
+        try {
+          if (typeof interaction !== 'object' || interaction === null || Array.isArray(interaction)) {
+            throw new Error('Interaction payload must be a JSON object')
+          }
+          const encoded = JSON.stringify(interaction)
+          if (!encoded) {
+            throw new Error('Interaction payload must be a JSON object')
+          }
+          interactionJson = encoded
+        } catch (error) {
+          get().updateLifecycle({
+            type: 'error',
+            messageId: assistantId,
+            runId: assistantId,
+            error: {
+              code: 'interaction_encode_failed',
+              phase: 'queued',
+              message: error instanceof Error ? error.message : 'Interaction payload could not be encoded',
+              retryable: false,
+            },
+          })
+          return
+        }
+
+        if (!isTauri()) {
+          if (!sourceRunId) {
+            get().updateLifecycle({ type: 'error', messageId: assistantId, runId: assistantId, error: {
+              code: 'interaction_source_run_missing', phase: 'queued', message: 'The source UAR run is unavailable for this interaction.', retryable: false,
+            } })
+            return
+          }
+          wireAdapter.bind(assistantId)
+          try {
+            for await (const event of streamHostedA2uiAction(interaction, sourceRunId)) wireAdapter.handle(event)
+          } catch (error) {
+            wireAdapter.handle({ type: 'run_error', run_id: assistantId, error: {
+              code: 'interaction_start_failed', phase: 'tool_execution', message: error instanceof Error ? error.message : String(error), retryable: true,
+            } })
+          }
+          persistActiveConversation()
+          return
+        }
+
+        wireAdapter.bind(assistantId)
+        await sendAgentInteractionA2ui(interactionJson, history, get().activeConversationId, branchId)
+          .then((runId) => {
+            get().updateLifecycle({ type: 'started', messageId: assistantId, runId })
+          })
+          .catch((error: unknown) => {
+            console.error(error)
+            get().updateLifecycle({
+              type: 'error',
+              messageId: assistantId,
+              runId: assistantId,
+              error: {
+                code: 'interaction_start_failed',
+                phase: 'queued',
+                message: error instanceof Error ? error.message : String(error),
+                retryable: true,
+              },
+            })
+          })
+        persistActiveConversation()
       },
 
       resubmitMessage: async (userMessageId: string) => {
@@ -524,13 +644,14 @@ export const useChatStore = create<ChatState & ChatActions>()(
 
       cancelActiveRun: async () => {
         const runId = get().activeRunId
-        if (!runId || !isTauri()) return
+        if (!runId) return
         const message = get().messages.find((item) => item.runId === runId)
         if (message) get().updateLifecycle({
           type: 'phase', messageId: message.id, runId,
           phase: message.runPhase ?? 'generation', status: 'preparing', message: 'Cancelling',
         })
-        await cancelAgentRun(runId)
+        if (isTauri()) await cancelAgentRun(runId)
+        else await cancelHostedChat(get().activeConversationId)
       },
 
       initListeners: () => {

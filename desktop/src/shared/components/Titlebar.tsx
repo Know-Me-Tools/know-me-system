@@ -10,6 +10,8 @@ import { useState } from 'react'
 import { isTauri } from '@tauri-apps/api/core'
 import { getCurrentWindow, type Window as TauriWindow } from '@tauri-apps/api/window'
 import { platform } from '@tauri-apps/plugin-os'
+import { Settings } from 'lucide-react'
+import { useSettingsOverlay } from '@/features/settings/hooks/useSettingsOverlay'
 import { KnowMeLogo, KnowMeWordmark } from './KnowMeLogo'
 
 const appWindow: TauriWindow | null = isTauri() ? getCurrentWindow() : null
@@ -65,6 +67,7 @@ function WindowControlsWindows() {
 }
 
 export function Titlebar() {
+  const { openSettings } = useSettingsOverlay()
   const [os] = useState(() => {
     if (!isTauri()) return null
     try {
@@ -97,6 +100,16 @@ export function Titlebar() {
         <KnowMeLogo size={16} className="text-[color:var(--color-fg)]" />
         <KnowMeWordmark className="text-[13px]" />
       </div>
+      <button
+        type="button"
+        aria-label="Open settings"
+        title="Settings"
+        onMouseDown={(event) => event.stopPropagation()}
+        onClick={openSettings}
+        className="flex size-9 items-center justify-center rounded-lg text-[color:var(--color-fg-sub)] hover:bg-[color:var(--color-card-hov)] hover:text-[color:var(--color-fg)] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[color:var(--color-ember)]"
+      >
+        <Settings aria-hidden className="size-4" />
+      </button>
       {isTauri() && os !== null && !isMac && <WindowControlsWindows />}
     </header>
   )

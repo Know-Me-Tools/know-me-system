@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-cloud-model-save"
+description = "Enables the cloud_model_save command without any pre-configured scope."
+commands.allow = ["cloud_model_save"]
+
+[[permission]]
+identifier = "deny-cloud-model-save"
+description = "Denies the cloud_model_save command without any pre-configured scope."
+commands.deny = ["cloud_model_save"]

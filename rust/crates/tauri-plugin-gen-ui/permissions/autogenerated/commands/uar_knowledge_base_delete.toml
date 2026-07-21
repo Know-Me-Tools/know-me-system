@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-uar-knowledge-base-delete"
+description = "Enables the uar_knowledge_base_delete command without any pre-configured scope."
+commands.allow = ["uar_knowledge_base_delete"]
+
+[[permission]]
+identifier = "deny-uar-knowledge-base-delete"
+description = "Denies the uar_knowledge_base_delete command without any pre-configured scope."
+commands.deny = ["uar_knowledge_base_delete"]

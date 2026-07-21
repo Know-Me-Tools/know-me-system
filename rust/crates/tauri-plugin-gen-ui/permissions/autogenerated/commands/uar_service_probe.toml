@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-uar-service-probe"
+description = "Enables the uar_service_probe command without any pre-configured scope."
+commands.allow = ["uar_service_probe"]
+
+[[permission]]
+identifier = "deny-uar-service-probe"
+description = "Denies the uar_service_probe command without any pre-configured scope."
+commands.deny = ["uar_service_probe"]

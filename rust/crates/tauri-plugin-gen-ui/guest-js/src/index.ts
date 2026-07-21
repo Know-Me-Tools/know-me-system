@@ -40,6 +40,58 @@ export interface ViewDescriptor {
   cursor: string | null;
 }
 
+interface WireEntityRecord {
+  id: string;
+  entity_type: string;
+  data_json: string;
+}
+
+interface WireListResult {
+  items: WireEntityRecord[];
+  next_cursor: string | null;
+}
+
+interface WireViewDescriptor {
+  entity_type: string;
+  filters: FilterSpec[];
+  sorts: SortSpec[];
+  limit: number | null;
+  cursor: string | null;
+}
+
+function toWireView(view: ViewDescriptor): WireViewDescriptor {
+  return {
+    entity_type: view.entityType,
+    filters: view.filters,
+    sorts: view.sorts,
+    limit: view.limit,
+    cursor: view.cursor,
+  };
+}
+
+function toWireEntity(record: EntityRecord): WireEntityRecord {
+  return {
+    id: record.id,
+    entity_type: record.entityType,
+    data_json: record.dataJson,
+  };
+}
+
+function fromWireEntity(record: WireEntityRecord): EntityRecord {
+  return {
+    id: record.id,
+    entityType: record.entity_type,
+    dataJson: record.data_json,
+  };
+}
+
+function fromWireList(result: WireListResult): ListResult {
+  return {
+    items: result.items.map(fromWireEntity),
+    nextCursor: result.next_cursor,
+  };
+}
+
 // --- Command wrappers --------------------------------------------------------
 
 /** Boot-order invariant, step 1 of 3: open the config store + run migrations. */
@@ -95,6 +147,40 @@ export function streamAgentA2ui(
     messages,
     conversationId,
     branchId,
+  });
+}
+/**
+ * Continue a chat run from a structured client/A2UI interaction.
+ *
+ * Stores pass the interaction as JSON so the Rust layer can validate shape,
+ * extract typed UAR artifact responses, and preserve the shared stream/event
+ * semantics. Components must go through the chat hook/store layer; they should
+ * never call this binding directly.
+ */
+export function sendAgentInteractionA2ui(
+  interactionJson: string,
+  messages: InferenceHistoryMessage[],
+  conversationId: string,
+  branchId: string,
+): Promise<string> {
+  return invoke<string>(cmd("send_agent_interaction_a2ui"), {
+    interactionJson,
+    messages,
+    conversationId,
+    branchId,
+  });
+}
+
+/** Persist a validated A2UI surface in the UAR-owned component library. */
+export function promoteA2uiComponent(
+  title: string,
+  source: string,
+  description?: string | null,
+): Promise<Record<string, unknown>> {
+  return invoke<Record<string, unknown>>(cmd("promote_a2ui_component"), {
+    title,
+    source,
+    description: description ?? null,
   });
 }
 /** Which lane chat turns currently run on. Zero-config installs prefer local. */
@@ -165,6 +251,13 @@ export interface SaveUarServiceRequest {
   agentArtifactJson: string;
   sessionId: string | null;
 }
+export interface UarServiceProbeResult {
+  serviceUrl: string;
+  ok: boolean;
+  httpStatus: number | null;
+  runtimeStatus: string | null;
+  message: string;
+}
 export function cancelAgentRun(runId: string): Promise<boolean> {
   return invoke<boolean>(cmd("cancel_agent_run"), { runId });
 }
@@ -189,26 +282,57 @@ export function uarServiceConfig(): Promise<ConfiguredUarService> {
 export function uarServiceSave(request: SaveUarServiceRequest): Promise<void> {
   return invoke<void>(cmd("uar_service_save"), { request });
 }
+export function uarServiceProbe(): Promise<UarServiceProbeResult> {
+  return invoke<UarServiceProbeResult>(cmd("uar_service_probe"));
+}
 export interface ProviderCatalogEntry {
   id: string;
   displayName: string;
   defaultBaseUrl: string | null;
   requiresApiKey: boolean;
-  supportsChat: boolean;
+  configured: boolean;
+  enabled: boolean;
+  models: ProviderModelEntry[];
+}
+export interface ProviderModelEntry {
+  id: string;
+  displayName: string | null;
+  contextWindow: number | null;
+  maxOutputTokens: number | null;
+  supportsVision: boolean;
+  supportsTools: boolean;
+  supportsReasoning: boolean;
+  supportsStructuredOutput: boolean;
+  supportsStreaming: boolean;
+  enabled: boolean;
 }
 export interface ConfiguredProvider {
   id: string;
-  kind: string;
+  displayName: string;
   baseUrl: string | null;
   enabled: boolean;
   hasApiKey: boolean;
+  protocol: unknown;
+  defaultModel: string | null;
+  models: ProviderModelEntry[];
 }
 export interface SaveProviderRequest {
   id: string;
   kind: string;
+  displayName?: string | null;
   baseUrl: string | null;
   apiKey: string | null;
   enabled: boolean;
+  protocol?: unknown;
+  defaultModel?: string | null;
+  models?: ProviderModelEntry[];
+}
+export interface ProviderTestResult {
+  ok: boolean;
+  providerId: string;
+  modelId: string;
+  latencyMs: number;
+  receivedText: boolean;
 }
 export interface ConfiguredCloudModel {
   providerId: string;
@@ -216,6 +340,87 @@ export interface ConfiguredCloudModel {
 }
 export function providerCatalog(): Promise<ProviderCatalogEntry[]> {
   return invoke<ProviderCatalogEntry[]>(cmd("provider_catalog"));
+}
+export type ResourceSelectionMode = "inherit" | "auto" | "all" | "none" | "selected";
+export interface ResourceSelection {
+  mode: ResourceSelectionMode;
+  ids: string[];
+  denied_ids: string[];
+}
+export interface ModelRoute {
+  provider_id: string;
+  model_id: string;
+}
+export interface RunPolicy {
+  version: number;
+  chat_mode: "local" | "uar" | "agent" | null;
+  agent_id: string | null;
+  model: ModelRoute | null;
+  skills: ResourceSelection;
+  tools: ResourceSelection;
+  mcp_servers: ResourceSelection;
+  knowledge_bases: ResourceSelection;
+  memory_enabled: boolean | null;
+  context_strategy: unknown | null;
+  tool_approval: "inherit" | "auto" | "ask" | "deny";
+}
+export interface ChatControlPlaneCatalog {
+  agents: unknown;
+  skills: unknown;
+  tools: unknown;
+  knowledgeBases: unknown;
+}
+export interface UarAdminSnapshot {
+  settings: unknown;
+  settingTypes: unknown;
+  agents: unknown;
+  skills: unknown;
+  tools: unknown;
+  knowledgeBases: unknown;
+  mcpServers: unknown;
+  memories: unknown;
+}
+export function chatControlCatalog(): Promise<ChatControlPlaneCatalog> {
+  return invoke<ChatControlPlaneCatalog>(cmd("chat_control_catalog"));
+}
+export function uarAdminSnapshot(): Promise<UarAdminSnapshot> {
+  return invoke<UarAdminSnapshot>(cmd("uar_admin_snapshot"));
+}
+export function uarSettingSave(key: string, value: unknown): Promise<unknown> {
+  return invoke<unknown>(cmd("uar_setting_save"), { key, value });
+}
+export function uarAgentSave(agent: unknown): Promise<unknown> {
+  return invoke<unknown>(cmd("uar_agent_save"), { agent });
+}
+export function uarAgentDelete(id: string): Promise<void> {
+  return invoke<void>(cmd("uar_agent_delete"), { id });
+}
+export function uarMcpServerSave(name: string, server: unknown): Promise<unknown> {
+  return invoke<unknown>(cmd("uar_mcp_server_save"), { name, server });
+}
+export function uarMcpServerDelete(name: string): Promise<unknown> {
+  return invoke<unknown>(cmd("uar_mcp_server_delete"), { name });
+}
+export function uarMemoryDelete(id: string): Promise<unknown> {
+  return invoke<unknown>(cmd("uar_memory_delete"), { id });
+}
+export function uarKnowledgeBaseCreate(request: unknown): Promise<unknown> {
+  return invoke<unknown>(cmd("uar_knowledge_base_create"), { request });
+}
+export function uarKnowledgeBaseDelete(id: string): Promise<void> {
+  return invoke<void>(cmd("uar_knowledge_base_delete"), { id });
+}
+export function conversationPolicyGet(conversationId: string): Promise<RunPolicy | null> {
+  return invoke<RunPolicy | null>(cmd("conversation_policy_get"), { conversationId });
+}
+export function conversationPolicySave(conversationId: string, policy: RunPolicy): Promise<unknown> {
+  return invoke<unknown>(cmd("conversation_policy_save"), { conversationId, policy });
+}
+export function conversationPolicyDelete(conversationId: string): Promise<void> {
+  return invoke<void>(cmd("conversation_policy_delete"), { conversationId });
+}
+export function conversationEffectiveConfig(conversationId: string): Promise<unknown> {
+  return invoke<unknown>(cmd("conversation_effective_config"), { conversationId });
 }
 export function providerList(): Promise<ConfiguredProvider[]> {
   return invoke<ConfiguredProvider[]>(cmd("provider_list"));
@@ -226,6 +431,9 @@ export function providerSave(request: SaveProviderRequest): Promise<void> {
 export function providerDelete(id: string): Promise<void> {
   return invoke<void>(cmd("provider_delete"), { id });
 }
+export function providerTest(id: string, model?: string | null): Promise<ProviderTestResult> {
+  return invoke<ProviderTestResult>(cmd("provider_test"), { id, model: model ?? null });
+}
 export function cloudModelGet(): Promise<ConfiguredCloudModel | null> {
   return invoke<ConfiguredCloudModel | null>(cmd("cloud_model_get"));
 }
@@ -233,16 +441,17 @@ export function cloudModelSave(providerId: string, modelId: string): Promise<voi
   return invoke<void>(cmd("cloud_model_save"), { request: { providerId, modelId } });
 }
 export function entityList(view: ViewDescriptor): Promise<ListResult> {
-  return invoke<ListResult>(cmd("entity_list"), { view });
+  return invoke<WireListResult>(cmd("entity_list"), { view: toWireView(view) }).then(fromWireList);
 }
 export function entityGet(entityType: string, id: string): Promise<EntityRecord | null> {
-  return invoke<EntityRecord | null>(cmd("entity_get"), { entityType, id });
+  return invoke<WireEntityRecord | null>(cmd("entity_get"), { entityType, id })
+    .then((record) => (record ? fromWireEntity(record) : null));
 }
 export function entityCreate(record: EntityRecord): Promise<EntityRecord> {
-  return invoke<EntityRecord>(cmd("entity_create"), { record });
+  return invoke<WireEntityRecord>(cmd("entity_create"), { record: toWireEntity(record) }).then(fromWireEntity);
 }
 export function entityUpdate(record: EntityRecord): Promise<EntityRecord> {
-  return invoke<EntityRecord>(cmd("entity_update"), { record });
+  return invoke<WireEntityRecord>(cmd("entity_update"), { record: toWireEntity(record) }).then(fromWireEntity);
 }
 export function entityDelete(entityType: string, id: string): Promise<void> {
   return invoke<void>(cmd("entity_delete"), { entityType, id });

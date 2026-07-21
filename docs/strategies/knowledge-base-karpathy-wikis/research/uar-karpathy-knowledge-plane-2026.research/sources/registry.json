@@ -1,0 +1,206 @@
+{
+  "schema_version": "1.0",
+  "evaluation_scale": "0-5; authority, directness, currency, and relevance considered",
+  "sources": [
+    {
+      "id": "L01",
+      "type": "local-source",
+      "title": "Universal Agent Runtime README",
+      "uri": "rust/vendor/universal-agent-runtime/README.md",
+      "score": 5,
+      "supports": ["UAR runtime ownership", "RAG capabilities", "platform posture", "license boundary"]
+    },
+    {
+      "id": "L02",
+      "type": "local-source",
+      "title": "UAR product support matrix",
+      "uri": "rust/vendor/universal-agent-runtime/docs/product-support-matrix.md",
+      "score": 5,
+      "supports": ["web stable", "desktop preview", "mobile experimental", "browser WASM unsupported", "embedding tiers"]
+    },
+    {
+      "id": "L03",
+      "type": "local-source",
+      "title": "UAR/BossFang integration",
+      "uri": "rust/vendor/universal-agent-runtime/docs/librefang-integration.md",
+      "score": 5,
+      "supports": ["service-first integration", "single service", "OpenAI/A2A/AG-UI seams", "shared memory scope risk"]
+    },
+    {
+      "id": "L04",
+      "type": "local-code",
+      "title": "UAR Rust SDK embedded runtime",
+      "uri": "rust/vendor/universal-agent-runtime/sdks/rust/src/runtime.rs",
+      "score": 5,
+      "supports": ["embedded builder starts server", "direct runtime handles unpopulated"]
+    },
+    {
+      "id": "L05",
+      "type": "local-code",
+      "title": "UAR RAG pipeline, retrieval, and verification",
+      "uri": "rust/vendor/universal-agent-runtime/src/uar/rag/",
+      "score": 5,
+      "supports": ["retrieval backend seam", "RRF fusion", "lexical verification", "citation pipeline"]
+    },
+    {
+      "id": "L06",
+      "type": "local-source",
+      "title": "Prometheus knowledge system README",
+      "uri": "rust/vendor/universal-agent-runtime/crates/prometheus-skill-system/README.md",
+      "score": 5,
+      "supports": ["Markdown wiki", "TF-IDF focus", "MCP and UAR bridge", "self-learning model"]
+    },
+    {
+      "id": "L07",
+      "type": "local-code",
+      "title": "Cross-platform trace protocol",
+      "uri": "rust/vendor/universal-agent-runtime/crates/prometheus-skill-system/tools/prometheus-cli/crates/prometheus-agents/src/trace_protocol.rs",
+      "score": 5,
+      "supports": ["TraceCapture exists", "Claude adapter partial", "generic adapters return no data"]
+    },
+    {
+      "id": "L08",
+      "type": "local-code",
+      "title": "Learning CLI and knowledge compiler",
+      "uri": "rust/vendor/universal-agent-runtime/crates/prometheus-skill-system/tools/prometheus-cli/crates/",
+      "score": 5,
+      "supports": ["trace store and evaluation", "trace-to-wiki compiler", "CLI compilation incomplete"]
+    },
+    {
+      "id": "L09",
+      "type": "local-code",
+      "title": "KnowMe UAR integration seam",
+      "uri": "rust/crates/gen_ui_agent/src/uar.rs",
+      "score": 5,
+      "supports": ["service projection exists", "typed runtime facade", "current projection-only state"]
+    },
+    {
+      "id": "L10",
+      "type": "local-code",
+      "title": "KnowMe mobile/service chat path",
+      "uri": "rust/crates/gen_ui_agent/src/chat.rs",
+      "score": 5,
+      "supports": ["mobile UAR not wired", "non-mobile SDK path"]
+    },
+    {
+      "id": "L11",
+      "type": "local-code",
+      "title": "KnowMe embedded graph-RAG store",
+      "uri": "rust/crates/gen_ui_db_graph/src/",
+      "score": 5,
+      "supports": ["embedded SurrealDB", "384-dimensional embedder", "BM25/vector/graph RRF"]
+    },
+    {
+      "id": "L12",
+      "type": "local-source",
+      "title": "KnowMe context fabric specification",
+      "uri": "docs/knowme-context-fabric-spec.md",
+      "score": 4,
+      "supports": ["single Rust context fabric", "context budgets", "model-binding provenance"]
+    },
+    {
+      "id": "L13",
+      "type": "local-source",
+      "title": "Existing KnowMe agent strategy",
+      "uri": "docs/strategies/agents/README.md",
+      "score": 4,
+      "supports": ["records the older browser-WASM deployment statement requiring explicit supersession"]
+    },
+    {
+      "id": "W01",
+      "type": "research-paper",
+      "title": "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks",
+      "uri": "https://arxiv.org/abs/2005.11401",
+      "score": 5,
+      "supports": ["explicit non-parametric memory", "provenance and updateability motivation"]
+    },
+    {
+      "id": "W02",
+      "type": "research-paper",
+      "title": "Ragas: Automated Evaluation of Retrieval Augmented Generation",
+      "uri": "https://arxiv.org/abs/2309.15217",
+      "score": 5,
+      "supports": ["faithfulness", "answer relevance", "context precision and recall"]
+    },
+    {
+      "id": "W03",
+      "type": "research-paper",
+      "title": "BEIR: A Heterogeneous Benchmark for Zero-shot Evaluation of Information Retrieval Models",
+      "uri": "https://arxiv.org/abs/2104.08663",
+      "score": 5,
+      "supports": ["heterogeneous retrieval evaluation", "dense and sparse baselines"]
+    },
+    {
+      "id": "W04",
+      "type": "research-project",
+      "title": "Microsoft Research GraphRAG",
+      "uri": "https://www.microsoft.com/en-us/research/project/graphrag/",
+      "score": 5,
+      "supports": ["graph/community retrieval for corpus-level questions"]
+    },
+    {
+      "id": "W05",
+      "type": "official-engineering-source",
+      "title": "Context engineering for agents",
+      "uri": "https://www.langchain.com/blog/context-engineering-for-agents",
+      "score": 4,
+      "supports": ["write, select, compress, isolate context strategies"]
+    },
+    {
+      "id": "W06",
+      "type": "official-platform-doc",
+      "title": "Apple BGProcessingTask",
+      "uri": "https://developer.apple.com/documentation/backgroundtasks/bgprocessingtask",
+      "score": 5,
+      "supports": ["interruptible background scheduling constraints"]
+    },
+    {
+      "id": "W07",
+      "type": "official-platform-doc",
+      "title": "Android WorkManager",
+      "uri": "https://developer.android.com/reference/androidx/work/WorkManager",
+      "score": 5,
+      "supports": ["persistent deferrable bounded work"]
+    },
+    {
+      "id": "W08",
+      "type": "official-platform-doc",
+      "title": "Tauri external binaries/sidecars",
+      "uri": "https://v2.tauri.app/develop/sidecar/",
+      "score": 5,
+      "supports": ["target-specific sidecar packaging", "spawn permission model"]
+    },
+    {
+      "id": "W09",
+      "type": "official-protocol-doc",
+      "title": "AG-UI overview and events",
+      "uri": "https://docs.ag-ui.com/",
+      "score": 5,
+      "supports": ["event-based agent/frontend protocol", "run and state lifecycle"]
+    },
+    {
+      "id": "W10",
+      "type": "official-protocol-doc",
+      "title": "A2UI",
+      "uri": "https://a2ui.org/",
+      "score": 5,
+      "supports": ["safe declarative agent UI payloads", "Flutter renderer availability"]
+    },
+    {
+      "id": "W11",
+      "type": "official-library-doc",
+      "title": "Flutter Rust Bridge cross-platform overview",
+      "uri": "https://cjycode.com/flutter_rust_bridge/guides/cross-platform/overview",
+      "score": 5,
+      "supports": ["native Rust/Flutter types and streams"]
+    },
+    {
+      "id": "W12",
+      "type": "official-database-doc",
+      "title": "SurrealDB vector, full-text, graph, and hybrid search",
+      "uri": "https://surrealdb.com/docs/learn/data-models/vector-search/overview",
+      "score": 5,
+      "supports": ["single multi-model store", "vector/full-text hybrid retrieval"]
+    }
+  ]
+}

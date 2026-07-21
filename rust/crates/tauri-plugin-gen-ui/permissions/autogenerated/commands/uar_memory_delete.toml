@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-uar-memory-delete"
+description = "Enables the uar_memory_delete command without any pre-configured scope."
+commands.allow = ["uar_memory_delete"]
+
+[[permission]]
+identifier = "deny-uar-memory-delete"
+description = "Denies the uar_memory_delete command without any pre-configured scope."
+commands.deny = ["uar_memory_delete"]

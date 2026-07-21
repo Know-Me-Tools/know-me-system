@@ -5,7 +5,9 @@
 //! run_migrations/load_seeds/attach_sync_shapes replace the ad-hoc stubs that used
 //! to live directly in src-tauri/src/commands.rs (removed — this plugin is now the
 //! single desktop command surface, matching the mobile FFI's single intent surface).
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+#[cfg(feature = "scribe")]
+use std::sync::Mutex;
 
 use crate::error::Result;
 use gen_ui_db_graph::{MemoryHit, RelatedEntity, SearchMode};
@@ -41,6 +43,50 @@ pub async fn stream_agent_a2ui(
         .map_err(crate::Error::from)?;
     tracing::info!(run_id = %run_id, "desktop chat run started");
     Ok(run_id)
+}
+
+/// Continue a conversation from a structured A2UI/client interaction.
+///
+/// This is intentionally separate from `stream_agent_a2ui`: user prompts and
+/// artifact/action responses have different trust boundaries. The Rust agent
+/// layer validates that `interaction_json` is an object and, on the UAR lane,
+/// extracts a typed artifact response instead of asking the model to interpret
+/// arbitrary UI prose.
+#[tauri::command]
+pub async fn send_agent_interaction_a2ui(
+    interaction_json: String,
+    messages: Vec<gen_ui_types::inference::InferenceMessage>,
+    conversation_id: String,
+    branch_id: String,
+) -> Result<String> {
+    tracing::info!(
+        history_items = messages.len(),
+        "desktop structured interaction turn starting"
+    );
+    let run_id = gen_ui_agent::chat::send_interaction(
+        interaction_json,
+        messages,
+        conversation_id,
+        branch_id,
+    )
+    .await
+    .map_err(gen_ui_types::CoreError::from)
+    .map_err(crate::Error::from)?;
+    tracing::info!(run_id = %run_id, "desktop structured interaction run started");
+    Ok(run_id)
+}
+
+/// Promote a validated A2UI surface into the UAR-owned component registry.
+#[tauri::command]
+pub async fn promote_a2ui_component(
+    title: String,
+    source: String,
+    description: Option<String>,
+) -> Result<serde_json::Value> {
+    gen_ui_agent::chat::promote_a2ui_component(title, source, description)
+        .await
+        .map_err(gen_ui_types::CoreError::from)
+        .map_err(Into::into)
 }
 
 /// Current chat lane: "cloud" or "local".
@@ -109,8 +155,11 @@ pub async fn local_runtime_diagnostics(
 }
 
 #[tauri::command]
-pub fn uar_runtime_status() -> Result<gen_ui_agent::uar::UarRuntimeStatus> {
-    Ok(gen_ui_agent::uar::runtime_status())
+pub async fn uar_runtime_status() -> Result<gen_ui_agent::uar::UarRuntimeStatus> {
+    gen_ui_agent::chat::uar_runtime_status()
+        .await
+        .map_err(gen_ui_types::CoreError::from)
+        .map_err(Into::into)
 }
 
 #[tauri::command]
@@ -130,8 +179,147 @@ pub async fn uar_service_save(request: gen_ui_agent::chat::SaveUarServiceRequest
 }
 
 #[tauri::command]
-pub fn provider_catalog() -> Result<Vec<gen_ui_agent::provider_admin::ProviderCatalogEntry>> {
+pub async fn uar_service_probe() -> Result<gen_ui_agent::chat::UarServiceProbeResult> {
+    gen_ui_agent::chat::probe_uar_service_config()
+        .await
+        .map_err(gen_ui_types::CoreError::from)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+pub async fn provider_catalog() -> Result<Vec<gen_ui_agent::provider_admin::ProviderCatalogEntry>> {
     gen_ui_agent::provider_admin::catalog()
+        .await
+        .map_err(gen_ui_types::CoreError::from)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+pub async fn chat_control_catalog() -> Result<gen_ui_agent::control_plane::ChatControlPlaneCatalog>
+{
+    gen_ui_agent::control_plane::catalog()
+        .await
+        .map_err(gen_ui_types::CoreError::from)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+pub async fn uar_admin_snapshot() -> Result<gen_ui_agent::control_plane::UarAdminSnapshot> {
+    gen_ui_agent::control_plane::admin_snapshot()
+        .await
+        .map_err(gen_ui_types::CoreError::from)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+pub async fn uar_setting_save(key: String, value: serde_json::Value) -> Result<serde_json::Value> {
+    gen_ui_agent::control_plane::update_setting(&key, &value)
+        .await
+        .map_err(gen_ui_types::CoreError::from)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+pub async fn uar_agent_save(agent: serde_json::Value) -> Result<serde_json::Value> {
+    gen_ui_agent::control_plane::save_agent(&agent)
+        .await
+        .map_err(gen_ui_types::CoreError::from)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+pub async fn uar_agent_delete(id: String) -> Result<()> {
+    gen_ui_agent::control_plane::delete_agent(&id)
+        .await
+        .map_err(gen_ui_types::CoreError::from)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+pub async fn uar_mcp_server_save(
+    name: String,
+    server: serde_json::Value,
+) -> Result<serde_json::Value> {
+    gen_ui_agent::control_plane::save_mcp_server(&name, &server)
+        .await
+        .map_err(gen_ui_types::CoreError::from)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+pub async fn uar_mcp_server_delete(name: String) -> Result<serde_json::Value> {
+    gen_ui_agent::control_plane::delete_mcp_server(&name)
+        .await
+        .map_err(gen_ui_types::CoreError::from)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+pub async fn uar_memory_delete(id: String) -> Result<serde_json::Value> {
+    gen_ui_agent::control_plane::delete_memory(&id)
+        .await
+        .map_err(gen_ui_types::CoreError::from)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+pub async fn uar_knowledge_base_create(request: serde_json::Value) -> Result<serde_json::Value> {
+    gen_ui_agent::control_plane::create_knowledge_base(&request)
+        .await
+        .map_err(gen_ui_types::CoreError::from)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+pub async fn uar_knowledge_base_delete(id: String) -> Result<()> {
+    gen_ui_agent::control_plane::delete_knowledge_base(&id)
+        .await
+        .map_err(gen_ui_types::CoreError::from)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+pub async fn conversation_policy_get(conversation_id: String) -> Result<serde_json::Value> {
+    gen_ui_agent::control_plane::conversation_policy(&conversation_id)
+        .await
+        .map_err(gen_ui_types::CoreError::from)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+pub async fn conversation_policy_save(
+    conversation_id: String,
+    policy: serde_json::Value,
+) -> Result<serde_json::Value> {
+    gen_ui_agent::control_plane::save_conversation_policy(&conversation_id, &policy)
+        .await
+        .map_err(gen_ui_types::CoreError::from)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+pub async fn conversation_policy_delete(conversation_id: String) -> Result<()> {
+    gen_ui_agent::control_plane::delete_conversation_policy(&conversation_id)
+        .await
+        .map_err(gen_ui_types::CoreError::from)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+pub async fn conversation_effective_config(conversation_id: String) -> Result<serde_json::Value> {
+    gen_ui_agent::control_plane::effective_config(&conversation_id)
+        .await
+        .map_err(gen_ui_types::CoreError::from)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+pub async fn provider_test(
+    id: String,
+    model: Option<String>,
+) -> Result<gen_ui_agent::provider_admin::ProviderTestResult> {
+    gen_ui_agent::provider_admin::test(&id, model.as_deref())
+        .await
         .map_err(gen_ui_types::CoreError::from)
         .map_err(Into::into)
 }
@@ -542,13 +730,16 @@ pub async fn graph_expand(entity_id: String, depth: u32) -> Result<Vec<RelatedEn
 // gen_ui_ffi's mobile scribe_start/scribe_stop call — no duplicated business
 // logic. One recording in flight per process, mirroring gen_ui_agent's
 // single-chat-turn precedent.
+#[cfg(feature = "scribe")]
 static RECORDING: OnceCell<Mutex<Option<gen_ui_audio::Recorder>>> = OnceCell::new();
 
+#[cfg(feature = "scribe")]
 fn recording_slot() -> &'static Mutex<Option<gen_ui_audio::Recorder>> {
     RECORDING.get_or_init(|| Mutex::new(None))
 }
 
 #[tauri::command]
+#[cfg(feature = "scribe")]
 pub async fn scribe_start() -> Result<()> {
     let mut guard = recording_slot()
         .lock()
@@ -567,6 +758,7 @@ pub async fn scribe_start() -> Result<()> {
 }
 
 #[tauri::command]
+#[cfg(feature = "scribe")]
 pub async fn scribe_stop() -> Result<String> {
     let recorder = recording_slot()
         .lock()
@@ -578,4 +770,22 @@ pub async fn scribe_stop() -> Result<String> {
         .await
         .map_err(Into::<gen_ui_types::CoreError>::into)
         .map_err(Into::into)
+}
+
+#[tauri::command]
+#[cfg(not(feature = "scribe"))]
+pub async fn scribe_start() -> Result<()> {
+    Err(gen_ui_types::CoreError::Terminal(
+        "desktop transcription is not enabled in this build".to_string(),
+    )
+    .into())
+}
+
+#[tauri::command]
+#[cfg(not(feature = "scribe"))]
+pub async fn scribe_stop() -> Result<String> {
+    Err(gen_ui_types::CoreError::Terminal(
+        "desktop transcription is not enabled in this build".to_string(),
+    )
+    .into())
 }

@@ -52,6 +52,7 @@ pub fn run() {
         // instead of racing the first instance for the config-db PGlite lock.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
                 let _ = window.set_focus();
                 let _ = window.unminimize();
             }
@@ -62,6 +63,31 @@ pub fn run() {
         .plugin(tauri_plugin_gen_ui::init())
         .setup(|app| {
             tracing::info!("tauri setup starting");
+
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Regular);
+
+            let window = match app.get_webview_window("main") {
+                Some(window) => window,
+                None => {
+                    tracing::warn!("main window missing from configuration; creating fallback");
+                    tauri::WebviewWindowBuilder::new(
+                        app,
+                        "main",
+                        tauri::WebviewUrl::App("index.html".into()),
+                    )
+                    .title("KnowMe")
+                    .inner_size(1280.0, 820.0)
+                    .min_inner_size(800.0, 600.0)
+                    .decorations(false)
+                    .build()?
+                }
+            };
+            window.show()?;
+            window.unminimize()?;
+            window.set_focus()?;
+            tracing::info!("main window presented");
+
             let exit = MenuItem::with_id(app, "exit", "Exit", true, Some("CmdOrCtrl+Q"))?;
             let file_menu = Submenu::with_items(app, "File", true, &[&exit])?;
 

@@ -4,7 +4,11 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[serde(
+    tag = "type",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum ContentBlock {
     Text {
         text: String,
@@ -50,4 +54,25 @@ pub enum ContentBlock {
         mime: String,
     },
     Divider,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ContentBlock;
+
+    #[test]
+    fn structured_block_fields_serialize_in_the_cross_platform_camel_case_contract() {
+        let value = serde_json::to_value(ContentBlock::ToolResult {
+            tool_use_id: "call-1".into(),
+            output_json: r#"{"ok":true}"#.into(),
+            is_error: false,
+        })
+        .expect("tool result serializes");
+
+        assert_eq!(value["type"], "toolResult");
+        assert_eq!(value["toolUseId"], "call-1");
+        assert_eq!(value["outputJson"], r#"{"ok":true}"#);
+        assert_eq!(value["isError"], false);
+        assert!(value.get("tool_use_id").is_none());
+    }
 }

@@ -14,5 +14,6 @@ gen_ui_db_graph = { path = "../gen_ui_db_graph", features = ["embed-native"] }
 tokio = { workspace = true, features = ["sync"] }
 thiserror.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 tracing.workspace = true
 dashmap.workspace = true

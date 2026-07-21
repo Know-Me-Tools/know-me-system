@@ -6,6 +6,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
 import '../features/chat/presentation/screens/chat_screen.dart';
 import '../features/memory/presentation/screens/memory_screen.dart';
 import '../features/overview/presentation/screens/overview_screens.dart';
+import '../features/settings/presentation/screens/settings_screen.dart';
 
 /// The four KnowMe-slice tabs, in shell order. Adding a destination here is the
 /// only edit needed to surface a feature — labels/icons/paths stay in lockstep.
@@ -15,7 +16,6 @@ const _tabs = <(String, IconData, String)>[
   ('/hands', Icons.back_hand_outlined, 'Hands'),
   ('/memory', Icons.memory, 'Memory'),
   ('/models', Icons.developer_board_outlined, 'Models'),
-  ('/settings', Icons.tune, 'Settings'),
 ];
 
 final appRouter = GoRouter(

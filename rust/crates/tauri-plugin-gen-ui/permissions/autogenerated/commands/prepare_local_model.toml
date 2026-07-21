@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-prepare-local-model"
+description = "Enables the prepare_local_model command without any pre-configured scope."
+commands.allow = ["prepare_local_model"]
+
+[[permission]]
+identifier = "deny-prepare-local-model"
+description = "Denies the prepare_local_model command without any pre-configured scope."
+commands.deny = ["prepare_local_model"]

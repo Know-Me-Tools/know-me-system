@@ -64,3 +64,13 @@ Current Android direction:
 - Generation limits and tool-capable model plumbing: **PARTIAL** — shared sampling fields exist, but current mobile defaults are too small and structured tool execution is absent.
 
 ## ASSESSMENT COMPLETE
+
+## Supplemental knowledge-runtime assessment — 2026-07-19
+
+The UAR RAG, Karpathy wiki, and evaluated learning-loop architecture across
+mobile, desktop, and web is assessed separately in
+`knowledge-base-karpathy-wikis-assessment.md`. Its normative strategy is
+`docs/strategies/knowledge-base-karpathy-wikis/README.md`.
+
+This supplemental document does not alter the active LiteRT-LM change or the
+phase implementation counters.

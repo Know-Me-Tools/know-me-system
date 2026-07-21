@@ -34,7 +34,7 @@ gen_ui_client   = { path = "../gen_ui_client", default-features = false, feature
 gen_ui_db       = { path = "../gen_ui_db", features = ["sqlite"] }
 gen_ui_db_graph = { path = "../gen_ui_db_graph", features = ["embed-native"] }
 liter-llm.workspace = true
-flutter_rust_bridge = "=2.13.0-beta.5"
+flutter_rust_bridge = "=2.12.0"
 anyhow.workspace = true
 once_cell.workspace = true
 serde_json.workspace = true

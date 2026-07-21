@@ -1,0 +1,11 @@
+{
+  "stage": "plan",
+  "completedAt": "2026-07-20T20:32:46Z",
+  "outputs": [
+    "plan.md"
+  ],
+  "nextStage": "execute",
+  "summaryForNext": "1 atomic OpenSpec change with 5 gated milestones; UAR kernel first, host providers second, client routing and certification last",
+  "skipped": false,
+  "skipReason": null
+}

@@ -9,10 +9,16 @@ export function useHome() {
   const initLane = useLaneStore((state) => state.init)
   useEffect(() => { void initLane() }, [initLane])
   const desktop = isTauri()
-  const model = lane === 'local' ? 'Qwen 2.5 0.5B Q4' : 'Cloud provider'
-  const modelDetail = lane === 'local'
-    ? `${desktop ? 'Native Rust' : 'WebLLM'} · ${localAvailable ? 'ready' : 'initializing'}`
-    : 'Bring your own key · explicit network use'
+  const model = lane === 'uar'
+    ? 'Universal Agent Runtime'
+    : lane === 'local'
+      ? 'Qwen 2.5 0.5B Q4'
+      : 'Cloud provider'
+  const modelDetail = lane === 'uar'
+    ? 'Orchestrator agent · Liter-LLM backend'
+    : lane === 'local'
+      ? `${desktop ? 'Native Rust' : 'WebLLM'} · ${localAvailable ? 'ready' : 'initializing'}`
+      : 'Bring your own key · explicit network use'
   return {
     summary: [
       { label: 'Active model', value: model, detail: modelDetail, status: localAvailable ? 'ready' : 'loading' },

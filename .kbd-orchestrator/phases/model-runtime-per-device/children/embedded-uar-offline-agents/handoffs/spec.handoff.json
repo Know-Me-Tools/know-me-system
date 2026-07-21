@@ -1,0 +1,11 @@
+{
+  "stage": "spec",
+  "completedAt": "2026-07-20T20:31:32Z",
+  "outputs": [
+    "openspec/changes/embed-uar-mobile-offline/proposal.md"
+  ],
+  "nextStage": "plan",
+  "summaryForNext": "1 OpenSpec change; 4/4 artifacts complete; validation passed; zeespec n/a",
+  "skipped": false,
+  "skipReason": null
+}

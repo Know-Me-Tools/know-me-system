@@ -3,6 +3,7 @@ import { useExternalStoreRuntime, type ThreadMessageLike } from '@assistant-ui/r
 import { useEffect } from 'react'
 import type { ContentBlock, Message } from '@/bridge/a2ui/types'
 import { useChatStore } from '../stores/chatStore'
+import { useLaneStore } from '../stores/laneStore'
 
 type AssistantPart = Exclude<ThreadMessageLike['content'], string>[number]
 
@@ -41,8 +42,41 @@ function toAssistantPart(block: ContentBlock): AssistantPart {
   }
 }
 
+/**
+ * Assistant UI models a tool invocation and its eventual result as one
+ * `tool-call` resource. The canonical transcript deliberately stores them as
+ * two ordered ContentBlocks, so join them at this adapter boundary instead of
+ * exposing two resources with the same toolCallId.
+ */
+function toAssistantParts(blocks: ContentBlock[]): AssistantPart[] {
+  const toolUseIds = new Set(
+    blocks
+      .filter((block): block is Extract<ContentBlock, { type: 'toolUse' }> => block.type === 'toolUse')
+      .map((block) => block.id),
+  )
+  const results = new Map(
+    blocks
+      .filter((block): block is Extract<ContentBlock, { type: 'toolResult' }> => block.type === 'toolResult')
+      .map((block) => [block.toolUseId, block]),
+  )
+
+  return blocks.flatMap((block): AssistantPart[] => {
+    if (block.type === 'toolResult' && toolUseIds.has(block.toolUseId)) return []
+    if (block.type !== 'toolUse') return [toAssistantPart(block)]
+
+    const result = results.get(block.id)
+    return [{
+      type: 'tool-call',
+      toolCallId: block.id,
+      toolName: block.name,
+      argsText: block.inputJson,
+      ...(result ? { result: parseObject(result.outputJson), isError: result.isError } : {}),
+    }]
+  })
+}
+
 function convertMessage(message: Message): ThreadMessageLike {
-  const content = message.content.map(toAssistantPart)
+  const content = toAssistantParts(message.content)
   if (message.role === 'assistant') {
     if (message.runStatus === 'error' && message.error) {
       content.push({ type: 'data', name: 'runError', data: message.error } as AssistantPart)
@@ -85,10 +119,15 @@ export function useAssistantChatRuntime() {
   const renameConversation = useChatStore((state) => state.renameConversation)
   const deleteConversation = useChatStore((state) => state.deleteConversation)
   const cancelActiveRun = useChatStore((state) => state.cancelActiveRun)
+  const initLane = useLaneStore((state) => state.init)
 
   useEffect(() => {
     void hydrateConversations().catch((cause: unknown) => console.error('conversation hydration failed', cause))
   }, [hydrateConversations])
+
+  useEffect(() => {
+    void initLane().catch((cause: unknown) => console.error('lane initialization failed', cause))
+  }, [initLane])
 
   return useExternalStoreRuntime({
     messages,

@@ -15,6 +15,12 @@ use gen_ui_types::events::A2uiEvent;
 use gen_ui_types::inference::InferenceProvider;
 use tokio::sync::{broadcast, Mutex, OnceCell};
 
+pub use gen_ui_agent::control_plane::ChatControlPlaneCatalog;
+pub use gen_ui_agent::provider_admin::{
+    ConfiguredCloudModel, ConfiguredProvider, ProviderCatalogEntry, ProviderTestResult,
+    SaveCloudModelRequest, SaveProviderRequest,
+};
+
 /// Process configuration for the shared application host.
 #[derive(Debug, Clone)]
 pub struct HostConfig {
@@ -41,16 +47,6 @@ pub enum HostError {
     Chat(String),
     #[error("unknown or already-consumed run: {0}")]
     UnknownRun(String),
-}
-
-#[derive(Debug, Clone, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ProviderCatalogEntry {
-    pub id: String,
-    pub display_name: String,
-    pub default_base_url: Option<String>,
-    pub requires_api_key: bool,
-    pub supports_chat: bool,
 }
 
 type PendingEvents = Arc<Mutex<Option<broadcast::Receiver<A2uiEvent>>>>;
@@ -101,20 +97,74 @@ impl AppServices {
             .map_err(|error| HostError::Chat(error.to_string()))
     }
 
-    pub fn provider_catalog(&self) -> Result<Vec<ProviderCatalogEntry>, HostError> {
+    pub async fn provider_catalog(&self) -> Result<Vec<ProviderCatalogEntry>, HostError> {
         gen_ui_agent::provider_admin::catalog()
-            .map(|entries| {
-                entries
-                    .into_iter()
-                    .map(|entry| ProviderCatalogEntry {
-                        id: entry.id,
-                        display_name: entry.display_name,
-                        default_base_url: entry.default_base_url,
-                        requires_api_key: entry.requires_api_key,
-                        supports_chat: entry.supports_chat,
-                    })
-                    .collect()
-            })
+            .await
+            .map_err(|error| HostError::Initialization(error.to_string()))
+    }
+
+    pub async fn providers(&self) -> Result<Vec<ConfiguredProvider>, HostError> {
+        gen_ui_agent::provider_admin::list()
+            .await
+            .map_err(|error| HostError::Initialization(error.to_string()))
+    }
+
+    pub async fn save_provider(&self, request: SaveProviderRequest) -> Result<(), HostError> {
+        gen_ui_agent::provider_admin::save(request)
+            .await
+            .map_err(|error| HostError::Initialization(error.to_string()))
+    }
+
+    pub async fn delete_provider(&self, id: &str) -> Result<(), HostError> {
+        gen_ui_agent::provider_admin::delete(id)
+            .await
+            .map_err(|error| HostError::Initialization(error.to_string()))
+    }
+
+    pub async fn test_provider(
+        &self,
+        id: &str,
+        model: Option<&str>,
+    ) -> Result<ProviderTestResult, HostError> {
+        gen_ui_agent::provider_admin::test(id, model)
+            .await
+            .map_err(|error| HostError::Initialization(error.to_string()))
+    }
+
+    pub async fn cloud_model(&self) -> Result<Option<ConfiguredCloudModel>, HostError> {
+        gen_ui_agent::provider_admin::get_cloud_model()
+            .await
+            .map_err(|error| HostError::Initialization(error.to_string()))
+    }
+
+    pub async fn save_cloud_model(&self, request: SaveCloudModelRequest) -> Result<(), HostError> {
+        gen_ui_agent::provider_admin::save_cloud_model(request)
+            .await
+            .map_err(|error| HostError::Initialization(error.to_string()))
+    }
+
+    pub async fn chat_control_catalog(&self) -> Result<ChatControlPlaneCatalog, HostError> {
+        gen_ui_agent::control_plane::catalog()
+            .await
+            .map_err(|error| HostError::Initialization(error.to_string()))
+    }
+
+    pub async fn conversation_policy(
+        &self,
+        conversation_id: &str,
+    ) -> Result<serde_json::Value, HostError> {
+        gen_ui_agent::control_plane::conversation_policy(conversation_id)
+            .await
+            .map_err(|error| HostError::Initialization(error.to_string()))
+    }
+
+    pub async fn save_conversation_policy(
+        &self,
+        conversation_id: &str,
+        policy: &serde_json::Value,
+    ) -> Result<serde_json::Value, HostError> {
+        gen_ui_agent::control_plane::save_conversation_policy(conversation_id, policy)
+            .await
             .map_err(|error| HostError::Initialization(error.to_string()))
     }
 

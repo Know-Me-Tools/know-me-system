@@ -203,6 +203,44 @@ pub async fn run_migrations(data_dir: String) -> Result<(), CoreError> {
         .map(|platform| platform.default_model().model_id)
         .unwrap_or(gen_ui_inference::catalog::ANDROID_GEMMA4_E2B_LITERTLM_ID)
         .to_string();
+    #[cfg(target_os = "android")]
+    {
+        let provider = crate::local_provider::android_litert_lm_uar_provider_config();
+        if provider.default_model.as_deref() != Some(default_model.as_str()) {
+            return Err(boot_fail(
+                "embedded UAR local provider registration",
+                "Android UAR default model does not match the pinned inference artifact",
+            ));
+        }
+        tracing::info!(
+            provider_id = %provider.id,
+            model_id = %default_model,
+            context_tokens = provider.models[0].context_window,
+            "Android LiteRT-LM provider metadata ready for embedded UAR"
+        );
+    }
+    #[cfg(target_os = "ios")]
+    {
+        let provider = crate::local_provider::ios_qwen35_metal_uar_provider_config();
+        if provider.default_model.as_deref() != Some(default_model.as_str()) {
+            return Err(boot_fail(
+                "embedded UAR local provider registration",
+                "iOS UAR default model does not match the pinned inference artifact",
+            ));
+        }
+        if !provider.models[0].supports_vision {
+            return Err(boot_fail(
+                "embedded UAR local provider registration",
+                "iOS Qwen registration is missing its vision capability",
+            ));
+        }
+        tracing::info!(
+            provider_id = %provider.id,
+            model_id = %default_model,
+            context_tokens = provider.models[0].context_window,
+            "iOS Qwen3.5 Metal provider metadata ready for embedded UAR"
+        );
+    }
     let existing_pref = store
         .get_model_pref("chat", "local")
         .await
@@ -219,7 +257,7 @@ pub async fn run_migrations(data_dir: String) -> Result<(), CoreError> {
                 surface: "chat".to_string(),
                 lane: "local".to_string(),
                 provider_id: None,
-                model_id: default_model,
+                model_id: default_model.clone(),
                 params: serde_json::json!({
                     "context_len": 8192,
                     "max_tokens": 1024,
@@ -244,10 +282,41 @@ pub async fn run_migrations(data_dir: String) -> Result<(), CoreError> {
         Arc::new(gen_ui_inference::LlamaCppEngine::new(
             std::path::PathBuf::from(&data_dir).join("model-cache/llama"),
         ));
-    gen_ui_agent::state::init_with_inference(
+
+    #[cfg(target_os = "android")]
+    let embedded_uar = Some(Arc::new(
+        gen_ui_agent::uar::UarEmbeddedRuntime::build_local(
+            inference.clone(),
+            gen_ui_types::inference::LocalModelSpec {
+                model: default_model.clone(),
+                context_len: Some(8_192),
+            },
+            crate::local_provider::android_litert_lm_uar_provider_config(),
+        )
+        .await
+        .map_err(|error| boot_fail("embedded UAR initialization", error))?,
+    ));
+    #[cfg(target_os = "ios")]
+    let embedded_uar = Some(Arc::new(
+        gen_ui_agent::uar::UarEmbeddedRuntime::build_local(
+            inference.clone(),
+            gen_ui_types::inference::LocalModelSpec {
+                model: default_model.clone(),
+                context_len: Some(8_192),
+            },
+            crate::local_provider::ios_qwen35_metal_uar_provider_config(),
+        )
+        .await
+        .map_err(|error| boot_fail("embedded UAR initialization", error))?,
+    ));
+    #[cfg(not(any(target_os = "ios", target_os = "android")))]
+    let embedded_uar = None;
+
+    gen_ui_agent::state::init_with_inference_and_uar(
         ConfigBackend::Surreal(store.clone()),
         store,
         Some(inference),
+        embedded_uar,
     );
     register_mobile_diagnostics_mcp()
         .await

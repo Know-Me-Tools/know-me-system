@@ -22,8 +22,8 @@ pnpm = "11.15.0"
 
 [frameworks]
 tauri_cli = "2.11.4"
-flutter_rust_bridge = "2.13.0-beta.5" # latest available FRB line; validate before release
-riverpod = "3.3.1"              # latest coherent generated-code set: flutter_riverpod 3.3.1, annotation 4.0.2, generator 4.0.3
+flutter_rust_bridge = "2.13.0-beta.5" # latest available FRB line; newer than pub.dev stable 2.12.0; validate before release
+riverpod = "3.3.1"              # latest coherent set that compiles today with Freezed: flutter_riverpod 3.3.1, annotation 4.0.2, sqflite 0.4.2, generator 4.0.3; 3.3.2/4.0.4 currently conflict with Freezed's analyzer line
 vite = "8.1.5"
 react = "19.2.7"
 zustand = "5.0.14"

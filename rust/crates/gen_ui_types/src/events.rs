@@ -4,6 +4,13 @@
 use crate::lifecycle::{RunError, RunPhase, RunStatus};
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct StreamCitation {
+    pub source: String,
+    pub quote: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum StreamEvent {
@@ -44,6 +51,9 @@ pub enum StreamEvent {
     Citation {
         source: String,
         quote: String,
+    },
+    Citations {
+        citations: Vec<StreamCitation>,
     },
     Memory {
         operation: String,

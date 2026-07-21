@@ -1,0 +1,17 @@
+{
+  "audit_trail": {
+    "executed_at": "2026-07-20T20:13:14.413644Z",
+    "skill_id": "sycophancy.correction",
+    "strictness": "standard",
+    "version": "1.0.0"
+  },
+  "classifications": [
+    {
+      "pattern_id": "S-07",
+      "rationale": "Assessment length advisory; verify that each section delivers analytical value.",
+      "severity": "low"
+    }
+  ],
+  "correction_mandatory": false,
+  "sycophancy_score": 0.01785714365541935
+}
