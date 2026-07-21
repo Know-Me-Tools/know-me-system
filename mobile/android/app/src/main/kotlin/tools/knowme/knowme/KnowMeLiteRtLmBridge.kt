@@ -160,11 +160,17 @@ object KnowMeLiteRtLmBridge {
             val item = messages.optJSONObject(index) ?: continue
             val role = item.optString("role")
             val content = item.optString("content")
-            if (content.isBlank()) continue
+            // Only user turns are safe to drop when empty. Dropping a blank
+            // assistant or tool turn breaks call/result pairing: the model would
+            // see a tool result with no preceding call (or vice versa) and lose
+            // the thread. Rust renders tool calls into `content`, so a blank
+            // assistant turn here means genuinely empty output, which we still
+            // preserve as a placeholder to keep the transcript ordered.
+            if (content.isBlank() && role != "assistant" && role != "tool") continue
             when (role) {
                 "system" -> systemInstruction = Contents.of(content)
-                "assistant" -> initialMessages += Message.model(Contents.of(content))
-                "tool" -> initialMessages += Message.tool(Contents.of(content))
+                "assistant" -> initialMessages += Message.model(Contents.of(nonEmpty(content)))
+                "tool" -> initialMessages += Message.tool(Contents.of(nonEmpty(content)))
                 // The latest user message is sent through sendMessage() so the
                 // Conversation API computes only the incremental prompt.
                 "user" -> if (index < messages.length() - 1) initialMessages += Message.user(content)
@@ -189,6 +195,14 @@ object KnowMeLiteRtLmBridge {
             extraContext = mapOf("enable_thinking" to false),
         )
     }
+
+    /**
+     * Keep a preserved-but-empty turn representable. `Contents.of("")` is not a
+     * safe assumption across LiteRT-LM versions, and an ordered transcript with
+     * an explicit placeholder beats a silently dropped turn.
+     */
+    private fun nonEmpty(content: String): String =
+        content.ifBlank { "(no output)" }
 
     private fun toolProvidersFromRequest(request: JSONObject): List<ToolProvider> {
         val tools = request.optJSONArray("tools") ?: return emptyList()

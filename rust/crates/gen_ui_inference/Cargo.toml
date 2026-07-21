@@ -49,3 +49,9 @@ mistralrs = { workspace = true, optional = true }
 
 [target.'cfg(target_os = "android")'.dependencies]
 jni.workspace = true
+
+# sysctl(hw.memsize) for the iOS jetsam preflight — an over-budget model load
+# kills the process outright, so the size gate has to run before the load rather
+# than catching a failure after it.
+[target.'cfg(target_os = "ios")'.dependencies]
+libc = "0.2"

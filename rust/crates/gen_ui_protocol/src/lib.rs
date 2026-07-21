@@ -170,11 +170,62 @@ fn uar_message_to_inference_message(value: &serde_json::Value) -> Result<Inferen
     };
     Ok(InferenceMessage {
         role,
-        content: flatten_uar_message_content(value.get("content")),
+        content: compose_uar_message_content(value),
         name: json_string(value, &["name"]).map(str::to_owned),
         tool_call_id: first_json_string(value, &[&["tool_call_id"][..], &["toolCallId"][..]])
             .map(str::to_owned),
     })
+}
+
+/// Render a UAR message body into the flat `content` string local engines take.
+///
+/// `InferenceMessage.content` is a plain `String`, so an assistant turn that
+/// only made tool calls (UAR keeps those in a sibling `tool_calls` array, with
+/// `content` null or empty) would otherwise flatten to `""`. That is not merely
+/// lossy: Android's LiteRT-LM bridge skips blank-content messages outright
+/// (`KnowMeLiteRtLmBridge.conversationConfigFromRequest`), so the call would
+/// vanish while its `role: "tool"` result stayed — leaving the model a tool
+/// result with nothing that asked for it. Serializing the calls into the text
+/// keeps the call/result pair coherent when UAR history is replayed through a
+/// local provider.
+fn compose_uar_message_content(value: &serde_json::Value) -> String {
+    let text = flatten_uar_message_content(value.get("content"));
+    let calls = render_uar_tool_calls(value);
+    match (text.trim().is_empty(), calls) {
+        (_, None) => text,
+        (true, Some(calls)) => calls,
+        (false, Some(calls)) => format!("{text}\n{calls}"),
+    }
+}
+
+/// Serialize an assistant turn's `tool_calls` into a stable textual form.
+///
+/// Returns `None` when the message carries no usable tool calls, so callers can
+/// leave ordinary content untouched.
+fn render_uar_tool_calls(value: &serde_json::Value) -> Option<String> {
+    let calls = first_json_array(value, &[&["tool_calls"][..], &["toolCalls"][..]])?;
+    let rendered = calls
+        .iter()
+        .filter_map(render_uar_tool_call)
+        .collect::<Vec<_>>();
+    (!rendered.is_empty()).then(|| rendered.join("\n"))
+}
+
+fn render_uar_tool_call(call: &serde_json::Value) -> Option<String> {
+    let function = call.get("function").unwrap_or(call);
+    let name = json_string(function, &["name"]).or_else(|| json_string(call, &["name"]))?;
+    // OpenAI-shaped payloads carry `arguments` as a JSON *string*; UAR's own
+    // normalized events use an object. Accept either without re-encoding a
+    // string into a quoted string.
+    let arguments = function
+        .get("arguments")
+        .or_else(|| call.get("arguments"))
+        .map(|arguments| match arguments {
+            serde_json::Value::String(raw) => raw.clone(),
+            other => other.to_string(),
+        })
+        .unwrap_or_else(|| "{}".to_owned());
+    Some(format!("[tool_call: {name} {arguments}]"))
 }
 
 fn flatten_uar_message_content(content: Option<&serde_json::Value>) -> String {
@@ -957,6 +1008,24 @@ fn json_string<'a>(value: &'a serde_json::Value, path: &[&str]) -> Option<&'a st
 
 fn first_json_string<'a>(value: &'a serde_json::Value, paths: &[&[&str]]) -> Option<&'a str> {
     paths.iter().find_map(|path| json_string(value, path))
+}
+
+fn json_array<'a>(
+    value: &'a serde_json::Value,
+    path: &[&str],
+) -> Option<&'a Vec<serde_json::Value>> {
+    let mut cursor = value;
+    for segment in path {
+        cursor = cursor.get(*segment)?;
+    }
+    cursor.as_array()
+}
+
+fn first_json_array<'a>(
+    value: &'a serde_json::Value,
+    paths: &[&[&str]],
+) -> Option<&'a Vec<serde_json::Value>> {
+    paths.iter().find_map(|path| json_array(value, path))
 }
 
 fn normalize_citation_event(payload: &serde_json::Value) -> StreamEvent {
@@ -1844,6 +1913,86 @@ impl UarLocalProviderEventBridge {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn assistant_tool_calls_are_rendered_into_content() {
+        // Regression: an assistant turn that only made tool calls used to flatten
+        // to empty content, so its call vanished when UAR history was replayed
+        // through a local provider — the model then saw an orphaned tool result.
+        let payload = UarLlmRequestPayload {
+            messages: vec![
+                serde_json::json!({"role": "user", "content": "weather?"}),
+                serde_json::json!({
+                    "role": "assistant",
+                    "content": serde_json::Value::Null,
+                    "tool_calls": [{
+                        "id": "call_1",
+                        "type": "function",
+                        "function": {"name": "get_weather", "arguments": "{\"city\":\"Paris\"}"}
+                    }]
+                }),
+                serde_json::json!({
+                    "role": "tool",
+                    "tool_call_id": "call_1",
+                    "content": "18C"
+                }),
+            ],
+            tools: vec![],
+            extra_params: None,
+        };
+        let request = uar_llm_payload_to_inference_request(&payload).unwrap();
+        let assistant = &request.messages[1];
+        assert_eq!(assistant.role, InferenceRole::Assistant);
+        assert!(
+            assistant.content.contains("get_weather") && assistant.content.contains("Paris"),
+            "assistant tool call must survive into content, got: {:?}",
+            assistant.content
+        );
+        assert!(
+            !assistant.content.trim().is_empty(),
+            "assistant turn must not be blank — a blank turn is dropped by the Android bridge"
+        );
+        assert_eq!(request.messages[2].role, InferenceRole::Tool);
+    }
+
+    #[test]
+    fn assistant_text_plus_tool_calls_keeps_both() {
+        let payload = UarLlmRequestPayload {
+            messages: vec![serde_json::json!({
+                "role": "assistant",
+                "content": "Let me check.",
+                "tool_calls": [{
+                    "function": {"name": "search", "arguments": {"q": "x"}}
+                }]
+            })],
+            tools: vec![],
+            extra_params: None,
+        };
+        let request = uar_llm_payload_to_inference_request(&payload).unwrap();
+        let content = &request.messages[0].content;
+        assert!(
+            content.contains("Let me check."),
+            "text preserved: {content:?}"
+        );
+        assert!(
+            content.contains("search"),
+            "tool call preserved: {content:?}"
+        );
+    }
+
+    #[test]
+    fn assistant_without_tool_calls_is_unchanged() {
+        let payload = UarLlmRequestPayload {
+            messages: vec![serde_json::json!({
+                "role": "assistant",
+                "content": "plain answer"
+            })],
+            tools: vec![],
+            extra_params: None,
+        };
+        let request = uar_llm_payload_to_inference_request(&payload).unwrap();
+        assert_eq!(request.messages[0].content, "plain answer");
+    }
 
     fn rendered(events: &[A2uiEvent]) -> (String, String) {
         let mut answer = String::new();

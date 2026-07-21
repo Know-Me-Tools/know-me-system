@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- On-device inference loads a multi-gigabyte GGUF into resident memory.
+	     Without this entitlement iOS jetsam terminates the process during model
+	     load, which is a process kill rather than a catchable error, so the
+	     engine's CPU/smaller-model fallback never gets a chance to run.
+	     Requires the matching capability on the provisioning profile. -->
+	<key>com.apple.developer.kernel.increased-memory-limit</key>
+	<true/>
+</dict>
+</plist>

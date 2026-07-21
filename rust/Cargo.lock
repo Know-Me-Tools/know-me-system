@@ -4801,6 +4801,7 @@ dependencies = [
  "gen_ui_runtime",
  "gen_ui_types",
  "jni 0.22.4",
+ "libc",
  "llama-cpp-2",
  "mistralrs",
  "reqwest 0.13.4",
