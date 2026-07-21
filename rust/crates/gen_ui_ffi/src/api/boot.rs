@@ -257,7 +257,7 @@ pub async fn run_migrations(data_dir: String) -> Result<(), CoreError> {
                 surface: "chat".to_string(),
                 lane: "local".to_string(),
                 provider_id: None,
-                model_id: default_model,
+                model_id: default_model.clone(),
                 params: serde_json::json!({
                     "context_len": 8192,
                     "max_tokens": 1024,
@@ -282,10 +282,41 @@ pub async fn run_migrations(data_dir: String) -> Result<(), CoreError> {
         Arc::new(gen_ui_inference::LlamaCppEngine::new(
             std::path::PathBuf::from(&data_dir).join("model-cache/llama"),
         ));
-    gen_ui_agent::state::init_with_inference(
+
+    #[cfg(target_os = "android")]
+    let embedded_uar = Some(Arc::new(
+        gen_ui_agent::uar::UarEmbeddedRuntime::build_local(
+            inference.clone(),
+            gen_ui_types::inference::LocalModelSpec {
+                model: default_model.clone(),
+                context_len: Some(8_192),
+            },
+            crate::local_provider::android_litert_lm_uar_provider_config(),
+        )
+        .await
+        .map_err(|error| boot_fail("embedded UAR initialization", error))?,
+    ));
+    #[cfg(target_os = "ios")]
+    let embedded_uar = Some(Arc::new(
+        gen_ui_agent::uar::UarEmbeddedRuntime::build_local(
+            inference.clone(),
+            gen_ui_types::inference::LocalModelSpec {
+                model: default_model.clone(),
+                context_len: Some(8_192),
+            },
+            crate::local_provider::ios_qwen35_metal_uar_provider_config(),
+        )
+        .await
+        .map_err(|error| boot_fail("embedded UAR initialization", error))?,
+    ));
+    #[cfg(not(any(target_os = "ios", target_os = "android")))]
+    let embedded_uar = None;
+
+    gen_ui_agent::state::init_with_inference_and_uar(
         ConfigBackend::Surreal(store.clone()),
         store,
         Some(inference),
+        embedded_uar,
     );
     register_mobile_diagnostics_mcp()
         .await
