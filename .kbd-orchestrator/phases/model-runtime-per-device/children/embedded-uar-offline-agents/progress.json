@@ -86,6 +86,20 @@
             "parent": "6eb81d9 on codex/android-litert-lm-recovery (pointer bump + KBD artifacts)",
             "note": "light muted-foreground AA defect (#9AA3B0 -> #4B5563) found by concurrent session and included in 4b664f8"
           }
+        },
+        "uar-ui-chat-reskin": {
+          "status": "applied-pending-commit",
+          "appliedAt": "2026-07-21T13:45:00Z",
+          "by": "kimi",
+          "tasks_done": "24/27 (sections 1-6 + 7.1-7.2)",
+          "remaining": [
+            "7.3 Playwright e2e selectors (needs backend; -> uar-ui-verify-gates)",
+            "7.4 two-theme smoke pass (-> uar-ui-verify-gates)",
+            "7.5 a11y interactive checklist (-> uar-ui-verify-gates)"
+          ],
+          "verified": "tsc -b clean; eslint clean; vite build green; vitest 152/153 (1 pre-existing a2ui-uar pkg failure -> uar-ui-a2ui-retoken)",
+          "branch": "uar-ui-chat-reskin (uncommitted)",
+          "notes": "openspec/changes/uar-ui-chat-reskin/verification-notes.md"
         }
       }
     }

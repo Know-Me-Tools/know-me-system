@@ -4,9 +4,9 @@
   "change": "embed-uar-mobile-offline",
   "status": "implementation_ready",
   "currentTask": "implement the shared offline embedded UAR kernel for desktop, Android, and iOS",
-  "nextPendingChange": "uar-ui-token-convergence",
+  "nextPendingChange": "uar-ui-chat-reskin",
   "sourceTool": "kimi",
-  "exactNextCommand": "/opsx:apply uar-ui-token-convergence",
+  "exactNextCommand": "/opsx:apply uar-ui-chat-reskin",
   "parentPhase": "model-runtime-per-device",
   "childPhases": [
     "embedded-uar-offline-agents"
@@ -19,7 +19,7 @@
   "publicationStatus": "NOT_TRACKED",
   "changesCompleted": 0,
   "changesTotal": 1,
-  "updatedAt": "2026-07-21T12:18:00Z",
+  "updatedAt": "2026-07-21T13:05:00Z",
   "path": [
     "model-runtime-per-device",
     "embedded-uar-offline-agents"
