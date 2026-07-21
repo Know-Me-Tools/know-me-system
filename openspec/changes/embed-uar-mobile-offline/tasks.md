@@ -9,7 +9,7 @@
 
 - [x] 2.1 Implement UAR `LlmDriver` conversion over KnowMe's structured `InferenceProvider` request and canonical event streams
 - [x] 2.2 Register Android LiteRT-LM model metadata/capabilities as the embedded UAR default provider and model
-- [ ] 2.3 Register iOS Metal/Qwen model metadata/capabilities through the same provider injection contract
+- [x] 2.3 Register iOS Metal/Qwen model metadata/capabilities through the same provider injection contract
 - [ ] 2.4 Replace mobile `CloudService` defaults and service-only chat routing with the embedded UAR facade while retaining explicit optional service/BYOK mode
 
 ## 3. Offline Data and Control Plane

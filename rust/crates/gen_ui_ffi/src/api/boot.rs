@@ -219,6 +219,28 @@ pub async fn run_migrations(data_dir: String) -> Result<(), CoreError> {
             "Android LiteRT-LM provider metadata ready for embedded UAR"
         );
     }
+    #[cfg(target_os = "ios")]
+    {
+        let provider = crate::local_provider::ios_qwen35_metal_uar_provider_config();
+        if provider.default_model.as_deref() != Some(default_model.as_str()) {
+            return Err(boot_fail(
+                "embedded UAR local provider registration",
+                "iOS UAR default model does not match the pinned inference artifact",
+            ));
+        }
+        if !provider.models[0].supports_vision {
+            return Err(boot_fail(
+                "embedded UAR local provider registration",
+                "iOS Qwen registration is missing its vision capability",
+            ));
+        }
+        tracing::info!(
+            provider_id = %provider.id,
+            model_id = %default_model,
+            context_tokens = provider.models[0].context_window,
+            "iOS Qwen3.5 Metal provider metadata ready for embedded UAR"
+        );
+    }
     let existing_pref = store
         .get_model_pref("chat", "local")
         .await
