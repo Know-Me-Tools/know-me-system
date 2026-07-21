@@ -77,10 +77,15 @@
           "tasks_done": "18/21",
           "remaining": [
             "5.3 Playwright e2e + screenshot regeneration (needs running Axum backend)",
-            "5.5 browser/Docker/Tauri serve parity (needs running backend)",
-            "5.6 submodule commit + parent pointer bump (awaiting operator confirmation)"
+            "5.5 browser/Docker/Tauri serve parity (needs running backend)"
           ],
-          "verified": "tsc -b clean; vite build green; validate-static-bundle ok; build-storybook green; eslint clean; AA ratios computed"
+          "verified": "tsc -b clean; vite build green; validate-static-bundle ok; build-storybook green; eslint clean; AA ratios computed",
+          "commits": {
+            "submodule": ["4b664f8 token convergence (kimi)", "ac8959e ui primitive sweep (concurrent claude session)"],
+            "pushed_to": "origin/uar-ui-token-convergence",
+            "parent": "6eb81d9 on codex/android-litert-lm-recovery (pointer bump + KBD artifacts)",
+            "note": "light muted-foreground AA defect (#9AA3B0 -> #4B5563) found by concurrent session and included in 4b664f8"
+          }
         }
       }
     }

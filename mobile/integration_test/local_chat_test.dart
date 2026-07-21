@@ -6,6 +6,7 @@ import 'package:integration_test/integration_test.dart';
 
 import 'package:knowme_poc/features/chat/presentation/providers/chat_notifier.dart';
 import 'package:knowme_poc/features/chat/presentation/screens/chat_screen.dart';
+import 'package:knowme_poc/features/chat/domain/entities/chat_message.dart';
 import 'package:knowme_poc/main.dart' as app;
 
 void main() {
@@ -32,9 +33,15 @@ void main() {
         tester.element(find.byType(ChatScreen)),
       );
       final deadline = DateTime.now().add(const Duration(minutes: 12));
+      String? previousDiagnostics;
       while (DateTime.now().isBefore(deadline)) {
         await tester.pump(const Duration(seconds: 2));
         final state = container.read(chatProvider);
+        final diagnostics = _diagnostics(state);
+        if (diagnostics != previousDiagnostics) {
+          debugPrint('KnowMe integration state: $diagnostics');
+          previousDiagnostics = diagnostics;
+        }
         final assistant = state.messages.where(
           (message) =>
               message.role == 'assistant' && message.content.isNotEmpty,
@@ -43,11 +50,45 @@ void main() {
           expect(find.textContaining('⚠️'), findsNothing);
           return;
         }
+        final failed = state.messages.where(
+          (message) => message.role == 'assistant' && message.error != null,
+        );
+        if (failed.isNotEmpty) {
+          fail('assistant run failed: $diagnostics');
+        }
       }
       fail(
-        'local inference did not finalize an assistant bubble in 12 minutes',
+        'local inference did not finalize an assistant bubble in 12 minutes: '
+        '${_diagnostics(container.read(chatProvider))}',
       );
     },
     timeout: const Timeout(Duration(minutes: 15)),
   );
+}
+
+String _diagnostics(ChatState state) {
+  final messages = state.messages.map(
+    (message) => <String, Object?>{
+      'role': message.role,
+      'runId': message.runId,
+      'status': message.runStatus,
+      'phase': message.runPhase,
+      'statusMessage': message.statusMessage,
+      'streaming': message.isStreaming,
+      'blockCount': message.content.length,
+      'error': message.error == null
+          ? null
+          : <String, Object?>{
+              'code': message.error!.code,
+              'phase': message.error!.phase,
+              'message': message.error!.displayMessage,
+            },
+    },
+  );
+  return <String, Object?>{
+    'threadId': state.threadId,
+    'isLoading': state.isLoading,
+    'modelOperation': state.modelOperation,
+    'messages': messages.toList(),
+  }.toString();
 }
