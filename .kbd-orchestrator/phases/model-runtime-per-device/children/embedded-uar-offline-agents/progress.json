@@ -38,8 +38,51 @@
   "active_change": "embed-uar-mobile-offline",
   "blocked_changes": [],
   "sourceTool": "codex",
-  "last_updated_by": "codex",
-  "last_updated": "2026-07-20T20:35:00Z",
+  "last_updated_by": "kimi",
+  "last_updated": "2026-07-21T12:10:28Z",
   "createdBy": "kbd-new-child",
-  "updatedAt": "2026-07-20T20:35:00Z"
+  "updatedAt": "2026-07-21T12:10:28Z",
+  "scoped_assessments": [
+    {
+      "id": "uar-ui-knowme-redesign",
+      "file": "assessment-uar-ui-knowme-redesign.md",
+      "completedAt": "2026-07-21T12:10:28Z",
+      "by": "kimi",
+      "note": "New-scope assess: UAR submodule web UI -> KnowMe React 19 UI convergence; proposes change uar-ui-knowme-convergence"
+    }
+  ],
+  "scoped_plans": [
+    {
+      "id": "uar-ui-knowme-redesign",
+      "file": "plan-uar-ui-knowme-redesign.md",
+      "completedAt": "2026-07-21T12:14:00Z",
+      "by": "kimi",
+      "changes": [
+        "uar-ui-token-convergence",
+        "uar-ui-chat-reskin",
+        "uar-ui-shell-navigation",
+        "uar-ui-a2ui-retoken",
+        "uar-ui-verify-gates"
+      ],
+      "operator_decisions": [
+        "port token values, keep Tailwind 3.4",
+        "scoped TanStack Query exemption for vendored submodule",
+        "admin console keeps scoped CRT theme"
+      ],
+      "change_status": {
+        "uar-ui-token-convergence": {
+          "status": "applied-pending-live-verification",
+          "appliedAt": "2026-07-21T12:45:00Z",
+          "by": "kimi",
+          "tasks_done": "18/21",
+          "remaining": [
+            "5.3 Playwright e2e + screenshot regeneration (needs running Axum backend)",
+            "5.5 browser/Docker/Tauri serve parity (needs running backend)",
+            "5.6 submodule commit + parent pointer bump (awaiting operator confirmation)"
+          ],
+          "verified": "tsc -b clean; vite build green; validate-static-bundle ok; build-storybook green; eslint clean; AA ratios computed"
+        }
+      }
+    }
+  ]
 }

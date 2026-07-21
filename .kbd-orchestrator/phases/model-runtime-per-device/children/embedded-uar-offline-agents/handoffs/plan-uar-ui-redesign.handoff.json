@@ -1,0 +1,13 @@
+{
+  "stage": "plan",
+  "completedAt": "2026-07-21T12:14:00Z",
+  "outputs": [
+    "plan-uar-ui-knowme-redesign.md"
+  ],
+  "nextStage": "execute",
+  "summaryForNext": "5 changes for uar-ui-knowme-convergence: token port first (TW3 kept, stale configs purged, KnowMe ladder/fonts/radius/flat-2.0 enforcement), then chat reskin + shell/nav + a2ui retoken in parallel, then verification gates. Operator decisions baked in: TW3 port (no TW4 migration), TanStack Query scoped exemption, admin CRT theme kept. First command: /opsx:new uar-ui-token-convergence.",
+  "skipped": false,
+  "skipReason": null,
+  "scope": "uar-ui-knowme-redesign",
+  "note": "Does not replace the phase-level plan handoff for embed-uar-mobile-offline; scoped to the operator-requested UI redesign."
+}
