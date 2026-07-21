@@ -281,7 +281,111 @@ fn preflight_artifact(artifact: ArtifactSpec) -> CoreResult<()> {
             artifact.file_name, artifact.byte_len, max_bytes
         )));
     }
+    if let Some(budget) = device_memory_budget_bytes() {
+        let required = artifact
+            .byte_len
+            .saturating_add(RUNTIME_MEMORY_HEADROOM_BYTES);
+        if required > budget {
+            return Err(CoreError::Transient(format!(
+                "model {} needs ~{} bytes resident (artifact + {} bytes runtime headroom) but this device's safe budget is {} bytes; \
+                 select a smaller model",
+                artifact.file_name, required, RUNTIME_MEMORY_HEADROOM_BYTES, budget
+            )));
+        }
+    }
     Ok(())
+}
+
+/// Bytes to reserve beyond the model file for the KV cache, compute buffers,
+/// and the rest of the app. Deliberately coarse — this gate exists to keep a
+/// hopeless load from ever starting, not to predict peak usage precisely.
+const RUNTIME_MEMORY_HEADROOM_BYTES: u64 = 1024 * 1024 * 1024;
+
+/// Whether this artifact is too large for the device, without producing an
+/// error. Lets the caller choose a smaller model instead of failing outright.
+fn memory_preflight_rejects(artifact: ArtifactSpec) -> bool {
+    device_memory_budget_bytes().is_some_and(|budget| {
+        artifact
+            .byte_len
+            .saturating_add(RUNTIME_MEMORY_HEADROOM_BYTES)
+            > budget
+    })
+}
+
+/// The next-smaller cataloged model that fits this device, if one exists.
+///
+/// Returns `None` when the requested model already fits (no downgrade needed),
+/// when the spec is not a known catalog id (an absolute path is the caller's own
+/// choice), or when no cataloged alternative is small enough. Self-guarding so a
+/// caller cannot accidentally downgrade a model that was fine as-is.
+fn downgrade_for_memory(spec: &LocalModelSpec) -> Option<LocalModelSpec> {
+    // Ordered largest-to-smallest; pick the first that clears the budget.
+    const FALLBACKS: &[&str] = &[ANDROID_QWEN3_4B_ID];
+    let requested = artifact_set_for_id(&spec.model)?;
+    if !memory_preflight_rejects(requested.model) {
+        return None;
+    }
+    FALLBACKS
+        .iter()
+        .filter(|candidate| **candidate != spec.model)
+        .find_map(|candidate| {
+            let set = artifact_set_for_id(candidate)?;
+            (!memory_preflight_rejects(set.model)).then(|| LocalModelSpec {
+                model: (*candidate).to_owned(),
+                context_len: spec.context_len,
+            })
+        })
+}
+
+/// The memory a local model may safely occupy on this device, or `None` when
+/// the platform gives no usable signal (desktop, where the OS pages).
+///
+/// iOS terminates a process that exceeds its jetsam allowance rather than
+/// failing an allocation, so an over-budget load cannot be caught as an `Err`
+/// after the fact — it has to be refused up front. The fraction is intentionally
+/// conservative: the OS, other apps, and this app's non-model allocations all
+/// draw on the same physical memory.
+fn device_memory_budget_bytes() -> Option<u64> {
+    if let Some(override_bytes) = std::env::var("KNOWME_DEVICE_MEMORY_BUDGET_BYTES")
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+    {
+        return Some(override_bytes);
+    }
+    #[cfg(target_os = "ios")]
+    {
+        // Share of physical RAM an app can hold before jetsam intervenes, even
+        // with com.apple.developer.kernel.increased-memory-limit granted.
+        const IOS_JETSAM_SAFE_FRACTION: f64 = 0.55;
+        let physical = physical_memory_bytes()?;
+        return Some((physical as f64 * IOS_JETSAM_SAFE_FRACTION) as u64);
+    }
+    #[cfg(not(target_os = "ios"))]
+    {
+        None
+    }
+}
+
+#[cfg(target_os = "ios")]
+fn physical_memory_bytes() -> Option<u64> {
+    // sysctl hw.memsize is the documented total-physical-memory query on Darwin.
+    let mut size: u64 = 0;
+    let mut length = std::mem::size_of::<u64>();
+    let name = c"hw.memsize";
+    // SAFETY: `name` is a valid NUL-terminated C string; `size` is a live u64
+    // and `length` accurately describes its size, which is what sysctlbyname
+    // requires for the output buffer. The return value is checked before `size`
+    // is read.
+    let result = unsafe {
+        libc::sysctlbyname(
+            name.as_ptr(),
+            std::ptr::addr_of_mut!(size).cast(),
+            std::ptr::addr_of_mut!(length),
+            std::ptr::null_mut(),
+            0,
+        )
+    };
+    (result == 0 && size > 0).then_some(size)
 }
 
 fn gpu_backend_name() -> &'static str {
@@ -436,6 +540,43 @@ impl InferenceProvider for LlamaCppEngine {
         }
         self.model_cancelled.store(false, Ordering::Release);
         let (path, artifact) = resolve_model(spec, &self.cache_dir)?;
+
+        // A model that cannot fit this device's memory budget must be swapped
+        // out BEFORE the download and load, not after: on iOS an over-budget
+        // load is terminated by jetsam, which is a process kill rather than an
+        // `Err`, so the post-load fallback below would never run. Downgrading
+        // here also avoids spending a multi-gigabyte download on an artifact
+        // that could never have been loaded.
+        let (spec, path, artifact) = match artifact {
+            Some(artifact) if memory_preflight_rejects(artifact) => {
+                match downgrade_for_memory(spec) {
+                    Some(smaller) => {
+                        tracing::warn!(
+                            target: "knowme_llama",
+                            requested = %spec.model,
+                            selected = %smaller.model,
+                            "requested local model exceeds this device's memory budget; using a smaller model"
+                        );
+                        let (smaller_path, smaller_artifact) =
+                            resolve_model(&smaller, &self.cache_dir)?;
+                        (
+                            std::borrow::Cow::Owned(smaller),
+                            smaller_path,
+                            smaller_artifact,
+                        )
+                    }
+                    // No smaller option: surface the budget error rather than
+                    // starting a load this device cannot survive.
+                    None => {
+                        preflight_artifact(artifact)?;
+                        (std::borrow::Cow::Borrowed(spec), path, Some(artifact))
+                    }
+                }
+            }
+            other => (std::borrow::Cow::Borrowed(spec), path, other),
+        };
+        let spec = spec.as_ref();
+
         if let Some(artifact) = artifact {
             preflight_artifact(artifact)?;
             if let Err(error) = ensure_catalog_model_with_status(
@@ -958,5 +1099,93 @@ mod tests {
             ..crate::catalog::ANDROID_QWEN3_4B.model
         };
         assert!(preflight_artifact(oversized).is_err());
+    }
+
+    /// Run `body` with `KNOWME_DEVICE_MEMORY_BUDGET_BYTES` set, restoring the
+    /// prior value afterward. Serialized because env vars are process-global.
+    fn with_memory_budget(bytes: u64, body: impl FnOnce()) {
+        use std::sync::Mutex;
+        static GUARD: Mutex<()> = Mutex::new(());
+        let _lock = GUARD
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let key = "KNOWME_DEVICE_MEMORY_BUDGET_BYTES";
+        let previous = std::env::var(key).ok();
+        std::env::set_var(key, bytes.to_string());
+        body();
+        match previous {
+            Some(value) => std::env::set_var(key, value),
+            None => std::env::remove_var(key),
+        }
+    }
+
+    #[test]
+    fn memory_budget_override_gates_the_9b_model() {
+        // 6 GB budget: the 5.68 GB Qwen 9B + 1 GB headroom overflows it.
+        with_memory_budget(6 * 1024 * 1024 * 1024, || {
+            assert!(
+                memory_preflight_rejects(crate::catalog::IPHONE_QWEN35_9B.model),
+                "9B + headroom must exceed a 6 GB budget"
+            );
+            // The 2.89 GB 4B model + 1 GB headroom fits.
+            assert!(
+                !memory_preflight_rejects(crate::catalog::ANDROID_QWEN3_4B.model),
+                "4B + headroom must fit inside a 6 GB budget"
+            );
+        });
+    }
+
+    #[test]
+    fn downgrade_picks_the_smaller_model_when_the_9b_is_too_large() {
+        with_memory_budget(6 * 1024 * 1024 * 1024, || {
+            let downgraded = downgrade_for_memory(&LocalModelSpec {
+                model: IPHONE_QWEN35_9B_ID.to_string(),
+                context_len: Some(4096),
+            })
+            .expect("a smaller cataloged model should be selected");
+            assert_eq!(downgraded.model, ANDROID_QWEN3_4B_ID);
+            assert_eq!(
+                downgraded.context_len,
+                Some(4096),
+                "context_len is preserved"
+            );
+        });
+    }
+
+    #[test]
+    fn downgrade_returns_none_when_no_option_fits() {
+        // 1 GB budget: even the 4B fallback (2.89 GB) cannot fit.
+        with_memory_budget(1024 * 1024 * 1024, || {
+            assert!(downgrade_for_memory(&LocalModelSpec {
+                model: IPHONE_QWEN35_9B_ID.to_string(),
+                context_len: None,
+            })
+            .is_none());
+        });
+    }
+
+    #[test]
+    fn downgrade_returns_none_for_non_catalog_specs() {
+        with_memory_budget(1, || {
+            assert!(downgrade_for_memory(&LocalModelSpec {
+                model: "/abs/path/to/custom.gguf".to_string(),
+                context_len: None,
+            })
+            .is_none());
+        });
+    }
+
+    #[test]
+    fn generous_budget_rejects_nothing() {
+        with_memory_budget(64 * 1024 * 1024 * 1024, || {
+            assert!(!memory_preflight_rejects(
+                crate::catalog::IPHONE_QWEN35_9B.model
+            ));
+            assert!(downgrade_for_memory(&LocalModelSpec {
+                model: IPHONE_QWEN35_9B_ID.to_string(),
+                context_len: None,
+            })
+            .is_none());
+        });
     }
 }

@@ -313,3 +313,102 @@ local engine a second time, not a defect in the switching mechanism itself.
   landing a fix, since three independent defects in the same area (dropped
   `tool_calls`, empty-turn history loss, un-paired context trimming) could each
   independently produce the same user-visible symptom.
+
+---
+
+# Remediation status (2026-07-21, same day)
+
+## Fixed
+
+### Android — dropped assistant `tool_calls` (primary cause)
+
+`gen_ui_protocol` now renders an assistant turn's `tool_calls` into the flat
+`content` string that local engines consume, via `compose_uar_message_content`
+and `render_uar_tool_calls`. `InferenceMessage.content` is a plain `String` with
+no structured tool-call field, so text is the only available channel.
+
+Accepts both payload shapes without double-encoding: OpenAI-style `arguments` as
+a JSON *string*, and UAR's own normalized object form.
+
+The Android bridge (`KnowMeLiteRtLmBridge.conversationConfigFromRequest`) was
+also skipping any blank-content message outright — which is what actually made
+the dropped call fatal rather than merely lossy. It now preserves assistant and
+tool turns even when blank (with a `(no output)` placeholder), and only drops
+empty *user* turns. Dropping either half of a call/result pair leaves the model
+an orphan.
+
+Regression tests in `gen_ui_protocol`:
+`assistant_tool_calls_are_rendered_into_content`,
+`assistant_text_plus_tool_calls_keeps_both`,
+`assistant_without_tool_calls_is_unchanged`.
+
+### iOS — jetsam kill on model load
+
+Two changes, both needed:
+
+1. **`mobile/ios/Runner/Runner.entitlements`** (new) declares
+   `com.apple.developer.kernel.increased-memory-limit`, wired into all three
+   Runner build configurations via `CODE_SIGN_ENTITLEMENTS`. **Requires the
+   matching capability on the provisioning profile** — the entitlement alone is
+   not sufficient, and an unprovisioned build will fail to sign.
+
+2. **A real device-RAM preflight** in `gen_ui_inference/src/llama.rs`. The old
+   `preflight_artifact` compared the artifact's declared size to a static 8 GB
+   cap, which the 5.68 GB model passed. It now also checks
+   `artifact + 1 GB headroom` against a device budget derived from
+   `sysctl hw.memsize` at 55% (iOS only; `None` elsewhere, where the OS pages).
+
+   Critically, the check runs **before download and load**, and on rejection
+   substitutes a smaller cataloged model rather than erroring. The pre-existing
+   9B→4B fallback could never fire, because it keyed off a Rust `Err` from
+   `LlamaModel::load_from_file` and a jetsam kill is process termination, not a
+   catchable error. Downgrading up front also avoids spending a multi-gigabyte
+   download on an artifact that could never load.
+
+   `KNOWME_DEVICE_MEMORY_BUDGET_BYTES` overrides the budget for testing.
+
+Tests: `memory_budget_override_gates_the_9b_model`,
+`downgrade_picks_the_smaller_model_when_the_9b_is_too_large`,
+`downgrade_returns_none_when_no_option_fits`,
+`downgrade_returns_none_for_non_catalog_specs`,
+`generous_budget_rejects_nothing`.
+
+`generous_budget_rejects_nothing` caught a real defect during development:
+`downgrade_for_memory` initially returned the first *fitting* fallback without
+checking whether the requested model needed replacing, so a generous budget
+still produced a spurious downgrade. The function is now self-guarding.
+
+## Verified
+
+| Check | Result |
+|---|---|
+| `cargo test -p gen_ui_protocol` | 43 passed, 0 failed |
+| `cargo test -p gen_ui_inference --features local-llama` | 10 passed, 0 failed |
+| `cargo clippy` (both crates) | no warnings from changed code |
+| `cargo check --target aarch64-apple-ios --features local-llama-metal` | exit 0 |
+
+The iOS target check needed an explicit SDK sysroot
+(`BINDGEN_EXTRA_CLANG_ARGS_aarch64_apple_ios`); without it `llama-cpp-sys-2`'s
+bindgen fails on `stdio.h` before reaching any first-party code. That is a local
+toolchain gap, not a code defect — the real build supplies the sysroot through
+cargokit/the podspec.
+
+## NOT fixed — still open
+
+- **No on-device verification.** Neither fix has run on real hardware. The iOS
+  fix in particular depends on a provisioning profile carrying the increased-
+  memory-limit capability, which cannot be validated from here.
+- **The 55% jetsam fraction and 1 GB headroom are estimates**, not measured
+  values. They are deliberately conservative, but the right numbers come from
+  profiling a real device under load.
+- **UAR's empty-turn history loss** (`manager.rs:2039-2041`, assistant turns with
+  empty `accumulated_content` are never written back to the session) is
+  untouched. It lives in the vendored submodule.
+- **UAR's context-window trimming can still orphan a tool-call/tool-result pair**
+  (`context/manager.rs:86-141` trims by token count with no pairing awareness).
+  Also untouched, also in the submodule. Either of these can independently
+  reproduce a malformed-history symptom on a long conversation.
+- **`RUN_FINISHED` misreported as `RUN_ERROR`** when a `<think>` block is left
+  open at stream end, and **`RUN_ERROR`'s producer `code` is discarded**
+  (hardcoded to `inference_error`). Both are projector-level issues that make
+  field diagnosis harder; neither breaks inference.
