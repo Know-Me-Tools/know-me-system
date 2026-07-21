@@ -88,8 +88,11 @@
           }
         },
         "uar-ui-chat-reskin": {
-          "status": "applied-pending-commit",
+          "status": "merged",
           "appliedAt": "2026-07-21T13:45:00Z",
+          "mergedAt": "2026-07-21T18:37:28Z",
+          "mergeCommit": "dc158a8",
+          "pr": "https://github.com/Prometheus-AGS/universal-agent-runtime/pull/171",
           "by": "kimi",
           "tasks_done": "24/27 (sections 1-6 + 7.1-7.2)",
           "remaining": [
@@ -98,7 +101,7 @@
             "7.5 a11y interactive checklist (-> uar-ui-verify-gates)"
           ],
           "verified": "tsc -b clean; eslint clean; vite build green; vitest 152/153 (1 pre-existing a2ui-uar pkg failure -> uar-ui-a2ui-retoken)",
-          "branch": "uar-ui-chat-reskin (uncommitted)",
+          "branch": "uar-ui-chat-reskin (merged to main)",
           "notes": "openspec/changes/uar-ui-chat-reskin/verification-notes.md"
         }
       }
