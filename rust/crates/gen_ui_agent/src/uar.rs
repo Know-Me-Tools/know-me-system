@@ -176,7 +176,7 @@ pub fn ios_qwen35_mlx_provider_config(model_id: impl Into<String>) -> UarProvide
         default_model: Some(model_id.clone()),
         models: vec![ModelConfig {
             id: model_id,
-            display_name: Some("Qwen3.5 4B · on-device (MLX)".to_string()),
+            display_name: Some("Qwen3 4B · on-device (MLX)".to_string()),
             context_window: Some(IOS_QWEN35_TRUSTED_CONTEXT_TOKENS),
             supports_vision: false,
             supports_tools: true,
