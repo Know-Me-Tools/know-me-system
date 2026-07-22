@@ -26,6 +26,14 @@ pub mod llama;
 #[cfg(any(feature = "local-llama", feature = "local-litert-lm"))]
 pub mod catalog;
 
+/// Device-memory preflight shared across mobile engines (jetsam gate).
+#[cfg(feature = "local-llama")]
+pub(crate) mod memory;
+
+/// Tool-schema prompt injection shared by engines without a native tool API.
+#[cfg(feature = "local-llama")]
+pub(crate) mod prompt;
+
 #[cfg(all(feature = "local-litert-lm", target_os = "android"))]
 pub mod android_litert_jni;
 
