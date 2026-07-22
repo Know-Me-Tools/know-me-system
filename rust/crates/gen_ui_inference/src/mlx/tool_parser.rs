@@ -1,45 +1,73 @@
 // TJ-ARCH-MOB-001 compliant
-//! Streaming parser that turns Qwen `<tool_call>…</tool_call>` blocks in the
-//! model's text stream into canonical tool-call `StreamEvent`s, so the host
-//! tool gate and the UAR driver bridge consume the same event shape they get
-//! from every other engine.
+//! Streaming segmenter that splits a model's raw text stream into canonical
+//! `StreamEvent`s: assistant content (`TextDelta`), extended reasoning
+//! (`ThinkingDelta`), and tool calls (`ToolCallStarted/Delta/Complete`). The
+//! host tool gate and the UAR driver bridge then consume the same event shape
+//! they get from every other engine, and the shared `A2uiAdapter` turns
+//! `ThinkingDelta` into a collapsible `thinking` ContentBlock.
 //!
 //! The parser is fed token deltas as they stream. Open/close tags can split
 //! across deltas, so a bounded holdback buffer keeps just enough tail to detect
 //! a tag that has only partially arrived; everything definitely-not-a-tag is
-//! emitted immediately as text.
+//! emitted immediately. Reasoning markup is per-model (`ReasoningFormat`): Qwen3
+//! uses `<think>…</think>`; a model with `ReasoningFormat::None` skips the
+//! reasoning tags entirely and only tool calls are extracted.
 
 use gen_ui_types::events::StreamEvent;
+use gen_ui_types::inference::ReasoningFormat;
 
-const OPEN_TAG: &str = "<tool_call>";
-const CLOSE_TAG: &str = "</tool_call>";
-
-/// The most bytes we might need to hold back while waiting to see whether a
-/// partial tag completes — one char less than the longer tag.
-const MAX_HOLDBACK: usize = CLOSE_TAG.len() - 1;
+const TOOL_OPEN: &str = "<tool_call>";
+const TOOL_CLOSE: &str = "</tool_call>";
+const THINK_OPEN: &str = "<think>";
+const THINK_CLOSE: &str = "</think>";
 
 #[derive(Debug, PartialEq)]
 enum State {
-    /// Passing text through, watching for `<tool_call>`.
+    /// Passing assistant content through, watching for an open tag.
     Text,
+    /// Inside a `<think>` block, emitting its body as `ThinkingDelta` until
+    /// `</think>`.
+    InThinking,
     /// Inside a tool call, accumulating its JSON body until `</tool_call>`.
     InToolCall,
 }
 
+/// The longest close tag governs how much tail we must hold back while a partial
+/// tag might still complete. `</tool_call>` is the longest of the four.
+const MAX_HOLDBACK: usize = TOOL_CLOSE.len() - 1;
+
+/// Streaming segmenter. Retains the historical `ToolCallParser` name so existing
+/// call sites and tests keep working; it now also splits reasoning when the
+/// model's `ReasoningFormat` declares a thinking markup.
 pub(crate) struct ToolCallParser {
     state: State,
-    /// Unmatched tail that might be the start of a tag (Text state) or the
-    /// accumulating body / partial close tag (InToolCall state).
+    /// Unmatched tail: a possible partial open tag (Text), the accumulating tool
+    /// JSON / partial close (InToolCall), or streamed reasoning (InThinking).
     buffer: String,
     next_call_index: usize,
+    /// Whether `<think>` blocks are recognized. `false` for
+    /// `ReasoningFormat::None`, so a literal `<think>` in content is passed
+    /// through untouched.
+    think_enabled: bool,
 }
 
 impl ToolCallParser {
+    /// Tool-call-only parser (no reasoning split). Retained for existing tests
+    /// and callers that predate per-model reasoning formats.
     pub(crate) fn new() -> Self {
+        Self::with_reasoning(ReasoningFormat::None)
+    }
+
+    /// Parser configured for a model's reasoning markup. `Qwen3Think` (and, for
+    /// now, `Harmony`, which shares the `<think>`-style recognition until a
+    /// harmony model is wired) enable reasoning extraction; `None` disables it.
+    pub(crate) fn with_reasoning(format: ReasoningFormat) -> Self {
+        let think_enabled = matches!(format, ReasoningFormat::Qwen3Think);
         Self {
             state: State::Text,
             buffer: String::new(),
             next_call_index: 0,
+            think_enabled,
         }
     }
 
@@ -50,8 +78,15 @@ impl ToolCallParser {
         loop {
             match self.state {
                 State::Text => {
-                    if let Some(pos) = self.buffer.find(OPEN_TAG) {
-                        // Emit text before the tag, drop the tag, switch state.
+                    // Find the earliest of the open tags we recognize.
+                    let tool_at = self.buffer.find(TOOL_OPEN);
+                    let think_at = if self.think_enabled {
+                        self.buffer.find(THINK_OPEN)
+                    } else {
+                        None
+                    };
+                    let next = earliest(tool_at, think_at);
+                    if let Some((pos, tag)) = next {
                         let text = self.buffer[..pos].to_string();
                         if !text.is_empty() {
                             out.push(StreamEvent::TextDelta {
@@ -59,13 +94,17 @@ impl ToolCallParser {
                                 delta: text,
                             });
                         }
-                        self.buffer.drain(..pos + OPEN_TAG.len());
-                        self.state = State::InToolCall;
+                        self.buffer.drain(..pos + tag.len());
+                        self.state = if tag == THINK_OPEN {
+                            State::InThinking
+                        } else {
+                            State::InToolCall
+                        };
                         continue;
                     }
                     // No complete open tag. Emit everything except a tail that
-                    // could still become one; keep that tail buffered.
-                    let safe = safe_emit_len(&self.buffer, OPEN_TAG);
+                    // could still become one of the open tags; keep that tail.
+                    let safe = self.safe_text_emit_len();
                     if safe > 0 {
                         let text = self.buffer[..safe].to_string();
                         out.push(StreamEvent::TextDelta {
@@ -76,10 +115,36 @@ impl ToolCallParser {
                     }
                     break;
                 }
-                State::InToolCall => {
-                    if let Some(pos) = self.buffer.find(CLOSE_TAG) {
+                State::InThinking => {
+                    if let Some(pos) = self.buffer.find(THINK_CLOSE) {
                         let body = self.buffer[..pos].to_string();
-                        self.buffer.drain(..pos + CLOSE_TAG.len());
+                        if !body.is_empty() {
+                            out.push(StreamEvent::ThinkingDelta {
+                                index: 0,
+                                delta: body,
+                            });
+                        }
+                        self.buffer.drain(..pos + THINK_CLOSE.len());
+                        self.state = State::Text;
+                        continue;
+                    }
+                    // No close yet: stream the safe prefix as reasoning, holding
+                    // back only a possible partial `</think>`.
+                    let safe = safe_emit_len(&self.buffer, THINK_CLOSE);
+                    if safe > 0 {
+                        let body = self.buffer[..safe].to_string();
+                        out.push(StreamEvent::ThinkingDelta {
+                            index: 0,
+                            delta: body,
+                        });
+                        self.buffer.drain(..safe);
+                    }
+                    break;
+                }
+                State::InToolCall => {
+                    if let Some(pos) = self.buffer.find(TOOL_CLOSE) {
+                        let body = self.buffer[..pos].to_string();
+                        self.buffer.drain(..pos + TOOL_CLOSE.len());
                         self.state = State::Text;
                         out.extend(self.emit_tool_call(&body));
                         continue;
@@ -93,8 +158,8 @@ impl ToolCallParser {
         out
     }
 
-    /// Flush at end of stream: emit any buffered text, or a best-effort tool
-    /// call if a block was left open, so nothing is silently dropped.
+    /// Flush at end of stream: emit any buffered content, reasoning, or a
+    /// best-effort tool call if a block was left open, so nothing is dropped.
     pub(crate) fn finish(&mut self) -> Vec<StreamEvent> {
         let mut out = Vec::new();
         match self.state {
@@ -106,6 +171,17 @@ impl ToolCallParser {
                     });
                 }
             }
+            State::InThinking => {
+                // Stream ended mid-`<think>`. Emit the remainder as reasoning
+                // rather than losing it; the close tag simply never arrived.
+                if !self.buffer.is_empty() {
+                    out.push(StreamEvent::ThinkingDelta {
+                        index: 0,
+                        delta: std::mem::take(&mut self.buffer),
+                    });
+                }
+                self.state = State::Text;
+            }
             State::InToolCall => {
                 // Stream ended mid-tool-call. Emit what we have as a best-effort
                 // call rather than losing it; malformed JSON is handled by
@@ -116,6 +192,18 @@ impl ToolCallParser {
             }
         }
         out
+    }
+
+    /// Bytes of `buffer` emittable now as text without risking that a suffix is
+    /// the start of any recognized open tag. Holds back the longest suffix that
+    /// is a proper prefix of `<tool_call>` or (when enabled) `<think>`.
+    fn safe_text_emit_len(&self) -> usize {
+        let tool = safe_emit_len(&self.buffer, TOOL_OPEN);
+        if self.think_enabled {
+            tool.min(safe_emit_len(&self.buffer, THINK_OPEN))
+        } else {
+            tool
+        }
     }
 
     /// Turn one `<tool_call>` body (expected `{"name":…,"arguments":…}`) into
@@ -173,6 +261,21 @@ impl ToolCallParser {
                 },
             ],
         }
+    }
+}
+
+/// Pick the earlier of two optional tag matches, returning its position and the
+/// tag literal. `None` positions lose to `Some`; equal positions can't happen
+/// (the tags differ), but tool wins the tie defensively.
+fn earliest(
+    tool_at: Option<usize>,
+    think_at: Option<usize>,
+) -> Option<(usize, &'static str)> {
+    match (tool_at, think_at) {
+        (Some(t), Some(k)) if k < t => Some((k, THINK_OPEN)),
+        (Some(t), _) => Some((t, TOOL_OPEN)),
+        (None, Some(k)) => Some((k, THINK_OPEN)),
+        (None, None) => None,
     }
 }
 

@@ -4,6 +4,8 @@
 //! metadata (`X-Linked-Etag`).  URLs are revision-pinned so a mutable `main`
 //! branch cannot silently replace a model after release.
 
+use gen_ui_types::inference::ReasoningFormat;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ArtifactSpec {
     pub repository: &'static str,
@@ -156,6 +158,9 @@ pub struct MlxArtifactSet {
     /// above the artifact bytes, unlike llama.cpp's mmap profile. Estimated
     /// until tuned against on-device jetsam evidence.
     pub estimated_peak_bytes: u64,
+    /// How this model marks reasoning tokens, so the engine splits `<think>`
+    /// blocks into `ThinkingDelta` instead of leaking them into content.
+    pub reasoning_format: ReasoningFormat,
 }
 
 macro_rules! mlx_file {
@@ -256,6 +261,7 @@ pub const IOS_QWEN35_4B_MLX: MlxArtifactSet = MlxArtifactSet {
     ],
     total_bytes: 2_278_969_756,
     estimated_peak_bytes: 3_400_000_000,
+    reasoning_format: ReasoningFormat::Qwen3Think,
 };
 
 /// Qwen3-8B 4-bit MLX — the 12 GB-device opt-in tier. Architecture `qwen3`
@@ -334,6 +340,7 @@ pub const IOS_QWEN35_9B_MLX: MlxArtifactSet = MlxArtifactSet {
     ],
     total_bytes: 4_623_782_544,
     estimated_peak_bytes: 6_200_000_000,
+    reasoning_format: ReasoningFormat::Qwen3Think,
 };
 
 pub const IOS_QWEN35_4B_MLX_ID: &str = IOS_QWEN35_4B_MLX.model_id;

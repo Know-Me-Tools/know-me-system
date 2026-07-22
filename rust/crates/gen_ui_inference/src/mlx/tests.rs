@@ -192,6 +192,28 @@ fn parse_all(deltas: &[&str]) -> Vec<StreamEvent> {
     out
 }
 
+/// Parse with Qwen3 `<think>` reasoning splitting enabled.
+fn parse_all_reasoning(deltas: &[&str]) -> Vec<StreamEvent> {
+    use gen_ui_types::inference::ReasoningFormat;
+    let mut parser = ToolCallParser::with_reasoning(ReasoningFormat::Qwen3Think);
+    let mut out = Vec::new();
+    for delta in deltas {
+        out.extend(parser.push(delta));
+    }
+    out.extend(parser.finish());
+    out
+}
+
+fn thinking_of(events: &[StreamEvent]) -> String {
+    events
+        .iter()
+        .filter_map(|event| match event {
+            StreamEvent::ThinkingDelta { delta, .. } => Some(delta.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
 fn text_of(events: &[StreamEvent]) -> String {
     events
         .iter()
@@ -275,4 +297,69 @@ fn parser_text_after_tool_call_is_preserved() {
     assert!(events
         .iter()
         .any(|e| matches!(e, StreamEvent::ToolCallStarted { .. })));
+}
+
+// -------- reasoning (`<think>`) splitting --------
+
+#[test]
+fn think_block_becomes_thinking_deltas_not_text() {
+    let events =
+        parse_all_reasoning(&["<think>the user wants a greeting</think>Hello there!"]);
+    assert_eq!(thinking_of(&events), "the user wants a greeting");
+    assert_eq!(text_of(&events), "Hello there!");
+    // Reasoning must never leak into content.
+    assert!(!text_of(&events).contains("the user wants"));
+}
+
+#[test]
+fn think_disabled_passes_tags_through_as_text() {
+    // ReasoningFormat::None: a literal <think> is ordinary content.
+    let events = parse_all(&["<think>kept</think> body"]);
+    assert!(thinking_of(&events).is_empty());
+    assert_eq!(text_of(&events), "<think>kept</think> body");
+}
+
+#[test]
+fn think_open_and_close_split_across_deltas() {
+    let events = parse_all_reasoning(&[
+        "prefix <thi",
+        "nk>reason",
+        "ing text</thi",
+        "nk>answer",
+    ]);
+    assert_eq!(thinking_of(&events), "reasoning text");
+    assert_eq!(text_of(&events), "prefix answer");
+    // The split "<thi"/"nk>" must not leak as text.
+    assert!(!text_of(&events).contains("think"));
+}
+
+#[test]
+fn think_then_tool_call_interleave() {
+    let events = parse_all_reasoning(&[
+        "<think>need the weather tool</think>",
+        "<tool_call>{\"name\":\"weather\",\"arguments\":{\"city\":\"SF\"}}</tool_call>",
+        "Here you go.",
+    ]);
+    assert_eq!(thinking_of(&events), "need the weather tool");
+    assert_eq!(text_of(&events), "Here you go.");
+    assert!(events.iter().any(|e| matches!(
+        e,
+        StreamEvent::ToolCallStarted { name, .. } if name == "weather"
+    )));
+}
+
+#[test]
+fn think_no_markup_is_plain_passthrough() {
+    // Reasoning enabled, but the model emits no <think> — content is untouched.
+    let events = parse_all_reasoning(&["just a normal answer with no reasoning"]);
+    assert!(thinking_of(&events).is_empty());
+    assert_eq!(text_of(&events), "just a normal answer with no reasoning");
+}
+
+#[test]
+fn think_unterminated_flushes_as_thinking_on_finish() {
+    // Stream ends mid-<think>; the remainder must surface as reasoning, not vanish.
+    let events = parse_all_reasoning(&["<think>partial reasoning that never closes"]);
+    assert_eq!(thinking_of(&events), "partial reasoning that never closes");
+    assert!(text_of(&events).is_empty());
 }

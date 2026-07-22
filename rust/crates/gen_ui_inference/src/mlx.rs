@@ -17,7 +17,7 @@ use gen_ui_types::error::{CoreError, CoreResult};
 use gen_ui_types::events::StreamEvent;
 use gen_ui_types::inference::{
     InferenceMessage, InferenceProvider, InferenceRequest, InferenceRole, InferenceToolResult,
-    LocalModelSpec,
+    LocalModelSpec, ReasoningFormat,
 };
 use gen_ui_types::lifecycle::{
     ModelOperationState, RunError, RunPhase, RuntimeDiagnostics, RuntimeGateReport,
@@ -130,6 +130,18 @@ impl MlxEngine {
     /// The model directory that holds every verified file for this spec.
     fn model_dir(&self, set: &MlxArtifactSet) -> PathBuf {
         self.cache_dir.join(set.model_id)
+    }
+
+    /// Reasoning markup of the currently loaded model, so the segmenter splits
+    /// `<think>` blocks. Falls back to `None` when nothing is loaded (the
+    /// generation would fail before producing tokens anyway).
+    async fn loaded_reasoning_format(&self) -> ReasoningFormat {
+        let guard = self.loaded.read().await;
+        guard
+            .as_ref()
+            .and_then(|loaded| mlx_artifact_set_for_id(&loaded.spec.model))
+            .map(|set| set.reasoning_format)
+            .unwrap_or(ReasoningFormat::None)
     }
 }
 
@@ -353,7 +365,8 @@ impl InferenceProvider for MlxEngine {
         let request_json = build_request_json(&messages, request)?;
         let bridge = Arc::clone(&self.bridge);
         let self_test = Arc::clone(&self.backend_self_test_passed);
-        Ok(self.stream_generation(bridge, request_json, self_test))
+        let reasoning = self.loaded_reasoning_format().await;
+        Ok(self.stream_generation(bridge, request_json, self_test, reasoning))
     }
 
     async fn continue_with_tool_results(
@@ -378,7 +391,8 @@ impl InferenceProvider for MlxEngine {
         let request_json = build_continuation_json(&messages)?;
         let bridge = Arc::clone(&self.bridge);
         let self_test = Arc::clone(&self.backend_self_test_passed);
-        Ok(self.stream_generation(bridge, request_json, self_test))
+        let reasoning = self.loaded_reasoning_format().await;
+        Ok(self.stream_generation(bridge, request_json, self_test, reasoning))
     }
 
     async fn unload(&self) -> CoreResult<()> {
@@ -496,17 +510,20 @@ impl MlxEngine {
     }
 
     /// Drive one bridge generation on a blocking thread, translating bridge
-    /// events into canonical `StreamEvent`s through the tool-call parser.
+    /// events into canonical `StreamEvent`s through the segmenter. `reasoning`
+    /// is the loaded model's reasoning markup, so `<think>` blocks split into
+    /// `ThinkingDelta` for models that emit them.
     fn stream_generation(
         &self,
         bridge: Arc<dyn MlxBridge>,
         request_json: String,
         self_test: Arc<AtomicBool>,
+        reasoning: ReasoningFormat,
     ) -> futures::stream::BoxStream<'static, StreamEvent> {
         let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
         gen_ui_runtime::spawn_blocking(move || {
             let _ = sender.send(StreamEvent::MessageStart);
-            let mut parser = ToolCallParser::new();
+            let mut parser = ToolCallParser::with_reasoning(reasoning);
             let mut produced_output = false;
             let generate_result = bridge.generate(&request_json, &mut |event| match event {
                 MlxBridgeEvent::Delta { text } => {
