@@ -161,7 +161,13 @@ final class KnowMeMlxBridge {
 
     /// Run an async body to completion on the current thread. The Rust host
     /// already calls us from a blocking worker, so blocking here is intended.
-    private func runBlocking<T>(_ body: @escaping () async throws -> T) rethrows -> T {
+    ///
+    /// Declared `throws` (not `rethrows`): the body's error is captured into a
+    /// `Result` across the Task/semaphore boundary, so Swift can't prove the
+    /// re-thrown error originates from the parameter closure. Both call sites
+    /// already handle the throw (load propagates to the C onError trampoline;
+    /// generate catches it into an `error` event).
+    private func runBlocking<T>(_ body: @escaping () async throws -> T) throws -> T {
         let semaphore = DispatchSemaphore(value: 0)
         var result: Result<T, Error>!
         Task {
