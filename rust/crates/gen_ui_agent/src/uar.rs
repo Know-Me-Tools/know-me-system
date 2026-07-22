@@ -149,35 +149,36 @@ pub fn android_litert_lm_provider_config(model_id: impl Into<String>) -> UarProv
     }
 }
 
-/// Stable UAR provider identity for iOS's in-process llama.cpp/Metal lane.
-///
-/// Metal offload, CPU fallback, and MTMD projector loading are runtime details
-/// beneath this route. Agent policies therefore keep referring to the same
-/// provider and model when the backend changes or vision is initialized lazily.
-pub const IOS_LLAMA_METAL_PROVIDER_ID: &str = "knowme-local-llama-metal";
 pub const IOS_QWEN35_TRUSTED_CONTEXT_TOKENS: u32 = 8_192;
 pub const IOS_QWEN35_MAX_OUTPUT_TOKENS: u32 = 1_024;
 
-/// Build the credential-free UAR registration for iOS's pinned Qwen3.5 model.
+/// Stable UAR provider identity for iOS's in-process MLX-Swift lane.
 ///
-/// The platform leaf supplies the immutable catalog id. The model's paired
-/// projector is loaded by the local inference adapter only when an image is
-/// present, while UAR owns agent orchestration, tool policy, and run events.
+/// The provider id names the execution boundary, not the model file or
+/// accelerator. It stays stable across model swaps so persisted agent policies
+/// survive an artifact change.
+pub const IOS_MLX_PROVIDER_ID: &str = "knowme-local-mlx";
+
+/// Build the credential-free UAR registration for iOS's MLX-Swift model.
+///
+/// Text-only today: MLXVLM's Swift registry has no Qwen3.5 vision processor
+/// yet, so images route through document/OCR extraction rather than image
+/// tensors. UAR owns agent orchestration, tool policy, and run events.
 #[must_use]
-pub fn ios_qwen35_metal_provider_config(model_id: impl Into<String>) -> UarProviderConfig {
+pub fn ios_qwen35_mlx_provider_config(model_id: impl Into<String>) -> UarProviderConfig {
     let model_id = model_id.into();
     UarProviderConfig {
-        id: IOS_LLAMA_METAL_PROVIDER_ID.to_string(),
-        display_name: "KnowMe on-device · llama.cpp Metal".to_string(),
+        id: IOS_MLX_PROVIDER_ID.to_string(),
+        display_name: "KnowMe on-device · MLX".to_string(),
         base_url: String::new(),
         api_key: None,
         protocol: ProtocolSetting::Auto,
         default_model: Some(model_id.clone()),
         models: vec![ModelConfig {
             id: model_id,
-            display_name: Some("Qwen3.5 9B Vision · on-device".to_string()),
+            display_name: Some("Qwen3.5 4B · on-device (MLX)".to_string()),
             context_window: Some(IOS_QWEN35_TRUSTED_CONTEXT_TOKENS),
-            supports_vision: true,
+            supports_vision: false,
             supports_tools: true,
             supports_reasoning: true,
             supports_structured_output: true,
@@ -1448,11 +1449,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn ios_qwen35_metal_is_a_credential_free_multimodal_uar_default() {
-        const PINNED_MODEL_ID: &str = "qwen3.5-9b-q4-k-m";
-        let provider = ios_qwen35_metal_provider_config(PINNED_MODEL_ID);
+    async fn ios_qwen35_mlx_is_a_credential_free_text_uar_default() {
+        const PINNED_MODEL_ID: &str = "qwen3.5-4b-mlx-4bit";
+        let provider = ios_qwen35_mlx_provider_config(PINNED_MODEL_ID);
 
-        assert_eq!(provider.id, IOS_LLAMA_METAL_PROVIDER_ID);
+        assert_eq!(provider.id, IOS_MLX_PROVIDER_ID);
         assert!(provider.enabled);
         assert!(provider.api_key.is_none());
         assert!(provider.base_url.is_empty());
@@ -1466,7 +1467,8 @@ mod tests {
             Some(IOS_QWEN35_TRUSTED_CONTEXT_TOKENS)
         );
         assert_eq!(model.max_output_tokens, Some(IOS_QWEN35_MAX_OUTPUT_TOKENS));
-        assert!(model.supports_vision);
+        // Text-only today (no Qwen3.5 vision processor in MLXVLM's Swift registry).
+        assert!(!model.supports_vision);
         assert!(model.supports_tools);
         assert!(model.supports_reasoning);
         assert!(model.supports_structured_output);
@@ -1479,42 +1481,42 @@ mod tests {
             .await
             .expect("iOS local provider registers");
         registry
-            .set_default(IOS_LLAMA_METAL_PROVIDER_ID)
+            .set_default(IOS_MLX_PROVIDER_ID)
             .await
             .expect("iOS local provider becomes default");
 
         assert_eq!(
             registry.default_model().await,
             Some((
-                IOS_LLAMA_METAL_PROVIDER_ID.to_string(),
+                IOS_MLX_PROVIDER_ID.to_string(),
                 PINNED_MODEL_ID.to_string()
             ))
         );
         let resolved = registry
-            .resolve_to_llm_config(IOS_LLAMA_METAL_PROVIDER_ID, "")
+            .resolve_to_llm_config(IOS_MLX_PROVIDER_ID, "")
             .await
             .expect("default local route resolves without credentials");
         assert_eq!(
             resolved.model,
-            format!("{IOS_LLAMA_METAL_PROVIDER_ID}/{PINNED_MODEL_ID}")
+            format!("{IOS_MLX_PROVIDER_ID}/{PINNED_MODEL_ID}")
         );
         assert!(resolved.api_key.is_none());
         assert!(resolved.base_url.is_none());
 
         let routed = universal_agent_runtime::llm::router::ModelRouter::new(Arc::clone(&registry))
             .route(&universal_agent_runtime::llm::router::RouteRequirements {
-                needs_vision: true,
+                needs_vision: false,
                 needs_tools: true,
                 needs_reasoning: true,
                 needs_structured_output: true,
                 min_context: Some(IOS_QWEN35_TRUSTED_CONTEXT_TOKENS.into()),
-                preferred_provider: Some(IOS_LLAMA_METAL_PROVIDER_ID.to_string()),
+                preferred_provider: Some(IOS_MLX_PROVIDER_ID.to_string()),
                 ..Default::default()
             })
             .await;
         assert_eq!(
             routed.as_deref(),
-            Some("knowme-local-llama-metal/qwen3.5-9b-q4-k-m")
+            Some("knowme-local-mlx/qwen3.5-4b-mlx-4bit")
         );
     }
 

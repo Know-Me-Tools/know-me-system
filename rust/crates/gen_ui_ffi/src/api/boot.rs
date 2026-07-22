@@ -200,7 +200,7 @@ pub async fn run_migrations(data_dir: String) -> Result<(), CoreError> {
     // or model-selection logic. Existing user-selected preferences are kept;
     // only superseded bundled Android Qwen defaults are migrated.
     let default_model = gen_ui_inference::catalog::current_mobile_platform()
-        .map(|platform| platform.default_model().model_id)
+        .map(|platform| platform.default_model_id())
         .unwrap_or(gen_ui_inference::catalog::ANDROID_GEMMA4_E2B_LITERTLM_ID)
         .to_string();
     #[cfg(target_os = "android")]
@@ -221,24 +221,22 @@ pub async fn run_migrations(data_dir: String) -> Result<(), CoreError> {
     }
     #[cfg(target_os = "ios")]
     {
-        let provider = crate::local_provider::ios_qwen35_metal_uar_provider_config();
+        let provider = crate::local_provider::ios_qwen35_mlx_uar_provider_config();
         if provider.default_model.as_deref() != Some(default_model.as_str()) {
             return Err(boot_fail(
                 "embedded UAR local provider registration",
                 "iOS UAR default model does not match the pinned inference artifact",
             ));
         }
-        if !provider.models[0].supports_vision {
-            return Err(boot_fail(
-                "embedded UAR local provider registration",
-                "iOS Qwen registration is missing its vision capability",
-            ));
-        }
+        // The iOS default is text-only today: MLXVLM's Swift registry has no
+        // Qwen3.5 vision processor yet, so images route through the Xberg
+        // extraction path (like the Android text-only lane). Vision returns as
+        // a catalog swap when the processor lands upstream — no assert here.
         tracing::info!(
             provider_id = %provider.id,
             model_id = %default_model,
             context_tokens = provider.models[0].context_window,
-            "iOS Qwen3.5 Metal provider metadata ready for embedded UAR"
+            "iOS Qwen3.5 MLX provider metadata ready for embedded UAR"
         );
     }
     let existing_pref = store
@@ -248,7 +246,10 @@ pub async fn run_migrations(data_dir: String) -> Result<(), CoreError> {
     let migrate_legacy = existing_pref.as_ref().is_none_or(|pref| {
         matches!(
             pref.model_id.as_str(),
-            "qwen2.5-0.5b-instruct-q4" | "qwen3.5-4b-q4-k-m" | "qwen3-4b-instruct-2507-q5-k-m"
+            "qwen2.5-0.5b-instruct-q4"
+                | "qwen3.5-4b-q4-k-m"
+                | "qwen3-4b-instruct-2507-q5-k-m"
+                | "qwen3.5-9b-q4-k-m"
         )
     });
     if migrate_legacy {
@@ -277,7 +278,14 @@ pub async fn run_migrations(data_dir: String) -> Result<(), CoreError> {
         Arc::new(gen_ui_inference::LiteRtLmEngine::new(
             std::path::PathBuf::from(&data_dir).join("model-cache/litert-lm"),
         ));
-    #[cfg(not(target_os = "android"))]
+    // iOS runs MLX-Swift (Metal) via the registered Swift bridge — llama.cpp is
+    // no longer built for Apple platforms.
+    #[cfg(target_os = "ios")]
+    let inference: Arc<dyn gen_ui_types::inference::InferenceProvider> =
+        Arc::new(gen_ui_inference::MlxEngine::new(
+            std::path::PathBuf::from(&data_dir).join("model-cache/mlx"),
+        ));
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     let inference: Arc<dyn gen_ui_types::inference::InferenceProvider> =
         Arc::new(gen_ui_inference::LlamaCppEngine::new(
             std::path::PathBuf::from(&data_dir).join("model-cache/llama"),
@@ -304,7 +312,7 @@ pub async fn run_migrations(data_dir: String) -> Result<(), CoreError> {
                 model: default_model.clone(),
                 context_len: Some(8_192),
             },
-            crate::local_provider::ios_qwen35_metal_uar_provider_config(),
+            crate::local_provider::ios_qwen35_mlx_uar_provider_config(),
         )
         .await
         .map_err(|error| boot_fail("embedded UAR initialization", error))?,
