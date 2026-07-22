@@ -18,6 +18,11 @@ local-llama-metal = ["local-llama", "llama-cpp-2/metal"]
 local-llama-opencl = ["local-llama", "llama-cpp-2/opencl"]
 local-llama-mtmd = ["local-llama", "llama-cpp-2/mtmd", "llama-cpp-2/common"]
 local-litert-lm = ["dep:reqwest", "dep:sha2", "dep:encoding_rs"]
+# iOS MLX-Swift lane. Rust owns catalog/download/verify/preflight; a Swift
+# bridge (registered at app launch) binds MLX generation. No Rust ML crate —
+# inference lives entirely on the Swift side — so this is host-compilable and
+# unit-tested with a mock bridge.
+local-mlx = ["dep:reqwest", "dep:sha2"]
 
 [dependencies]
 gen_ui_types   = { path = "../gen_ui_types" }
