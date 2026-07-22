@@ -58,7 +58,13 @@ const SETTING_UAR_DEPLOYMENT_MODE: &str = "uar_deployment_mode";
 const DEFAULT_LOCAL_MODEL: &str = "qwen3.5-4b-mlx-4bit";
 #[cfg(target_os = "android")]
 const DEFAULT_LOCAL_MODEL: &str = "gemma-4-e2b-it-litertlm";
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
+// macOS desktop runs the MLX (mlex) engine, so its default must be an MLX
+// catalog id (the same Qwen3-4B MLX set iOS uses) — a GGUF id would not resolve
+// against `mlx_artifact_set_for_id` and would fail to prepare local inference.
+#[cfg(target_os = "macos")]
+const DEFAULT_LOCAL_MODEL: &str = "qwen3.5-4b-mlx-4bit";
+// Windows/Linux desktop runs llama.cpp, so its default is the pinned GGUF model.
+#[cfg(not(any(target_os = "ios", target_os = "android", target_os = "macos")))]
 const DEFAULT_LOCAL_MODEL: &str = "qwen3-4b-instruct-2507-q5-k-m";
 
 /// Sampling defaults for the local lane, used when a model_pref's `params`
