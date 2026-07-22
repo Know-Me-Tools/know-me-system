@@ -34,6 +34,9 @@ pub enum LocalRuntimeKind {
     LiteRtLm,
     Mistral,
     WebLlm,
+    /// MLX-Swift on iOS: Metal unified-memory inference behind the same
+    /// `InferenceProvider` seam; the Swift side binds generation only.
+    Mlx,
 }
 
 /// Sampling parameters shared by every engine lane.
