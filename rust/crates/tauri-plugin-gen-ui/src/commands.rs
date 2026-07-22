@@ -391,9 +391,16 @@ pub async fn run_migrations<R: Runtime>(app: tauri::AppHandle<R>) -> Result<()> 
     std::fs::create_dir_all(&data_dir).map_err(|e| {
         tauri::Error::from(std::io::Error::new(e.kind(), format!("app data dir: {e}")))
     })?;
-    // Desktop's zero-configuration local-inference lane. It shares the same
-    // revision-pinned, checksum-gated Qwen GGUF engine as mobile; the first local
-    // turn downloads into app data, and later turns reuse that durable cache.
+    // Desktop's zero-configuration local-inference lane, selected per platform
+    // (the engine matrix): macOS runs MLX in-process via the mlex (mlx-c) crate
+    // to match iOS; Windows/Linux run llama.cpp. Both share the revision-pinned,
+    // checksum-gated catalog and the InferenceProvider seam, so the first local
+    // turn downloads into app data and later turns reuse that durable cache.
+    #[cfg(target_os = "macos")]
+    let inference: Arc<dyn gen_ui_types::inference::InferenceProvider> = Arc::new(
+        gen_ui_inference::MlxcEngine::new(data_dir.join("model-cache/mlx")),
+    );
+    #[cfg(not(target_os = "macos"))]
     let inference: Arc<dyn gen_ui_types::inference::InferenceProvider> = Arc::new(
         gen_ui_inference::LlamaCppEngine::new(data_dir.join("model-cache")),
     );
