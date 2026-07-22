@@ -83,7 +83,12 @@ final class KnowMeMlxBridge {
     // MARK: generate
 
     /// Run one generation, invoking `emit` per streamed event.
-    func generate(requestJSON: String, emit: (String) -> Void) {
+    ///
+    /// `emit` is `@escaping` because it is captured by the `@escaping` async
+    /// body handed to `runBlocking`. It does not actually outlive this call —
+    /// `runBlocking` blocks on a semaphore until the MLX Task finishes — but the
+    /// compiler can't see through the semaphore, so the annotation is required.
+    func generate(requestJSON: String, emit: @escaping (String) -> Void) {
         cancelled = false
         guard let container = queue.sync(execute: { self.container }) else {
             emit(BridgeEvent.error("MLX model is not loaded").json)
@@ -98,13 +103,15 @@ final class KnowMeMlxBridge {
             return
         }
 
-        let messages: [[String: String]] = request.messages.map {
+        // MLXLMCommon.Message is [String: Any]; build that shape directly so the
+        // UserInput(messages:) call type-checks without an implicit cast.
+        let messages: [[String: Any]] = request.messages.map {
             ["role": $0.role, "content": $0.content]
         }
         let params = GenerateParameters(
+            maxTokens: Int(request.generationSettings?.max_tokens ?? 1024),
             temperature: request.generationSettings?.temperature ?? 0.7,
             topP: request.generationSettings?.top_p ?? 0.9)
-        let maxTokens = Int(request.generationSettings?.max_tokens ?? 1024)
 
         do {
             try runBlocking {
