@@ -11,8 +11,12 @@
 # rustflags = ["-C", "link-arg=-fuse-ld=/opt/homebrew/opt/llvm/bin/ld64.lld"]
 
 [env]
-# Native inference/audio dependencies use std::filesystem (macOS 10.15+).
-MACOSX_DEPLOYMENT_TARGET = { value = "10.15", force = true }
+# MLX (mlx-c, via the `mlex` crate) hard-requires macOS 14.0 at CMake configure;
+# the older audio/inference std::filesystem floor (10.15) is a strict subset, so
+# pinning 14.0 satisfies MLX without regressing anything else. Apple-native
+# STT/TTS and MLX replace whisper.cpp/llama.cpp on macOS (mirroring iOS), so no
+# dependency needs the old floor. Project policy explicitly allows raising minimums.
+MACOSX_DEPLOYMENT_TARGET = { value = "14.0", force = true }
 
 [target.x86_64-unknown-linux-gnu]
 # mold is the fastest production linker on Linux (install: apt/brew install mold)

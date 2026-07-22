@@ -1,7 +1,9 @@
 # TJ-ARCH-MOB-001 compliant
 
 [env]
-# whisper.cpp uses std::filesystem, which is unavailable before macOS 10.15.
-# Cargo owns native dependency compilation, so this must live here rather than
+# MLX (mlx-c, via `mlex`) requires macOS 14.0 at CMake configure; the older
+# whisper.cpp std::filesystem floor (10.15) is a strict subset, so 14.0 satisfies
+# both. Apple-native STT/TTS and MLX replace whisper/llama on macOS (mirroring
+# iOS). Cargo owns native dependency compilation, so this lives here rather than
 # solely in tauri.conf.json's bundle metadata.
-MACOSX_DEPLOYMENT_TARGET = { value = "10.15", force = true }
+MACOSX_DEPLOYMENT_TARGET = { value = "14.0", force = true }
