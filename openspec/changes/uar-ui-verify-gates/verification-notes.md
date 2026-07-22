@@ -1,11 +1,17 @@
 # Verification notes — uar-ui-verify-gates
 
-Recorded 2026-07-21 (kimi). Branch `uar-ui-verify-gates` in the UAR submodule,
-based on `origin/main` (dc158a8) + the a2ui-retoken work (PR #173 open).
+Recorded 2026-07-21 (kimi). **Final state: all five convergence PRs merged to
+`main` (644a80f)** — #172 shell-navigation (1d8b3ba), #173 a2ui-retoken (9539a0a),
+#174 verify-gates (c7239b7), #175 chain completion (644a80f). Post-merge main:
+`tsc -b` clean, `vite build` green, vitest **153/153**. The screenshot matrix
+under `screenshots/` was recaptured against the merged rail/bottom-bar shell.
+
 Environment: pre-existing backend on `:1906` serving the freshly built static
 bundle from this tree; Vite dev `:8080` (Playwright-managed); `stub-llm` via the
-dedicated real-server config. Note: shell-nav (#172) was unmerged at capture
-time — the matrix shows the rebranded top-nav shell; re-run cheaply after merge.
+dedicated real-server config. (Earlier captures in this file's history showed
+the rebranded top-nav era while #172 was unmerged; the committed matrix is the
+final merged shell — rail at 1440, bottom bar at 320, ThemeToggle in the rail
+header, readiness card "Ready · Embedded · local".)
 
 ## Headline results
 
