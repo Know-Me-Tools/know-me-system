@@ -1,0 +1,196 @@
+// File: worlds.wit
+// The fully-detailed worlds (design D7): `hook`, `contributor`, `app-shell`.
+// All worlds export the shared optional `lifecycle` interface and import
+// only interfaces from the shared host set. Capability subsets are wired
+// at instantiation (librefang model): a guest importing a capability its
+// manifest does not declare fails at instantiation with a
+// missing-capability error, not at first use.
+
+/// Shared lifecycle exports, from knowme:plugin@0.1.0 `plugin.init` /
+/// `plugin.shutdown`.
+interface lifecycle {
+    /// Called once after instantiation, before any events are delivered.
+    /// Returning an error aborts installation activation.
+    init: func() -> result<_, string>;
+
+    /// Called before the component is dropped. Best-effort cleanup.
+    shutdown: func();
+}
+
+/// Typed pipeline contribution items crossing the contributor boundary
+/// (design D5: pipeline stages and contribution items are WIT
+/// enums/records, not JSON strings).
+interface contribution-types {
+    /// The ten KnowMe pipeline stages, in pipeline order.
+    enum pipeline-stage {
+        ingress,
+        intent-classify,
+        route,
+        context-assemble,
+        prompt-build,
+        inference,
+        tool-gate,
+        tool-execute,
+        post-process,
+        egress,
+    }
+
+    record context-snippet {
+        source: string,
+        text: string,
+        score: option<f32>,
+    }
+
+    record prompt-section {
+        role: string,
+        content: string,
+    }
+
+    record tool-call-request {
+        id: string,
+        name: string,
+        /// Tool input as JSON (spec-defined document, design D5).
+        input-json: string,
+    }
+
+    record tool-result-item {
+        tool-call-id: string,
+        output-json: string,
+        is-error: bool,
+    }
+
+    record citation-item {
+        source: string,
+        quote: string,
+    }
+
+    record memory-op-item {
+        operation: string,
+        key: string,
+        value: option<string>,
+    }
+
+    record custom-item {
+        source: string,
+        name: string,
+        payload-json: string,
+    }
+
+    /// A typed contribution item. Mirrors the pipeline-relevant subset of
+    /// `gen_ui_types::events::StreamEvent`.
+    variant contribution-item {
+        text(string),
+        context-snippet(context-snippet),
+        prompt-section(prompt-section),
+        tool-call-request(tool-call-request),
+        tool-result(tool-result-item),
+        citation(citation-item),
+        memory-op(memory-op-item),
+        custom(custom-item),
+    }
+
+    /// Input to `contribute`: the stage being run and the items assembled
+    /// so far.
+    record contribution-input {
+        run-id: string,
+        stage: pipeline-stage,
+        items: list<contribution-item>,
+    }
+
+    /// The contributor's output: items to merge into the pipeline.
+    record contribution {
+        items: list<contribution-item>,
+    }
+}
+
+/// Event-driven hook plugin. Absorbs the knowme:plugin@0.1.0 world
+/// `knowme-plugin` (init / handle-event / shutdown) with a typed AG-UI
+/// event envelope in place of `payload-json`.
+world hook {
+    // host-types is imported explicitly even though the other interfaces
+    // only `use` it, so bindgen `with:` mappings resolve (librefang
+    // world.wit documents the same constraint).
+    import host-types;
+    import host-log;
+    import host-kv;
+    import host-settings;
+    import host-net;
+    import host-uar;
+    import host-events;
+    import host-infer;
+    import host-memory;
+    import fs;
+    import env;
+    import time;
+
+    use host-events.{ag-ui-event};
+
+    export lifecycle;
+
+    /// Handle one event. Bounded by the host: 64 MiB linear memory, 30 s
+    /// per invocation via epoch interruption.
+    export handle-event: func(topic: string, event: ag-ui-event) -> result<_, string>;
+}
+
+/// Pipeline contributor plugin: invoked at a specific pipeline stage to
+/// merge typed items into the run.
+world contributor {
+    import host-types;
+    import host-log;
+    import host-kv;
+    import host-settings;
+    import host-net;
+    import host-uar;
+    import host-events;
+    import host-infer;
+    import host-memory;
+    import fs;
+    import env;
+    import time;
+
+    use contribution-types.{contribution-input, contribution};
+
+    export lifecycle;
+
+    /// Contribute items at one pipeline stage.
+    export contribute: func(input: contribution-input) -> result<contribution, string>;
+}
+
+/// App-shell plugin: owns one or more A2UI surfaces. The only world that
+/// imports `host-a2ui`.
+world app-shell {
+    import host-types;
+    import host-log;
+    import host-kv;
+    import host-settings;
+    import host-net;
+    import host-uar;
+    import host-events;
+    import host-infer;
+    import host-memory;
+    import host-a2ui;
+    import fs;
+    import env;
+    import time;
+
+    use host-a2ui.{a2ui-action};
+
+    export lifecycle;
+
+    /// Called once when the shell is first foregrounded. The plugin
+    /// creates its initial surfaces via `host-a2ui.push-surface`.
+    export init-shell: func() -> result<_, string>;
+
+    /// A user action raised on one of the plugin's A2UI surfaces.
+    export on-action: func(action: a2ui-action) -> result<_, string>;
+
+    /// A navigation request routed to this shell (route strings are
+    /// app-defined).
+    export on-navigate: func(route: string) -> result<_, string>;
+
+    /// The host resumed the shell from background.
+    export on-resume: func();
+
+    /// The host is suspending the shell; persist state via `host-kv`.
+    export on-suspend: func();
+}

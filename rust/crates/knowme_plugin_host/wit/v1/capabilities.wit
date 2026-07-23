@@ -1,0 +1,149 @@
+// File: capabilities.wit
+// Granular capability interfaces (design D2/D3). The host wires any subset
+// at instantiation; a guest importing a capability its manifest does not
+// declare fails at instantiation with a missing-capability error, not at
+// first use.
+
+/// Sandboxed filesystem access. Ported semantically from
+/// librefang:plugin@0.1.0 `fs` (design D2).
+interface fs {
+    use host-types.{host-error};
+
+    /// Read the entire contents of `path` as bytes. Subject to
+    /// path-traversal + capability checks (`path-denied` on escape).
+    read: func(path: string) -> result<list<u8>, host-error>;
+
+    /// Write `body` to `path`, replacing existing contents. Parent
+    /// directories are NOT created.
+    write: func(path: string, body: list<u8>) -> result<_, host-error>;
+
+    /// List the immediate children of `path`. Returns filenames only,
+    /// not full paths. Named `list-entries` rather than `list`
+    /// because `list` is a reserved keyword in WIT — collides with
+    /// the built-in list type constructor (`list<u8>` etc.) at parse
+    /// time.
+    list-entries: func(path: string) -> result<list<string>, host-error>;
+}
+
+/// Read environment variables granted to the plugin. Ported semantically
+/// from librefang:plugin@0.1.0 `env` (design D2).
+interface env {
+    use host-types.{host-error};
+
+    /// Read an env var the plugin has been granted access to. Returns
+    /// `none` if not set; returns `capability-denied` if the var is
+    /// outside the allowlist.
+    read: func(name: string) -> result<option<string>, host-error>;
+}
+
+/// Wall clock. Ported semantically from librefang:plugin@0.1.0 `time`.
+interface time {
+    /// Wall-clock now in SECONDS since the Unix epoch. Subject to
+    /// no capability gating — every plugin can read the clock.
+    now: func() -> u64;
+}
+
+/// SSRF-guarded HTTP. librefang:plugin@0.1.0 `net` renamed to `host-net`
+/// per design D2/D3: this is the general network capability, distinct from
+/// the Cedar-gated `host-uar` route.
+interface host-net {
+    use host-types.{host-error};
+
+    /// Plain HTTP request. Bodies are bytes; structured types (JSON etc.)
+    /// are the plugin's responsibility.
+    record http-request {
+        method: string,
+        url: string,
+        headers: list<tuple<string, string>>,
+        body: option<list<u8>>,
+    }
+
+    record http-response {
+        status: u16,
+        headers: list<tuple<string, string>>,
+        body: list<u8>,
+    }
+
+    /// Plain HTTP request. SSRF guard contract: the host resolves the URL
+    /// and refuses any target that is loopback, link-local, RFC1918
+    /// private, or a cloud metadata address (169.254.169.254 and
+    /// equivalents), returning `host-error.ssrf-denied`. Requires a
+    /// declared `net:<domain>` manifest permission; requests to undeclared
+    /// domains fail with `host-error.capability-denied`.
+    fetch: func(req: http-request) -> result<http-response, host-error>;
+}
+
+/// Cedar-gated UAR skill invocation (design D3). This was the 0.1.0
+/// contract's sole network path (`uar-invoke`) and is retained alongside
+/// `host-net` because the two routes have different policy enforcement
+/// points (Cedar policy engine + manifest skill allow-list vs. domain
+/// allow-list) and different audit semantics; collapsing them would blur
+/// the audit trail the security model depends on.
+interface host-uar {
+    use host-types.{host-error};
+
+    /// Invoke a UAR skill by name with a JSON-encoded payload. Every call
+    /// passes through Cedar policy and the manifest's declared allow-list;
+    /// a skill outside the allow-list fails with `host-error.policy-denied`.
+    invoke: func(skill: string, payload-json: string) -> result<string, host-error>;
+}
+
+/// Plugin-namespaced key-value storage. Absorbs knowme:plugin@0.1.0 scoped
+/// storage (`storage-get/set/delete`, byte values) and librefang `kv`,
+/// adding the explicit namespace parameter.
+///
+/// Own-namespace rule: a plugin can only access its own namespace. The
+/// `namespace` parameter exists so one component may host several logical
+/// stores and so the host can audit access; naming another plugin's
+/// namespace fails with `host-error.policy-denied`. No function accepts an
+/// arbitrary plugin id to access another plugin's data.
+interface host-kv {
+    use host-types.{host-error};
+
+    /// Retrieve the value associated with `key` in `namespace`. `none` if
+    /// the key is not present.
+    get: func(namespace: string, key: string) -> result<option<list<u8>>, host-error>;
+
+    /// Set the value associated with `key` in `namespace`. Overwrites
+    /// existing values.
+    set: func(namespace: string, key: string, value: list<u8>) -> result<_, host-error>;
+
+    /// Delete `key` from `namespace`. Deleting an absent key succeeds.
+    delete: func(namespace: string, key: string) -> result<_, host-error>;
+}
+
+/// Structured host logging. Ported from knowme:plugin@0.1.0 `host.log`.
+interface host-log {
+    /// Severity for host-side structured logging.
+    enum log-level {
+        debug,
+        info,
+        warn,
+        error,
+    }
+
+    /// Write a line to the host log, tagged with the plugin id.
+    log: func(level: log-level, message: string);
+}
+
+/// Plugin settings. The settings substrate arrives in
+/// `plugin-settings-substrate`; the interface lands now to avoid a 1.1
+/// bump (design D2).
+///
+/// Own-namespace restriction: reads may fetch any key in the calling
+/// plugin's OWN settings namespace, and writes are own-namespace only —
+/// `set-own` is deliberately the only setter and there is no setter that
+/// names another plugin. The settings document itself is a JSON value
+/// validated by the host against the plugin's declared settings schema
+/// (a spec-defined document, per design D5).
+interface host-settings {
+    use host-types.{host-error};
+
+    /// Read a settings key from the calling plugin's own namespace.
+    /// `none` if unset.
+    get: func(key: string) -> result<option<string>, host-error>;
+
+    /// Write a settings key in the calling plugin's own namespace. There
+    /// is intentionally no cross-namespace setter.
+    set-own: func(key: string, value: string) -> result<_, host-error>;
+}

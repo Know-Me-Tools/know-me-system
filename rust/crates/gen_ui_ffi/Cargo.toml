@@ -55,7 +55,9 @@ gen_ui_inference = { path = "../gen_ui_inference", features = ["local-litert-lm"
 jni.workspace = true
 [target.'cfg(target_os = "ios")'.dependencies]
 oslog = "0.2"
-gen_ui_inference = { path = "../gen_ui_inference", features = ["local-llama-metal", "local-llama-mtmd"] }
+# iOS runs MLX-Swift (Metal) via the registered Swift bridge; llama.cpp is no
+# longer built for Apple platforms.
+gen_ui_inference = { path = "../gen_ui_inference", features = ["local-mlx"] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 gen_ui_inference = { path = "../gen_ui_inference", features = ["local-llama"] }

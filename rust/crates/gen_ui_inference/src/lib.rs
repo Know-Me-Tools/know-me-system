@@ -23,8 +23,45 @@ pub use mistral::MistralEngine;
 #[cfg(feature = "local-llama")]
 pub mod llama;
 
-#[cfg(any(feature = "local-llama", feature = "local-litert-lm"))]
+#[cfg(any(
+    feature = "local-llama",
+    feature = "local-litert-lm",
+    feature = "local-mlx",
+    feature = "local-mlxc"
+))]
 pub mod catalog;
+
+/// Device-memory preflight shared across mobile engines (jetsam gate).
+#[cfg(any(feature = "local-llama", feature = "local-mlx", feature = "local-mlxc"))]
+pub(crate) mod memory;
+
+/// Tool-schema prompt injection shared by engines without a native tool API.
+#[cfg(any(feature = "local-llama", feature = "local-mlx"))]
+pub(crate) mod prompt;
+
+/// Multi-file MLX model download/verify, shared by the iOS and macOS MLX lanes.
+#[cfg(any(feature = "local-mlx", feature = "local-mlxc"))]
+pub(crate) mod mlx_download;
+
+/// iOS MLX-Swift lane. The engine is host-testable via a mock bridge; the FFI
+/// vtable that binds the real Swift bridge is iOS-only.
+#[cfg(feature = "local-mlx")]
+pub mod mlx;
+
+#[cfg(feature = "local-mlx")]
+pub use mlx::MlxEngine;
+
+#[cfg(all(feature = "local-mlx", target_os = "ios"))]
+pub mod ios_mlx_ffi;
+
+/// macOS MLX lane: in-process inference via the mlex crate (mlx-c). Compiled
+/// only on macOS builds — the `mlex` dep is target-gated — so the module is
+/// gated on both feature and target.
+#[cfg(all(feature = "local-mlxc", target_os = "macos"))]
+pub mod mlxc;
+
+#[cfg(all(feature = "local-mlxc", target_os = "macos"))]
+pub use mlxc::MlxcEngine;
 
 #[cfg(all(feature = "local-litert-lm", target_os = "android"))]
 pub mod android_litert_jni;

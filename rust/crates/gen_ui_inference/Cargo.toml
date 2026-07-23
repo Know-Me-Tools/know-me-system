@@ -18,6 +18,16 @@ local-llama-metal = ["local-llama", "llama-cpp-2/metal"]
 local-llama-opencl = ["local-llama", "llama-cpp-2/opencl"]
 local-llama-mtmd = ["local-llama", "llama-cpp-2/mtmd", "llama-cpp-2/common"]
 local-litert-lm = ["dep:reqwest", "dep:sha2", "dep:encoding_rs"]
+# iOS MLX-Swift lane. Rust owns catalog/download/verify/preflight; a Swift
+# bridge (registered at app launch) binds MLX generation. No Rust ML crate —
+# inference lives entirely on the Swift side — so this is host-compilable and
+# unit-tested with a mock bridge.
+local-mlx = ["dep:reqwest", "dep:sha2"]
+# macOS MLX lane. In-process inference via the mlex crate (Apple mlx-c C API,
+# no Python), unlike the iOS lane's Swift bridge. Shares the catalog, memory
+# preflight, and InferenceProvider seam. mlex is target-gated to macOS, so this
+# feature only does anything on a macOS build.
+local-mlxc = ["dep:reqwest", "dep:sha2", "dep:mlex", "dep:parking_lot"]
 
 [dependencies]
 gen_ui_types   = { path = "../gen_ui_types" }
@@ -55,3 +65,12 @@ jni.workspace = true
 # than catching a failure after it.
 [target.'cfg(target_os = "ios")'.dependencies]
 libc = "0.2"
+
+# mlex (Apple's official mlx-c C API, statically vendored — no Python) backs the
+# in-process macOS MLX lane. Target-gated to macOS so Windows/Linux/iOS/Android/
+# wasm builds never resolve or link the mlx-c C++/Metal graph. Optional +
+# feature-driven: only `local-mlxc` pulls it in.
+[target.'cfg(target_os = "macos")'.dependencies]
+mlex = { version = "0.1", optional = true }
+# Serializes access to the loaded mlx-c Session (which is !Sync) on macOS only.
+parking_lot = { workspace = true, optional = true }

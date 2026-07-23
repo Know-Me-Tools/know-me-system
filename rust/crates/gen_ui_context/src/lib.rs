@@ -87,6 +87,7 @@ pub enum EngineKind {
     MistralRs,
     WebLlm,
     CloudApi,
+    Mlx,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -418,6 +419,59 @@ pub mod presets {
                 estimator: EstimatorKind::ExactTokenizer,
             },
         )
+    }
+
+    /// iOS default: Qwen3.5-4B 4-bit under MLX-Swift. Profiled for the 8 GB
+    /// baseline device so the default works on every supported iPhone; the
+    /// 12 GB Pro tier opts into the 9B instead. Text lane today — MLXVLM's
+    /// Swift registry has no Qwen3.5 vision processor yet, so vision is off
+    /// and images route through the Xberg extraction path, mirroring the
+    /// Android text-only lane.
+    pub fn ios_qwen35_4b_mlx() -> (DeviceProfile, ModelProfile, RuntimeProfile) {
+        (
+            DeviceProfile {
+                id: "iphone-17".into(),
+                class: DeviceClass::MobileHigh,
+                ram_mb: 8_192,
+                battery_aware: true,
+                max_consecutive_inferences: 8,
+            },
+            ModelProfile {
+                id: "qwen3.5-4b-mlx-4bit".into(),
+                family: "qwen3.5".into(),
+                parameters_b: 4.0,
+                quant: QuantTier::Q4,
+                nominal_context: 262_144,
+                trusted_context: 8_192,
+                extended_context: Some(16_384),
+                attention: AttentionKind::HybridGdn {
+                    full_attention_layers: 8,
+                },
+                supports_vision: false,
+                thinking_modes: ThinkingModes::Toggleable,
+            },
+            RuntimeProfile {
+                engine: EngineKind::Mlx,
+                // No llguidance hookup in the MLX bridge; constrained output
+                // relies on prompt-level schema guidance until one exists.
+                grammar_constrained: false,
+                streaming: true,
+                multimodal: false,
+                estimator: EstimatorKind::ExactTokenizer,
+            },
+        )
+    }
+
+    /// 12 GB-device opt-in tier: Qwen3.5-9B 4-bit under MLX-Swift (the Qwen3.5
+    /// line has no 8B). Admission is decided by the memory preflight against
+    /// the catalog's estimated peak residency, never assumed.
+    pub fn ios_qwen35_9b_mlx() -> (DeviceProfile, ModelProfile, RuntimeProfile) {
+        let (mut device, mut model, runtime) = ios_qwen35_4b_mlx();
+        device.id = "iphone-17-pro-max".into();
+        device.ram_mb = 12_288;
+        model.id = "qwen3.5-9b-mlx-4bit".into();
+        model.parameters_b = 9.0;
+        (device, model, runtime)
     }
 
     pub fn cloud(model_id: &str) -> (DeviceProfile, ModelProfile, RuntimeProfile) {

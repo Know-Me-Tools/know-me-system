@@ -12,13 +12,14 @@ use std::time::Instant;
 use crate::catalog::{
     artifact_set_for_id, ArtifactSpec, ANDROID_QWEN3_4B, ANDROID_QWEN3_4B_ID, IPHONE_QWEN35_9B_ID,
 };
+use crate::prompt::messages_with_tool_context;
 use async_trait::async_trait;
 use futures::{StreamExt, TryStreamExt};
 use gen_ui_types::error::{CoreError, CoreResult};
 use gen_ui_types::events::StreamEvent;
 use gen_ui_types::inference::{
-    GrammarConstraint, InferenceMessage, InferenceProvider, InferenceRequest, InferenceRole,
-    LocalModelSpec, SampleParams,
+    GrammarConstraint, InferenceMessage, InferenceProvider, InferenceRequest, LocalModelSpec,
+    SampleParams,
 };
 use gen_ui_types::lifecycle::{ModelOperationState, RunError, RunPhase, RuntimeDiagnostics};
 use llama_cpp_2::context::params::LlamaContextParams;
@@ -281,17 +282,16 @@ fn preflight_artifact(artifact: ArtifactSpec) -> CoreResult<()> {
             artifact.file_name, artifact.byte_len, max_bytes
         )));
     }
-    if let Some(budget) = device_memory_budget_bytes() {
-        let required = artifact
-            .byte_len
-            .saturating_add(RUNTIME_MEMORY_HEADROOM_BYTES);
-        if required > budget {
-            return Err(CoreError::Transient(format!(
-                "model {} needs ~{} bytes resident (artifact + {} bytes runtime headroom) but this device's safe budget is {} bytes; \
-                 select a smaller model",
-                artifact.file_name, required, RUNTIME_MEMORY_HEADROOM_BYTES, budget
-            )));
-        }
+    if crate::memory::preflight_rejects(gguf_peak_bytes(artifact)) {
+        let budget = crate::memory::device_memory_budget_bytes().unwrap_or(0);
+        return Err(CoreError::Transient(format!(
+            "model {} needs ~{} bytes resident (artifact + {} bytes runtime headroom) but this device's safe budget is {} bytes; \
+             select a smaller model",
+            artifact.file_name,
+            gguf_peak_bytes(artifact),
+            RUNTIME_MEMORY_HEADROOM_BYTES,
+            budget
+        )));
     }
     Ok(())
 }
@@ -299,93 +299,30 @@ fn preflight_artifact(artifact: ArtifactSpec) -> CoreResult<()> {
 /// Bytes to reserve beyond the model file for the KV cache, compute buffers,
 /// and the rest of the app. Deliberately coarse — this gate exists to keep a
 /// hopeless load from ever starting, not to predict peak usage precisely.
+/// GGUF-specific: llama.cpp mmaps weights, so artifact bytes approximate the
+/// resident working set; MLX's unified-memory profile uses its own estimate.
 const RUNTIME_MEMORY_HEADROOM_BYTES: u64 = 1024 * 1024 * 1024;
+
+/// Estimated peak residency for a GGUF artifact under llama.cpp.
+fn gguf_peak_bytes(artifact: ArtifactSpec) -> u64 {
+    artifact
+        .byte_len
+        .saturating_add(RUNTIME_MEMORY_HEADROOM_BYTES)
+}
 
 /// Whether this artifact is too large for the device, without producing an
 /// error. Lets the caller choose a smaller model instead of failing outright.
 fn memory_preflight_rejects(artifact: ArtifactSpec) -> bool {
-    device_memory_budget_bytes().is_some_and(|budget| {
-        artifact
-            .byte_len
-            .saturating_add(RUNTIME_MEMORY_HEADROOM_BYTES)
-            > budget
-    })
+    crate::memory::preflight_rejects(gguf_peak_bytes(artifact))
 }
 
-/// The next-smaller cataloged model that fits this device, if one exists.
-///
-/// Returns `None` when the requested model already fits (no downgrade needed),
-/// when the spec is not a known catalog id (an absolute path is the caller's own
-/// choice), or when no cataloged alternative is small enough. Self-guarding so a
-/// caller cannot accidentally downgrade a model that was fine as-is.
+/// The next-smaller cataloged GGUF model that fits this device, if one exists.
 fn downgrade_for_memory(spec: &LocalModelSpec) -> Option<LocalModelSpec> {
     // Ordered largest-to-smallest; pick the first that clears the budget.
     const FALLBACKS: &[&str] = &[ANDROID_QWEN3_4B_ID];
-    let requested = artifact_set_for_id(&spec.model)?;
-    if !memory_preflight_rejects(requested.model) {
-        return None;
-    }
-    FALLBACKS
-        .iter()
-        .filter(|candidate| **candidate != spec.model)
-        .find_map(|candidate| {
-            let set = artifact_set_for_id(candidate)?;
-            (!memory_preflight_rejects(set.model)).then(|| LocalModelSpec {
-                model: (*candidate).to_owned(),
-                context_len: spec.context_len,
-            })
-        })
-}
-
-/// The memory a local model may safely occupy on this device, or `None` when
-/// the platform gives no usable signal (desktop, where the OS pages).
-///
-/// iOS terminates a process that exceeds its jetsam allowance rather than
-/// failing an allocation, so an over-budget load cannot be caught as an `Err`
-/// after the fact — it has to be refused up front. The fraction is intentionally
-/// conservative: the OS, other apps, and this app's non-model allocations all
-/// draw on the same physical memory.
-fn device_memory_budget_bytes() -> Option<u64> {
-    if let Some(override_bytes) = std::env::var("KNOWME_DEVICE_MEMORY_BUDGET_BYTES")
-        .ok()
-        .and_then(|value| value.parse::<u64>().ok())
-    {
-        return Some(override_bytes);
-    }
-    #[cfg(target_os = "ios")]
-    {
-        // Share of physical RAM an app can hold before jetsam intervenes, even
-        // with com.apple.developer.kernel.increased-memory-limit granted.
-        const IOS_JETSAM_SAFE_FRACTION: f64 = 0.55;
-        let physical = physical_memory_bytes()?;
-        return Some((physical as f64 * IOS_JETSAM_SAFE_FRACTION) as u64);
-    }
-    #[cfg(not(target_os = "ios"))]
-    {
-        None
-    }
-}
-
-#[cfg(target_os = "ios")]
-fn physical_memory_bytes() -> Option<u64> {
-    // sysctl hw.memsize is the documented total-physical-memory query on Darwin.
-    let mut size: u64 = 0;
-    let mut length = std::mem::size_of::<u64>();
-    let name = c"hw.memsize";
-    // SAFETY: `name` is a valid NUL-terminated C string; `size` is a live u64
-    // and `length` accurately describes its size, which is what sysctlbyname
-    // requires for the output buffer. The return value is checked before `size`
-    // is read.
-    let result = unsafe {
-        libc::sysctlbyname(
-            name.as_ptr(),
-            std::ptr::addr_of_mut!(size).cast(),
-            std::ptr::addr_of_mut!(length),
-            std::ptr::null_mut(),
-            0,
-        )
-    };
-    (result == 0 && size > 0).then_some(size)
+    crate::memory::downgrade_for_memory(spec, FALLBACKS, |id| {
+        artifact_set_for_id(id).map(|set| gguf_peak_bytes(set.model))
+    })
 }
 
 fn gpu_backend_name() -> &'static str {
@@ -828,44 +765,6 @@ impl InferenceProvider for LlamaCppEngine {
     async fn runtime_diagnostics(&self) -> Option<RuntimeDiagnostics> {
         self.diagnostics().await
     }
-}
-
-fn messages_with_tool_context(request: &InferenceRequest) -> CoreResult<Vec<InferenceMessage>> {
-    let mut messages = request.effective_messages();
-    if messages
-        .iter()
-        .all(|message| message.content.trim().is_empty())
-    {
-        return Err(terminal(
-            "mobile inference",
-            "request contains no message content",
-        ));
-    }
-    if !request.tools.is_empty() {
-        let tool_json = serde_json::to_string(&request.tools)
-            .map_err(|error| terminal("tool schema serialize", error))?;
-        let instruction = format!(
-            "Available tools are described by this JSON. Call a tool only when needed and emit arguments that satisfy its parameters schema:\n{tool_json}"
-        );
-        if let Some(system) = messages
-            .iter_mut()
-            .find(|message| message.role == InferenceRole::System)
-        {
-            system.content.push_str("\n\n");
-            system.content.push_str(&instruction);
-        } else {
-            messages.insert(
-                0,
-                InferenceMessage {
-                    role: InferenceRole::System,
-                    content: instruction,
-                    name: None,
-                    tool_call_id: None,
-                },
-            );
-        }
-    }
-    Ok(messages)
 }
 
 fn generate_blocking(

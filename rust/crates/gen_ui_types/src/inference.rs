@@ -34,6 +34,30 @@ pub enum LocalRuntimeKind {
     LiteRtLm,
     Mistral,
     WebLlm,
+    /// MLX-Swift on iOS: Metal unified-memory inference behind the same
+    /// `InferenceProvider` seam; the Swift side binds generation only.
+    Mlx,
+}
+
+/// How a model marks its extended-reasoning ("thinking") tokens in the raw
+/// text stream, so the engine can split reasoning from content and emit
+/// `StreamEvent::ThinkingDelta` instead of leaking it into the assistant reply.
+///
+/// This is a per-model property (declared in the model preset), not a runtime
+/// backend property: the same MLX/llama lane serves Qwen3 (`<think>`), a future
+/// harmony model (`<|channel|>analysis`), or a model with no visible reasoning.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ReasoningFormat {
+    /// No reasoning markup; every token is assistant content.
+    #[default]
+    None,
+    /// Qwen3-style `<think>…</think>` blocks (also DeepSeek-R1 distills).
+    Qwen3Think,
+    /// OpenAI harmony channels (`<|channel|>analysis<|message|>…`). Reserved for
+    /// a future harmony-format local model; the segmenter recognizes the tag set
+    /// but no wired model uses it yet.
+    Harmony,
 }
 
 /// Sampling parameters shared by every engine lane.

@@ -1,0 +1,51 @@
+/// knowme:plugin@1.0.0 — the canonical host↔plugin component contract
+/// (openspec change `plugin-wit-convergence`).
+///
+/// One package, seven worlds (`hook`, `contributor`, `agent`, `provider`,
+/// `app-shell`, `service`, `workflow`), one shared host-import surface
+/// (design D1). The host interface set is adopted semantically from
+/// librefang:plugin@0.1.0 and extended with KnowMe-specific capabilities
+/// (design D2); knowme:plugin@0.1.0 semantics are folded in (namespaced KV,
+/// Cedar-gated `host-uar.invoke`, typed `host-events.emit`).
+///
+/// Semver discipline (design D6, see `wit/README.md`): additive-only within
+/// 1.x; renames/removals require a 2.0.0 bump with a deprecation window.
+/// Guest manifests declare compatibility ranges, never exact pins.
+package knowme:plugin@1.0.0;
+
+/// Shared types for the host surface. Every fallible host function in this
+/// package returns `result<_, host-error>` — never a bare string error.
+interface host-types {
+    /// A failure originating from the KnowMe host while servicing a guest
+    /// capability call. Adopted from librefang:plugin@0.1.0 `host-error`
+    /// (seven cases) and extended with `policy-denied` and
+    /// `budget-exceeded` — nine cases total.
+    variant host-error {
+        /// The plugin's manifest did not declare this capability.
+        capability-denied(string),
+        /// The path argument escapes the plugin's permitted sandbox root
+        /// (path-traversal guard) or refers to a denied prefix.
+        path-denied(string),
+        /// The URL argument resolved to a blocked SSRF target
+        /// (loopback, link-local, RFC1918, metadata service).
+        ssrf-denied(string),
+        /// A policy decision (Cedar policy engine or manifest capability
+        /// card) forbade the operation — e.g. `host-uar.invoke` on a skill
+        /// outside the declared allow-list, or a `host-kv` access naming a
+        /// namespace other than the calling plugin's own.
+        policy-denied(string),
+        /// A declared budget (tokens, bytes, wall-clock, invocation count)
+        /// was exhausted before the operation could complete.
+        budget-exceeded(string),
+        /// Operating-system-level I/O failure.
+        io(string),
+        /// Argument was structurally invalid (missing field, wrong type,
+        /// bad encoding).
+        invalid-argument(string),
+        /// The operation timed out before the host could complete it.
+        timeout,
+        /// Catch-all for host-internal failures the plugin should not
+        /// try to interpret.
+        internal(string),
+    }
+}

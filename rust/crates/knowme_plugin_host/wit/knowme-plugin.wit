@@ -1,3 +1,8 @@
+/// DEPRECATED — knowme:plugin@0.1.0 is superseded by knowme:plugin@1.0.0
+/// (`wit/v1/`, openspec change `plugin-wit-convergence`). See `wit/MIGRATION.md`
+/// for the construct-by-construct mapping. This file is kept for reference and
+/// will be deleted in `plugin-manifest-v2`.
+///
 /// knowme:plugin@0.1.0 — the host↔plugin contract (FUNC-SPEC §08).
 ///
 /// v0.1 is deliberately few, typed, and boring. The host surface is limited to

@@ -1,0 +1,13 @@
+[package]
+name = "knowme_fixture_contributor"
+version = "0.1.0"
+edition = "2021"
+description = "Test fixture guest for the knowme:plugin@1.0.0 contributor world (plugin-sandbox-extraction task 7.2)"
+
+[workspace]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wit-bindgen = "0.57"

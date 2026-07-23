@@ -55,7 +55,7 @@ const SETTING_UAR_AGENT_ARTIFACT: &str = "uar_agent_artifact";
 const SETTING_UAR_SESSION_ID: &str = "uar_session_id";
 const SETTING_UAR_DEPLOYMENT_MODE: &str = "uar_deployment_mode";
 #[cfg(target_os = "ios")]
-const DEFAULT_LOCAL_MODEL: &str = "qwen3.5-9b-q4-k-m";
+const DEFAULT_LOCAL_MODEL: &str = "qwen3.5-4b-mlx-4bit";
 #[cfg(target_os = "android")]
 const DEFAULT_LOCAL_MODEL: &str = "gemma-4-e2b-it-litertlm";
 #[cfg(not(any(target_os = "ios", target_os = "android")))]
@@ -2110,8 +2110,10 @@ async fn assemble_context(
 ) -> Result<gen_ui_context::AssembledContext, ContextError> {
     let (device, model, mut runtime) = if cloud {
         presets::cloud(model_id)
-    } else if model_id == "qwen3.5-9b-q4-k-m" {
-        presets::ios_qwen35()
+    } else if model_id == "qwen3.5-4b-mlx-4bit" {
+        presets::ios_qwen35_4b_mlx()
+    } else if model_id == "qwen3.5-9b-mlx-4bit" {
+        presets::ios_qwen35_9b_mlx()
     } else if model_id == "gemma-4-e2b-it-litertlm-sm8750" {
         presets::android_litert_gemma4_e2b_sm8750()
     } else if model_id == "gemma-4-e2b-it-litertlm" {
@@ -2156,7 +2158,9 @@ async fn assemble_context(
         assistant_id: "local-assistant".into(),
         system_prompt: "You are KnowMe, a helpful private assistant. Follow the user's instructions, use available tools when useful, and answer in the user's language.".into(),
         user_text: user_message.into(),
-        thinking_requested: cloud || model_id == "qwen3.5-9b-q4-k-m",
+        thinking_requested: cloud
+            || model_id == "qwen3.5-4b-mlx-4bit"
+            || model_id == "qwen3.5-9b-mlx-4bit",
         strategy: StrategyConfig::default(),
     })
     .await

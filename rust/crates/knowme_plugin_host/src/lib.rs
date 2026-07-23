@@ -25,6 +25,19 @@
 
 use serde::{Deserialize, Serialize};
 
+pub mod dispatch;
+pub mod host;
+pub mod sandbox;
+pub mod types;
+
+pub use dispatch::HostDispatch;
+#[cfg(any(test, feature = "in-memory-dispatch"))]
+pub use dispatch::InMemoryDispatch;
+pub use host::{InstanceConfig, InstanceId, LoadedComponent, PluginHost, WorldKind};
+pub use sandbox::error::{HostError, SandboxError};
+pub use sandbox::state::{GuestContext, HostCapability};
+pub use sandbox::WasmtimePluginHost;
+
 /// v0.1 permission set. `network` is intentionally absent — the network is
 /// reached only via `uar-invoke("web-fetch", …)`, governed by Cedar.
 /// v0.2 candidates (librefang) are parsed but rejected by v0.1 hosts.
@@ -97,6 +110,10 @@ pub enum SignatureStatus {
 pub struct SandboxLimits {
     pub max_linear_memory_bytes: u64,
     pub max_event_duration_secs: u64,
+    /// Per-invocation fuel budget. 0 = unlimited (seeded as `u64::MAX / 2`,
+    /// the wasmtime-safe convention adopted in `sandbox::limits`).
+    #[serde(default)]
+    pub fuel_limit: u64,
 }
 
 impl Default for SandboxLimits {
@@ -104,6 +121,7 @@ impl Default for SandboxLimits {
         Self {
             max_linear_memory_bytes: 64 * 1024 * 1024,
             max_event_duration_secs: 30,
+            fuel_limit: 0,
         }
     }
 }

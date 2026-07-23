@@ -14,9 +14,9 @@ pub(crate) fn android_litert_lm_uar_provider_config() -> gen_ui_agent::uar::UarP
 }
 
 #[cfg(any(target_os = "ios", test))]
-pub(crate) fn ios_qwen35_metal_uar_provider_config() -> gen_ui_agent::uar::UarProviderConfig {
-    gen_ui_agent::uar::ios_qwen35_metal_provider_config(
-        gen_ui_inference::catalog::IPHONE_QWEN35_9B_ID,
+pub(crate) fn ios_qwen35_mlx_uar_provider_config() -> gen_ui_agent::uar::UarProviderConfig {
+    gen_ui_agent::uar::ios_qwen35_mlx_provider_config(
+        gen_ui_inference::catalog::IOS_QWEN35_4B_MLX_ID,
     )
 }
 
@@ -39,20 +39,19 @@ mod tests {
     }
 
     #[test]
-    fn ios_uar_registration_uses_the_pinned_model_and_projector() {
-        let provider = ios_qwen35_metal_uar_provider_config();
-        let expected = gen_ui_inference::catalog::IPHONE_QWEN35_9B_ID;
+    fn ios_uar_registration_uses_the_pinned_mlx_model() {
+        let provider = ios_qwen35_mlx_uar_provider_config();
+        let expected = gen_ui_inference::catalog::IOS_QWEN35_4B_MLX_ID;
 
         assert_eq!(provider.default_model.as_deref(), Some(expected));
         assert_eq!(provider.models.len(), 1);
         assert_eq!(provider.models[0].id, expected);
-        assert!(provider.models[0].supports_vision);
+        // Text-only today (no Qwen3.5 vision processor in MLXVLM yet).
+        assert!(!provider.models[0].supports_vision);
 
-        let artifacts = gen_ui_inference::catalog::artifact_set_for_id(&provider.models[0].id)
-            .expect("UAR must never advertise an iOS local model without pinned artifacts");
         assert!(
-            artifacts.projector.is_some(),
-            "a vision-capable iOS registration must include its pinned MTMD projector"
+            gen_ui_inference::catalog::mlx_artifact_set_for_id(&provider.models[0].id).is_some(),
+            "UAR must never advertise an iOS MLX model without a pinned file set"
         );
     }
 }
