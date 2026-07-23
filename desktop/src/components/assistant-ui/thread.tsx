@@ -352,12 +352,53 @@ const AssistantMessage: FC = () => {
 
       <div
         data-slot="aui_assistant-message-footer"
-        className={cn("ms-2 flex items-center", ACTION_BAR_HEIGHT)}
+        className={cn("ms-2 flex items-center gap-2", ACTION_BAR_HEIGHT)}
       >
         <BranchPicker />
         <AssistantActionBar />
+        <ProvenanceFooter />
       </div>
     </MessagePrimitive.Root>
+  );
+};
+
+/** Builds "agent · provider/model" from provenance, or null when empty. */
+function provenanceLabel(p: {
+  agentId?: string;
+  providerId?: string;
+  modelId?: string;
+}): string | null {
+  const agent = p.agentId?.trim() || undefined;
+  const provider = p.providerId?.trim() || undefined;
+  const model = p.modelId?.trim() || undefined;
+  const modelPart =
+    provider === "on-device"
+      ? "On-device"
+      : provider && model
+        ? `${provider}/${model}`
+        : (provider ?? model ?? undefined);
+  const parts = [agent, modelPart].filter(
+    (part): part is string => Boolean(part),
+  );
+  return parts.length === 0 ? null : parts.join(" · ");
+}
+
+/** Subtle, text-first chip showing which agent + provider/model produced the
+ *  response. Renders nothing until provenance resolves. */
+const ProvenanceFooter: FC = () => {
+  const messageId = useAuiState((s) => s.message.id);
+  const provenance = useChatStore((s) =>
+    s.messages.find((m) => m.id === messageId)?.provenance,
+  );
+  const label = provenance ? provenanceLabel(provenance) : null;
+  if (!label) return null;
+  return (
+    <span
+      className="text-muted-foreground truncate text-[11px]"
+      title={label}
+    >
+      {label}
+    </span>
   );
 };
 

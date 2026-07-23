@@ -23,4 +23,13 @@ export interface Message {
   diagnostics?: Record<string, unknown>
   contextPlanVersion?: string
   contextTelemetry?: unknown
+  /** Which agent + provider + model produced this assistant turn, projected from
+   *  the run's effective_run_policy. Any field may be absent. */
+  provenance?: MessageProvenance
+}
+
+export interface MessageProvenance {
+  agentId?: string
+  providerId?: string
+  modelId?: string
 }

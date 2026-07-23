@@ -318,9 +318,25 @@ export const useChatStore = create<ChatState & ChatActions>()(
             msg.runStatus = update.status
             msg.statusMessage = update.message
           } else if (update.type === 'telemetry') {
-            msg.contextTelemetry = update.payload
-            msg.contextPlanVersion = typeof update.payload === 'object' && update.payload !== null && 'planVersion' in update.payload
-              ? String((update.payload as { planVersion?: unknown }).planVersion ?? '') : msg.contextPlanVersion
+            const payload = update.payload
+            const asObject = typeof payload === 'object' && payload !== null
+              ? (payload as Record<string, unknown>) : undefined
+            // Provenance rides the telemetry channel under a `provenance` key.
+            // Capture it; a provenance-only event must not clobber real telemetry.
+            const provenance = asObject?.provenance
+            if (provenance && typeof provenance === 'object') {
+              const p = provenance as Record<string, unknown>
+              msg.provenance = {
+                agentId: typeof p.agentId === 'string' ? p.agentId : undefined,
+                providerId: typeof p.providerId === 'string' ? p.providerId : undefined,
+                modelId: typeof p.modelId === 'string' ? p.modelId : undefined,
+              }
+            }
+            if (asObject?.kind !== 'provenance') {
+              msg.contextTelemetry = payload
+              msg.contextPlanVersion = asObject && 'planVersion' in asObject
+                ? String(asObject.planVersion ?? '') : msg.contextPlanVersion
+            }
           } else if (update.type === 'error') {
             msg.error = update.error
             msg.runPhase = update.error.phase
