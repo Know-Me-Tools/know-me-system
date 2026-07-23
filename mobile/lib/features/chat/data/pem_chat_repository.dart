@@ -173,6 +173,7 @@ class PemChatRepository implements ChatRepository {
           'contextPlanVersion': message.contextPlanVersion,
           'attachmentPaths': message.attachmentPaths,
           'contextTelemetry': message.contextTelemetry,
+          'provenance': message.provenance,
           'content': message.content.map(_encodeBlock).toList(growable: false),
         }),
       ),
@@ -242,6 +243,10 @@ class PemChatRepository implements ChatRepository {
             const [],
         contextTelemetry:
             (data['contextTelemetry'] as Map<String, dynamic>?)
+                ?.cast<String, Object?>() ??
+            const {},
+        provenance:
+            (data['provenance'] as Map<String, dynamic>?)
                 ?.cast<String, Object?>() ??
             const {},
         content: (data['content'] as List<dynamic>)

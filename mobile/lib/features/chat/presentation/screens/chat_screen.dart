@@ -653,6 +653,7 @@ class _AssistantTurn extends StatelessWidget {
           segments[index],
           if (index != segments.length - 1) const SizedBox(height: 8),
         ],
+        _ProvenanceChip(provenance: message.provenance),
         Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
@@ -706,6 +707,64 @@ class _AssistantTurn extends StatelessWidget {
       ],
     );
   }
+}
+
+/// A subtle, text-first footer showing which agent + provider/model produced the
+/// response. Renders nothing until provenance resolves. Status is text (not color
+/// alone) and the label ellipsizes so it survives large Dynamic Type.
+class _ProvenanceChip extends StatelessWidget {
+  const _ProvenanceChip({required this.provenance});
+
+  final Map<String, Object?> provenance;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = _provenanceLabel(provenance);
+    if (label == null) return const SizedBox.shrink();
+    final colors = shad.Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(left: 14, top: 4, bottom: 2),
+      child: Row(
+        children: [
+          Icon(Icons.memory_outlined, size: 12, color: colors.mutedForeground),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: colors.mutedForeground, fontSize: 11),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Build the "agent · provider/model" label, or null when there is nothing to
+/// show. The on-device provider id renders as "On-device"; missing parts are
+/// omitted rather than shown as nulls.
+String? _provenanceLabel(Map<String, Object?> provenance) {
+  String? str(String key) {
+    final value = provenance[key]?.toString().trim();
+    return (value == null || value.isEmpty) ? null : value;
+  }
+
+  final agent = str('agentId');
+  final provider = str('providerId');
+  final model = str('modelId');
+
+  final modelPart = switch ((provider, model)) {
+    ('on-device', _) => 'On-device',
+    (final p?, final m?) => '$p/$m',
+    (final p?, null) => p,
+    (null, final m?) => m,
+    (null, null) => null,
+  };
+
+  final parts = [?agent, ?modelPart];
+  return parts.isEmpty ? null : parts.join(' · ');
 }
 
 bool _isAnswerBlock(ContentBlock block) => switch (block) {

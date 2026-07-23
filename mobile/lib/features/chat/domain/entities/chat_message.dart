@@ -28,6 +28,7 @@ class ChatMessage {
     this.contextPlanVersion,
     this.attachmentPaths = const [],
     this.contextTelemetry = const {},
+    this.provenance = const {},
   }) : createdAt =
            createdAt ?? DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
        updatedAt =
@@ -54,6 +55,11 @@ class ChatMessage {
   final List<String> attachmentPaths;
   final Map<String, Object?> contextTelemetry;
 
+  /// Which agent + provider + model produced this assistant turn, projected from
+  /// the run's `effective_run_policy`. Keys: `agentId`, `providerId`, `modelId`
+  /// (any may be null). Empty for user messages or before the run resolves.
+  final Map<String, Object?> provenance;
+
   ChatMessage copyWith({
     List<ContentBlock>? content,
     bool? isStreaming,
@@ -65,6 +71,7 @@ class ChatMessage {
     DateTime? updatedAt,
     List<String>? attachmentPaths,
     Map<String, Object?>? contextTelemetry,
+    Map<String, Object?>? provenance,
     String? contextPlanVersion,
   }) => ChatMessage(
     id: id,
@@ -87,6 +94,7 @@ class ChatMessage {
     contextPlanVersion: contextPlanVersion ?? this.contextPlanVersion,
     attachmentPaths: attachmentPaths ?? this.attachmentPaths,
     contextTelemetry: contextTelemetry ?? this.contextTelemetry,
+    provenance: provenance ?? this.provenance,
   );
 }
 

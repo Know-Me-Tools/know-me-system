@@ -236,6 +236,41 @@ void main() {
       );
     },
   );
+
+  test(
+    'provenance from a ContextTelemetry event lands on the message',
+    () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(chatProvider.notifier);
+
+      Stream<A2uiEvent> runWithProvenance() async* {
+        yield const RunStarted('run-prov');
+        yield const ContextTelemetry('run-prov', {
+          'kind': 'provenance',
+          'provenance': {
+            'agentId': 'orchestrator-agent',
+            'providerId': 'anthropic',
+            'modelId': 'claude-opus-4-8',
+          },
+        });
+        yield const BlockEvent('run-prov', TextBlock('Answer.'));
+        yield const RunFinished('run-prov');
+      }
+
+      await notifier.foldStream('msg-prov', runWithProvenance());
+
+      final msg = container
+          .read(chatProvider)
+          .messages
+          .firstWhere((m) => m.id == 'msg-prov');
+      expect(msg.provenance['agentId'], 'orchestrator-agent');
+      expect(msg.provenance['providerId'], 'anthropic');
+      expect(msg.provenance['modelId'], 'claude-opus-4-8');
+      // A provenance-only telemetry event must not overwrite context telemetry.
+      expect(msg.contextTelemetry, isEmpty);
+    },
+  );
 }
 
 ChatMessage _message(

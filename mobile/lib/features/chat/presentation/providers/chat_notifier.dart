@@ -208,13 +208,29 @@ class ChatNotifier extends _$ChatNotifier {
   }
 
   void updateContextTelemetry(String messageId, ContextTelemetry event) {
+    // Provenance (which agent + provider + model produced the turn) is projected
+    // onto the same ContextTelemetry channel under a `provenance` key. Capture it
+    // into the typed field when present; otherwise leave provenance untouched so a
+    // later real telemetry event does not clear it.
+    final provenance = event.payload['provenance'];
+    final provenanceMap = provenance is Map
+        ? provenance.cast<String, Object?>()
+        : null;
+    final isProvenanceOnly = event.payload['kind'] == 'provenance';
     state = state.copyWith(
       messages: [
         for (final message in state.messages)
           if (message.id == messageId)
             message.copyWith(
-              contextPlanVersion: event.payload['planVersion']?.toString(),
-              contextTelemetry: event.payload.cast<String, Object?>(),
+              // A provenance-only telemetry event carries no context plan/version
+              // and should not overwrite the real context telemetry.
+              contextPlanVersion: isProvenanceOnly
+                  ? message.contextPlanVersion
+                  : event.payload['planVersion']?.toString(),
+              contextTelemetry: isProvenanceOnly
+                  ? message.contextTelemetry
+                  : event.payload.cast<String, Object?>(),
+              provenance: provenanceMap ?? message.provenance,
             )
           else
             message,
@@ -823,6 +839,7 @@ class ChatNotifier extends _$ChatNotifier {
       messageId: messageId,
       onBlock: streamBlock,
       onFinalize: finalizeMessage,
+      onTelemetry: updateContextTelemetry,
     );
     _drivers[messageId] = driver;
     await driver.connect(stream);
