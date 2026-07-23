@@ -1,0 +1,240 @@
+// File: events.wit
+// KnowMe-specific extension interfaces (design D2): typed AG-UI events,
+// streaming inference, provenance-tagged memory recall, and the A2UI
+// surface push channel. AG-UI events and A2UI messages are typed WIT
+// records at the ABI boundary (design D5); they mirror the serde DTOs in
+// `gen_ui_types::events` and UAR's `uar.a2ui/1` profile but are
+// deliberately self-contained in this package (no cross-repo imports).
+
+/// AG-UI event bus. Absorbs knowme:plugin@0.1.0 `emit-event` with a typed
+/// envelope. Inter-plugin communication goes through here; plugins never
+/// call each other directly.
+interface host-events {
+    use host-types.{host-error};
+
+    record run-started {
+        thread-id: string,
+        run-id: string,
+    }
+
+    record tool-call-start {
+        id: string,
+        name: string,
+    }
+
+    record tool-call-args {
+        id: string,
+        delta: string,
+    }
+
+    record tool-call-result {
+        id: string,
+        output-json: string,
+        is-error: bool,
+    }
+
+    record custom-event {
+        name: string,
+        /// Event payload as JSON (spec-defined document, design D5).
+        value-json: string,
+    }
+
+    record run-cancelled {
+        run-id: string,
+        message: string,
+    }
+
+    record run-error {
+        run-id: string,
+        /// RunError payload as JSON (spec-defined document, design D5).
+        error-json: string,
+    }
+
+    /// AG-UI event envelope. Mirrors `gen_ui_types::events::AguiEvent`
+    /// (SCREAMING_SNAKE_CASE serde tag) variant-for-variant.
+    variant ag-ui-event {
+        run-started(run-started),
+        /// Text delta payload.
+        text-message-content(string),
+        /// Reasoning delta payload.
+        reasoning-message-content(string),
+        tool-call-start(tool-call-start),
+        tool-call-args(tool-call-args),
+        /// Tool-call id payload.
+        tool-call-end(string),
+        tool-call-result(tool-call-result),
+        custom(custom-event),
+        /// Full state snapshot as JSON (spec-defined document).
+        state-snapshot(string),
+        /// Run id payload.
+        run-finished(string),
+        run-cancelled(run-cancelled),
+        run-error(run-error),
+    }
+
+    /// Emit an AG-UI event onto the host event bus under `topic`.
+    emit: func(topic: string, event: ag-ui-event) -> result<_, host-error>;
+
+    /// Subscribe to a topic. Returns an opaque subscription id. Matching
+    /// events are delivered through the world's event entry point (e.g.
+    /// `handle-event` in the `hook` world).
+    subscribe: func(topic: string) -> result<string, host-error>;
+
+    /// Cancel a subscription previously returned by `subscribe`.
+    unsubscribe: func(subscription: string) -> result<_, host-error>;
+}
+
+/// Host-mediated inference (design D2). The request takes a modality plus
+/// a request record; model *selection* remains host policy (see the design
+/// open question — refined by `plugin-provider-world`).
+interface host-infer {
+    use host-types.{host-error};
+
+    /// Requested output modality.
+    enum modality {
+        text,
+        audio,
+        image,
+    }
+
+    record infer-request {
+        modality: modality,
+        /// Free-form model hint ("small", "fast", a catalog id). The host
+        /// is free to ignore it; selection is host policy.
+        model-hint: option<string>,
+        prompt: string,
+        /// Modality/provider-specific parameters as JSON (spec-defined
+        /// document, design D5).
+        params-json: option<string>,
+    }
+
+    record infer-response {
+        output: string,
+        /// Token/cost accounting as JSON (spec-defined document).
+        usage-json: option<string>,
+    }
+
+    record infer-chunk {
+        delta: string,
+        is-final: bool,
+    }
+
+    /// One-shot inference.
+    infer: func(request: infer-request) -> result<infer-response, host-error>;
+
+    /// Streaming inference. Chunks are delivered in order; the final chunk
+    /// has `is-final: true`. The ordered-list ABI is the minimal viable
+    /// stream; a live-streaming ABI lands with `plugin-provider-world`.
+    infer-stream: func(request: infer-request) -> result<list<infer-chunk>, host-error>;
+}
+
+/// Host memory recall (design D2). Hits are provenance-tagged so the
+/// plugin (and the audit trail) can see where each recalled item came
+/// from.
+interface host-memory {
+    use host-types.{host-error};
+
+    enum provenance-kind {
+        conversation,
+        document,
+        plugin,
+        system,
+    }
+
+    record provenance {
+        kind: provenance-kind,
+        /// Source identifier (run id, document id, plugin id).
+        source-id: string,
+        /// Seconds since the Unix epoch.
+        at-secs: u64,
+    }
+
+    record memory-hit {
+        key: string,
+        value: string,
+        score: f32,
+        provenance: provenance,
+    }
+
+    record recall-query {
+        text: string,
+        limit: option<u32>,
+    }
+
+    /// Recall memory items relevant to the query, ranked by score.
+    recall: func(query: recall-query) -> result<list<memory-hit>, host-error>;
+}
+
+/// A2UI surface push channel. Imported by the `app-shell` world ONLY —
+/// no other world may present UI.
+///
+/// Message shapes mirror UAR's validated `uar.a2ui/1` profile of A2UI
+/// v0.9.1 (create / components / data / delete). Component properties and
+/// data-model entries stay JSON because they are validated by the host
+/// against the surface's declared catalog — spec-defined documents per
+/// design D5.
+interface host-a2ui {
+    use host-types.{host-error};
+
+    /// A2UI component kinds supported by the `uar.a2ui/1` profile.
+    enum component-kind {
+        text,
+        button,
+        text-field,
+        check-box,
+        choice-picker,
+        row,
+        column,
+        card,
+        divider,
+    }
+
+    record component {
+        id: string,
+        kind: component-kind,
+        /// Component properties as JSON, validated by the host against the
+        /// surface's declared catalog (spec-defined document, design D5).
+        props-json: string,
+    }
+
+    record create-surface {
+        surface-id: string,
+        catalog-id: string,
+    }
+
+    record update-components {
+        surface-id: string,
+        components: list<component>,
+    }
+
+    record update-data-model {
+        surface-id: string,
+        /// Data-model entries as JSON (spec-defined document, design D5).
+        entries-json: string,
+    }
+
+    /// A2UI v0.9.1 message set (create / components / data / delete).
+    variant a2ui-message {
+        create-surface(create-surface),
+        update-components(update-components),
+        update-data-model(update-data-model),
+        /// Surface id payload.
+        delete-surface(string),
+    }
+
+    /// Push an A2UI message to a surface owned by the calling app-shell
+    /// plugin. Pushing to another plugin's surface fails with
+    /// `host-error.policy-denied`.
+    push-surface: func(message: a2ui-message) -> result<_, host-error>;
+
+    /// An action raised by the user on an A2UI surface, delivered to the
+    /// app-shell world's `on-action` export. Mirrors the A2UI
+    /// `ActionEvent` shape.
+    record a2ui-action {
+        surface-id: string,
+        component-id: string,
+        name: string,
+        /// Action context as JSON (A2UI `ActionEvent.context`).
+        context-json: option<string>,
+    }
+}
