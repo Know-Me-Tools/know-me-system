@@ -15,14 +15,30 @@ use gen_ui_types::events::A2uiEvent;
 use gen_ui_types::events::StreamEvent;
 use gen_ui_types::inference::{InferenceProvider, LocalModelSpec};
 use serde::{Deserialize, Serialize};
-use std::{collections::VecDeque, sync::Arc};
+use std::{
+    collections::{HashMap, VecDeque},
+    sync::Arc,
+};
 pub use universal_agent_runtime::llm::ProviderConfig as UarProviderConfig;
 use universal_agent_runtime::{
-    llm::{registry::ModelConfig, registry::ProtocolSetting, LlmDriver, LlmRequest},
+    config::{build_client_config, LlmConfig},
+    llm::{
+        registry::ModelConfig, registry::ProtocolSetting, LiterLlmDriver, LlmDriver, LlmRequest,
+    },
     normalized::{Citation as UarCitation, NormalizedEvent as UarNormalizedEvent},
 };
 
 use crate::error::AgentError;
+
+/// The well-known provider id under which the on-device local model is presented
+/// in the unified provider picker. Selecting this id routes the embedded UAR run
+/// to the on-device inference bridge instead of a cloud provider.
+pub const LOCAL_PROVIDER_ID: &str = "on-device";
+
+/// Config-store setting holding the id of the provider the embedded UAR should
+/// route to (either [`LOCAL_PROVIDER_ID`] or a configured cloud provider id).
+/// Unset ⇒ the on-device local model (offline-capable first-run default).
+pub const SETTING_UAR_ACTIVE_PROVIDER: &str = "uar_active_provider";
 
 /// How this platform should access UAR.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -280,6 +296,203 @@ impl LlmDriver for UarLocalInferenceDriverBridge {
             },
         )
         .boxed())
+    }
+}
+
+/// The resolved model backend a single embedded-UAR run should execute against.
+///
+/// Produced by an [`ActiveModelSelector`] at `stream()` time and consumed by the
+/// [`UarRoutingDriver`] to dispatch either to the on-device inference bridge or a
+/// cloud `LiterLlmDriver`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ActiveRoute {
+    /// Route to the on-device local model (the wrapped inference bridge).
+    Local,
+    /// Route to a configured cloud provider/model over liter-llm.
+    Cloud {
+        /// Configured provider id (e.g. `"openai"`), used for cache keying and
+        /// the liter-llm `provider/model` address.
+        provider_id: String,
+        /// Model id within the provider (e.g. `"gpt-4o"`).
+        model_id: String,
+        /// Optional base-URL override; `None` uses liter-llm auto-detection.
+        base_url: Option<String>,
+        /// Resolved API key for the provider.
+        api_key: String,
+    },
+}
+
+/// Resolves the currently-selected model backend for the embedded UAR. Kept as a
+/// trait so the [`UarRoutingDriver`] is unit-testable with a scripted selector.
+#[async_trait::async_trait]
+pub trait ActiveModelSelector: Send + Sync {
+    /// The route the next run should execute against.
+    async fn active(&self) -> Result<ActiveRoute, AgentError>;
+}
+
+/// [`ActiveModelSelector`] backed by the KnowMe config store. Reads the selected
+/// provider id from [`SETTING_UAR_ACTIVE_PROVIDER`]; the on-device local id (or an
+/// unset/dangling selection) resolves to [`ActiveRoute::Local`], any other id to
+/// the matching configured cloud provider + its selected model.
+pub struct ConfigActiveSelector;
+
+#[async_trait::async_trait]
+impl ActiveModelSelector for ConfigActiveSelector {
+    async fn active(&self) -> Result<ActiveRoute, AgentError> {
+        // Never fail the run because selection couldn't be read. Any error
+        // (config store not initialized, transient read failure) degrades to the
+        // on-device model, which is always available. `resolve()` holds the real
+        // logic; this wrapper enforces the Local fallback.
+        Ok(self.resolve().await.unwrap_or(ActiveRoute::Local))
+    }
+}
+
+impl ConfigActiveSelector {
+    async fn resolve(&self) -> Result<ActiveRoute, AgentError> {
+        let config = crate::state::config()?;
+        let selected = config
+            .get_setting(SETTING_UAR_ACTIVE_PROVIDER)
+            .await?
+            .and_then(|value| value.as_str().map(str::to_owned));
+
+        // Unset or the local id ⇒ on-device. This keeps first-run offline-capable
+        // with no keys configured.
+        let provider_id = match selected {
+            Some(id) if id != LOCAL_PROVIDER_ID => id,
+            _ => return Ok(ActiveRoute::Local),
+        };
+
+        // A cloud provider is selected: resolve its credentials and model. Any
+        // gap (deleted provider, missing key, no model pref) falls back to Local
+        // rather than failing the run — the picker can never strand the user.
+        let Some(provider) = config.get_provider(&provider_id).await? else {
+            return Ok(ActiveRoute::Local);
+        };
+        if !provider.enabled {
+            return Ok(ActiveRoute::Local);
+        }
+        let Some(api_key) = provider
+            .api_key_ref
+            .as_deref()
+            .map(crate::secrets::resolve_api_key)
+            .transpose()?
+        else {
+            return Ok(ActiveRoute::Local);
+        };
+        let model_id = config
+            .get_model_pref(SURFACE_CHAT, LANE_CLOUD)
+            .await?
+            .map(|pref| pref.model_id)
+            .filter(|model_id| !model_id.is_empty());
+        let Some(model_id) = model_id else {
+            return Ok(ActiveRoute::Local);
+        };
+
+        Ok(ActiveRoute::Cloud {
+            provider_id,
+            model_id,
+            base_url: provider.base_url,
+            api_key,
+        })
+    }
+}
+
+const SURFACE_CHAT: &str = "chat";
+const LANE_CLOUD: &str = "cloud";
+
+/// The single `LlmDriver` the embedded UAR kernel holds for its lifetime, routing
+/// each run to the on-device local model OR a configured cloud provider.
+///
+/// The embedded `RunManager` builds one driver at construction and reuses it for
+/// every run (the per-run `LlmRequest` carries no model string), so backend
+/// selection must happen *inside* the driver: on each `stream()` the selector is
+/// consulted and the call is dispatched to the wrapped local bridge or a cloud
+/// [`LiterLlmDriver`] (built lazily and cached per `(provider_id, model_id)`).
+/// Both emit `UarNormalizedEvent`, so the downstream projection is identical.
+pub struct UarRoutingDriver {
+    local: Arc<UarLocalInferenceDriverBridge>,
+    selector: Arc<dyn ActiveModelSelector>,
+    cloud_cache: tokio::sync::RwLock<HashMap<(String, String), Arc<LiterLlmDriver>>>,
+}
+
+impl UarRoutingDriver {
+    /// Wrap the on-device bridge with a routing layer driven by `selector`.
+    pub fn new(
+        local: Arc<UarLocalInferenceDriverBridge>,
+        selector: Arc<dyn ActiveModelSelector>,
+    ) -> Self {
+        Self {
+            local,
+            selector,
+            cloud_cache: tokio::sync::RwLock::new(HashMap::new()),
+        }
+    }
+
+    /// Drop all cached cloud drivers. Called when provider config changes so a
+    /// re-keyed provider is rebuilt on its next run.
+    pub async fn invalidate_cloud_cache(&self) {
+        self.cloud_cache.write().await.clear();
+    }
+
+    /// Get or build the cloud driver for a `(provider_id, model_id)` selection.
+    /// Reuses UAR's own `LiterLlmDriver` + `build_client_config`, so this is the
+    /// exact cloud path the service UAR uses — with no submodule change.
+    async fn cloud_driver(
+        &self,
+        provider_id: &str,
+        model_id: &str,
+        base_url: Option<String>,
+        api_key: String,
+    ) -> anyhow::Result<Arc<LiterLlmDriver>> {
+        let key = (provider_id.to_owned(), model_id.to_owned());
+        if let Some(driver) = self.cloud_cache.read().await.get(&key) {
+            return Ok(Arc::clone(driver));
+        }
+        let model = format!("{provider_id}/{model_id}");
+        // LlmConfig has no Default derive but every field has a serde default, so
+        // build it from a minimal JSON object and override the three fields we set.
+        let mut llm_config: LlmConfig = serde_json::from_value(serde_json::json!({}))
+            .map_err(|error| anyhow::anyhow!("construct LlmConfig: {error}"))?;
+        llm_config.model = model.clone();
+        llm_config.api_key = Some(api_key);
+        llm_config.base_url = base_url;
+        let client_config = build_client_config(&llm_config);
+        let driver = Arc::new(LiterLlmDriver::new(client_config, model, None)?);
+        self.cloud_cache
+            .write()
+            .await
+            .insert(key, Arc::clone(&driver));
+        Ok(driver)
+    }
+}
+
+#[async_trait::async_trait]
+impl LlmDriver for UarRoutingDriver {
+    async fn stream(
+        &self,
+        request: LlmRequest,
+    ) -> anyhow::Result<
+        std::pin::Pin<Box<dyn futures::Stream<Item = anyhow::Result<UarNormalizedEvent>> + Send>>,
+    > {
+        match self
+            .selector
+            .active()
+            .await
+            .map_err(|error| anyhow::anyhow!("resolve active model: {error}"))?
+        {
+            ActiveRoute::Local => self.local.stream(request).await,
+            ActiveRoute::Cloud {
+                provider_id,
+                model_id,
+                base_url,
+                api_key,
+            } => {
+                let driver = self
+                    .cloud_driver(&provider_id, &model_id, base_url, api_key)
+                    .await?;
+                driver.stream(request).await
+            }
+        }
     }
 }
 
@@ -628,8 +841,17 @@ impl UarEmbeddedRuntime {
         model_spec: LocalModelSpec,
         provider_config: UarProviderConfig,
     ) -> Result<Self, AgentError> {
-        let driver: Arc<dyn LlmDriver> =
-            Arc::new(UarLocalInferenceDriverBridge::new(provider, model_spec));
+        // Wrap the on-device bridge in the routing driver so a single embedded
+        // run can execute against the local model OR a configured cloud provider,
+        // chosen at stream() time from the persisted active selection. Cloud
+        // providers are additionally registered into the runtime's provider
+        // registry after build (see `register_cloud_providers`) so they list and
+        // resolve for policy/telemetry; execution switching is the driver's job.
+        let local_bridge = Arc::new(UarLocalInferenceDriverBridge::new(provider, model_spec));
+        let driver: Arc<dyn LlmDriver> = Arc::new(UarRoutingDriver::new(
+            local_bridge,
+            Arc::new(ConfigActiveSelector),
+        ));
         let persistence: Arc<dyn universal_agent_runtime::uar::persistence::PersistenceLayer> =
             Arc::new(
                 universal_agent_runtime::uar::persistence::providers::memory::InMemoryProvider::new(
@@ -1487,10 +1709,7 @@ mod tests {
 
         assert_eq!(
             registry.default_model().await,
-            Some((
-                IOS_MLX_PROVIDER_ID.to_string(),
-                PINNED_MODEL_ID.to_string()
-            ))
+            Some((IOS_MLX_PROVIDER_ID.to_string(), PINNED_MODEL_ID.to_string()))
         );
         let resolved = registry
             .resolve_to_llm_config(IOS_MLX_PROVIDER_ID, "")
@@ -2321,5 +2540,107 @@ mod tests {
         );
 
         server.abort();
+    }
+
+    // -------- routing driver (local ⊕ cloud selection) --------
+
+    /// A scripted selector so the routing driver is testable without touching the
+    /// config store or a live cloud endpoint.
+    struct ScriptedSelector(ActiveRoute);
+
+    #[async_trait::async_trait]
+    impl ActiveModelSelector for ScriptedSelector {
+        async fn active(&self) -> Result<ActiveRoute, AgentError> {
+            Ok(self.0.clone())
+        }
+    }
+
+    fn empty_llm_request() -> LlmRequest {
+        LlmRequest {
+            messages: vec![serde_json::json!({"role": "user", "content": "hi"})],
+            tools: vec![],
+            cache_strategy: None,
+            thinking_config: None,
+            anthropic_system: None,
+            extra_params: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn routing_driver_local_route_streams_from_the_on_device_bridge() {
+        // Selector says Local ⇒ the request must reach the wrapped inference
+        // provider (proving no cloud dispatch), and the on-device stream projects.
+        let inference = Arc::new(RecordingInferenceProvider::with_events(vec![
+            StreamEvent::MessageStart,
+            StreamEvent::TextDelta {
+                index: 0,
+                delta: "on-device answer".into(),
+            },
+            StreamEvent::Done,
+        ]));
+        let bridge = Arc::new(UarLocalInferenceDriverBridge::new(
+            inference.clone(),
+            LocalModelSpec {
+                model: "test-model".into(),
+                context_len: None,
+            },
+        ));
+        let driver = UarRoutingDriver::new(bridge, Arc::new(ScriptedSelector(ActiveRoute::Local)));
+
+        let events: Vec<_> = driver
+            .stream(empty_llm_request())
+            .await
+            .expect("local route streams")
+            .collect()
+            .await;
+
+        // The on-device provider actually generated (Local was honored, not cloud).
+        assert_eq!(inference.requests.lock().len(), 1);
+        assert!(!events.is_empty());
+        assert!(events.iter().all(|event| event.is_ok()));
+    }
+
+    #[tokio::test]
+    async fn cloud_driver_cache_reuses_one_driver_per_provider_model() {
+        // Two builds for the same (provider, model) return the same Arc; a
+        // different model builds a distinct driver. Proves keyed caching without
+        // needing a live endpoint (LiterLlmDriver::new only constructs a client).
+        let bridge = Arc::new(UarLocalInferenceDriverBridge::new(
+            Arc::new(RecordingInferenceProvider::default()),
+            LocalModelSpec {
+                model: "test-model".into(),
+                context_len: None,
+            },
+        ));
+        let driver = UarRoutingDriver::new(bridge, Arc::new(ScriptedSelector(ActiveRoute::Local)));
+
+        let a = driver
+            .cloud_driver("openai", "gpt-4o", None, "sk-test".into())
+            .await
+            .expect("build cloud driver a");
+        let b = driver
+            .cloud_driver("openai", "gpt-4o", None, "sk-test".into())
+            .await
+            .expect("build cloud driver b");
+        assert!(Arc::ptr_eq(&a, &b), "same (provider,model) ⇒ cached driver");
+
+        let c = driver
+            .cloud_driver("openai", "gpt-4o-mini", None, "sk-test".into())
+            .await
+            .expect("build cloud driver c");
+        assert!(
+            !Arc::ptr_eq(&a, &c),
+            "different model ⇒ distinct cached driver"
+        );
+
+        driver.invalidate_cloud_cache().await;
+        let d = driver
+            .cloud_driver("openai", "gpt-4o", None, "sk-test".into())
+            .await
+            .expect("rebuild after invalidate");
+        assert!(
+            !Arc::ptr_eq(&a, &d),
+            "cache cleared ⇒ fresh driver after invalidate"
+        );
     }
 }

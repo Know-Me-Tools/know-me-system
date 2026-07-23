@@ -1103,19 +1103,21 @@ pub async fn save_uar_service_config(request: SaveUarServiceRequest) -> Result<(
                 .unwrap_or(serde_json::Value::Null),
         )
         .await?;
+    // On iOS/Android the UAR is ALWAYS the embedded in-process kernel — there is no
+    // service URL and no remote deployment. Writing a remote deployment mode here would
+    // flip mobile out of `EmbeddedLibrary` (the default from
+    // `selected_uar_deployment_mode`) and make every subsequent chat turn demand
+    // `uar_service_url`, which does not exist on mobile. So only desktop persists a
+    // remote deployment mode; mobile keeps its embedded default untouched.
+    #[cfg(not(any(target_os = "ios", target_os = "android")))]
     config
         .set_setting(
             SETTING_UAR_DEPLOYMENT_MODE,
-            serde_json::Value::String(
-                if cfg!(any(target_os = "ios", target_os = "android")) {
-                    "cloud_service"
-                } else {
-                    "http_service"
-                }
-                .to_owned(),
-            ),
+            serde_json::Value::String("http_service".to_owned()),
         )
-        .await
+        .await?;
+
+    Ok(())
 }
 
 pub async fn probe_uar_service_config() -> Result<UarServiceProbeResult, AgentError> {
