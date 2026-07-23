@@ -1492,10 +1492,28 @@ impl A2uiAdapter {
                 source,
                 event_name,
                 payload,
-            } => vec![A2uiEvent::Block {
-                run_id: self.run_id.clone(),
-                block: custom_event_artifact(source, event_name, payload),
-            }],
+            } => {
+                // The effective-run-policy artifact is provenance metadata, not a
+                // display artifact. Project it as ContextTelemetry (which the mobile
+                // and desktop folds attach to the assistant message) instead of a
+                // raw JSON block.
+                let value = payload.get("value").unwrap_or(payload);
+                if is_effective_run_policy_artifact(source, event_name, value) {
+                    let content = value.get("content").unwrap_or(value);
+                    let provenance = provenance_from_effective_run_policy(content);
+                    return vec![A2uiEvent::ContextTelemetry {
+                        run_id: self.run_id.clone(),
+                        payload: serde_json::json!({
+                            "kind": "provenance",
+                            "provenance": provenance,
+                        }),
+                    }];
+                }
+                vec![A2uiEvent::Block {
+                    run_id: self.run_id.clone(),
+                    block: custom_event_artifact(source, event_name, payload),
+                }]
+            }
             StreamEvent::Done => {
                 let unclosed = self.reasoning.is_thinking();
                 let pending = self.reasoning.flush();
@@ -1541,6 +1559,57 @@ impl A2uiAdapter {
             }
         }
     }
+}
+
+/// Per-run provenance projected from an `effective_run_policy` artifact:
+/// which agent, provider, and model produced the assistant turn.
+///
+/// Each field is `null` when the source policy omits it; the UI degrades
+/// gracefully (see the Flutter/React provenance chips).
+pub fn provenance_from_effective_run_policy(content: &serde_json::Value) -> serde_json::Value {
+    // The artifact `content` may arrive either as a JSON object or as a JSON
+    // string containing the serialized `EffectiveRunPolicy`. Normalize both.
+    let owned;
+    let policy = match content {
+        serde_json::Value::String(raw) => {
+            owned = serde_json::from_str::<serde_json::Value>(raw).ok();
+            owned.as_ref().unwrap_or(content)
+        }
+        other => other,
+    };
+
+    let agent_id = json_string(policy, &["agent_id"])
+        .or_else(|| json_string(policy, &["agentId"]))
+        .map(str::to_owned);
+    let provider_id = first_json_string(
+        policy,
+        &[&["model", "provider_id"][..], &["model", "providerId"][..]],
+    )
+    .map(str::to_owned);
+    let model_id = first_json_string(
+        policy,
+        &[&["model", "model_id"][..], &["model", "modelId"][..]],
+    )
+    .map(str::to_owned);
+
+    serde_json::json!({
+        "agentId": agent_id,
+        "providerId": provider_id,
+        "modelId": model_id,
+    })
+}
+
+/// True when a `uar.artifact.available` custom event carries the
+/// `effective_run_policy` provenance artifact rather than a display artifact.
+fn is_effective_run_policy_artifact(
+    source: &str,
+    event_name: &str,
+    value: &serde_json::Value,
+) -> bool {
+    source == "uar"
+        && event_name == "uar.artifact.available"
+        && first_json_string(value, &[&["artifactType"][..], &["artifact_type"][..]])
+            == Some("effective_run_policy")
 }
 
 fn custom_event_artifact(

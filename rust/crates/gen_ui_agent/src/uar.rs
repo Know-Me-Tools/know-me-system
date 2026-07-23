@@ -8,8 +8,8 @@
 
 use futures::{stream::BoxStream, StreamExt};
 use gen_ui_protocol::{
-    normalize_uar_agui_event, uar_llm_payload_to_inference_request, A2uiAdapter,
-    UarLlmRequestPayload,
+    normalize_uar_agui_event, provenance_from_effective_run_policy,
+    uar_llm_payload_to_inference_request, A2uiAdapter, UarLlmRequestPayload,
 };
 use gen_ui_types::events::A2uiEvent;
 use gen_ui_types::events::StreamEvent;
@@ -1515,18 +1515,63 @@ const fn service_artifact_response_available() -> bool {
 /// same `A2uiAdapter` buffer.
 pub struct UarEventProjector {
     adapter: A2uiAdapter,
+    /// Agent id observed on `RUN_STARTED`, used to back-fill provenance when the
+    /// `effective_run_policy` artifact itself omits `agentId`.
+    last_agent_id: Option<String>,
 }
 
 impl UarEventProjector {
     pub fn new(run_id: impl Into<String>) -> Self {
         Self {
             adapter: A2uiAdapter::new(run_id),
+            last_agent_id: None,
         }
     }
 
     pub fn ingest_agui_payload(&mut self, payload: &serde_json::Value) -> Vec<A2uiEvent> {
+        // Remember the RunStart agent id before normalization drops it.
+        if payload.get("type").and_then(serde_json::Value::as_str) == Some("RUN_STARTED") {
+            if let Some(agent_id) = payload
+                .get("input")
+                .and_then(|input| input.get("agentId"))
+                .and_then(serde_json::Value::as_str)
+            {
+                self.last_agent_id = Some(agent_id.to_owned());
+            }
+        }
+
         let event = normalize_uar_agui_event(payload);
-        self.adapter.ingest(&event)
+        let mut events = self.adapter.ingest(&event);
+        for event in &mut events {
+            back_fill_provenance_agent_id(event, self.last_agent_id.as_deref());
+        }
+        events
+    }
+}
+
+/// Fill a null `agentId` in a provenance `ContextTelemetry` payload from the
+/// RunStart-observed agent id. No-op for any other event or a non-null agentId.
+fn back_fill_provenance_agent_id(event: &mut A2uiEvent, fallback_agent_id: Option<&str>) {
+    let Some(fallback) = fallback_agent_id else {
+        return;
+    };
+    let A2uiEvent::ContextTelemetry { payload, .. } = event else {
+        return;
+    };
+    let Some(provenance) = payload.get_mut("provenance") else {
+        return;
+    };
+    let missing = provenance
+        .get("agentId")
+        .map(serde_json::Value::is_null)
+        .unwrap_or(true);
+    if missing {
+        if let Some(object) = provenance.as_object_mut() {
+            object.insert(
+                "agentId".into(),
+                serde_json::Value::String(fallback.to_owned()),
+            );
+        }
     }
 }
 
@@ -2192,6 +2237,96 @@ mod tests {
                 && content.contains("agui.artifact_input_request")
                 && content.contains("artifact-1")
         ));
+    }
+
+    #[test]
+    fn projector_maps_effective_run_policy_artifact_to_provenance_telemetry() {
+        let mut projector = UarEventProjector::new("run-1");
+        let output = projector.ingest_agui_payload(&serde_json::json!({
+            "type": "CUSTOM",
+            "profile": "uar.agui/1",
+            "name": "uar.artifact.available",
+            "value": {
+                "artifactId": "artifact-1",
+                "artifactType": "effective_run_policy",
+                "content": {
+                    "agent_id": "office-assistant",
+                    "model": { "provider_id": "anthropic", "model_id": "claude-opus-4-8" }
+                },
+                "sourceRunId": "run-1"
+            },
+            "runId": "run-1"
+        }));
+
+        assert_eq!(
+            output.len(),
+            1,
+            "policy artifact must not also emit a block"
+        );
+        let A2uiEvent::ContextTelemetry { payload, .. } = &output[0] else {
+            panic!("expected ContextTelemetry, got {:?}", output[0]);
+        };
+        let provenance = &payload["provenance"];
+        assert_eq!(provenance["agentId"], "office-assistant");
+        assert_eq!(provenance["providerId"], "anthropic");
+        assert_eq!(provenance["modelId"], "claude-opus-4-8");
+    }
+
+    #[test]
+    fn projector_back_fills_provenance_agent_id_from_run_started() {
+        let mut projector = UarEventProjector::new("run-1");
+        // RunStart carries the agent id; the policy artifact omits it.
+        let _ = projector.ingest_agui_payload(&serde_json::json!({
+            "type": "RUN_STARTED",
+            "profile": "uar.agui/1",
+            "runId": "run-1",
+            "threadId": "run-1",
+            "input": { "agentId": "office-assistant" }
+        }));
+        let output = projector.ingest_agui_payload(&serde_json::json!({
+            "type": "CUSTOM",
+            "profile": "uar.agui/1",
+            "name": "uar.artifact.available",
+            "value": {
+                "artifactType": "effective_run_policy",
+                "content": {
+                    "agent_id": null,
+                    "model": { "provider_id": "on-device", "model_id": "gemma-3n" }
+                }
+            },
+            "runId": "run-1"
+        }));
+
+        let telemetry = output
+            .iter()
+            .find_map(|event| match event {
+                A2uiEvent::ContextTelemetry { payload, .. } => Some(payload),
+                _ => None,
+            })
+            .expect("expected a ContextTelemetry event");
+        assert_eq!(telemetry["provenance"]["agentId"], "office-assistant");
+        assert_eq!(telemetry["provenance"]["providerId"], "on-device");
+        assert_eq!(telemetry["provenance"]["modelId"], "gemma-3n");
+    }
+
+    #[test]
+    fn provenance_helper_parses_string_encoded_policy() {
+        let content = serde_json::json!(
+            "{\"agent_id\":\"a\",\"model\":{\"provider_id\":\"p\",\"model_id\":\"m\"}}"
+        );
+        let provenance = provenance_from_effective_run_policy(&content);
+        assert_eq!(provenance["agentId"], "a");
+        assert_eq!(provenance["providerId"], "p");
+        assert_eq!(provenance["modelId"], "m");
+    }
+
+    #[test]
+    fn provenance_helper_nulls_missing_parts() {
+        let content = serde_json::json!({ "agent_id": "a" });
+        let provenance = provenance_from_effective_run_policy(&content);
+        assert_eq!(provenance["agentId"], "a");
+        assert!(provenance["providerId"].is_null());
+        assert!(provenance["modelId"].is_null());
     }
 
     #[test]
