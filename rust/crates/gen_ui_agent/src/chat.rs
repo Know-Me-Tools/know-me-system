@@ -1103,13 +1103,14 @@ pub async fn save_uar_service_config(request: SaveUarServiceRequest) -> Result<(
                 .unwrap_or(serde_json::Value::Null),
         )
         .await?;
-    // On iOS/Android the UAR is ALWAYS the embedded in-process kernel — there is no
-    // service URL and no remote deployment. Writing a remote deployment mode here would
-    // flip mobile out of `EmbeddedLibrary` (the default from
+    // iOS/Android AND macOS host the UAR as the embedded in-process kernel — there
+    // is no service URL and no remote deployment. Writing a remote deployment mode
+    // here would flip them out of `EmbeddedLibrary` (the default from
     // `selected_uar_deployment_mode`) and make every subsequent chat turn demand
-    // `uar_service_url`, which does not exist on mobile. So only desktop persists a
-    // remote deployment mode; mobile keeps its embedded default untouched.
-    #[cfg(not(any(target_os = "ios", target_os = "android")))]
+    // `uar_service_url`, which does not exist there. So only the Windows/Linux
+    // service clients persist a remote deployment mode; embedded hosts keep their
+    // embedded default untouched.
+    #[cfg(not(any(target_os = "ios", target_os = "android", target_os = "macos")))]
     config
         .set_setting(
             SETTING_UAR_DEPLOYMENT_MODE,
@@ -1251,7 +1252,13 @@ pub(crate) async fn selected_uar_deployment_mode(
         Some(other) => Err(AgentError::Config(format!(
             "unknown UAR deployment mode '{other}'"
         ))),
-        None if cfg!(any(target_os = "ios", target_os = "android")) => {
+        None if cfg!(any(
+            target_os = "ios",
+            target_os = "android",
+            target_os = "macos"
+        )) =>
+        {
+            // iOS/Android and now macOS host the embedded UAR kernel in-process.
             Ok(crate::uar::UarDeploymentMode::EmbeddedLibrary)
         }
         None => Ok(crate::uar::UarDeploymentMode::HttpService),

@@ -8,8 +8,8 @@
 
 use futures::{stream::BoxStream, StreamExt};
 use gen_ui_protocol::{
-    normalize_uar_agui_event, provenance_from_effective_run_policy,
-    uar_llm_payload_to_inference_request, A2uiAdapter, UarLlmRequestPayload,
+    normalize_uar_agui_event, uar_llm_payload_to_inference_request, A2uiAdapter,
+    UarLlmRequestPayload,
 };
 use gen_ui_types::events::A2uiEvent;
 use gen_ui_types::events::StreamEvent;
@@ -1585,6 +1585,7 @@ pub fn runtime_status() -> UarRuntimeStatus {
 mod tests {
     use super::*;
     use futures::StreamExt;
+    use gen_ui_protocol::provenance_from_effective_run_policy;
     use gen_ui_types::content_block::ContentBlock;
     use gen_ui_types::inference::{InferenceRequest, InferenceToolResult};
     use gen_ui_types::{CoreError, CoreResult};

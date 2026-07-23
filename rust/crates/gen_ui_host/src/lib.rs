@@ -262,10 +262,37 @@ async fn bootstrap_inner(
     .await
     .map_err(|error| HostError::Initialization(error.to_string()))?;
 
-    gen_ui_agent::state::init_with_inference(
+    // macOS runs the same in-process MLX engine iOS does, so it hosts the
+    // embedded UAR kernel too (no service URL) — matching mobile. Windows/Linux
+    // stay service clients (no embedded_uar). The embedded runtime is built from
+    // the same inference provider and the shared MLX provider config (macOS reuses
+    // the iOS Qwen3-4B MLX id), then handed to state alongside the provider.
+    #[cfg(target_os = "macos")]
+    let embedded_uar = match inference.clone() {
+        Some(provider) => {
+            const MACOS_MLX_MODEL_ID: &str = "qwen3.5-4b-mlx-4bit";
+            let built = gen_ui_agent::uar::UarEmbeddedRuntime::build_local(
+                provider,
+                gen_ui_types::inference::LocalModelSpec {
+                    model: MACOS_MLX_MODEL_ID.to_string(),
+                    context_len: Some(8_192),
+                },
+                gen_ui_agent::uar::ios_qwen35_mlx_provider_config(MACOS_MLX_MODEL_ID),
+            )
+            .await
+            .map_err(|error| HostError::Initialization(error.to_string()))?;
+            Some(Arc::new(built))
+        }
+        None => None,
+    };
+    #[cfg(not(target_os = "macos"))]
+    let embedded_uar = None;
+
+    gen_ui_agent::state::init_with_inference_and_uar(
         ConfigBackend::Postgres(Arc::new(config_store)),
         Arc::new(memory),
         inference,
+        embedded_uar,
     );
     tracing::info!(path = %config.data_dir.display(), "shared application host ready");
 
