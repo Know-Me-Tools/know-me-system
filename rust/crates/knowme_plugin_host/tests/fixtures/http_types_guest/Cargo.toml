@@ -1,0 +1,13 @@
+[package]
+name = "knowme_fixture_http_types"
+version = "0.1.0"
+edition = "2021"
+description = "Negative fixture: hook-world guest that also imports wasi:http/types (plugin-sandbox-extraction task 7.3)"
+
+[workspace]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wit-bindgen = "0.57"

@@ -1,0 +1,100 @@
+// File: worlds-unstable.wit
+// Minimal viable worlds (design D7): `agent`, `provider`, `service`,
+// `workflow`. Each ships with `// unstable:` annotations and is refined by
+// the named follow-up change; the additive-only policy (design D6) makes
+// refinement safe within 1.x. Payloads that are spec-defined documents
+// (A2A tasks, capability descriptors, workflow documents) stay JSON
+// strings per design D5.
+
+// unstable: refined by plugin-agent-world
+/// Long-lived agent plugin (A2A-shaped task contract, agents doc §4.1).
+world agent {
+    import host-types;
+    import host-log;
+    import host-kv;
+    import host-events;
+    import host-infer;
+    import host-memory;
+    import fs;
+    import env;
+    import time;
+
+    export lifecycle;
+
+    // unstable: refined by plugin-agent-world
+    /// Start a task. `task-json` is the A2A task document (spec-defined
+    /// document, design D5). Returns the host-issued task id.
+    export start-task: func(task-json: string) -> result<string, string>;
+
+    // unstable: refined by plugin-agent-world
+    /// Poll a task. Returns the A2A task-status document as JSON.
+    export poll-task: func(task-id: string) -> result<string, string>;
+
+    // unstable: refined by plugin-agent-world
+    /// Cancel a running task.
+    export cancel-task: func(task-id: string) -> result<_, string>;
+}
+
+// unstable: refined by plugin-provider-world
+/// Model/provider plugin.
+world provider {
+    import host-types;
+    import host-log;
+    import time;
+
+    use host-infer.{infer-request, infer-response};
+
+    export lifecycle;
+
+    // unstable: refined by plugin-provider-world
+    /// The provider's capability descriptor as JSON (modalities, model
+    /// catalog ids, limits — a spec-defined document, design D5).
+    export capabilities: func() -> result<string, string>;
+
+    // unstable: refined by plugin-provider-world
+    /// Run one inference request against this provider.
+    export infer: func(request: infer-request) -> result<infer-response, string>;
+}
+
+// unstable: refined by plugin-service-world
+/// Headless service plugin: a wasi:http-aligned request handler exposed
+/// through the host's service broker.
+world service {
+    import host-types;
+    import host-log;
+    import host-kv;
+    import time;
+
+    use host-net.{http-request, http-response};
+
+    export lifecycle;
+
+    // unstable: refined by plugin-service-world
+    /// Handle one request. Request/response records are aligned with
+    /// wasi:http types so a future `wasi:http/incoming-handler` migration
+    /// is mechanical.
+    export handle: func(request: http-request) -> result<http-response, string>;
+}
+
+// unstable: refined by plugin-workflow-bossfang
+/// Workflow plugin: a declarative workflow definition plus signal
+/// delivery.
+world workflow {
+    import host-types;
+    import host-log;
+    import host-kv;
+    import host-events;
+    import time;
+
+    export lifecycle;
+
+    // unstable: refined by plugin-workflow-bossfang
+    /// The workflow document (`knowme.workflow/1` JSON — a spec-defined
+    /// document, design D5; promoted to a WIT record when the profile
+    /// stabilizes).
+    export definition: func() -> result<string, string>;
+
+    // unstable: refined by plugin-workflow-bossfang
+    /// Deliver a named signal to a running workflow instance.
+    export on-signal: func(instance-id: string, signal: string, payload-json: string) -> result<_, string>;
+}

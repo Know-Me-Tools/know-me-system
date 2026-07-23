@@ -1,0 +1,15 @@
+[package]
+name = "knowme_fixture_hook"
+version = "0.1.0"
+edition = "2021"
+description = "Test fixture guest for the knowme:plugin@1.0.0 hook world (plugin-sandbox-extraction task 7.1)"
+
+# Standalone workspace: fixtures build for wasm32-wasip2 and must not join
+# the host workspace.
+[workspace]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wit-bindgen = "0.57"
