@@ -19,13 +19,17 @@ class RustSettingsRepository implements SettingsRepository {
     Map<String, dynamic>? cloudModel;
     try {
       uarConfig = await bridge.uarServiceConfig();
-      if ((uarConfig['serviceUrl']?.toString() ?? '').isNotEmpty) {
-        admin = await bridge.uarAdminSnapshot();
-        catalog = await bridge.chatControlCatalog();
-        providers = await bridge.providerCatalog();
-        configuredProviders = await bridge.configuredProviders();
-        cloudModel = await bridge.cloudModel();
-      }
+      // On mobile the UAR is the embedded in-process kernel, so provider/model
+      // administration is served on-device with no service URL. Always load the
+      // catalog + configured providers + active model; the try/catch keeps a
+      // cold-initializing kernel from breaking Settings. (The desktop build is
+      // the only surface that still requires a configured service URL, and it
+      // reaches this repository through a different path.)
+      admin = await bridge.uarAdminSnapshot();
+      catalog = await bridge.chatControlCatalog();
+      providers = await bridge.providerCatalog();
+      configuredProviders = await bridge.configuredProviders();
+      cloudModel = await bridge.cloudModel();
     } catch (_) {
       // A local-only installation remains fully usable. The notifier exposes
       // connection errors for explicit user operations such as Probe/Save.

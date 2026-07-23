@@ -172,6 +172,17 @@ class SettingsNotifier extends _$SettingsNotifier {
     await _reloadSnapshot();
   });
 
+  /// Make [providerId] + [modelId] the active route the embedded runtime uses
+  /// for chat. Works for both the on-device provider and cloud providers — one
+  /// unified selection. Backed by `saveCloudModel`, which the embedded Rust
+  /// branch maps to the active-provider setting + the model preference.
+  Future<void> setActiveRoute(String providerId, String modelId) =>
+      _mutate(() async {
+        await _repository.saveCloudModel(providerId, modelId);
+        state = state.copyWith(notice: 'Active model set.');
+        await _reloadSnapshot();
+      });
+
   Future<void> testProvider(String id, String? model) => _mutate(() async {
     final result = await _repository.testProvider(id, model);
     state = state.copyWith(

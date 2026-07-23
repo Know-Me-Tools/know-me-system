@@ -10,9 +10,14 @@ import '../../../../core/theme/theme_mode_provider.dart';
 import '../../../../shared/widgets/knowme_screen.dart';
 import '../providers/settings_notifier.dart';
 
+/// The well-known id of the on-device local provider in the unified picker.
+/// Mirrors the Rust `LOCAL_PROVIDER_ID`; selecting it routes the embedded
+/// runtime to the on-device model rather than a cloud provider.
+const _localProviderId = 'on-device';
+
 enum _Section {
   providers('Model providers', Icons.cloud_outlined),
-  runtime('Universal Agent Runtime', Icons.hub_outlined),
+  runtime('Runtime & policy', Icons.hub_outlined),
   localModels('Local models', Icons.memory_outlined),
   agents('Agents', Icons.smart_toy_outlined),
   skills('Skills', Icons.auto_awesome_outlined),
@@ -338,134 +343,99 @@ class _PanelHeader extends StatelessWidget {
   }
 }
 
-class _RuntimePanel extends ConsumerStatefulWidget {
+/// On mobile the Universal Agent Runtime is ALWAYS the embedded in-process
+/// kernel — there is no service URL, API key, or session to configure. This
+/// panel is a read-only status surface; the model the runtime uses is chosen in
+/// the "Model providers" tab (on-device or a configured cloud provider).
+class _RuntimePanel extends ConsumerWidget {
   const _RuntimePanel({required this.state});
   final SettingsState state;
-  @override
-  ConsumerState<_RuntimePanel> createState() => _RuntimePanelState();
-}
-
-class _RuntimePanelState extends ConsumerState<_RuntimePanel> {
-  late final TextEditingController url;
-  final key = TextEditingController();
-  final session = TextEditingController();
-  @override
-  void initState() {
-    super.initState();
-    url = TextEditingController(
-      text: widget.state.snapshot.uarConfig['serviceUrl']?.toString() ?? '',
-    );
-    session.text =
-        widget.state.snapshot.uarConfig['sessionId']?.toString() ?? '';
-  }
 
   @override
-  void dispose() {
-    url.dispose();
-    key.dispose();
-    session.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final notifier = ref.read(settingsProvider.notifier);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final cloudModel = state.snapshot.cloudModel;
+    final activeLabel = switch (cloudModel) {
+      {'providerId': final String provider, 'modelId': final String model}
+          when provider.isNotEmpty && model.isNotEmpty =>
+        '$provider / $model',
+      _ => 'On-device model',
+    };
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const _PanelHeader(
-          title: 'Universal Agent Runtime',
+          title: 'Runtime & policy',
           caption:
-              'UAR is the only cloud-LLM path. It owns providers, real agents, skills, tools, memory, knowledge, A2UI and policy.',
+              'KnowMe runs the Universal Agent Runtime in-process on this '
+              'device — agents, skills, tools, memory, knowledge, A2UI and '
+              'policy. Choose which model it uses under Model providers.',
           icon: Icons.hub_outlined,
         ),
         const SizedBox(height: 20),
         _Card(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: Row(
             children: [
-              const Text(
-                'Chat runtime',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 10),
-              SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(
-                    value: 'uar',
-                    label: Text('UAR'),
-                    icon: Icon(Icons.hub_outlined),
-                  ),
-                  ButtonSegment(
-                    value: 'local',
-                    label: Text('Local'),
-                    icon: Icon(Icons.memory_outlined),
-                  ),
-                ],
-                selected: {
-                  widget.state.snapshot.activeLane == 'uar' ? 'uar' : 'local',
-                },
-                onSelectionChanged: widget.state.saving
-                    ? null
-                    : (value) => notifier.selectLane(value.first),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: url,
-                decoration: const InputDecoration(
-                  labelText: 'UAR service URL',
-                  hintText: 'http://127.0.0.1:1906',
+              Icon(Icons.memory_outlined, color: colors.primary),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Embedded · on-device',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Active model: $activeLabel',
+                      style: TextStyle(color: colors.onSurfaceVariant),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: key,
-                obscureText: true,
-                decoration: InputDecoration(
-                  labelText: 'Service API key · optional',
-                  hintText: widget.state.snapshot.uarConfig['hasApiKey'] == true
-                      ? 'Configured · enter to replace'
-                      : 'Credential',
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: session,
-                decoration: const InputDecoration(
-                  labelText: 'Session ID · optional',
-                ),
-              ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  shad.PrimaryButton(
-                    onPressed: widget.state.saving || url.text.trim().isEmpty
-                        ? null
-                        : () => notifier.saveRuntime(
-                            serviceUrl: url.text.trim(),
-                            apiKey: key.text.trim().isEmpty
-                                ? null
-                                : key.text.trim(),
-                            sessionId: session.text.trim().isEmpty
-                                ? null
-                                : session.text.trim(),
-                          ),
-                    child: const Text('Save runtime'),
-                  ),
-                  shad.SecondaryButton(
-                    onPressed: widget.state.saving
-                        ? null
-                        : notifier.probeRuntime,
-                    child: const Text('Test runtime'),
-                  ),
-                ],
-              ),
+              const SizedBox(width: 12),
+              _StatusPill(label: 'Active', color: colors.primary),
             ],
           ),
         ),
       ],
+    );
+  }
+}
+
+/// A small text-first status pill. Status is conveyed by the label text (not
+/// color alone) to satisfy the WCAG "status not by color alone" rule.
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.label, required this.color});
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.check_circle_outline, size: 14, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -606,6 +576,38 @@ class _ProvidersPanelState extends ConsumerState<_ProvidersPanel> {
     super.dispose();
   }
 
+  /// Trailing marker for a provider row. Prefers the ACTIVE marker, then the
+  /// ON-DEVICE tag, then the configured "ON" badge. Text-based so status is
+  /// never conveyed by color alone.
+  Widget? _providerListMarker(
+    BuildContext context, {
+    required bool isActive,
+    required bool isLocal,
+    required bool isConfigured,
+  }) {
+    final colors = Theme.of(context).colorScheme;
+    if (isActive) {
+      return _StatusPill(label: 'Active', color: colors.primary);
+    }
+    if (isLocal) {
+      return Text(
+        'ON-DEVICE',
+        style: TextStyle(
+          color: colors.onSurfaceVariant,
+          fontWeight: FontWeight.w700,
+          fontSize: 11,
+        ),
+      );
+    }
+    if (isConfigured) {
+      return Text(
+        'ON',
+        style: TextStyle(color: colors.primary, fontWeight: FontWeight.w700),
+      );
+    }
+    return null;
+  }
+
   void _select(Map<String, dynamic> provider) {
     final configured = widget.state.snapshot.configuredProviders
         .where((item) => item['id'] == provider['id'])
@@ -631,13 +633,23 @@ class _ProvidersPanelState extends ConsumerState<_ProvidersPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final providers = widget.state.snapshot.providers.where((provider) {
-      final q = search.text.trim().toLowerCase();
-      return q.isEmpty ||
-          '${provider['displayName']} ${provider['id']}'.toLowerCase().contains(
-            q,
-          );
-    }).toList();
+    final providers =
+        widget.state.snapshot.providers.where((provider) {
+            final q = search.text.trim().toLowerCase();
+            return q.isEmpty ||
+                '${provider['displayName']} ${provider['id']}'
+                    .toLowerCase()
+                    .contains(q);
+          }).toList()
+          // The on-device model is pinned first so "both" reads as one unified
+          // picker; the rest keep the catalog order (configured-first from Rust).
+          ..sort((a, b) {
+            final aLocal = a['id'] == _localProviderId ? 0 : 1;
+            final bLocal = b['id'] == _localProviderId ? 0 : 1;
+            return aLocal.compareTo(bLocal);
+          });
+    final activeProviderId = widget.state.snapshot.cloudModel?['providerId']
+        ?.toString();
     final selected =
         providers.where((item) => item['id'] == selectedId).firstOrNull ??
         providers.firstOrNull;
@@ -653,14 +665,18 @@ class _ProvidersPanelState extends ConsumerState<_ProvidersPanel> {
         const _PanelHeader(
           title: 'Model providers',
           caption:
-              'All provider metadata and credentials are owned by UAR/Liter-LLM. Only enabled providers and models are exposed to agents.',
+              'Choose the model the on-device runtime uses: the built-in '
+              'on-device model, or a cloud provider you configure with an API '
+              'key. Keys are stored securely on this device.',
           icon: Icons.cloud_outlined,
         ),
         const SizedBox(height: 20),
         if (providers.isEmpty)
           _Card(
             child: const Text(
-              'Connect and test a UAR service to load its provider catalog.',
+              'Loading models from the on-device runtime… The on-device model '
+              'works offline with no key; add a cloud provider below to use a '
+              'hosted model.',
             ),
           )
         else
@@ -681,31 +697,33 @@ class _ProvidersPanelState extends ConsumerState<_ProvidersPanel> {
                   for (final provider in providers)
                     ListTile(
                       selected: provider['id'] == selected?['id'],
-                      leading: CircleAvatar(
-                        child: Text(
-                          (provider['displayName']?.toString() ??
-                                  provider['id'].toString())
-                              .substring(0, 1)
-                              .toUpperCase(),
-                        ),
-                      ),
+                      leading: provider['id'] == _localProviderId
+                          ? const CircleAvatar(
+                              child: Icon(Icons.memory_outlined, size: 20),
+                            )
+                          : CircleAvatar(
+                              child: Text(
+                                (provider['displayName']?.toString() ??
+                                        provider['id'].toString())
+                                    .substring(0, 1)
+                                    .toUpperCase(),
+                              ),
+                            ),
                       title: Text(
                         provider['displayName']?.toString() ??
                             provider['id'].toString(),
                       ),
-                      trailing: provider['configured'] == true
-                          ? const Text(
-                              'ON',
-                              style: TextStyle(
-                                color: Colors.green,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            )
-                          : null,
+                      trailing: _providerListMarker(
+                        context,
+                        isActive: provider['id'] == activeProviderId,
+                        isLocal: provider['id'] == _localProviderId,
+                        isConfigured: provider['configured'] == true,
+                      ),
                       onTap: () => _select(provider),
                     ),
                 ],
               );
+              final isLocal = selected?['id'] == _localProviderId;
               final detail = selected == null
                   ? const SizedBox.shrink()
                   : _Card(
@@ -724,28 +742,40 @@ class _ProvidersPanelState extends ConsumerState<_ProvidersPanel> {
                                   ),
                                 ),
                               ),
-                              Switch(
-                                value: enabled,
-                                onChanged: (value) =>
-                                    setState(() => enabled = value),
-                              ),
+                              if (selected['id'] == activeProviderId ||
+                                  (isLocal && activeProviderId == null))
+                                _StatusPill(
+                                  label: 'Active',
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                              // The on-device provider is always enabled and has
+                              // no credential to toggle.
+                              if (!isLocal)
+                                Switch(
+                                  value: enabled,
+                                  onChanged: (value) =>
+                                      setState(() => enabled = value),
+                                ),
                             ],
                           ),
-                          TextField(
-                            controller: apiKey,
-                            obscureText: true,
-                            decoration: const InputDecoration(
-                              labelText: 'API key',
-                              hintText: 'Stored only by UAR',
+                          // The on-device model needs no API key or host.
+                          if (!isLocal) ...[
+                            TextField(
+                              controller: apiKey,
+                              obscureText: true,
+                              decoration: const InputDecoration(
+                                labelText: 'API key',
+                                hintText: 'Stored securely on this device',
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 10),
-                          TextField(
-                            controller: baseUrl,
-                            decoration: const InputDecoration(
-                              labelText: 'API host · optional',
+                            const SizedBox(height: 10),
+                            TextField(
+                              controller: baseUrl,
+                              decoration: const InputDecoration(
+                                labelText: 'API host · optional',
+                              ),
                             ),
-                          ),
+                          ],
                           const SizedBox(height: 16),
                           const Text(
                             'Models',
@@ -801,63 +831,90 @@ class _ProvidersPanelState extends ConsumerState<_ProvidersPanel> {
                             spacing: 8,
                             runSpacing: 8,
                             children: [
+                              // "Use this model" makes the selected provider +
+                              // its default model the active route for the
+                              // embedded runtime. Available for both local and
+                              // cloud (one unified selection).
                               shad.PrimaryButton(
-                                onPressed: widget.state.saving
-                                    ? null
-                                    : () {
-                                        final modelValues = models
-                                            .map(
-                                              (model) => {
-                                                ...model,
-                                                'enabled': enabledModels
-                                                    .contains(
-                                                      model['id'].toString(),
-                                                    ),
-                                              },
-                                            )
-                                            .toList();
-                                        ref
-                                            .read(settingsProvider.notifier)
-                                            .saveProvider({
-                                              'id': selected['id'],
-                                              'kind': selected['id'],
-                                              'displayName':
-                                                  selected['displayName'],
-                                              'baseUrl':
-                                                  baseUrl.text.trim().isEmpty
-                                                  ? null
-                                                  : baseUrl.text.trim(),
-                                              'apiKey':
-                                                  apiKey.text.trim().isEmpty
-                                                  ? null
-                                                  : apiKey.text.trim(),
-                                              'enabled': enabled,
-                                              'defaultModel': defaultModel,
-                                              'models': modelValues,
-                                            });
-                                      },
-                                child: const Text('Save provider'),
-                              ),
-                              shad.SecondaryButton(
-                                onPressed: widget.state.saving
+                                onPressed:
+                                    widget.state.saving ||
+                                        (!isLocal && defaultModel == null)
                                     ? null
                                     : () => ref
                                           .read(settingsProvider.notifier)
-                                          .testProvider(
+                                          .setActiveRoute(
                                             selected['id'].toString(),
-                                            defaultModel,
+                                            isLocal
+                                                ? (defaultModel ??
+                                                      (models.isNotEmpty
+                                                          ? models.first['id']
+                                                                .toString()
+                                                          : ''))
+                                                : defaultModel!,
                                           ),
-                                child: const Text('Test connection'),
+                                child: const Text('Use this model'),
                               ),
-                              if (selected['configured'] == true)
-                                shad.GhostButton(
-                                  onPressed: () => ref
-                                      .read(settingsProvider.notifier)
-                                      .deleteProvider(
-                                        selected['id'].toString(),
-                                      ),
-                                  child: const Text('Remove'),
+                              // Local has no credential/host to save, no remote
+                              // to test, and cannot be removed.
+                              if (!isLocal) ...[
+                                shad.SecondaryButton(
+                                  onPressed: widget.state.saving
+                                      ? null
+                                      : () {
+                                          final modelValues = models
+                                              .map(
+                                                (model) => {
+                                                  ...model,
+                                                  'enabled': enabledModels
+                                                      .contains(
+                                                        model['id'].toString(),
+                                                      ),
+                                                },
+                                              )
+                                              .toList();
+                                          ref
+                                              .read(settingsProvider.notifier)
+                                              .saveProvider({
+                                                'id': selected['id'],
+                                                'kind': selected['id'],
+                                                'displayName':
+                                                    selected['displayName'],
+                                                'baseUrl':
+                                                    baseUrl.text.trim().isEmpty
+                                                    ? null
+                                                    : baseUrl.text.trim(),
+                                                'apiKey':
+                                                    apiKey.text.trim().isEmpty
+                                                    ? null
+                                                    : apiKey.text.trim(),
+                                                'enabled': enabled,
+                                                'defaultModel': defaultModel,
+                                                'models': modelValues,
+                                              });
+                                        },
+                                  child: const Text('Save provider'),
                                 ),
+                                shad.SecondaryButton(
+                                  onPressed: widget.state.saving
+                                      ? null
+                                      : () => ref
+                                            .read(settingsProvider.notifier)
+                                            .testProvider(
+                                              selected['id'].toString(),
+                                              defaultModel,
+                                            ),
+                                  child: const Text('Test connection'),
+                                ),
+                                if (selected['configured'] == true)
+                                  shad.GhostButton(
+                                    onPressed: () => ref
+                                        .read(settingsProvider.notifier)
+                                        .deleteProvider(
+                                          selected['id'].toString(),
+                                        ),
+                                    child: const Text('Remove'),
+                                  ),
+                              ],
                             ],
                           ),
                         ],
