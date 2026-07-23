@@ -7,7 +7,29 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{chat, error::AgentError};
+use crate::{chat, error::AgentError, uar::UarDeploymentMode};
+
+#[path = "provider_admin_embedded.rs"]
+mod embedded;
+
+/// Which provider-administration backend serves this platform. The service
+/// backend delegates every call to the HTTP UAR; the embedded backend serves
+/// the same operations from the on-device config store + secrets, so the mobile
+/// "Model providers" tab works with no `uar_service_url`.
+enum Backend {
+    Embedded,
+    Service,
+}
+
+/// Select the provider-admin backend from the configured deployment mode. Only
+/// [`UarDeploymentMode::EmbeddedLibrary`] uses the on-device path; the HTTP and
+/// cloud service modes both go through the service client.
+async fn backend() -> Result<Backend, AgentError> {
+    match chat::selected_uar_deployment_mode().await? {
+        UarDeploymentMode::EmbeddedLibrary => Ok(Backend::Embedded),
+        UarDeploymentMode::HttpService | UarDeploymentMode::CloudService => Ok(Backend::Service),
+    }
+}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -93,6 +115,10 @@ pub struct ProviderTestResult {
 }
 
 pub async fn catalog() -> Result<Vec<ProviderCatalogEntry>, AgentError> {
+    match backend().await? {
+        Backend::Embedded => return embedded::catalog().await,
+        Backend::Service => {}
+    }
     let client = chat::uar_service_client().await?;
     let providers_api = client.providers();
     let (catalog, configured) =
@@ -147,6 +173,10 @@ pub async fn catalog() -> Result<Vec<ProviderCatalogEntry>, AgentError> {
 }
 
 pub async fn list() -> Result<Vec<ConfiguredProvider>, AgentError> {
+    match backend().await? {
+        Backend::Embedded => return embedded::list().await,
+        Backend::Service => {}
+    }
     let client = chat::uar_service_client().await?;
     let response = client.providers().list().await.map_err(uar_error)?;
     let mut providers = response
@@ -165,6 +195,10 @@ pub async fn save(request: SaveProviderRequest) -> Result<(), AgentError> {
         return Err(AgentError::Config(
             "provider id and catalog provider id are required".into(),
         ));
+    }
+    match backend().await? {
+        Backend::Embedded => return embedded::save(request).await,
+        Backend::Service => {}
     }
     let client = chat::uar_service_client().await?;
     let existing = client
@@ -245,6 +279,10 @@ pub async fn save(request: SaveProviderRequest) -> Result<(), AgentError> {
 }
 
 pub async fn delete(id: &str) -> Result<(), AgentError> {
+    match backend().await? {
+        Backend::Embedded => return embedded::delete(id.trim()).await,
+        Backend::Service => {}
+    }
     chat::uar_service_client()
         .await?
         .providers()
@@ -254,6 +292,10 @@ pub async fn delete(id: &str) -> Result<(), AgentError> {
 }
 
 pub async fn test(id: &str, model: Option<&str>) -> Result<ProviderTestResult, AgentError> {
+    match backend().await? {
+        Backend::Embedded => return embedded::test(id.trim(), model).await,
+        Backend::Service => {}
+    }
     let result = chat::uar_service_client()
         .await?
         .providers()
@@ -270,6 +312,10 @@ pub async fn test(id: &str, model: Option<&str>) -> Result<ProviderTestResult, A
 }
 
 pub async fn get_cloud_model() -> Result<Option<ConfiguredCloudModel>, AgentError> {
+    match backend().await? {
+        Backend::Embedded => return embedded::get_cloud_model().await,
+        Backend::Service => {}
+    }
     let response = chat::uar_service_client()
         .await?
         .providers()
@@ -292,6 +338,10 @@ pub async fn get_cloud_model() -> Result<Option<ConfiguredCloudModel>, AgentErro
 }
 
 pub async fn save_cloud_model(request: SaveCloudModelRequest) -> Result<(), AgentError> {
+    match backend().await? {
+        Backend::Embedded => return embedded::save_cloud_model(request).await,
+        Backend::Service => {}
+    }
     let client = chat::uar_service_client().await?;
     let response = client.providers().list().await.map_err(uar_error)?;
     let provider = response

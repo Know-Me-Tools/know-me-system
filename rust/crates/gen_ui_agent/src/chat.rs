@@ -1235,7 +1235,8 @@ struct UarServiceChatConfig {
     session_id: Option<String>,
 }
 
-async fn selected_uar_deployment_mode() -> Result<crate::uar::UarDeploymentMode, AgentError> {
+pub(crate) async fn selected_uar_deployment_mode(
+) -> Result<crate::uar::UarDeploymentMode, AgentError> {
     let configured = string_setting(SETTING_UAR_DEPLOYMENT_MODE)
         .await?
         .or_else(|| std::env::var("KNOWME_UAR_DEPLOYMENT_MODE").ok());

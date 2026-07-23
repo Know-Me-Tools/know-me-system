@@ -820,6 +820,10 @@ pub trait UarRuntimeFacade: Send + Sync {
 #[derive(Clone)]
 pub struct UarEmbeddedRuntime {
     runtime: universal_agent_runtime_sdk::Runtime,
+    /// The single routing driver the runtime executes every run through. Retained
+    /// so provider-admin mutations can invalidate its cached cloud drivers when a
+    /// provider is re-keyed or removed (see [`Self::invalidate_routing_cache`]).
+    routing: Arc<UarRoutingDriver>,
 }
 
 impl std::fmt::Debug for UarEmbeddedRuntime {
@@ -848,10 +852,11 @@ impl UarEmbeddedRuntime {
         // registry after build (see `register_cloud_providers`) so they list and
         // resolve for policy/telemetry; execution switching is the driver's job.
         let local_bridge = Arc::new(UarLocalInferenceDriverBridge::new(provider, model_spec));
-        let driver: Arc<dyn LlmDriver> = Arc::new(UarRoutingDriver::new(
+        let routing = Arc::new(UarRoutingDriver::new(
             local_bridge,
             Arc::new(ConfigActiveSelector),
         ));
+        let driver: Arc<dyn LlmDriver> = routing.clone();
         let persistence: Arc<dyn universal_agent_runtime::uar::persistence::PersistenceLayer> =
             Arc::new(
                 universal_agent_runtime::uar::persistence::providers::memory::InMemoryProvider::new(
@@ -864,7 +869,29 @@ impl UarEmbeddedRuntime {
             .build()
             .await
             .map_err(|error| AgentError::Config(format!("embedded UAR: {error}")))?;
-        Ok(Self { runtime })
+        Ok(Self { runtime, routing })
+    }
+
+    /// Register (or replace) a cloud provider in the embedded runtime's provider
+    /// registry so it lists and resolves for policy/telemetry. Execution switching
+    /// between local and cloud remains the routing driver's job; this only keeps
+    /// the registry's view of configured providers in sync with the config store.
+    pub async fn register_cloud_provider(
+        &self,
+        config: UarProviderConfig,
+    ) -> Result<(), AgentError> {
+        self.runtime
+            .provider_registry()
+            .register_custom_provider(config)
+            .await
+            .map_err(|error| AgentError::Config(format!("register cloud provider: {error}")))
+    }
+
+    /// Drop every cached cloud driver held by the routing driver. Call after any
+    /// provider credential/base-URL/selection change so the next run rebuilds the
+    /// driver from the updated config rather than reusing a stale client.
+    pub async fn invalidate_routing_cache(&self) {
+        self.routing.invalidate_cloud_cache().await;
     }
 
     fn projected_run(
