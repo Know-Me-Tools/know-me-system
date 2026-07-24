@@ -894,6 +894,76 @@ impl UarEmbeddedRuntime {
         self.routing.invalidate_cloud_cache().await;
     }
 
+    // ---- embedded admin surface ----
+    //
+    // Thin JSON facades over the SDK Runtime's in-process settings + agent admin
+    // (added in the embedded-run-policy-and-admin-surface UAR change), so the
+    // KnowMe `control_plane` embedded branch can administer settings and agents
+    // with no HTTP service. Each serializes the typed SDK result to the
+    // `serde_json::Value` shape `control_plane`'s HTTP path already returns.
+
+    /// Read a typed setting (e.g. `run_policy.global`); `None` when unset.
+    pub async fn get_setting(&self, key: &str) -> Result<Option<serde_json::Value>, AgentError> {
+        self.runtime
+            .get_setting(key)
+            .await
+            .map_err(|error| AgentError::Config(format!("get setting {key}: {error}")))
+    }
+
+    /// Write a typed setting value.
+    pub async fn set_setting(&self, key: &str, value: serde_json::Value) -> Result<(), AgentError> {
+        self.runtime
+            .set_setting(key, value)
+            .await
+            .map_err(|error| AgentError::Config(format!("set setting {key}: {error}")))
+    }
+
+    /// Current setting values + registered setting types, as `(values, types)`
+    /// JSON — the shape the admin snapshot exposes.
+    pub async fn settings_snapshot(
+        &self,
+    ) -> Result<(serde_json::Value, serde_json::Value), AgentError> {
+        let snapshot = self
+            .runtime
+            .settings_snapshot()
+            .await
+            .map_err(|error| AgentError::Config(format!("settings snapshot: {error}")))?;
+        let values = serde_json::to_value(&snapshot.values)
+            .map_err(|error| AgentError::Config(format!("serialize settings: {error}")))?;
+        let types = serde_json::to_value(&snapshot.types)
+            .map_err(|error| AgentError::Config(format!("serialize setting types: {error}")))?;
+        Ok((values, types))
+    }
+
+    /// All agent definitions as JSON.
+    pub async fn list_agents(&self) -> Result<serde_json::Value, AgentError> {
+        let agents = self
+            .runtime
+            .list_agents()
+            .await
+            .map_err(|error| AgentError::Config(format!("list agents: {error}")))?;
+        serde_json::to_value(&agents)
+            .map_err(|error| AgentError::Config(format!("serialize agents: {error}")))
+    }
+
+    /// Create or replace an agent from its JSON artifact.
+    pub async fn upsert_agent(&self, agent: &serde_json::Value) -> Result<(), AgentError> {
+        let artifact = serde_json::from_value(agent.clone())
+            .map_err(|error| AgentError::Config(format!("parse agent artifact: {error}")))?;
+        self.runtime
+            .upsert_agent(artifact)
+            .await
+            .map_err(|error| AgentError::Config(format!("upsert agent: {error}")))
+    }
+
+    /// Delete an agent by id.
+    pub async fn delete_agent(&self, id: &str) -> Result<(), AgentError> {
+        self.runtime
+            .delete_agent(id)
+            .await
+            .map_err(|error| AgentError::Config(format!("delete agent {id}: {error}")))
+    }
+
     fn projected_run(
         &self,
         run_id: String,
