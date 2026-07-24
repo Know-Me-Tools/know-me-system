@@ -964,6 +964,63 @@ impl UarEmbeddedRuntime {
             .map_err(|error| AgentError::Config(format!("delete agent {id}: {error}")))
     }
 
+    /// Load the per-conversation run policy record, or `null` when none is saved.
+    pub async fn conversation_policy(
+        &self,
+        conversation_id: &str,
+    ) -> Result<serde_json::Value, AgentError> {
+        let record = self
+            .runtime
+            .get_conversation_policy(conversation_id)
+            .await
+            .map_err(|error| AgentError::Config(format!("load conversation policy: {error}")))?;
+        serde_json::to_value(&record)
+            .map_err(|error| AgentError::Config(format!("serialize conversation policy: {error}")))
+    }
+
+    /// Save or replace the per-conversation run policy; echoes the stored record.
+    pub async fn save_conversation_policy(
+        &self,
+        conversation_id: &str,
+        policy: &serde_json::Value,
+    ) -> Result<serde_json::Value, AgentError> {
+        let run_policy = serde_json::from_value(policy.clone())
+            .map_err(|error| AgentError::Config(format!("parse run policy: {error}")))?;
+        let record = self
+            .runtime
+            .save_conversation_policy(conversation_id, run_policy)
+            .await
+            .map_err(|error| AgentError::Config(format!("save conversation policy: {error}")))?;
+        serde_json::to_value(&record)
+            .map_err(|error| AgentError::Config(format!("serialize conversation policy: {error}")))
+    }
+
+    /// Delete the per-conversation run policy.
+    pub async fn delete_conversation_policy(
+        &self,
+        conversation_id: &str,
+    ) -> Result<(), AgentError> {
+        self.runtime
+            .delete_conversation_policy(conversation_id)
+            .await
+            .map_err(|error| AgentError::Config(format!("delete conversation policy: {error}")))
+    }
+
+    /// Resolve the effective configuration (agent + requested + effective policy)
+    /// for a conversation, mirroring the service path's effective-config shape.
+    pub async fn effective_config(
+        &self,
+        conversation_id: &str,
+    ) -> Result<serde_json::Value, AgentError> {
+        let config = self.runtime.effective_config(conversation_id).await;
+        Ok(serde_json::json!({
+            "sessionId": conversation_id,
+            "agent": config.agent,
+            "requestedPolicy": config.requested_policy,
+            "effectivePolicy": config.effective_policy,
+        }))
+    }
+
     fn projected_run(
         &self,
         run_id: String,

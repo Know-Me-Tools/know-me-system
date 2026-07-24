@@ -249,7 +249,9 @@ pub async fn delete_knowledge_base(id: &str) -> Result<(), AgentError> {
 
 pub async fn conversation_policy(conversation_id: &str) -> Result<serde_json::Value, AgentError> {
     if let Backend::Embedded = backend().await? {
-        return Err(not_on_embedded("per-conversation policy"));
+        return crate::state::embedded_uar()?
+            .conversation_policy(conversation_id)
+            .await;
     }
     chat::uar_service_client()
         .await?
@@ -264,7 +266,9 @@ pub async fn save_conversation_policy(
     policy: &serde_json::Value,
 ) -> Result<serde_json::Value, AgentError> {
     if let Backend::Embedded = backend().await? {
-        return Err(not_on_embedded("per-conversation policy"));
+        return crate::state::embedded_uar()?
+            .save_conversation_policy(conversation_id, policy)
+            .await;
     }
     chat::uar_service_client()
         .await?
@@ -276,7 +280,9 @@ pub async fn save_conversation_policy(
 
 pub async fn delete_conversation_policy(conversation_id: &str) -> Result<(), AgentError> {
     if let Backend::Embedded = backend().await? {
-        return Err(not_on_embedded("per-conversation policy"));
+        return crate::state::embedded_uar()?
+            .delete_conversation_policy(conversation_id)
+            .await;
     }
     chat::uar_service_client()
         .await?
@@ -288,7 +294,9 @@ pub async fn delete_conversation_policy(conversation_id: &str) -> Result<(), Age
 
 pub async fn effective_config(conversation_id: &str) -> Result<serde_json::Value, AgentError> {
     if let Backend::Embedded = backend().await? {
-        return Err(not_on_embedded("effective config resolution"));
+        return crate::state::embedded_uar()?
+            .effective_config(conversation_id)
+            .await;
     }
     chat::uar_service_client()
         .await?
