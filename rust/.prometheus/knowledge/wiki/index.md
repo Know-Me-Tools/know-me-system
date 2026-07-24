@@ -2,6 +2,12 @@
 
 ## Reference
 
+* [Mobile embedded-UAR provider config (local⊕cloud) + cross-platform parity](/mobile-embedded-uar-provider-config-and-parity.md)
+* [iOS MLX switchover + Qwen3.5→Qwen3-4B arch fix + build fixes](/ios-mlx-switchover-and-qwen3-arch-fix.md)
+* [<think> reasoning split into ThinkingDelta (multi-tag segmenter)](/ios-think-split-segmenter.md)
+* [Transport-free AG-UI encoder in the UAR (ADR 0012)](/transport-free-agui-encoder-in-uar.md)
+* [Full-agentic local parity + LANE_LOCAL vs LANE_UAR](/local-agentic-parity-and-lanes.md)
+* [WebLLM in-browser local inference — demonstrated live](/webllm-browser-local-inference-demo.md)
 * [Android Rust cross-compile progress for Hybrid Mobile PoC](/android-rust-cross-compile-progress-for-hybrid-mobile-poc.md)
 * [Android Rust target install during Hybrid Mobile PoC verification](/android-rust-target-install-during-hybrid-mobile-poc-verification.md)
 * [Codegen and CI Verification Executor Completion Marker](/codegen-and-ci-verification-executor-completion-marker.md)

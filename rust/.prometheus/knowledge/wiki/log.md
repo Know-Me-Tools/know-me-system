@@ -35,3 +35,10 @@
 * **Creation**: [Executor Session Completion for Codegen and CI Verification](/executor-session-completion-for-codegen-and-ci-verification.md)
 * **Creation**: [KnowMe PoC SurrealDB RELATE error handling and endpoint fix](/knowme-poc-surrealdb-relate-error-handling-and-endpoint-fix.md)
 * **Creation**: [Hybrid Mobile PoC iOS Skia Verification Status](/hybrid-mobile-poc-ios-skia-verification-status.md)
+* **Creation**: [iOS MLX switchover + Qwen3.5→Qwen3-4B arch fix + build fixes](/ios-mlx-switchover-and-qwen3-arch-fix.md)
+* **Creation**: [<think> reasoning split into ThinkingDelta (multi-tag segmenter)](/ios-think-split-segmenter.md)
+* **Creation**: [Transport-free AG-UI encoder in the UAR (ADR 0012)](/transport-free-agui-encoder-in-uar.md)
+* **Creation**: [Full-agentic local parity + LANE_LOCAL vs LANE_UAR](/local-agentic-parity-and-lanes.md)
+* **Creation**: [WebLLM in-browser local inference — demonstrated live](/webllm-browser-local-inference-demo.md)
+
+* 2026-07-24 — Mobile embedded-UAR provider config (M1 routing driver, M2 on-device admin, M3/M4 always-embedded + Flutter, M6/M6b provenance, M7 macOS embedded host); cross-platform parity verified; M5a UAR submodule change (embedded run-policy + admin surface, ADR 0013) authored + delegated.
