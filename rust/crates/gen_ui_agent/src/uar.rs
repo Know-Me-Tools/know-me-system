@@ -95,6 +95,24 @@ pub struct UarRunRequest {
     pub session_id: Option<String>,
     pub agent_id: Option<String>,
     pub run_policy: Option<serde_json::Value>,
+    /// Prior conversation turns from the host's durable store, used to seed an
+    /// empty embedded session after a cold start so the UAR lane presents the
+    /// full thread to the model rather than only the current message.
+    #[serde(default)]
+    pub history: Vec<UarSeedMessage>,
+}
+
+/// A prior conversation turn supplied to seed the embedded session.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct UarSeedMessage {
+    /// `"user"`, `"assistant"`, `"tool"`, or `"system"`.
+    pub role: String,
+    /// The message text.
+    pub content: String,
+    /// The tool-call id when `role == "tool"`.
+    #[serde(default)]
+    pub tool_call_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -1067,23 +1085,50 @@ impl UarRuntimeFacade for UarEmbeddedRuntime {
 
     async fn start_run(&self, request: UarRunRequest) -> Result<UarProjectedRun, AgentError> {
         let conversation_id = request.session_id;
+        let seed_history: Vec<universal_agent_runtime_sdk::SeedMessage> = request
+            .history
+            .into_iter()
+            .map(|message| universal_agent_runtime_sdk::SeedMessage {
+                role: message.role,
+                content: message.content,
+                tool_call_id: message.tool_call_id,
+            })
+            .collect();
         let run_id = if let Some(artifact) = request.artifact {
             let artifact = serde_json::from_value(artifact)
                 .map_err(|error| AgentError::Config(format!("UAR agent artifact: {error}")))?;
             self.runtime
-                .start_run(artifact, request.input, conversation_id, None, Vec::new())
-                .await
-        } else {
-            self.runtime
-                .start_agent_run(
-                    request.agent_id.as_deref().unwrap_or("orchestrator-agent"),
+                .start_run_with_history(
+                    artifact,
                     request.input,
                     conversation_id,
                     None,
                     Vec::new(),
+                    seed_history,
                 )
                 .await
+        } else {
+            // Resolve the built-in agent, then start with seeded history so the
+            // agentless (orchestrator) path also repopulates a cold session.
+            let agent_id = request.agent_id.as_deref().unwrap_or("orchestrator-agent");
+            let artifact = self
+                .runtime
+                .get_agent(agent_id)
+                .await
                 .map_err(embedded_sdk_error)?
+                .ok_or_else(|| {
+                    AgentError::Config(format!("UAR agent '{agent_id}' was not found"))
+                })?;
+            self.runtime
+                .start_run_with_history(
+                    artifact,
+                    request.input,
+                    conversation_id,
+                    None,
+                    Vec::new(),
+                    seed_history,
+                )
+                .await
         };
         self.subscribe_projected(run_id).await
     }
@@ -2119,6 +2164,7 @@ mod tests {
                 session_id: Some("offline-test-conversation".into()),
                 agent_id: None,
                 run_policy: None,
+                history: Vec::new(),
             })
             .await
             .expect("seeded orchestrator run starts");
@@ -2784,6 +2830,7 @@ mod tests {
                 session_id: Some("session-1".into()),
                 agent_id: None,
                 run_policy: None,
+                history: Vec::new(),
             })
             .await
             .unwrap();

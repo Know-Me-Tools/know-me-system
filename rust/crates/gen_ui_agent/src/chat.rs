@@ -198,7 +198,7 @@ pub async fn send(
         .await;
     }
     if lane == LANE_UAR {
-        return send_uar(user_message, conversation_id, run_id).await;
+        return send_uar(user_message, history, conversation_id, run_id).await;
     }
 
     let pref = state::config()?
@@ -486,7 +486,7 @@ async fn send_content(
         .await;
     }
     if lane == LANE_UAR {
-        return send_uar(local_fallback, conversation_id, run_id).await;
+        return send_uar(local_fallback, history, conversation_id, run_id).await;
     }
     let pref = state::config()?
         .get_model_pref(SURFACE_CHAT, LANE_CLOUD)
@@ -1312,6 +1312,7 @@ async fn selected_uar_runtime() -> Result<
 
 async fn send_uar(
     user_message: String,
+    history: Vec<InferenceMessage>,
     conversation_id: String,
     run_id: String,
 ) -> Result<String, AgentError> {
@@ -1361,13 +1362,33 @@ async fn send_uar(
             message: "Starting Universal Agent Runtime run".into(),
         });
 
+        // Key the session strictly by the per-conversation id. A global
+        // `uar_session_id` setting (a service-era concept) must NOT collapse every
+        // conversation into one shared session on the embedded runtime — that
+        // bleeds context across conversations. Only honor it on the service path,
+        // where the session id is the caller's contract with a remote UAR.
+        let session_id = match runtime_mode {
+            "embedded_library" => Some(conversation_id.clone()),
+            _ => config.session_id.clone().or(Some(conversation_id.clone())),
+        };
+        // Seed the embedded session from the host's durable history so a
+        // cold-started conversation still presents the full thread to the model.
+        let seed_history = history
+            .into_iter()
+            .map(|message| crate::uar::UarSeedMessage {
+                role: message.role.as_str().to_owned(),
+                content: message.content,
+                tool_call_id: message.tool_call_id,
+            })
+            .collect::<Vec<_>>();
         let projected = match runtime
             .start_run(crate::uar::UarRunRequest {
                 artifact: config.artifact,
                 input: user_message,
-                session_id: config.session_id.or(Some(conversation_id.clone())),
+                session_id,
                 agent_id: None,
                 run_policy: None,
+                history: seed_history,
             })
             .await
         {
