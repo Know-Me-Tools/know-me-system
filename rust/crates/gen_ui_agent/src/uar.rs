@@ -1269,163 +1269,37 @@ fn project_embedded_stream(
                         Err(tokio::sync::broadcast::error::RecvError::Closed) => return None,
                     }
                 };
-                let payload = embedded_stream_payload(event);
-                projected.extend(projector.ingest_agui_payload(&payload));
+                if let Some(payload) = embedded_stream_payload(&event) {
+                    projected.extend(projector.ingest_agui_payload(&payload));
+                }
             }
         },
     )
     .boxed()
 }
 
+/// Encode one embedded-runtime stream event as an AG-UI frame.
+///
+/// Delegates to UAR's canonical transport-free encoder (ADR 0012) rather than
+/// maintaining a parallel `NormalizedEvent -> AG-UI` map here: the runtime owns
+/// the wire contract, and a second hand-rolled copy silently drifts from it.
+/// Returns `None` for events that produce no wire frame.
 fn embedded_stream_payload(
-    event: universal_agent_runtime::uar::runtime::manager::StreamEvent,
-) -> serde_json::Value {
-    use universal_agent_runtime::uar::domain::events::NormalizedEvent;
-
-    let event_id = event.id.to_string();
-    let custom = |name: &str, run_id: Option<&str>, value: serde_json::Value| {
-        serde_json::json!({
-            "type": "CUSTOM",
-            "profile": "uar.agui/1",
-            "name": name,
-            "value": value,
-            "runId": run_id,
-            "threadId": run_id,
-            "eventId": event_id,
-        })
+    event: &universal_agent_runtime::uar::runtime::manager::StreamEvent,
+) -> Option<serde_json::Value> {
+    use universal_agent_runtime::uar::api::adapters::{
+        enrich_agui_spec_payload, to_agui_spec_event,
     };
-    match event.event {
-        NormalizedEvent::RunStart { run_id, agent_id } => serde_json::json!({
-            "type": "RUN_STARTED", "profile": "uar.agui/1", "eventId": event_id,
-            "threadId": run_id, "runId": run_id, "input": { "agentId": agent_id }
-        }),
-        NormalizedEvent::ChatDelta { run_id, text_delta } => serde_json::json!({
-            "type": "TEXT_MESSAGE_CONTENT", "profile": "uar.agui/1", "eventId": event_id,
-            "messageId": format!("{run_id}:assistant"), "delta": text_delta,
-            "threadId": run_id, "runId": run_id
-        }),
-        NormalizedEvent::ThinkingDelta { run_id, text_delta }
-        | NormalizedEvent::ReasoningDelta { run_id, text_delta } => serde_json::json!({
-            "type": "REASONING_MESSAGE_CONTENT", "profile": "uar.agui/1", "eventId": event_id,
-            "messageId": format!("{run_id}:reasoning"), "delta": text_delta,
-            "threadId": run_id, "runId": run_id
-        }),
-        NormalizedEvent::Citation { run_id, sources } => serde_json::json!({
-            "type": "agui.citation.added", "eventId": event_id,
-            "request_id": run_id, "citations": sources
-        }),
-        NormalizedEvent::RagCitations { run_id, citations } => serde_json::json!({
-            "type": "agui.rag_citations", "eventId": event_id,
-            "request_id": run_id, "citations": citations
-        }),
-        NormalizedEvent::MemoryRecall { run_id, items } => serde_json::json!({
-            "type": "agui.memory.recall", "eventId": event_id,
-            "request_id": run_id, "items": items
-        }),
-        NormalizedEvent::SkillActivated {
-            run_id,
-            skill_id,
-            title,
-            selection_method,
-        } => serde_json::json!({
-            "type": "agui.skill.activated", "eventId": event_id,
-            "request_id": run_id, "skill": { "id": skill_id, "title": title },
-            "selection_method": selection_method, "phase": "activated"
-        }),
-        NormalizedEvent::ToolDelta {
-            run_id,
-            call_index,
-            tool_call_id,
-            delta,
-        } => serde_json::json!({
-            "type": "agui.tool_call.delta", "eventId": event_id,
-            "request_id": run_id, "call_index": call_index, "id": tool_call_id,
-            "delta": { "arguments": delta.to_string() }
-        }),
-        NormalizedEvent::ToolStart {
-            run_id,
-            call_index,
-            tool_call_id,
-            tool,
-            input,
-        } => serde_json::json!({
-            "type": "agui.tool_call.complete", "eventId": event_id,
-            "request_id": run_id, "call_index": call_index, "id": tool_call_id,
-            "name": tool, "arguments_json": input.to_string()
-        }),
-        NormalizedEvent::ToolEnd {
-            run_id,
-            call_index,
-            tool_call_id,
-            tool,
-            output,
-            ok,
-        } => serde_json::json!({
-            "type": "agui.tool_result", "eventId": event_id,
-            "request_id": run_id, "call_index": call_index, "id": tool_call_id,
-            "name": tool, "content": output.to_string(), "success": ok
-        }),
-        NormalizedEvent::Artifact { run_id, artifact }
-        | NormalizedEvent::ArtifactDisplay { run_id, artifact } => custom(
-            "uar.artifact.available",
-            Some(&run_id),
-            serde_json::json!({
-                "artifactId": artifact.artifact_id,
-                "artifactType": artifact.artifact_type,
-                "title": artifact.title,
-                "content": artifact.content,
-                "language": artifact.language,
-                "metadata": artifact.metadata,
-                "sourceRunId": run_id,
-            }),
-        ),
-        NormalizedEvent::ArtifactInputRequest { run_id, artifact } => custom(
-            "uar.artifact.input_required",
-            Some(&run_id),
-            serde_json::json!({
-                "artifactId": artifact.artifact_id,
-                "artifactType": artifact.artifact_type,
-                "title": artifact.title,
-                "content": artifact.content,
-                "metadata": artifact.metadata,
-                "sourceRunId": run_id,
-            }),
-        ),
-        NormalizedEvent::Error {
-            run_id,
-            code,
-            message,
-        } => serde_json::json!({
-            "type": "RUN_ERROR", "profile": "uar.agui/1", "eventId": event_id,
-            "threadId": run_id, "runId": run_id, "code": code, "message": message
-        }),
-        NormalizedEvent::Cancelled { run_id } => serde_json::json!({
-            "type": "agui.cancelled", "eventId": event_id, "request_id": run_id,
-            "message": "Run cancelled"
-        }),
-        NormalizedEvent::RunDone { run_id } | NormalizedEvent::RunDoneWithUsage { run_id, .. } => {
-            serde_json::json!({
-                "type": "RUN_FINISHED", "profile": "uar.agui/1", "eventId": event_id,
-                "threadId": run_id, "runId": run_id
-            })
-        }
-        NormalizedEvent::StatePatch { run_id, patch } => serde_json::json!({
-            "type": "CUSTOM", "profile": "uar.agui/1", "eventId": event_id,
-            "name": "agui.state.patch", "runId": run_id, "threadId": run_id,
-            "value": { "patch": patch }
-        }),
-        other => {
-            let value = serde_json::to_value(&other).unwrap_or_else(
-                |error| serde_json::json!({ "serializationError": error.to_string() }),
-            );
-            let name = value
-                .get("type")
-                .and_then(serde_json::Value::as_str)
-                .map(|kind| format!("uar.{}", kind.to_ascii_lowercase()))
-                .unwrap_or_else(|| "uar.unknown".into());
-            custom(&name, None, value)
-        }
-    }
+
+    let (event_name, payload) = to_agui_spec_event(&event.event)?;
+    // Ordinal 8 matches the SSE path so live and embedded frames share the same
+    // `eventId`/`sequence` derivation.
+    Some(enrich_agui_spec_payload(
+        event_name,
+        payload,
+        &event.id.to_string(),
+        8,
+    ))
 }
 
 #[derive(Debug, Clone)]
