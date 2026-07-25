@@ -7,8 +7,17 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { useUarAdmin } from '../hooks/useUarAdmin'
+import { ModelRoutePicker, type ModelRoute } from './ModelRoutePicker'
 
 type JsonRecord = Record<string, unknown>
+
+/** Read a `{ provider_id, model_id }` route from a policy draft, or null. */
+function modelRoute(value: unknown): ModelRoute | null {
+  const model = record(value)
+  const providerId = text(model.provider_id)
+  const modelId = text(model.model_id)
+  return providerId && modelId ? { provider_id: providerId, model_id: modelId } : null
+}
 
 const fieldClass = 'min-h-11 border-0 bg-[color:var(--color-surface)] shadow-none focus-visible:ring-2'
 
@@ -115,7 +124,6 @@ export function AgentsPanel() {
     mcp_servers: ids(toolsRoot.mcp_servers).map((id) => ({ id, label: id })),
     knowledge_bases: array(admin.snapshot?.knowledgeBases).map((item) => ({ id: text(item.id), label: text(item.name) || text(item.id) })).filter((item) => item.id),
   }
-  const model = record(agentPolicy.model)
   return <div>
     <PanelHeader icon={Bot} title="Agents" caption="Agent definitions and execution metadata are stored and enforced by UAR. The Orchestrator and Default agents are protected." />
     <div className="mt-6 grid gap-4 md:grid-cols-[16rem_minmax(0,1fr)]">
@@ -124,7 +132,7 @@ export function AgentsPanel() {
         <div><Label htmlFor="agent-title">Name</Label><Input id="agent-title" className={fieldClass} value={displayedTitle} onChange={(event) => setTitle(event.target.value)} /></div>
         <div><Label htmlFor="agent-description">Description</Label><Input id="agent-description" className={fieldClass} value={displayedDescription} onChange={(event) => setDescription(event.target.value)} /></div>
         <div><Label htmlFor="agent-prompt">System prompt</Label><Textarea id="agent-prompt" className={`${fieldClass} min-h-40`} value={displayedPrompt} onChange={(event) => setSystemPrompt(event.target.value)} /></div>
-        <div className="grid gap-3 sm:grid-cols-2"><div><Label htmlFor="agent-provider">Provider</Label><Input id="agent-provider" className={fieldClass} value={text(model.provider_id)} onChange={(event) => setAgentPolicy((current) => ({ ...current, model: { ...record(current.model), provider_id: event.target.value } }))} placeholder="Use configured default" /></div><div><Label htmlFor="agent-model">Model</Label><Input id="agent-model" className={fieldClass} value={text(model.model_id)} onChange={(event) => setAgentPolicy((current) => ({ ...current, model: { ...record(current.model), model_id: event.target.value } }))} placeholder="Use configured default" /></div></div>
+        <div className="space-y-2"><p className="text-sm font-semibold">Model</p><p className="text-xs leading-5 text-[color:var(--color-fg-faint)]">Overrides the global default for this agent. Leave on global default to inherit.</p><ModelRoutePicker value={modelRoute(agentPolicy.model)} onChange={(route) => setAgentPolicy((current) => ({ ...current, model: route }))} inheritLabel="Global default" disabled={admin.saving} /></div>
         <div className="space-y-3"><p className="text-sm font-semibold">Agent execution policy</p>{(['skills', 'tools', 'mcp_servers', 'knowledge_bases'] as const).map((key) => <PolicyResourceEditor key={key} label={{ skills: 'Skills', tools: 'Tools', mcp_servers: 'MCP servers', knowledge_bases: 'Knowledge bases' }[key]} value={record(agentPolicy[key])} options={choices[key]} onChange={(value) => setAgentPolicy((current) => ({ ...current, [key]: value }))} />)}</div>
         <div className="grid gap-3 sm:grid-cols-2"><label className="rounded-xl bg-[color:var(--color-surface)] p-4 text-sm font-semibold">Memory<select className={`${fieldClass} mt-2 w-full rounded-xl px-3 font-normal`} value={agentPolicy.memory_enabled === false ? 'off' : 'on'} onChange={(event) => setAgentPolicy((current) => ({ ...current, memory_enabled: event.target.value === 'on' }))}><option value="on">Enabled</option><option value="off">Disabled</option></select></label><label className="rounded-xl bg-[color:var(--color-surface)] p-4 text-sm font-semibold">Tool approval<select className={`${fieldClass} mt-2 w-full rounded-xl px-3 font-normal`} value={text(agentPolicy.tool_approval) || 'inherit'} onChange={(event) => setAgentPolicy((current) => ({ ...current, tool_approval: event.target.value }))}><option value="inherit">Global default</option><option value="auto">UAR governance</option><option value="ask">Always ask</option><option value="deny">Deny tools</option></select></label></div>
         <div className="flex justify-between gap-2">{!newMode && !protectedAgent && selected ? <Button variant="ghost" onClick={() => void admin.deleteAgent(text(selected.id))}><Trash2 aria-hidden /> Delete</Button> : <span /> }<Button disabled={admin.saving || !displayedTitle.trim()} onClick={() => void save()}><Save aria-hidden /> Save agent</Button></div>
@@ -187,6 +195,7 @@ export function GlobalRunPolicyPanel() {
   const contextType = text(record(draft.context_strategy).type) || 'inherit'
   const contextValue = (type: string): unknown => type === 'inherit' ? null : type === 'none' ? { type } : type === 'sliding_window' ? { type, max_messages: 20 } : type === 'summarize' ? { type, threshold: 12, summary_max_tokens: 500, model: null } : type === 'truncate_middle' ? { type, keep_first: 4, keep_last: 16 } : { type, short_term_turns: 5, mid_term_summary_tokens: 2_000, long_term_facts_tokens: 500 }
   return <div className="mt-8"><PanelHeader icon={SlidersHorizontal} title="Global chat policy" caption="This policy is persisted by UAR and is the first scope applied to every agent and conversation. Lower scopes may narrow it but cannot re-enable globally denied resources." />
+    <div className="mt-5 rounded-xl bg-[color:var(--color-surface)] p-4"><p className="text-sm font-semibold">Default model</p><p className="mt-1 text-sm leading-6 text-[color:var(--color-fg-sub)]">The model every conversation uses unless an agent or conversation overrides it. Leave on runtime default to use the on-device model.</p><div className="mt-3"><ModelRoutePicker value={modelRoute(draft.model)} onChange={(route) => setDraft((current) => ({ ...current, model: route }))} inheritLabel="Runtime default" disabled={admin.saving} /></div></div>
     <div className="mt-5 grid gap-3">{(['skills', 'tools', 'mcp_servers', 'knowledge_bases'] as const).map((key) => <PolicyResourceEditor key={key} label={{ skills: 'Skills', tools: 'Tools', mcp_servers: 'MCP servers', knowledge_bases: 'Knowledge bases' }[key]} value={record(draft[key])} options={choices[key]} onChange={(value) => updateResource(key, value)} />)}</div>
     <div className="mt-3 grid gap-3 sm:grid-cols-3">
       <label className="rounded-xl bg-[color:var(--color-surface)] p-4 text-sm font-semibold">Context strategy<select className={`${fieldClass} mt-2 w-full rounded-xl px-3 font-normal`} value={contextType} onChange={(event) => setDraft((current) => ({ ...current, context_strategy: contextValue(event.target.value) }))}><option value="inherit">Runtime default</option><option value="none">Full history</option><option value="sliding_window">Sliding window</option><option value="summarize">Summarize</option><option value="truncate_middle">First + latest</option><option value="hierarchical">Hierarchical</option></select></label>

@@ -9,6 +9,7 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
 import '../../../../core/theme/theme_mode_provider.dart';
 import '../../../../shared/widgets/knowme_screen.dart';
 import '../providers/settings_notifier.dart';
+import '../widgets/model_route_picker.dart';
 
 /// The well-known id of the on-device local provider in the unified picker.
 /// Mirrors the Rust `LOCAL_PROVIDER_ID`; selecting it routes the embedded
@@ -468,16 +469,79 @@ class _GlobalPolicyPanel extends ConsumerWidget {
               'The connected UAR has not registered run_policy.global yet. Restart or update the UAR service, then refresh.',
             ),
           )
-        else
+        else ...[
+          _Card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Default model',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'The model every conversation uses unless an agent or '
+                  'conversation overrides it. Leave on runtime default to use '
+                  'the on-device model.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ModelRoutePicker(
+                  providers: state.snapshot.providers,
+                  value: _routeFromPolicy(setting['data']),
+                  inheritLabel: 'Runtime default',
+                  enabled: !state.saving,
+                  onChanged: (route) => ref
+                      .read(settingsProvider.notifier)
+                      .saveSetting(
+                        'run_policy.global',
+                        _policyWithModel(setting['data'], route),
+                      ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
           _SettingEditor(
             setting: setting,
             save: (value) => ref
                 .read(settingsProvider.notifier)
                 .saveSetting('run_policy.global', value),
           ),
+        ],
       ],
     );
   }
+}
+
+/// Read a `{ providerId, modelId }` route from a policy value's `model` field.
+Map<String, String>? _routeFromPolicy(dynamic policy) {
+  if (policy is Map) {
+    final model = policy['model'];
+    if (model is Map) {
+      final provider = model['provider_id']?.toString() ?? '';
+      final id = model['model_id']?.toString() ?? '';
+      if (provider.isNotEmpty && id.isNotEmpty) {
+        return {'providerId': provider, 'modelId': id};
+      }
+    }
+  }
+  return null;
+}
+
+/// Return a copy of the policy object with its `model` field set from a route
+/// (or cleared to null when the route is null).
+Map<String, dynamic> _policyWithModel(dynamic policy, Map<String, String>? route) {
+  final next = <String, dynamic>{
+    if (policy is Map) ...policy.cast<String, dynamic>(),
+  };
+  next['model'] = route == null
+      ? null
+      : {'provider_id': route['providerId'], 'model_id': route['modelId']};
+  return next;
 }
 
 class _LocalModelsPanel extends ConsumerWidget {
@@ -1478,6 +1542,26 @@ class _AgentsPanelState extends ConsumerState<_AgentsPanel> {
     });
   }
 
+  /// Decode the current policy JSON in the editor, or an empty map if invalid.
+  Map<String, dynamic> _decodePolicy() {
+    try {
+      final decoded = jsonDecode(policy.text);
+      if (decoded is Map<String, dynamic>) return decoded;
+    } on FormatException {
+      // Fall through to empty — the picker degrades to "Global default".
+    }
+    return {};
+  }
+
+  /// Write a `{ provider_id, model_id }` model (or null) into the editor JSON,
+  /// keeping the rest of the policy intact so the raw editor stays authoritative.
+  void _setPolicyModel(Map<String, String>? route) {
+    final next = _policyWithModel(_decodePolicy(), route);
+    setState(() {
+      policy.text = const JsonEncoder.withIndent('  ').convert(next);
+    });
+  }
+
   Map<String, dynamic> _newAgent(Map<String, dynamic> runPolicy) => {
     'version': '1.0.0',
     'kind': 'agent',
@@ -1625,6 +1709,25 @@ class _AgentsPanelState extends ConsumerState<_AgentsPanel> {
                 minLines: 4,
                 maxLines: 10,
                 decoration: const InputDecoration(labelText: 'System prompt'),
+              ),
+              const SizedBox(height: 12),
+              const Text('Model', style: TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 4),
+              Text(
+                'Overrides the global default for this agent. Leave on global '
+                'default to inherit.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ModelRoutePicker(
+                providers: widget.state.snapshot.providers,
+                value: _routeFromPolicy(_decodePolicy()),
+                inheritLabel: 'Global default',
+                enabled: !widget.state.saving,
+                onChanged: _setPolicyModel,
               ),
               const SizedBox(height: 12),
               TextField(

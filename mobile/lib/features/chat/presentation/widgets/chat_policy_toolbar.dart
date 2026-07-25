@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
 
+import '../../../settings/presentation/providers/settings_notifier.dart';
+import '../../../settings/presentation/widgets/model_route_picker.dart';
 import '../providers/chat_control_notifier.dart';
 
 class ChatPolicyToolbar extends ConsumerStatefulWidget {
@@ -112,6 +114,14 @@ class _ChatPolicyToolbarState extends ConsumerState<ChatPolicyToolbar> {
                 onTap: state.saving ? null : () => notifier.setMode('local'),
               ),
               const SizedBox(width: 6),
+              _ModeButton(
+                label: 'Model ${_modelSummary(state.policy['model'])}',
+                icon: Icons.developer_board_outlined,
+                selected: _conversationRoute(state.policy['model']) != null,
+                onTap: state.saving
+                    ? null
+                    : () => _chooseModel(context, notifier),
+              ),
               _ResourceButton(
                 label: 'Skills',
                 icon: Icons.auto_awesome_outlined,
@@ -369,6 +379,62 @@ class _ChatPolicyToolbarState extends ConsumerState<ChatPolicyToolbar> {
     await notifier.patch({'context_strategy': strategy});
   }
 
+  Future<void> _chooseModel(BuildContext context, ChatControl notifier) async {
+    // The provider catalog lives in the settings snapshot; the toolbar reads it
+    // to offer the same providers/models as the settings model picker.
+    final providers = ref.read(settingsProvider).snapshot.providers;
+    final current = _conversationRoute(
+      ref.read(chatControlProvider(widget.conversationId)).policy['model'],
+    );
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => Padding(
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 16,
+          bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 16,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Conversation model',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Overrides the agent and global default for this chat only.',
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(sheetContext).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ModelRoutePicker(
+              providers: providers,
+              value: current,
+              inheritLabel: 'Agent / global default',
+              onChanged: (route) {
+                notifier.patch({
+                  'model': route == null
+                      ? null
+                      : {
+                          'provider_id': route['providerId'],
+                          'model_id': route['modelId'],
+                        },
+                });
+                Navigator.of(sheetContext).pop();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _chooseToolApproval(
     BuildContext context,
     ChatControl notifier,
@@ -503,6 +569,26 @@ Map<String, dynamic> _map(Object? value) => value is Map<String, dynamic>
     : const {};
 List<Map<String, dynamic>> _objects(Object? value) =>
     value is List ? value.map(_map).toList() : const [];
+/// Read a `{ providerId, modelId }` route from a policy's `model` field.
+Map<String, String>? _conversationRoute(dynamic model) {
+  if (model is Map) {
+    final provider = model['provider_id']?.toString() ?? '';
+    final id = model['model_id']?.toString() ?? '';
+    if (provider.isNotEmpty && id.isNotEmpty) {
+      return {'providerId': provider, 'modelId': id};
+    }
+  }
+  return null;
+}
+
+/// A compact chip label for the conversation model override.
+String _modelSummary(dynamic model) {
+  final route = _conversationRoute(model);
+  if (route == null) return 'inherit';
+  if (route['providerId'] == kOnDeviceProviderId) return 'On-device';
+  return route['modelId'] ?? route['providerId'] ?? 'inherit';
+}
+
 List<_Option> _agents(Map<String, dynamic> catalog) =>
     _objects(_map(catalog['agents'])['runtime_agents'])
         .map(
