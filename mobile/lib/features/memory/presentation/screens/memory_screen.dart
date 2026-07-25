@@ -60,6 +60,8 @@ class _MemoryScreenState extends ConsumerState<MemoryScreen> {
                       child: shad.TextField(
                         controller: _ingestController,
                         placeholder: const Text('Add a memory…'),
+                        contextMenuBuilder:
+                            shad.TextField.nativeContextMenuBuilder(),
                         onSubmitted: _isIngesting ? null : (_) => _ingest(),
                       ),
                     ),
@@ -88,6 +90,8 @@ class _MemoryScreenState extends ConsumerState<MemoryScreen> {
                       child: shad.TextField(
                         controller: _searchController,
                         placeholder: const Text('Hybrid graph-RAG search…'),
+                        contextMenuBuilder:
+                            shad.TextField.nativeContextMenuBuilder(),
                         onSubmitted: _isSearching ? null : (_) => _search(),
                       ),
                     ),

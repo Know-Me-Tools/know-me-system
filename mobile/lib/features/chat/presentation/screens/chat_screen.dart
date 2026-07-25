@@ -228,6 +228,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           minLines: 1,
                           maxLines: 5,
                           enabled: !modelBusy,
+                          // shadcn_flutter defaults contextMenuBuilder to null,
+                          // which suppresses the platform selection toolbar — so
+                          // long-press showed no Paste/Copy/Select All callout.
+                          // Restore the native adaptive toolbar so paste works.
+                          contextMenuBuilder:
+                              shad.TextField.nativeContextMenuBuilder(),
                           onSubmitted: _isSending || modelBusy
                               ? null
                               : (_) => _send(),
