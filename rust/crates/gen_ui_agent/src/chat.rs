@@ -76,6 +76,10 @@ const DEFAULT_TOP_K: i32 = 20;
 const DEFAULT_MIN_P: f32 = 0.0;
 const DEFAULT_MAX_TOKENS: u32 = 1024;
 const MAX_LOCAL_TOOL_REPAIR_ATTEMPTS: u8 = 2;
+/// Upper bound on tool declarations sent to a local model in one turn. Local
+/// models (notably the Android LiteRT-LM Gemma lane) have a small context
+/// window, so an unbounded registry would crowd out the conversation itself.
+const MAX_LOCAL_TOOL_DECLARATIONS: usize = 16;
 
 /// Request-scoped cloud credentials for anonymous hosted-web BYOK. The Axum
 /// leaf owns the lifetime: this value is never persisted or placed in global
@@ -2227,17 +2231,37 @@ fn param_i32(params: &serde_json::Value, key: &str, default: i32) -> i32 {
         .unwrap_or(default)
 }
 
+/// Build the shortlisted tool declarations sent to a local model for one turn.
+///
+/// Local models run in a tight context budget — the Android LiteRT-LM lane in
+/// particular — so declaring every cached tool from every registered server
+/// crowds out the conversation and degrades tool selection. The shortlist is
+/// therefore **bounded** at [`MAX_LOCAL_TOOL_DECLARATIONS`] and ordered
+/// **trusted-first**: tools from trusted-local servers are declared before
+/// untrusted ones, so the safest and most likely-useful tools survive the cap.
+///
+/// Ordering is a stable sort over the registry's deterministic server/tool
+/// order, so the same registry always yields the same shortlist. Tools beyond
+/// the cap are simply not declared this turn; if the model nonetheless asks for
+/// one, [`LocalToolCallGate`] already rejects it as outside the shortlisted set.
 fn local_tool_definitions(registry: &gen_ui_mcp::McpRegistry) -> Vec<InferenceTool> {
-    let mut definitions = Vec::new();
+    let mut candidates: Vec<(bool, InferenceTool)> = Vec::new();
     for server_name in registry.server_names() {
         let Some(server) = registry.get(&server_name) else {
             continue;
         };
+        let trusted = server.trust() == gen_ui_mcp::McpServerTrust::TrustedLocal;
         for tool in server.cached_tools() {
-            definitions.push(inference_tool_from_mcp(&server_name, tool));
+            candidates.push((trusted, inference_tool_from_mcp(&server_name, tool)));
         }
     }
-    definitions
+    // Stable sort keeps registry order within each trust tier.
+    candidates.sort_by_key(|(trusted, _)| !*trusted);
+    candidates.truncate(MAX_LOCAL_TOOL_DECLARATIONS);
+    candidates
+        .into_iter()
+        .map(|(_, definition)| definition)
+        .collect()
 }
 
 fn local_tool_policies(registry: &gen_ui_mcp::McpRegistry) -> BTreeMap<String, LocalToolPolicy> {
@@ -3232,6 +3256,83 @@ mod attachment_tests {
             }
             other => panic!("expected ToolResult, got {other:?}"),
         }
+    }
+
+    #[tokio::test]
+    async fn local_tool_shortlist_is_bounded_and_prefers_trusted_servers() {
+        // A transport that advertises `count` tools, so a server can exceed the
+        // per-turn declaration cap on its own.
+        #[derive(Debug)]
+        struct BulkTransport {
+            prefix: &'static str,
+            count: usize,
+        }
+
+        #[async_trait::async_trait]
+        impl gen_ui_mcp::McpTransport for BulkTransport {
+            async fn request(
+                &self,
+                method: &str,
+                _params: Option<serde_json::Value>,
+            ) -> gen_ui_types::CoreResult<serde_json::Value> {
+                match method {
+                    "tools/list" => Ok(serde_json::json!({
+                        "tools": (0..self.count)
+                            .map(|index| serde_json::json!({
+                                "name": format!("{}_{index}", self.prefix),
+                                "description": "bulk tool",
+                                "inputSchema": {"type": "object"}
+                            }))
+                            .collect::<Vec<_>>()
+                    })),
+                    other => Err(gen_ui_types::CoreError::Terminal(format!(
+                        "unexpected MCP method {other}"
+                    ))),
+                }
+            }
+        }
+
+        let registry = gen_ui_mcp::McpRegistry::new();
+        // Register the UNTRUSTED server first so plain registry order would put
+        // its tools ahead of the trusted server's — the shortlist must reorder.
+        let untrusted = registry.register(gen_ui_mcp::McpServerHandle::new(
+            "untrusted",
+            Box::new(BulkTransport {
+                prefix: "untrusted",
+                count: MAX_LOCAL_TOOL_DECLARATIONS,
+            }),
+        ));
+        untrusted.refresh_tools().await.expect("untrusted tools");
+        let trusted = registry.register(gen_ui_mcp::McpServerHandle::new_trusted_local(
+            "trusted",
+            Box::new(BulkTransport {
+                prefix: "trusted",
+                count: 4,
+            }),
+        ));
+        trusted.refresh_tools().await.expect("trusted tools");
+
+        let shortlist = local_tool_definitions(&registry);
+
+        // Bounded: never more declarations than the per-turn cap, even though
+        // the registry advertises more.
+        assert_eq!(shortlist.len(), MAX_LOCAL_TOOL_DECLARATIONS);
+
+        // Trusted-first: every tool from the trusted server survives the cap and
+        // is declared before any untrusted tool.
+        let trusted_count = shortlist
+            .iter()
+            .filter(|tool| tool.name.starts_with("trusted__"))
+            .count();
+        assert_eq!(trusted_count, 4, "all trusted tools survive the cap");
+        let first_untrusted = shortlist
+            .iter()
+            .position(|tool| tool.name.starts_with("untrusted__"))
+            .expect("untrusted tools fill the remainder");
+        assert_eq!(
+            first_untrusted, 4,
+            "trusted declarations precede untrusted ones"
+        );
     }
 
     #[tokio::test]
