@@ -69,15 +69,24 @@ class ChatControl extends _$ChatControl {
   }
 
   Future<void> setMode(String mode, {String? agentId}) async {
+    // `selectLane` persists `active_lane`, which is what Rust actually reads to
+    // route a send — it is the authority for the lane, not the conversation
+    // policy. Reflect the new mode in state immediately so the toolbar shows
+    // the tab the user tapped: `patch` below persists the conversation policy,
+    // but it no-ops when there is no conversation yet (a brand-new chat has an
+    // empty threadId) and swallows persist failures into `error`. Without this
+    // local update the lane switched in Rust while the UI kept showing the old
+    // tab, which read as "the Local tab does not work".
+    final agentIdForMode = switch (mode) {
+      'agent' => agentId,
+      'uar' => 'orchestrator-agent',
+      _ => null,
+    };
+    state = state.copyWith(
+      policy: {...state.policy, 'chat_mode': mode, 'agent_id': agentIdForMode},
+    );
     await _repository.selectLane(mode == 'local' ? 'local' : 'uar');
-    await patch({
-      'chat_mode': mode,
-      'agent_id': switch (mode) {
-        'agent' => agentId,
-        'uar' => 'orchestrator-agent',
-        _ => null,
-      },
-    });
+    await patch({'chat_mode': mode, 'agent_id': agentIdForMode});
   }
 
   Future<void> setSelection(String key, String mode, List<String> ids) =>

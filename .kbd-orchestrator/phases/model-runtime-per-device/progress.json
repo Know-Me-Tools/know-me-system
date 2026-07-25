@@ -39,14 +39,34 @@
   "completed_changes": [
     "android-litertlm-runtime",
     "litertlm-native-adapter",
-    "litertlm-device-proof",
-    "document-uar-karpathy-knowledge-strategy"
+    "document-uar-karpathy-knowledge-strategy",
+    "litertlm-local-tools"
   ],
-  "active_change": "litertlm-local-tools",
+  "active_change": "litertlm-device-proof",
   "blocked_changes": [],
   "sourceTool": "codex",
-  "last_updated_by": "codex",
-  "last_updated": "2026-07-19T08:17:00-05:00",
+  "last_updated_by": "claude-code",
+  "last_updated": "2026-07-25T19:15:00-05:00",
   "createdBy": "kbd-new-phase",
-  "updatedAt": "2026-07-20T20:09:55Z"
+  "updatedAt": "2026-07-20T20:09:55Z",
+  "status_corrections": [
+    {
+      "change": "android-litertlm-runtime",
+      "was": "completed",
+      "now": "completed",
+      "note": "Kept complete, but it was NOT actually working when first marked: release builds failed at ClassNotFoundException tools.knowme.knowme.KnowMeLiteRtLmBridge because R8 shrank the JNI-only bridge class. Fixed 2026-07-25 (commit 7330389: proguard keep rules + proguardFiles on the release buildType) and certified on Samsung SM-S936U."
+    },
+    {
+      "change": "litertlm-device-proof",
+      "was": "completed",
+      "now": "not_completed",
+      "note": "Reverted to incomplete. It claimed device certification of the Android path, but that path crashed at bridge load in release builds until 2026-07-25, so the claimed evidence could not have been obtained. Needs a genuine re-run: load time, throughput, backend, memory, thermal, cancellation, Markdown/Mermaid, attachment flow, and a permitted tool call."
+    },
+    {
+      "change": "litertlm-local-tools",
+      "was": "active",
+      "now": "completed",
+      "note": "Certified on Samsung SM-S936U 2026-07-25: shortlisted declarations -> model tool call (knowme_diagnostics__local_runtime_status) -> gate validation -> MCP execution -> continuation -> 393-char answer, tool_result_fallback_applied did not fire. Bounded trusted-first shortlist landed in commit e07002b."
+    }
+  ]
 }
