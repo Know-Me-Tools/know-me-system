@@ -246,11 +246,7 @@ pub async fn send_with_attachments(
     use base64::Engine as _;
     let run_id = uuid::Uuid::new_v4().to_string();
 
-    let lane = state::config()?
-        .get_setting(SETTING_ACTIVE_LANE)
-        .await?
-        .and_then(|value| value.as_str().map(str::to_owned))
-        .unwrap_or_else(default_lane);
+    let lane = resolve_lane_for_conversation(&conversation_id).await?;
     if lane == LANE_LOCAL {
         let mut local_prompt = user_message.clone();
         local_prompt.push_str("\n\nAttached files (processed by xberg):\n");
@@ -467,11 +463,7 @@ async fn send_content(
     branch_id: String,
     run_id: String,
 ) -> Result<String, AgentError> {
-    let lane = state::config()?
-        .get_setting(SETTING_ACTIVE_LANE)
-        .await?
-        .and_then(|value| value.as_str().map(str::to_owned))
-        .unwrap_or_else(default_lane);
+    let lane = resolve_lane_for_conversation(&conversation_id).await?;
     if lane == LANE_LOCAL {
         return send_local(
             local_fallback,
@@ -533,11 +525,7 @@ pub async fn send_interaction(
             "interaction payload must be a JSON object".into(),
         ));
     }
-    let lane = state::config()?
-        .get_setting(SETTING_ACTIVE_LANE)
-        .await?
-        .and_then(|value| value.as_str().map(str::to_owned))
-        .unwrap_or_else(default_lane);
+    let lane = resolve_lane_for_conversation(&conversation_id).await?;
     if lane == LANE_UAR {
         let run_id = uuid::Uuid::new_v4().to_string();
         return submit_uar_interaction(run_id, conversation_id, value).await;
@@ -2934,6 +2922,36 @@ mod attachment_tests {
         // the global setting rather than silently routing somewhere unintended.
         assert_eq!(lane_for_chat_mode("nonsense"), None);
         assert_eq!(lane_for_chat_mode(""), None);
+    }
+
+    #[test]
+    fn every_send_path_resolves_the_lane_per_conversation() {
+        // Routing must not depend on which entry point the UI happened to call:
+        // `send` was fixed first while `send_with_attachments`, `send_content`
+        // and `send_interaction` still read the global setting, so sending an
+        // attachment from a Local conversation silently ran on the global lane.
+        //
+        // Resolving the lane needs a live config and control plane, so this
+        // guards the source instead. Only two places may *read* the global
+        // setting: the `active_lane()` getter and the resolver's own fallback.
+        // Count `get_setting(SETTING_ACTIVE_LANE)` call sites specifically —
+        // the bare constant also appears in its own declaration and in
+        // `set_active_lane`'s write. The test module is excluded so this
+        // assertion does not count its own source.
+        let source = include_str!("chat.rs");
+        let production_source = source
+            .split_once("mod attachment_tests {")
+            .map(|(before, _)| before)
+            .expect("test module marks the end of production source");
+        let global_reads = production_source
+            .matches(".get_setting(SETTING_ACTIVE_LANE)")
+            .count();
+        assert_eq!(
+            global_reads, 2,
+            "the global active_lane setting may only be read by active_lane() \
+             and resolve_lane_for_conversation()'s fallback; a send path \
+             reading it directly bypasses per-conversation scope"
+        );
     }
 
     #[test]
