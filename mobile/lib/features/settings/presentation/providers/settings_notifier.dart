@@ -84,6 +84,26 @@ class SettingsNotifier extends _$SettingsNotifier {
     await _reloadSnapshot();
   });
 
+  /// Save the local lane's system prompt.
+  ///
+  /// A blank value clears the override, so the state is refreshed from Rust
+  /// rather than from what was typed — that is the only way the editor shows the
+  /// restored default instead of an empty field.
+  Future<void> saveLocalSystemPrompt(String prompt) => _mutate(() async {
+    await _repository.saveLocalSystemPrompt(prompt);
+    final effective = await _repository.localSystemPrompt();
+    state = state.copyWith(
+      snapshot: state.snapshot.copyWith(localSystemPrompt: effective),
+      notice: prompt.trim().isEmpty
+          ? 'Local system prompt reset to the default.'
+          : 'Local system prompt saved.',
+    );
+  });
+
+  /// Rust's shipped default, for the editor's reset affordance.
+  Future<String> defaultLocalSystemPrompt() =>
+      _repository.defaultLocalSystemPrompt();
+
   Future<void> probeRuntime() => _mutate(() async {
     final result = await _repository.probeRuntime();
     state = state.copyWith(

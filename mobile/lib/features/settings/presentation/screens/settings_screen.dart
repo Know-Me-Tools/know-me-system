@@ -612,7 +612,129 @@ class _LocalModelsPanel extends ConsumerWidget {
             ],
           ),
         ),
+        const SizedBox(height: 16),
+        _LocalSystemPromptCard(state: state),
       ],
+    );
+  }
+}
+
+/// Editor for the local lane's system prompt.
+///
+/// Stateful because the field owns a controller: rebuilding from `state` on
+/// every keystroke would fight the user's cursor. The controller is re-synced
+/// only when the saved value actually changes (a save or a reset), so in-progress
+/// edits survive unrelated Settings rebuilds.
+class _LocalSystemPromptCard extends ConsumerStatefulWidget {
+  const _LocalSystemPromptCard({required this.state});
+  final SettingsState state;
+
+  @override
+  ConsumerState<_LocalSystemPromptCard> createState() =>
+      _LocalSystemPromptCardState();
+}
+
+class _LocalSystemPromptCardState
+    extends ConsumerState<_LocalSystemPromptCard> {
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.state.snapshot.localSystemPrompt,
+  );
+
+  @override
+  void didUpdateWidget(_LocalSystemPromptCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final saved = widget.state.snapshot.localSystemPrompt;
+    if (saved != oldWidget.state.snapshot.localSystemPrompt &&
+        saved != _controller.text) {
+      _controller.text = saved;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _reset() async {
+    final notifier = ref.read(settingsProvider.notifier);
+    // Ask Rust for the default rather than hardcoding the copy here, so the two
+    // cannot drift.
+    final shipped = await notifier.defaultLocalSystemPrompt();
+    if (!mounted) return;
+    _controller.text = shipped;
+    await notifier.saveLocalSystemPrompt(shipped);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final notifier = ref.read(settingsProvider.notifier);
+    final saving = widget.state.saving;
+    return _Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Local system prompt',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Sent as the first message on every local run. Leave it blank and '
+            'save to restore the shipped default.',
+          ),
+          const SizedBox(height: 12),
+          // The visible heading above is not programmatically tied to the field,
+          // and a placeholder vanishes once text is entered — so the accessible
+          // name lives here rather than relying on either.
+          Semantics(
+            textField: true,
+            multiline: true,
+            label: 'Local system prompt',
+            hint: 'Sent as the first message on every local run. '
+                'Leave blank and save to restore the default.',
+            child: shad.TextArea(
+              controller: _controller,
+              initialHeight: 140,
+              expandableHeight: true,
+              placeholder: const Text('System prompt for the on-device model'),
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Wrap, so the two actions reflow instead of overflowing at large
+          // text scales rather than clipping.
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              Semantics(
+                button: true,
+                enabled: !saving,
+                label: 'Save local system prompt',
+                // Excluded so the row announces one name, not "Save local
+                // system prompt, Save prompt".
+                excludeSemantics: true,
+                child: shad.PrimaryButton(
+                  onPressed: saving
+                      ? null
+                      : () => notifier.saveLocalSystemPrompt(_controller.text),
+                  child: const Text('Save prompt'),
+                ),
+              ),
+              Semantics(
+                button: true,
+                enabled: !saving,
+                label: 'Reset local system prompt to the default',
+                excludeSemantics: true,
+                child: shad.SecondaryButton(
+                  onPressed: saving ? null : _reset,
+                  child: const Text('Reset to default'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

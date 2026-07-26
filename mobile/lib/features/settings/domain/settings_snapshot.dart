@@ -13,6 +13,7 @@ class SettingsSnapshot {
     this.providers = const [],
     this.configuredProviders = const [],
     this.cloudModel,
+    this.localSystemPrompt = '',
   });
 
   final String activeLane;
@@ -25,6 +26,11 @@ class SettingsSnapshot {
   final List<Map<String, dynamic>> configuredProviders;
   final Map<String, dynamic>? cloudModel;
 
+  /// The local lane's system prompt. Empty until [SettingsRepository.load]
+  /// resolves it; Rust substitutes its shipped default for a blank value, so an
+  /// empty string here means "not loaded yet", never "send no system prompt".
+  final String localSystemPrompt;
+
   SettingsSnapshot copyWith({
     String? activeLane,
     Map<String, dynamic>? uarConfig,
@@ -35,6 +41,7 @@ class SettingsSnapshot {
     List<Map<String, dynamic>>? providers,
     List<Map<String, dynamic>>? configuredProviders,
     Map<String, dynamic>? cloudModel,
+    String? localSystemPrompt,
   }) => SettingsSnapshot(
     activeLane: activeLane ?? this.activeLane,
     uarConfig: uarConfig ?? this.uarConfig,
@@ -45,5 +52,6 @@ class SettingsSnapshot {
     providers: providers ?? this.providers,
     configuredProviders: configuredProviders ?? this.configuredProviders,
     cloudModel: cloudModel ?? this.cloudModel,
+    localSystemPrompt: localSystemPrompt ?? this.localSystemPrompt,
   );
 }

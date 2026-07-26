@@ -221,6 +221,17 @@ Future<String> getThemeMode() => ffi.themeMode();
 
 Future<void> setThemeMode(String mode) => ffi.setThemeMode(mode: mode);
 
+/// The local lane's system prompt, already resolved to the shipped default when
+/// the user has not set one.
+Future<String> localSystemPrompt() => ffi.localSystemPrompt();
+
+/// Persist the local lane's system prompt; a blank value restores the default.
+Future<void> setLocalSystemPrompt(String prompt) =>
+    ffi.setLocalSystemPrompt(prompt: prompt);
+
+/// The shipped default, so "reset" does not duplicate Rust's copy in Dart.
+Future<String> defaultLocalSystemPrompt() => ffi.defaultLocalSystemPrompt();
+
 Future<String> resolveRemoteContent(String url, String kind) =>
     ffi.resolveRemoteContent(url: url, kind: kind);
 

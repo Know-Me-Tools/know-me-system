@@ -11,6 +11,10 @@ class RustSettingsRepository implements SettingsRepository {
     final lane = await bridge.activeLane();
     final localModel = await bridge.localModelStatus();
     final localDiagnostics = await bridge.localRuntimeDiagnostics() ?? const {};
+    // Read outside the try/catch below: the system prompt is a local settings
+    // read with no service dependency, so folding it in with the UAR calls would
+    // let a cold kernel silently blank a value the user edited.
+    final localSystemPrompt = await bridge.localSystemPrompt();
     Map<String, dynamic> uarConfig = const {};
     Map<String, dynamic> admin = const {};
     Map<String, dynamic> catalog = const {};
@@ -44,8 +48,20 @@ class RustSettingsRepository implements SettingsRepository {
       providers: providers,
       configuredProviders: configuredProviders,
       cloudModel: cloudModel,
+      localSystemPrompt: localSystemPrompt,
     );
   }
+
+  @override
+  Future<void> saveLocalSystemPrompt(String prompt) =>
+      bridge.setLocalSystemPrompt(prompt);
+
+  @override
+  Future<String> localSystemPrompt() => bridge.localSystemPrompt();
+
+  @override
+  Future<String> defaultLocalSystemPrompt() =>
+      bridge.defaultLocalSystemPrompt();
 
   @override
   Future<void> selectLane(String lane) => bridge.setActiveLane(lane);
