@@ -12,6 +12,7 @@ class ChatControlState {
     this.catalog = const {},
     this.policy = const {},
     this.effective = const {},
+    this.laneAvailability = const {},
     this.loading = false,
     this.saving = false,
     this.error,
@@ -19,14 +20,27 @@ class ChatControlState {
   final Map<String, dynamic> catalog;
   final Map<String, dynamic> policy;
   final Map<String, dynamic> effective;
+
+  /// Lane id -> why it cannot be selected, or null when it is selectable.
+  ///
+  /// Rust rejects switching to a lane whose runtime is unavailable, so the mode
+  /// picker renders those entries disabled with the reason instead of offering a
+  /// control that fails when tapped. An absent key means "not probed yet";
+  /// treat that as available so the UI never blocks on a missing probe.
+  final Map<String, String?> laneAvailability;
   final bool loading;
   final bool saving;
   final String? error;
+
+  /// True when [lane] has been probed and reported unavailable.
+  bool laneBlocked(String lane) =>
+      laneAvailability.containsKey(lane) && laneAvailability[lane] != null;
 
   ChatControlState copyWith({
     Map<String, dynamic>? catalog,
     Map<String, dynamic>? policy,
     Map<String, dynamic>? effective,
+    Map<String, String?>? laneAvailability,
     bool? loading,
     bool? saving,
     String? error,
@@ -35,6 +49,7 @@ class ChatControlState {
     catalog: catalog ?? this.catalog,
     policy: policy ?? this.policy,
     effective: effective ?? this.effective,
+    laneAvailability: laneAvailability ?? this.laneAvailability,
     loading: loading ?? this.loading,
     saving: saving ?? this.saving,
     error: clearError ? null : error ?? this.error,
@@ -50,16 +65,24 @@ class ChatControl extends _$ChatControl {
       ChatControlState(policy: _defaultPolicy());
 
   Future<void> load() async {
-    if (conversationId.isEmpty || state.loading) return;
+    if (state.loading) return;
     state = state.copyWith(loading: true, clearError: true);
     try {
+      // The catalog and lane availability describe the app, not a conversation,
+      // so they load even before the first message exists. Only the stored
+      // policy needs a conversation id — previously the whole load bailed out on
+      // an empty id, which left a brand-new chat with no agents to choose from.
       final results = await Future.wait<Object?>([
         _repository.catalog(),
-        _repository.policy(conversationId),
+        _repository.laneAvailability(),
+        if (conversationId.isNotEmpty) _repository.policy(conversationId),
       ]);
       state = state.copyWith(
         catalog: results[0]! as Map<String, dynamic>,
-        policy: results[1] as Map<String, dynamic>? ?? _defaultPolicy(),
+        laneAvailability: _laneAvailability(results[1]),
+        policy: results.length > 2
+            ? results[2] as Map<String, dynamic>? ?? _defaultPolicy()
+            : _defaultPolicy(),
       );
     } catch (error) {
       state = state.copyWith(error: await _repository.errorMessage(error));
@@ -68,26 +91,49 @@ class ChatControl extends _$ChatControl {
     }
   }
 
+  /// Switch this conversation's mode.
+  ///
+  /// Rust rejects a lane whose runtime is unavailable, and that rejection must
+  /// reach the user: this mirrors the error discipline of [load] and [patch] —
+  /// catch, record the reason in `error`, and leave the displayed selection
+  /// alone. Moving the selection optimistically would make the UI claim a mode
+  /// that Rust refused, which is worse than an unresponsive control because the
+  /// next send would silently route somewhere else.
   Future<void> setMode(String mode, {String? agentId}) async {
-    // `selectLane` persists `active_lane`, which is what Rust actually reads to
-    // route a send — it is the authority for the lane, not the conversation
-    // policy. Reflect the new mode in state immediately so the toolbar shows
-    // the tab the user tapped: `patch` below persists the conversation policy,
-    // but it no-ops when there is no conversation yet (a brand-new chat has an
-    // empty threadId) and swallows persist failures into `error`. Without this
-    // local update the lane switched in Rust while the UI kept showing the old
-    // tab, which read as "the Local tab does not work".
+    if (state.saving) return;
     final agentIdForMode = switch (mode) {
       'agent' => agentId,
       'uar' => 'orchestrator-agent',
       _ => null,
     };
+    state = state.copyWith(saving: true, clearError: true);
+    try {
+      await _repository.selectLane(_laneForMode(mode));
+    } catch (error) {
+      state = state.copyWith(
+        error: await _repository.errorMessage(error),
+        saving: false,
+      );
+      return;
+    }
+    // The lane switch succeeded, so the selection is real. Reflect it now — a
+    // brand-new conversation has no id yet, so `patch` cannot persist and this
+    // is the only place the choice is recorded until the thread exists.
     state = state.copyWith(
       policy: {...state.policy, 'chat_mode': mode, 'agent_id': agentIdForMode},
+      saving: false,
     );
-    await _repository.selectLane(mode == 'local' ? 'local' : 'uar');
     await patch({'chat_mode': mode, 'agent_id': agentIdForMode});
   }
+
+  /// Map the picker's user-facing mode onto an execution lane. Mirrors
+  /// `lane_for_chat_mode` in `chat.rs`: `agent` and `uar` both run through the
+  /// embedded UAR and differ only in which agent artifact the run resolves.
+  static String _laneForMode(String mode) => switch (mode) {
+    'local' => 'local',
+    'cloud' => 'cloud',
+    _ => 'uar',
+  };
 
   Future<void> setSelection(String key, String mode, List<String> ids) =>
       patch({
@@ -112,6 +158,26 @@ class ChatControl extends _$ChatControl {
       state = state.copyWith(saving: false);
     }
   }
+}
+
+/// Parse Rust's `lane_availability()` list into `lane -> reason?`.
+///
+/// Rust reports `[{lane, available, reason}]`. Only unavailable lanes carry a
+/// reason; available ones map to null so [ChatControlState.laneBlocked] can
+/// distinguish "usable" from "not probed".
+Map<String, String?> _laneAvailability(Object? raw) {
+  final entries = <String, String?>{};
+  if (raw is List) {
+    for (final item in raw) {
+      if (item is! Map) continue;
+      final lane = item['lane']?.toString();
+      if (lane == null || lane.isEmpty) continue;
+      entries[lane] = item['available'] == true
+          ? null
+          : item['reason']?.toString() ?? 'Unavailable on this device';
+    }
+  }
+  return entries;
 }
 
 Map<String, dynamic> _defaultPolicy() => {

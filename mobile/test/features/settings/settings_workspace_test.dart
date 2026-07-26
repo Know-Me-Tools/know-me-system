@@ -101,10 +101,20 @@ void main() {
   ) async {
     const state = ChatControlState(
       catalog: {
+        // Agents are shaped like real AgentArtifacts — the display name lives
+        // at `metadata.title`, not a flat `name`. A previous fixture used the
+        // flat key, which hid a bug where every embedded surface fell back to
+        // showing raw agent ids.
         'agents': {
           'runtime_agents': [
-            {'id': 'orchestrator-agent', 'name': 'Orchestrator'},
-            {'id': 'writer', 'name': 'Writer'},
+            {
+              'id': 'orchestrator-agent',
+              'metadata': {'title': 'Orchestrator'},
+            },
+            {
+              'id': 'writer',
+              'metadata': {'title': 'Writer'},
+            },
           ],
         },
         'skills': [
@@ -148,9 +158,12 @@ void main() {
         ),
       ),
     );
+    // One mode trigger labelled with the current selection — not a fixed
+    // Orchestrator/Agent/Local button row. The agent list grows, so the modes
+    // live in a sheet the trigger opens.
     expect(find.text('Orchestrator'), findsOneWidget);
-    expect(find.text('Agent'), findsOneWidget);
-    expect(find.text('Local'), findsOneWidget);
+    expect(find.text('Agent'), findsNothing);
+    expect(find.text('Local'), findsNothing);
     expect(find.text('Skills inherit'), findsOneWidget);
     await tester.drag(find.byType(ListView).last, const Offset(-650, 0));
     await tester.pumpAndSettle();

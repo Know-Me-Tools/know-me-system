@@ -182,13 +182,7 @@ pub async fn send(
 ) -> Result<String, AgentError> {
     let run_id = uuid::Uuid::new_v4().to_string();
 
-    // Which lane? Unset → local when this surface ships an engine. This makes
-    // first-run chat functional without a provider account or API key.
-    let lane = state::config()?
-        .get_setting(SETTING_ACTIVE_LANE)
-        .await?
-        .and_then(|v| v.as_str().map(str::to_owned))
-        .unwrap_or_else(default_lane);
+    let lane = resolve_lane_for_conversation(&conversation_id).await?;
 
     if lane == LANE_LOCAL {
         return send_local(
@@ -1192,6 +1186,95 @@ fn default_lane() -> String {
     } else {
         LANE_CLOUD.to_string()
     }
+}
+
+/// Map a conversation policy `chat_mode` onto an execution lane.
+///
+/// The UI's mode vocabulary is user-facing (`local`, `uar`, `agent`); the lanes
+/// are execution paths. `agent` and `uar` both run through the embedded UAR —
+/// they differ only in which agent artifact the run resolves — so both map to
+/// [`LANE_UAR`]. An unrecognized mode yields `None` so the caller falls back
+/// rather than inventing a lane.
+fn lane_for_chat_mode(mode: &str) -> Option<&'static str> {
+    match mode {
+        "local" => Some(LANE_LOCAL),
+        "uar" | "agent" => Some(LANE_UAR),
+        "cloud" => Some(LANE_CLOUD),
+        _ => None,
+    }
+}
+
+/// Resolve which lane a turn in this conversation runs on.
+///
+/// Precedence: the conversation's own `chat_mode` → the global
+/// `active_lane` setting → [`default_lane`]. Conversation scope comes first so
+/// one chat can be on-device while another uses the orchestrator; the global
+/// setting remains the fallback so conversations saved before per-conversation
+/// modes existed keep their previous behavior.
+async fn resolve_lane_for_conversation(conversation_id: &str) -> Result<String, AgentError> {
+    if !conversation_id.is_empty() {
+        if let Ok(record) = crate::control_plane::conversation_policy(conversation_id).await {
+            let lane = record
+                .get("policy")
+                .and_then(|policy| policy.get("chat_mode"))
+                .and_then(serde_json::Value::as_str)
+                .and_then(lane_for_chat_mode);
+            if let Some(lane) = lane {
+                return Ok(lane.to_string());
+            }
+        }
+    }
+
+    Ok(state::config()?
+        .get_setting(SETTING_ACTIVE_LANE)
+        .await?
+        .and_then(|value| value.as_str().map(str::to_owned))
+        .unwrap_or_else(default_lane))
+}
+
+/// Whether a lane can be selected right now, and if not, why.
+///
+/// The UI calls this to render unavailable modes as disabled with a reason
+/// instead of letting the user tap a control that will fail. It performs the
+/// same checks [`set_active_lane`] does, but is side-effect free: it never
+/// registers, loads, or mutates anything.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct LaneAvailability {
+    pub lane: String,
+    pub available: bool,
+    /// Human-readable reason when `available` is false; `None` when usable.
+    pub reason: Option<String>,
+}
+
+/// Report availability for every selectable lane in one call, so the mode
+/// picker can render its whole list without a round-trip per entry.
+pub async fn lane_availability() -> Result<Vec<LaneAvailability>, AgentError> {
+    let local = match state::inference() {
+        Ok(_) => LaneAvailability {
+            lane: LANE_LOCAL.to_string(),
+            available: true,
+            reason: None,
+        },
+        Err(error) => LaneAvailability {
+            lane: LANE_LOCAL.to_string(),
+            available: false,
+            reason: Some(error.to_string()),
+        },
+    };
+    let uar = match ensure_uar_lane_supported().await {
+        Ok(()) => LaneAvailability {
+            lane: LANE_UAR.to_string(),
+            available: true,
+            reason: None,
+        },
+        Err(error) => LaneAvailability {
+            lane: LANE_UAR.to_string(),
+            available: false,
+            reason: Some(error.to_string()),
+        },
+    };
+    Ok(vec![local, uar])
 }
 
 /// Switch lanes. Rejects unknown values rather than persisting a string that
@@ -2837,6 +2920,21 @@ mod attachment_tests {
     use gen_ui_db_graph::{
         Embedder, EmbeddingModelInfo, GraphError, GraphStore, GraphStoreConfig, EMBED_DIM,
     };
+
+    #[test]
+    fn chat_modes_map_onto_execution_lanes() {
+        // The picker's vocabulary is user-facing; lanes are execution paths.
+        assert_eq!(lane_for_chat_mode("local"), Some(LANE_LOCAL));
+        // `agent` and `uar` both run through the embedded UAR — they differ only
+        // in which agent artifact the run resolves — so both are LANE_UAR.
+        assert_eq!(lane_for_chat_mode("uar"), Some(LANE_UAR));
+        assert_eq!(lane_for_chat_mode("agent"), Some(LANE_UAR));
+        assert_eq!(lane_for_chat_mode("cloud"), Some(LANE_CLOUD));
+        // An unrecognized mode must NOT invent a lane; the caller falls back to
+        // the global setting rather than silently routing somewhere unintended.
+        assert_eq!(lane_for_chat_mode("nonsense"), None);
+        assert_eq!(lane_for_chat_mode(""), None);
+    }
 
     #[test]
     fn a2ui_interaction_keeps_the_completed_source_uar_run() {

@@ -61,9 +61,19 @@ pub async fn catalog() -> Result<ChatControlPlaneCatalog, AgentError> {
         // On embedded, agent definitions come from the in-process runtime; skills/
         // tools/knowledge-bases have no embedded admin surface yet, so they list
         // empty rather than demanding a service URL.
+        //
+        // Shape parity matters here: the service path returns the agents as
+        // `{ runtime_agents, federated_agents }` (see `api/discovery.rs`), while
+        // the embedded runtime hands back a bare array. Clients parse one shape,
+        // so wrap the array to match the service contract — otherwise every
+        // embedded surface (iOS/Android/macOS) silently sees an empty agent list
+        // while the agents exist and are seeded.
         let agents = crate::state::embedded_uar()?.list_agents().await?;
         return Ok(ChatControlPlaneCatalog {
-            agents,
+            agents: serde_json::json!({
+                "runtime_agents": agents,
+                "federated_agents": [],
+            }),
             skills: serde_json::json!([]),
             tools: serde_json::json!([]),
             knowledge_bases: serde_json::json!([]),

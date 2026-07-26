@@ -74,7 +74,11 @@ class _ChatPolicyToolbarState extends ConsumerState<ChatPolicyToolbar> {
                 : const [])
             .map((value) => _Option(value.toString(), value.toString()))
             .toList();
-    final knowledge = _objects(state.catalog['knowledge_bases'])
+    // The catalog struct serializes camelCase (`knowledgeBases`); the policy
+    // uses snake_case. Accept both so neither surface silently reads empty.
+    final knowledge = _objects(
+      state.catalog['knowledgeBases'] ?? state.catalog['knowledge_bases'],
+    )
         .map(
           (value) => _Option(
             value['id']?.toString() ?? '',
@@ -93,25 +97,17 @@ class _ChatPolicyToolbarState extends ConsumerState<ChatPolicyToolbar> {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
             children: [
+              // One control, labeled with the current choice. The list of modes
+              // is "every defined agent + Local", which grows — Material 3
+              // reserves segmented buttons for 2–5 fixed options and directs
+              // longer lists to a menu, so this opens a selection sheet.
               _ModeButton(
-                label: 'Orchestrator',
-                icon: Icons.hub_outlined,
-                selected: mode == 'uar',
-                onTap: state.saving ? null : () => notifier.setMode('uar'),
-              ),
-              _ModeButton(
-                label: 'Agent',
-                icon: Icons.smart_toy_outlined,
-                selected: mode == 'agent',
+                label: _modeLabel(mode, state.policy['agent_id'], agents),
+                icon: _modeIcon(mode),
+                selected: true,
                 onTap: state.saving
                     ? null
-                    : () => _chooseAgent(context, notifier, agents),
-              ),
-              _ModeButton(
-                label: 'Local',
-                icon: Icons.memory_outlined,
-                selected: mode == 'local',
-                onTap: state.saving ? null : () => notifier.setMode('local'),
+                    : () => _chooseMode(context, notifier, state, agents),
               ),
               const SizedBox(width: 6),
               _ModeButton(
@@ -231,31 +227,82 @@ class _ChatPolicyToolbarState extends ConsumerState<ChatPolicyToolbar> {
     );
   }
 
-  Future<void> _chooseAgent(
+  /// Pick how this conversation runs: any defined agent (through the UAR), or
+  /// the on-device model directly.
+  ///
+  /// Modes whose runtime is unavailable are shown disabled with the reason Rust
+  /// reported, rather than offered as controls that fail when tapped.
+  void _chooseMode(
     BuildContext context,
     ChatControl notifier,
+    ChatControlState state,
     List<_Option> agents,
-  ) async {
-    final selected = await showModalBottomSheet<String>(
+  ) {
+    final mode = state.policy['chat_mode']?.toString() ?? 'uar';
+    final agentId = state.policy['agent_id']?.toString();
+    final localBlocked = state.laneBlocked('local');
+    final uarBlocked = state.laneBlocked('uar');
+
+    shad.openSheetOverlay<void>(
       context: context,
-      builder: (context) => SafeArea(
+      position: shad.OverlayPosition.bottom,
+      builder: (sheetContext) => SafeArea(
         child: ListView(
           shrinkWrap: true,
           children: [
-            const ListTile(
-              title: Text('Choose an agent'),
-              subtitle: Text('Definitions and execution remain in UAR.'),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Conversation mode').semiBold(),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Agents run through the Universal Agent Runtime. '
+                    'Local talks to the on-device model directly.',
+                    style: shad.Theme.of(context).typography.small.copyWith(
+                      color: shad.Theme.of(
+                        context,
+                      ).colorScheme.mutedForeground,
+                    ),
+                  ),
+                ],
+              ),
             ),
             for (final agent in agents)
-              ListTile(
-                title: Text(agent.label),
-                onTap: () => Navigator.pop(context, agent.id),
+              _ModeChoiceTile(
+                label: agent.label,
+                // The agent lane is selected when this specific agent is the
+                // conversation's agent — not merely when the mode is agentic.
+                selected: mode != 'local' && agentId == agent.id,
+                blockedReason: uarBlocked
+                    ? state.laneAvailability['uar']
+                    : null,
+                onSelected: () {
+                  shad.closeSheet(sheetContext);
+                  notifier.setMode(
+                    agent.id == 'orchestrator-agent' ? 'uar' : 'agent',
+                    agentId: agent.id,
+                  );
+                },
               ),
+            _ModeChoiceTile(
+              label: 'Local',
+              subtitle: 'On-device model, no agent runtime',
+              selected: mode == 'local',
+              blockedReason: localBlocked
+                  ? state.laneAvailability['local']
+                  : null,
+              onSelected: () {
+                shad.closeSheet(sheetContext);
+                notifier.setMode('local');
+              },
+            ),
           ],
         ),
       ),
     );
-    if (selected != null) await notifier.setMode('agent', agentId: selected);
   }
 
   Future<void> _chooseResources(
@@ -478,6 +525,102 @@ class _ChatPolicyToolbarState extends ConsumerState<ChatPolicyToolbar> {
   );
 }
 
+/// Label for the mode trigger: the resolved agent's name, or "Local".
+///
+/// Shows the agent by name rather than the generic word "Agent" — the point of
+/// a single trigger is that it answers "what is this conversation running on?"
+/// without opening it.
+String _modeLabel(String mode, Object? agentId, List<_Option> agents) {
+  if (mode == 'local') return 'Local';
+  final id = agentId?.toString();
+  final match = agents.where((agent) => agent.id == id).firstOrNull;
+  if (match != null) return match.label;
+  return id == null || id.isEmpty ? 'Orchestrator' : id;
+}
+
+IconData _modeIcon(String mode) =>
+    mode == 'local' ? Icons.memory_outlined : Icons.hub_outlined;
+
+/// One selectable mode in the picker sheet.
+///
+/// Selection is conveyed by a radio icon AND semantics (never colour alone),
+/// and an unavailable mode is rendered disabled with its reason so the user
+/// learns why instead of tapping a dead control.
+class _ModeChoiceTile extends StatelessWidget {
+  const _ModeChoiceTile({
+    required this.label,
+    required this.selected,
+    required this.onSelected,
+    this.subtitle,
+    this.blockedReason,
+  });
+
+  final String label;
+  final String? subtitle;
+  final bool selected;
+  final String? blockedReason;
+  final VoidCallback onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final blocked = blockedReason != null;
+    final detail = blocked ? blockedReason : subtitle;
+    final theme = shad.Theme.of(context);
+    // Blocked rows dim but keep their text legible — the reason is the point.
+    final foreground = blocked
+        ? theme.colorScheme.mutedForeground
+        : theme.colorScheme.foreground;
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      enabled: !blocked,
+      label: label,
+      hint: detail,
+      // Excluded so the row reads as one control, not icon + two text nodes.
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: blocked ? null : onSelected,
+        child: ConstrainedBox(
+          // Project a11y floor: 48px minimum touch target.
+          constraints: const BoxConstraints(minHeight: 48),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Icon(
+                  selected
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
+                  size: 20,
+                  color: foreground,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(label, style: TextStyle(color: foreground)),
+                      if (detail != null)
+                        Text(
+                          detail,
+                          style: theme.typography.small.copyWith(
+                            color: theme.colorScheme.mutedForeground,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ModeButton extends StatelessWidget {
   const _ModeButton({
     required this.label,
@@ -594,7 +737,12 @@ List<_Option> _agents(Map<String, dynamic> catalog) =>
         .map(
           (value) => _Option(
             value['id']?.toString() ?? '',
-            value['name']?.toString() ??
+            // An AgentArtifact carries its display name at `metadata.title`;
+            // the flat `name`/`title` keys only appear on some service-shaped
+            // payloads. Check metadata first so embedded surfaces show real
+            // names instead of falling back to raw ids.
+            _map(value['metadata'])['title']?.toString() ??
+                value['name']?.toString() ??
                 value['title']?.toString() ??
                 value['id']?.toString() ??
                 '',

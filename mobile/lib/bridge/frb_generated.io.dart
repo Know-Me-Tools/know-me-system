@@ -7,11 +7,15 @@ import 'api/boot.dart';
 import 'api/chat.dart';
 import 'api/entity.dart';
 import 'api/streams.dart';
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi' as ffi;
+
 import 'frb_generated.dart';
+
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
+
 import 'third_party/gen_ui_db_graph.dart';
 import 'third_party/gen_ui_types/error.dart';
 import 'third_party/gen_ui_types/events.dart';

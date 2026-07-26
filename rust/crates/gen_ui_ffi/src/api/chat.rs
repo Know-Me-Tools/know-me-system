@@ -117,6 +117,16 @@ pub async fn set_active_lane(lane: String) -> Result<(), CoreError> {
         .map_err(Into::into)
 }
 
+/// Which lanes can be selected right now, and why not when they cannot.
+///
+/// The mode picker calls this to render unavailable modes as disabled with a
+/// reason, instead of offering a control that fails when tapped. Side-effect
+/// free: it probes registration state only and never loads an engine.
+pub async fn lane_availability() -> Result<String, CoreError> {
+    let value = gen_ui_agent::chat::lane_availability().await?;
+    serde_json::to_string(&value).map_err(|error| CoreError::Serde(error.to_string()))
+}
+
 pub async fn uar_service_config() -> Result<String, CoreError> {
     let value = gen_ui_agent::chat::uar_service_config().await?;
     serde_json::to_string(&value).map_err(|error| CoreError::Serde(error.to_string()))

@@ -14,5 +14,6 @@ class ChatControlRepository {
   Future<Map<String, dynamic>> effective(String conversationId) =>
       bridge.conversationEffectiveConfig(conversationId);
   Future<void> selectLane(String lane) => bridge.setActiveLane(lane);
+  Future<List<dynamic>> laneAvailability() => bridge.laneAvailability();
   Future<String> errorMessage(Object error) => bridge.bridgeErrorMessage(error);
 }

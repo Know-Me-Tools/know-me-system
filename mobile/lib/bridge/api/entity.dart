@@ -7,6 +7,7 @@ import '../frb_generated.dart';
 import '../third_party/gen_ui_types/error.dart';
 import '../third_party/gen_ui_types/transport.dart';
 import '../third_party/gen_ui_types/view.dart';
+
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `init_store`, `store`

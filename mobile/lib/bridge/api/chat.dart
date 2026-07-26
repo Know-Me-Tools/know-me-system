@@ -7,6 +7,7 @@ import '../frb_generated.dart';
 import '../third_party/gen_ui_db_graph.dart';
 import '../third_party/gen_ui_types/error.dart';
 import '../third_party/gen_ui_types/inference.dart';
+
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `parse_json`
@@ -87,6 +88,14 @@ Future<String> activeLane() => GenUiCore.instance.api.crateApiChatActiveLane();
 
 Future<void> setActiveLane({required String lane}) =>
     GenUiCore.instance.api.crateApiChatSetActiveLane(lane: lane);
+
+/// Which lanes can be selected right now, and why not when they cannot.
+///
+/// The mode picker calls this to render unavailable modes as disabled with a
+/// reason, instead of offering a control that fails when tapped. Side-effect
+/// free: it probes registration state only and never loads an engine.
+Future<String> laneAvailability() =>
+    GenUiCore.instance.api.crateApiChatLaneAvailability();
 
 Future<String> uarServiceConfig() =>
     GenUiCore.instance.api.crateApiChatUarServiceConfig();
