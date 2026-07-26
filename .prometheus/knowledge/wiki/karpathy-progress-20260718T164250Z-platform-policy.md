@@ -6,6 +6,7 @@ tags:
 - karpathy-progress
 - platform-policy
 - completed
+links: []
 sources:
 - conversation:operator-agent
 timestamp: 2026-07-18T16:42:50Z

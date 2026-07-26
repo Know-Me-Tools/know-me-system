@@ -1,0 +1,14 @@
+{
+  "id": "421baf08-6bcc-4b07-9cf8-3bd106c39cb9-a11y-gate",
+  "skill_name": "a11y-gate",
+  "timestamp": "2026-07-25T21:44:22.515984Z",
+  "duration_ms": 0,
+  "input_summary": "/a11y-gate ",
+  "output_summary": "",
+  "tool_calls": [],
+  "errors": [],
+  "classification": "failure",
+  "score": 0.2,
+  "reflection": null,
+  "project_path": "/Users/gqadonis/Projects/know-me/know-me-system"
+}

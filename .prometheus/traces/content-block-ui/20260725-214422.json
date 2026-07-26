@@ -1,0 +1,14 @@
+{
+  "id": "421baf08-6bcc-4b07-9cf8-3bd106c39cb9-content-block-ui",
+  "skill_name": "content-block-ui",
+  "timestamp": "2026-07-25T21:44:22.515242Z",
+  "duration_ms": 0,
+  "input_summary": "/content-block-ui ",
+  "output_summary": "",
+  "tool_calls": [],
+  "errors": [],
+  "classification": "failure",
+  "score": 0.2,
+  "reflection": null,
+  "project_path": "/Users/gqadonis/Projects/know-me/know-me-system"
+}

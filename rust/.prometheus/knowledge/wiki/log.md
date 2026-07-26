@@ -1,5 +1,19 @@
 # Update Log
 
+## 2026-07-26
+* **Creation**: [Model Runtime Per-Device Executor Session Complete](/model-runtime-per-device-executor-session-complete.md)
+* **Creation**: [Model Runtime Per-Device Executor Completion Marker](/model-runtime-per-device-executor-completion-marker.md)
+* **Creation**: [UAR conversation policy wrapper shape caused silent mode reset](/uar-conversation-policy-wrapper-shape-caused-silent-mode-reset.md)
+* **Creation**: [Model Runtime Per-Device Executor Session Complete](/model-runtime-per-device-executor-session-complete.md)
+* **Creation**: [Model runtime per-device execution marker with no completed changes](/model-runtime-per-device-execution-marker-with-no-completed-changes.md)
+* **Creation**: [Model Runtime Per Device Executor Session Completion](/model-runtime-per-device-executor-session-completion.md)
+* **Creation**: [KnowMe mode picker fixes and unresolved device certification](/knowme-mode-picker-fixes-and-unresolved-device-certification.md)
+* **Creation**: [Model Runtime Per Device Executor Session Completion](/model-runtime-per-device-executor-session-completion.md)
+* **Creation**: [KnowMe mode picker fixes and pending device verification](/knowme-mode-picker-fixes-and-pending-device-verification.md)
+* **Creation**: [KnowMe mode selector redesign MS1 status and Android catalog root cause](/knowme-mode-selector-redesign-ms1-status-and-android-catalog-root-cause.md)
+* **Creation**: [Model Runtime Per Device Executor Session Completion](/model-runtime-per-device-executor-session-completion.md)
+* **Creation**: [Android LiteRT-LM Local tab fix and remaining device proof gap](/android-litert-lm-local-tab-fix-and-remaining-device-proof-gap.md)
+
 ## 2026-07-25
 * **Creation**: [iOS certification of Local and embedded-UAR lanes on hardware](/ios-certification-of-local-and-embedded-uar-lanes-on-hardware.md)
 * **Creation**: [macOS embedded UAR host parity by deployment mode](/macos-embedded-uar-host-parity-by-deployment-mode.md)

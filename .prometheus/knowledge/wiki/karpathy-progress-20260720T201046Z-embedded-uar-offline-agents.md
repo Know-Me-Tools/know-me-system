@@ -6,6 +6,7 @@ tags:
 - karpathy-progress
 - embedded-uar-offline-agents
 - in-progress
+links: []
 sources:
 - conversation:operator-agent
 timestamp: 2026-07-20T20:10:46Z

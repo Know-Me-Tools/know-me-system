@@ -1,0 +1,14 @@
+{
+  "id": "421baf08-6bcc-4b07-9cf8-3bd106c39cb9-rust/vendor/universal-agent-runtime:openspec-new-change",
+  "skill_name": "rust/vendor/universal-agent-runtime:openspec-new-change",
+  "timestamp": "2026-07-25T21:44:22.515902Z",
+  "duration_ms": 0,
+  "input_summary": "/rust/vendor/universal-agent-runtime:openspec-new-change embedded-run-policy-and-admin-surface",
+  "output_summary": "",
+  "tool_calls": [],
+  "errors": [],
+  "classification": "failure",
+  "score": 0.2,
+  "reflection": null,
+  "project_path": "/Users/gqadonis/Projects/know-me/know-me-system"
+}
