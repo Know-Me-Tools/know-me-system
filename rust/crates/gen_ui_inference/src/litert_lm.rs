@@ -581,6 +581,10 @@ impl InferenceProvider for LiteRtLmEngine {
                 });
                 return Err(CoreError::Transient(run_error.message));
             }
+            // Model load is the dominant cold-start cost and a certification
+            // metric in its own right, so time it rather than inferring it from
+            // surrounding log timestamps.
+            let load_started = Instant::now();
             match crate::android_litert_jni::NativeLiteRtLmAdapter::load(&path, &runtime_cache) {
                 Ok(adapter) => {
                     tracing::info!(
@@ -588,6 +592,7 @@ impl InferenceProvider for LiteRtLmEngine {
                         model = %spec.model,
                         path = %path.display(),
                         cache = %runtime_cache.display(),
+                        load_ms = load_started.elapsed().as_millis() as u64,
                         "LiteRT-LM native adapter loaded"
                     );
                     let mut diagnostics = diagnostics;
@@ -673,8 +678,26 @@ impl InferenceProvider for LiteRtLmEngine {
                         target: "knowme_litert_lm",
                         "LiteRT-LM generation starting"
                     );
+                    // Timed here rather than inside `send_litert_response_events`:
+                    // this call site is the only one that brackets the blocking
+                    // generate, and throughput needs the duration paired with the
+                    // char count the emitter already reports.
+                    let generate_started = Instant::now();
                     match adapter.generate_text(&request) {
                         Ok(response) => {
+                            let generate_ms = generate_started.elapsed().as_millis() as u64;
+                            let chars = response.text.chars().count();
+                            tracing::info!(
+                                target: "knowme_litert_lm",
+                                generate_ms,
+                                chars,
+                                chars_per_second = if generate_ms > 0 {
+                                    (chars as u64) * 1000 / generate_ms
+                                } else {
+                                    0
+                                },
+                                "LiteRT-LM generation timing"
+                            );
                             send_litert_response_events(
                                 response,
                                 &sender,

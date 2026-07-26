@@ -65,10 +65,25 @@ Source plan: `.kbd-orchestrator/phases/model-runtime-per-device/plan.md`
 
 ## PROGRESS LEDGER
 
+Authoritative status lives in `progress.json` (including its `status_corrections`).
+This ledger drifted from it and was reconciled on 2026-07-26.
+
 - [COMPLETED] `android-litertlm-runtime` — Codex via `/kbd-apply`
+  - Marked complete before it worked: release builds died at
+    `ClassNotFoundException tools.knowme.knowme.KnowMeLiteRtLmBridge` because R8
+    shrank the JNI-only bridge. Fixed and certified on SM-S936U 2026-07-25
+    (commit `7330389`).
 - [COMPLETED] `litertlm-native-adapter` — Codex via `/kbd-apply`
-- [PENDING] `litertlm-local-tools` — Codex via `/kbd-apply`
-- [COMPLETED] `litertlm-device-proof` — Manual physical-device verification
+- [COMPLETED] `document-uar-karpathy-knowledge-strategy`
+- [COMPLETED] `litertlm-local-tools` — certified on SM-S936U 2026-07-25
+  (shortlist → model tool call → gate → MCP execution → continuation → answer;
+  `tool_result_fallback_applied` did not fire). Commit `e07002b`.
+- [IN PROGRESS] `litertlm-device-proof` — Manual physical-device verification.
+  Previously marked COMPLETED, but that claim is void: the Android release path
+  crashed at bridge load until 2026-07-25, so the asserted evidence could not
+  have been obtained. Requires a genuine re-run capturing load time, throughput,
+  backend, memory, thermal, cancellation, Markdown/Mermaid, attachment flow, and
+  a permitted tool call.
 
 ## OUTPUTS
 

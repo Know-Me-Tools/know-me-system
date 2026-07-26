@@ -223,6 +223,48 @@ thermal_raw = adb_shell("dumpsys", "thermalservice")
 meminfo_raw = adb_shell("dumpsys", "meminfo", package)
 pid = adb_shell("pidof", package)
 
+
+def parse_performance(pid_value):
+    """Harvest load time and generation throughput from the runtime's own logs.
+
+    The engine emits `load_ms` on "native adapter loaded" and `generate_ms` /
+    `chars` / `chars_per_second` on "generation timing". Reading them here keeps
+    the certification numbers machine-captured instead of eyeballed out of a log
+    tail. Values are None when the markers are absent — a run that never loaded
+    the model or never generated must not silently report zero.
+    """
+    args = ["adb", "logcat", "-d"]
+    if pid_value:
+        args.append(f"--pid={pid_value}")
+    raw = run(args)[0]
+    result = {
+        "modelLoadMs": None,
+        "generateMs": None,
+        "generatedChars": None,
+        "charsPerSecond": None,
+        "observedBackend": None,
+        "generationCount": 0,
+    }
+    for line in raw.splitlines():
+        if "LiteRT-LM native adapter loaded" in line:
+            found = re.search(r"load_ms[=:]\s*(\d+)", line)
+            if found:
+                result["modelLoadMs"] = int(found.group(1))
+            model = re.search(r"model[=:]\s*(\S+)", line)
+            if model:
+                result["observedBackend"] = model.group(1)
+        elif "LiteRT-LM generation timing" in line:
+            result["generationCount"] += 1
+            for key, field in (
+                ("generate_ms", "generateMs"),
+                ("chars", "generatedChars"),
+                ("chars_per_second", "charsPerSecond"),
+            ):
+                found = re.search(rf"{key}[=:]\s*(\d+)", line)
+                if found:
+                    result[field] = int(found.group(1))
+    return result
+
 report = {
     "schemaVersion": 1,
     "generatedAt": dt.datetime.now(dt.timezone.utc).isoformat(),
@@ -258,6 +300,7 @@ report = {
     "uar": uar_metadata(),
     "memory": parse_meminfo(meminfo_raw),
     "thermal": parse_thermal(thermal_raw),
+    "performance": parse_performance(pid),
     "artifacts": known_artifacts(),
 }
 
