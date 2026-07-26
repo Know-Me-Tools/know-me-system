@@ -734,7 +734,7 @@ impl InferenceProvider for LiteRtLmEngine {
                                     "LiteRT-LM generation cancelled by user"
                                 );
                                 let _ = sender.send(StreamEvent::Cancelled {
-                                    message: "Stopped by you".into(),
+                                    message: "Cancelled by user".into(),
                                 });
                             } else {
                                 tracing::error!(

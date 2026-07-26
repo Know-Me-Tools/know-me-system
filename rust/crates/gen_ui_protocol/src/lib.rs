@@ -2072,7 +2072,7 @@ mod tests {
         // tool call. That call used to vanish, and its absence also left any
         // tool result in history with no matching call.
         let events = events_for_interrupted_tool_call(StreamEvent::Cancelled {
-            message: "Stopped by you".into(),
+            message: "Cancelled by user".into(),
         });
 
         let (name, input_json) =
