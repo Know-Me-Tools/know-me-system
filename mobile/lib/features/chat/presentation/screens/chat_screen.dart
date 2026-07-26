@@ -55,12 +55,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     super.dispose();
   }
 
+  /// Set when the user taps Steer, cleared once that send goes out.
+  ///
+  /// Tapping Steer only focuses the composer; the intent has to survive until
+  /// the user finishes typing and submits, otherwise the correction goes out as
+  /// an anonymous new question and the model has no reason to treat the stopped
+  /// turn as work to build on.
+  bool _pendingSteer = false;
+
   /// Hand the composer to the user after they stop a run.
   ///
   /// Steering is the point of stopping, so put the caret where the next
   /// instruction goes rather than making them find it. The existing text is
   /// left alone — a half-typed thought is theirs to keep.
   void _focusComposerToSteer() {
+    setState(() => _pendingSteer = true);
     _composerFocus.requestFocus();
     _scrollToLatest();
   }
@@ -132,6 +141,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                             .read(chatProvider.notifier)
                             .regenerateResponse(message.id),
                         onSteer: _focusComposerToSteer,
+                        onResume: () =>
+                            ref.read(chatProvider.notifier).sendResume(),
                         onInteraction: (interaction) {
                           if (interaction['kind'] == 'local_tool_approve') {
                             final approvalId = interaction['approvalId']
@@ -235,22 +246,39 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: shad.TextField(
-                          controller: _controller,
-                          focusNode: _composerFocus,
-                          placeholder: const Text('Ask KnowMe anything…'),
-                          minLines: 1,
-                          maxLines: 5,
-                          enabled: !modelBusy,
-                          // shadcn_flutter defaults contextMenuBuilder to null,
-                          // which suppresses the platform selection toolbar — so
-                          // long-press showed no Paste/Copy/Select All callout.
-                          // Restore the native adaptive toolbar so paste works.
-                          contextMenuBuilder:
-                              shad.TextField.nativeContextMenuBuilder(),
-                          onSubmitted: _isSending || modelBusy
-                              ? null
-                              : (_) => _send(),
+                        // The armed-steer state is otherwise carried only by the
+                        // placeholder, which a screen reader does not re-announce
+                        // — so name the mode on the field itself.
+                        child: Semantics(
+                          textField: true,
+                          label: _pendingSteer
+                              ? 'Steer the stopped response'
+                              : 'Message KnowMe',
+                          child: shad.TextField(
+                            controller: _controller,
+                            focusNode: _composerFocus,
+                            // Name the mode while it is armed. Steering is a
+                            // different act from asking, and the whole point of
+                            // making it explicit is that a regular user can tell
+                            // which one they are about to do.
+                            placeholder: Text(
+                              _pendingSteer
+                                  ? 'Steer the stopped response…'
+                                  : 'Ask KnowMe anything…',
+                            ),
+                            minLines: 1,
+                            maxLines: 5,
+                            enabled: !modelBusy,
+                            // shadcn_flutter defaults contextMenuBuilder to null,
+                            // which suppresses the platform selection toolbar — so
+                            // long-press showed no Paste/Copy/Select All callout.
+                            // Restore the native adaptive toolbar so paste works.
+                            contextMenuBuilder:
+                                shad.TextField.nativeContextMenuBuilder(),
+                            onSubmitted: _isSending || modelBusy
+                                ? null
+                                : (_) => _send(),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -326,21 +354,29 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ),
     ];
     final attachmentPaths = [for (final file in _attachments) ?file.path];
+    final isSteer = _pendingSteer;
     _controller.clear();
     setState(() {
       _attachments.clear();
       _attachmentError = null;
       _isSending = true;
       _isNearBottom = true;
+      _pendingSteer = false;
     });
+    final body = text.isEmpty ? 'Please review the attached files.' : text;
+    final notifier = ref.read(chatProvider.notifier);
     try {
-      await ref
-          .read(chatProvider.notifier)
-          .sendMessage(
-            text.isEmpty ? 'Please review the attached files.' : text,
-            attachments: attachmentBlocks,
-            attachmentPaths: attachmentPaths,
-          );
+      await (isSteer
+          ? notifier.sendSteer(
+              body,
+              attachments: attachmentBlocks,
+              attachmentPaths: attachmentPaths,
+            )
+          : notifier.sendMessage(
+              body,
+              attachments: attachmentBlocks,
+              attachmentPaths: attachmentPaths,
+            ));
     } finally {
       if (mounted) setState(() => _isSending = false);
     }
@@ -441,6 +477,7 @@ class _MessageBubble extends StatelessWidget {
     required this.onDelete,
     required this.onRegenerate,
     required this.onSteer,
+    required this.onResume,
     this.onInteraction,
     this.remoteResolver,
   });
@@ -450,6 +487,7 @@ class _MessageBubble extends StatelessWidget {
   final Future<void> Function() onDelete;
   final Future<void> Function() onRegenerate;
   final VoidCallback onSteer;
+  final Future<void> Function() onResume;
   final AgentInteractionCallback? onInteraction;
   final RemoteContentResolver? remoteResolver;
 
@@ -481,6 +519,7 @@ class _MessageBubble extends StatelessWidget {
               onDelete: onDelete,
               onRegenerate: onRegenerate,
               onSteer: onSteer,
+              onResume: onResume,
             ),
           ),
         ),
@@ -584,6 +623,7 @@ class _AssistantTurn extends StatelessWidget {
     required this.onDelete,
     required this.onRegenerate,
     required this.onSteer,
+    required this.onResume,
     this.onInteraction,
     this.remoteResolver,
   });
@@ -596,6 +636,7 @@ class _AssistantTurn extends StatelessWidget {
   /// Hand the user the composer, pre-focused, so they can redirect from what
   /// was already generated rather than starting over.
   final VoidCallback onSteer;
+  final Future<void> Function() onResume;
   final AgentInteractionCallback? onInteraction;
   final RemoteContentResolver? remoteResolver;
 
@@ -665,9 +706,13 @@ class _AssistantTurn extends StatelessWidget {
     } else if (message.runStatus == 'cancelled') {
       segments.add(
         _StoppedTurnBar(
-          message: message.statusMessage ?? 'Stopped',
+          // Matches the durable status Rust writes ("Cancelled by user",
+          // chat.rs:151) so one state never shows two different words. Reached
+          // only if a cancel arrives with no message at all.
+          message: message.statusMessage ?? 'Cancelled by user',
           keptBlocks: blocks.length,
           onSteer: onSteer,
+          onResume: onResume,
           onRegenerate: onRegenerate,
           onDelete: onDelete,
         ),
@@ -954,13 +999,20 @@ class _RunErrorBubble extends StatelessWidget {
 ///
 /// Stopping is how users steer: they see the model heading the wrong way and
 /// interrupt it, expecting the work so far to stay in play. This says so
-/// explicitly — what was kept, and the three things they can do next — because
+/// explicitly — what was kept, and the four things they can do next — because
 /// the previous label left regular users unsure whether their work survived.
+///
+/// The two actions that KEEP the user's work lead (Steer, Resume); the two that
+/// throw it away are subordinate, so the destructive option stops competing for
+/// the tap. Codex and Amp both treat steer and interrupt as separate intents
+/// rather than one undifferentiated "send again", which is the distinction most
+/// users are actually reaching for when they hit stop.
 class _StoppedTurnBar extends StatelessWidget {
   const _StoppedTurnBar({
     required this.message,
     required this.keptBlocks,
     required this.onSteer,
+    required this.onResume,
     required this.onRegenerate,
     required this.onDelete,
   });
@@ -968,6 +1020,7 @@ class _StoppedTurnBar extends StatelessWidget {
   final String message;
   final int keptBlocks;
   final VoidCallback onSteer;
+  final Future<void> Function() onResume;
   final Future<void> Function() onRegenerate;
   final Future<void> Function() onDelete;
 
@@ -1012,21 +1065,42 @@ class _StoppedTurnBar extends StatelessWidget {
               _StoppedAction(
                 icon: Icons.edit_outlined,
                 label: 'Steer',
-                semanticLabel: 'Steer from here — write a new instruction',
+                semanticLabel:
+                    'Steer from here — write a new instruction, '
+                    'keeping the work so far',
                 onPressed: onSteer,
-                primary: true,
+                emphasis: _ActionEmphasis.primary,
               ),
+              // For the user who stopped and changed their mind. Only offered
+              // when something was actually kept — there is nothing to continue
+              // from otherwise.
+              if (keptBlocks > 0)
+                _StoppedAction(
+                  icon: Icons.play_arrow_outlined,
+                  label: 'Resume',
+                  semanticLabel: 'Resume — continue from where it stopped',
+                  onPressed: () => onResume(),
+                  emphasis: _ActionEmphasis.primary,
+                ),
               _StoppedAction(
                 icon: Icons.refresh,
+                // Named for what it does to the kept work: `regenerateResponse`
+                // is destructive in place, so it discards the partial answer the
+                // rest of this bar exists to preserve. Saying "replaces" is the
+                // difference between an informed tap and a surprise.
                 label: 'Retry',
-                semanticLabel: 'Retry this response',
+                semanticLabel:
+                    'Retry — replaces this response and discards the '
+                    'work so far',
                 onPressed: () => onRegenerate(),
+                emphasis: _ActionEmphasis.subordinate,
               ),
               _StoppedAction(
                 icon: Icons.delete_outline,
                 label: 'Discard',
                 semanticLabel: 'Discard this stopped response',
                 onPressed: () => onDelete(),
+                emphasis: _ActionEmphasis.subordinate,
               ),
             ],
           ),
@@ -1036,30 +1110,33 @@ class _StoppedTurnBar extends StatelessWidget {
   }
 }
 
+/// How much visual weight an action carries.
+///
+/// Three tiers rather than a bool, because the bar now has to say which actions
+/// keep the user's work (primary) and which throw it away (subordinate) without
+/// relying on colour alone.
+enum _ActionEmphasis { primary, secondary, subordinate }
+
 class _StoppedAction extends StatelessWidget {
   const _StoppedAction({
     required this.icon,
     required this.label,
     required this.semanticLabel,
     required this.onPressed,
-    this.primary = false,
+    this.emphasis = _ActionEmphasis.secondary,
   });
 
   final IconData icon;
   final String label;
   final String semanticLabel;
   final VoidCallback onPressed;
-  final bool primary;
+  final _ActionEmphasis emphasis;
 
   @override
   Widget build(BuildContext context) {
     final child = Row(
       mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 16),
-        const SizedBox(width: 6),
-        Text(label),
-      ],
+      children: [Icon(icon, size: 16), const SizedBox(width: 6), Text(label)],
     );
     return Semantics(
       button: true,
@@ -1069,9 +1146,20 @@ class _StoppedAction extends StatelessWidget {
       excludeSemantics: true,
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: 48),
-        child: primary
-            ? shad.PrimaryButton(onPressed: onPressed, child: child)
-            : shad.SecondaryButton(onPressed: onPressed, child: child),
+        child: switch (emphasis) {
+          _ActionEmphasis.primary => shad.PrimaryButton(
+            onPressed: onPressed,
+            child: child,
+          ),
+          _ActionEmphasis.secondary => shad.SecondaryButton(
+            onPressed: onPressed,
+            child: child,
+          ),
+          _ActionEmphasis.subordinate => shad.GhostButton(
+            onPressed: onPressed,
+            child: child,
+          ),
+        },
       ),
     );
   }

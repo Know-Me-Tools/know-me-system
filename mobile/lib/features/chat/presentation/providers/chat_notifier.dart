@@ -21,6 +21,20 @@ part 'chat_notifier.g.dart';
 
 const _uuid = Uuid();
 
+/// Prefixed to a steer so the model treats the stopped turn as work to build on.
+///
+/// Worded for the model, but it stays visible in the transcript, so it also has
+/// to read sensibly to the user who sent it.
+const _steerPreamble =
+    'I stopped your previous response part-way through. Keep the work you had '
+    'already done in mind, then follow this correction instead of continuing '
+    'the direction you were heading:';
+
+/// Sent verbatim when the user resumes a stopped turn.
+const _resumeInstruction =
+    'Continue your previous response from where you stopped. Do not start over '
+    'or repeat what you already wrote.';
+
 // ChatNotifier.build() is synchronous (never throws), so provider-level retry
 // does not apply here. The FFI terminality that matters lives on the async
 // FFI-backed providers (entityList/entity/syncStatus) and on the Mutation's
@@ -309,6 +323,7 @@ class ChatNotifier extends _$ChatNotifier {
     List<ContentBlock> attachments = const [],
     List<String> attachmentPaths = const [],
     String branchId = 'main',
+    String? intent,
   }) async {
     await load();
     if (!ref.mounted || state.threadId.isEmpty) return;
@@ -320,6 +335,7 @@ class ChatNotifier extends _$ChatNotifier {
       createdAt: DateTime.now().toUtc(),
       branchId: branchId,
       attachmentPaths: attachmentPaths,
+      intent: intent,
     );
     final assistantId = _uuid.v4();
     final assistantMsg = ChatMessage(
@@ -383,6 +399,41 @@ class ChatNotifier extends _$ChatNotifier {
     _drivers[assistantId] = driver;
     ref.onDispose(() => driver.dispose());
   }
+
+  /// Course-correct after a stop, keeping the partial work in play.
+  ///
+  /// The user stopped *because* they were steering — they read the partial answer
+  /// or a tool call and want a different direction. The preamble tells the model
+  /// that plainly, so the stopped turn reads as work-in-progress to build on
+  /// rather than a failed attempt to ignore.
+  ///
+  /// The tag travels in the content because that is the only carrier every lane
+  /// forwards verbatim — see [ChatMessage.intent] for why `name` and a new role
+  /// string both fail silently.
+  Future<void> sendSteer(
+    String text, {
+    List<ContentBlock> attachments = const [],
+    List<String> attachmentPaths = const [],
+    String branchId = 'main',
+  }) => sendMessage(
+    '$_steerPreamble\n\n$text',
+    attachments: attachments,
+    attachmentPaths: attachmentPaths,
+    branchId: branchId,
+    intent: 'steer',
+  );
+
+  /// Carry on from where a stop landed.
+  ///
+  /// For the user who stopped and changed their mind. No Rust changes are needed:
+  /// [_historyForRust] filters only on `branchId` and non-empty text — there is
+  /// no `runStatus` filter — so the cancelled partial turn is already in history
+  /// and the model sees `[… assistant(partial), user(continue)]`.
+  ///
+  /// The instruction stays visible in the transcript rather than being hidden, so
+  /// the conversation remains honest about what was actually sent.
+  Future<void> sendResume({String branchId = 'main'}) =>
+      sendMessage(_resumeInstruction, branchId: branchId, intent: 'resume');
 
   Future<void> resubmitMessage(String messageId) async {
     final message = state.messages

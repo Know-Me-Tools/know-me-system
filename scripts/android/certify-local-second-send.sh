@@ -56,15 +56,34 @@ if [[ "${CERT_CLEAN_CHAT_STATE:-1}" == "1" ]]; then
 fi
 
 dump_ui() {
-  adb shell uiautomator dump "$REMOTE_UI_XML" >/dev/null 2>&1
-  adb exec-out cat "$REMOTE_UI_XML" > "$UI_XML_PATH"
+  # `uiautomator dump` fails with "could not get idle state" while the app is
+  # animating — which is EXACTLY when a streaming run needs snapshotting. The
+  # old `|| true` form left a stale XML behind, so a later grep read the
+  # previous screen as if it were the current one and the Stop control appeared
+  # to be missing. Retry, then fail loudly rather than lying.
+  local attempt=0
+  while (( attempt < 6 )); do
+    attempt=$((attempt + 1))
+    adb shell rm -f "$REMOTE_UI_XML" >/dev/null 2>&1
+    if adb shell uiautomator dump "$REMOTE_UI_XML" >/dev/null 2>&1 \
+      && adb exec-out cat "$REMOTE_UI_XML" > "$UI_XML_PATH" 2>/dev/null \
+      && [[ -s "$UI_XML_PATH" ]] \
+      && python3 -c "import sys,xml.etree.ElementTree as ET; ET.parse(sys.argv[1])" \
+           "$UI_XML_PATH" 2>/dev/null; then
+      return 0
+    fi
+    sleep 1
+  done
+  echo "UI dump failed after $attempt attempts (app never went idle)" >&2
+  return 1
 }
 
-tap_matching_node() {
-  local needle="$1"
-  dump_ui
-  local point
-  point="$(python3 - "$UI_XML_PATH" "$needle" <<'PY'
+# Centre point of the first node whose text/content-desc/hint contains $1,
+# read from the LAST dump. Separate from tapping so a slot can be measured now
+# and tapped later — necessary because `uiautomator dump` stops working once the
+# app animates continuously during streaming.
+node_point() {
+  python3 - "$UI_XML_PATH" "$1" <<'PY'
 import re
 import sys
 import xml.etree.ElementTree as ET
@@ -86,6 +105,41 @@ for node in root.iter("node"):
     raise SystemExit(0)
 raise SystemExit(1)
 PY
+}
+
+tap_matching_node() {
+  dump_ui || return 1
+  local point
+  point="$(node_point "$1")" || return 1
+  [[ -n "$point" ]] || return 1
+  adb shell input tap $point
+}
+
+# Tap the composer by widget class, not by its placeholder text.
+#
+# The hint changes to "Steer the stopped response…" once a steer is armed, so
+# matching on "Ask KnowMe anything" silently misses the composer in exactly the
+# state this feature introduces.
+tap_composer() {
+  dump_ui
+  local point
+  point="$(python3 - "$UI_XML_PATH" <<'PYX'
+import re
+import sys
+import xml.etree.ElementTree as ET
+
+root = ET.parse(sys.argv[1]).getroot()
+for node in root.iter("node"):
+    if node.attrib.get("class") != "android.widget.EditText":
+        continue
+    match = re.search(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", node.attrib.get("bounds", ""))
+    if not match:
+        continue
+    x1, y1, x2, y2 = map(int, match.groups())
+    print(f"{(x1 + x2) // 2} {(y1 + y2) // 2}")
+    raise SystemExit(0)
+raise SystemExit(1)
+PYX
 )" || return 1
   [[ -n "$point" ]] || return 1
   adb shell input tap $point
@@ -203,7 +257,7 @@ select_local_lane() {
 # Navigate to the chat surface. A fresh launch lands on Home, where the mode
 # trigger does not exist yet — checking the lane before this always fails.
 open_chat() {
-  if tap_matching_node "Ask KnowMe anything"; then
+  if tap_composer; then
     return
   fi
   tap_matching_node "Chat" || {
@@ -216,7 +270,7 @@ open_chat() {
 
 compose_and_send() {
   local prompt="$1"
-  if ! tap_matching_node "Ask KnowMe anything"; then
+  if ! tap_composer; then
     local width height
     read -r width height < <(screen_dimensions)
     adb shell input tap "$((width / 2))" "$((height - 240))"
@@ -228,6 +282,20 @@ compose_and_send() {
     echo "ui xml: $UI_XML_PATH" >&2
     exit 1
   }
+  # Measure the stop slot NOW, in the brief window after the send and before the
+  # first token. Once tokens stream the app animates continuously and
+  # `uiautomator dump` fails with "could not get idle state" for the rest of the
+  # run, so Stop cannot be located later. It must also be measured AFTER the
+  # send: the composer shrinks from 5 lines to 1 when the text clears, moving the
+  # button ~480px down.
+  sleep 2
+  if dump_ui; then
+    STOP_SLOT="$(node_point "Stop generating")" \
+      || STOP_SLOT="$(node_point "Send message")" \
+      || STOP_SLOT=""
+  else
+    STOP_SLOT=""
+  fi
   # Confirm the send actually took. A tap that lands but does not submit leaves
   # the prompt sitting in the composer, and the run then reads whatever the
   # previous process left in the log as if it were this turn's output.
@@ -305,11 +373,11 @@ while (( SECONDS < deadline )); do
   # still reporting a pass.
   if (( cancel_tapped == 0 )) && rg -q "generation produced text chars=" "$LOG_PATH"; then
     sleep "$CANCEL_AFTER_GENERATION_SECONDS"
-    tap_matching_node "Stop generating" || {
-      echo "SECOND-SEND FAIL: Stop control not found while streaming; refusing to blind-tap" >&2
-      echo "ui xml: $UI_XML_PATH" >&2
+    [[ -n "$STOP_SLOT" ]] || {
+      echo "SECOND-SEND FAIL: no stop slot was measured; refusing to blind-tap" >&2
       exit 1
     }
+    adb shell input tap $STOP_SLOT
     cancel_tapped=1
   fi
   if (( cancel_tapped == 1 )) && rg -q "streaming stopped by user|generation cancelled by user|Cancelled by user" "$LOG_PATH"; then

@@ -174,6 +174,7 @@ class PemChatRepository implements ChatRepository {
           'attachmentPaths': message.attachmentPaths,
           'contextTelemetry': message.contextTelemetry,
           'provenance': message.provenance,
+          'intent': message.intent,
           'content': message.content.map(_encodeBlock).toList(growable: false),
         }),
       ),
@@ -249,6 +250,7 @@ class PemChatRepository implements ChatRepository {
             (data['provenance'] as Map<String, dynamic>?)
                 ?.cast<String, Object?>() ??
             const {},
+        intent: data['intent']?.toString(),
         content: (data['content'] as List<dynamic>)
             .cast<Map<String, dynamic>>()
             .map(ContentBlock.fromJson)

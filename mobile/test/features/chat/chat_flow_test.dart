@@ -271,6 +271,100 @@ void main() {
       expect(msg.contextTelemetry, isEmpty);
     },
   );
+
+  test('sendSteer marks the turn and tells the model to keep the work', () async {
+    final repo = _FakeChatRepository();
+    final container = ProviderContainer(
+      overrides: [chatRepositoryProvider.overrideWithValue(repo)],
+    );
+    final subscription = container.listen(chatProvider, (_, _) {});
+    addTearDown(container.dispose);
+    addTearDown(subscription.close);
+
+    final notifier = container.read(chatProvider.notifier);
+    await notifier.load();
+    await notifier.sendSteer('Focus on the cost side instead.');
+    await _flushAsyncEvents();
+
+    final request = repo.startRequests.single;
+    // The correction has to survive verbatim AND be framed as a correction —
+    // the tag rides in the content because it is the only carrier every lane
+    // forwards unchanged.
+    expect(request.message, contains('Focus on the cost side instead.'));
+    expect(request.message, contains('stopped your previous response'));
+
+    final sent = container
+        .read(chatProvider)
+        .messages
+        .firstWhere((message) => message.id == request.userMessageId);
+    expect(sent.intent, 'steer');
+  });
+
+  test('sendResume continues after the stopped partial turn', () async {
+    final repo = _FakeChatRepository(
+      messages: [
+        _message('u-1', 'user', 'Write a long guide.', branchId: 'main'),
+        ChatMessage(
+          id: 'a-1',
+          role: 'assistant',
+          content: [const TextBlock('Chapter one, partially wri')],
+          branchId: 'main',
+          runStatus: 'cancelled',
+          statusMessage: 'Cancelled by user',
+        ),
+      ],
+    );
+    final container = ProviderContainer(
+      overrides: [chatRepositoryProvider.overrideWithValue(repo)],
+    );
+    final subscription = container.listen(chatProvider, (_, _) {});
+    addTearDown(container.dispose);
+    addTearDown(subscription.close);
+
+    final notifier = container.read(chatProvider.notifier);
+    await notifier.load();
+    await notifier.sendResume();
+    await _flushAsyncEvents();
+
+    final request = repo.startRequests.single;
+    // This is what makes Resume free of Rust changes: history filters on
+    // branchId and non-empty text only — there is NO runStatus filter — so the
+    // cancelled partial turn is still there for the model to continue from.
+    expect(request.history.map((entry) => '${entry.role}:${entry.content}'), [
+      'user:Write a long guide.',
+      'assistant:Chapter one, partially wri',
+    ]);
+    expect(request.message, contains('Continue your previous response'));
+
+    final sent = container
+        .read(chatProvider)
+        .messages
+        .firstWhere((message) => message.id == request.userMessageId);
+    expect(sent.intent, 'resume');
+  });
+
+  test('an ordinary send carries no intent', () async {
+    final repo = _FakeChatRepository();
+    final container = ProviderContainer(
+      overrides: [chatRepositoryProvider.overrideWithValue(repo)],
+    );
+    final subscription = container.listen(chatProvider, (_, _) {});
+    addTearDown(container.dispose);
+    addTearDown(subscription.close);
+
+    final notifier = container.read(chatProvider.notifier);
+    await notifier.load();
+    await notifier.sendMessage('Just a question.');
+    await _flushAsyncEvents();
+
+    final request = repo.startRequests.single;
+    expect(request.message, 'Just a question.');
+    final sent = container
+        .read(chatProvider)
+        .messages
+        .firstWhere((message) => message.id == request.userMessageId);
+    expect(sent.intent, isNull);
+  });
 }
 
 ChatMessage _message(
