@@ -1,30 +1,29 @@
 {
   "phase": "model-runtime-per-device",
   "previousPhase": "on-device-qwen35",
-  "change": "desktop-stable-port",
+  "change": "litertlm-device-proof",
   "status": "executing",
-  "currentTask": "desktop-stable-port apply: macOS floor raised to 14.0 (mlex/mlx-c lane compiles for the first time), MlxcEngine certified, per-target engine matrix (macOS MLX / Win-Linux llama.cpp) verified by a full tauri-plugin build. Remaining: runtime cert (launch desktop app + agent turn), Win/Linux CI cross-build.",
+  "currentTask": "litertlm-device-proof: physical-device evidence for the Android LiteRT-LM path. Of the 9 required items, backend/memory/thermal, cancellation, Markdown/Mermaid, and the permitted tool call already have scripts under scripts/android/; load time and throughput were instrumented 2026-07-26 (commit c92fc80: load_ms on adapter load, generate_ms/chars/chars_per_second on generation, harvested into write-local-certification-report.sh). Attachment flow still has no certification script. BLOCKED: Samsung SM-S936U (R5GYB4AZD7A) reads `adb unauthorized` and needs an on-screen 'Allow USB debugging' tap before any device evidence can be captured.",
   "nextPendingChange": null,
   "sourceTool": "claude-code",
   "exactNextCommand": null,
   "parentPhase": "model-runtime-per-device",
   "childPhases": [
-    "embedded-uar-offline-agents",
-    "desktop-stable-port"
+    "embedded-uar-offline-agents"
   ],
-  "childPointer": "desktop-stable-port",
+  "childPointer": "embedded-uar-offline-agents",
   "completionMetric": "implementation",
-  "implementationCompleted": 13,
-  "implementationTotal": 18,
+  "implementationCompleted": 4,
+  "implementationTotal": 5,
   "certificationStatus": "IN_PROGRESS",
   "publicationStatus": "NOT_TRACKED",
-  "changesCompleted": 1,
-  "changesTotal": 2,
-  "updatedAt": "2026-07-22T18:00:00Z",
+  "changesCompleted": 4,
+  "changesTotal": 5,
+  "updatedAt": "2026-07-26T15:55:00Z",
   "path": [
     "model-runtime-per-device",
-    "desktop-stable-port"
+    "embedded-uar-offline-agents"
   ],
-  "blockedReason": null,
-  "resolvedNotes": "iOS local inference certified on device (Qwen3-4B generating tokens); the qwen3_5-arch model was repointed to Qwen3-4B (MLX-Swift 2.29.1 does not register qwen3_5). iOS <think> reasoning now emits ThinkingDelta -> collapsible thinking ContentBlock (commit 06f5fd9). Submodule PRs #172/#173 are MERGED; the parent submodule pointer is stable on UAR main. iOS provisioning resolved via automatic code signing carrying com.apple.developer.kernel.increased-memory-limit. Active work: desktop-stable-port OpenSpec change (macOS Tauri port stabilization)."
+  "blockedReason": "litertlm-device-proof cannot capture device evidence until the Samsung SM-S936U USB-debugging authorization prompt is accepted on the phone.",
+  "resolvedNotes": "Reconciled 2026-07-26 against .kbd-orchestrator/phases/model-runtime-per-device/progress.json, which is the authoritative record and was last written 2026-07-25 (this waypoint had been stale since 2026-07-22). The prior contents pointed at a change and child phase named `desktop-stable-port` that has no phase directory under .kbd-orchestrator/phases/, no openspec change, and no reference in the phase's own plan/execution docs — it survived only here, so `/opsx:new desktop-stable-port` would have materialized a change from a dangling reference. The phase record lists exactly one child (embedded-uar-offline-agents) and active_change litertlm-device-proof at 4/5.\n\nSession work now certified on device: the single mode picker replacing the 3-button row; per-conversation lane resolution on every send path; the ConversationPolicyRecord-vs-RunPolicy wrapper fix behind 'selecting Local does nothing' (it failed silently because every RunPolicy field is serde(default), so the wrapper deserialized to defaults without erroring); Android Local mode certified on SM-S936U (routes to LiteRT-LM with no UAR run, per-conversation isolation holds); and on iPhone 17 Pro Max the MLX TemplateException('System message must be at the beginning.') fix plus the editable local system prompt. Commits 0a97500, cf48e98, e81f303, c92fc80, 82d0c69, ff7d800, pushed through 109b131.\n\nStill open: durable embedded persistence (embed-uar-mobile-offline task 3.1) — InMemoryProvider at rust/crates/gen_ui_agent/src/uar.rs:880 means per-conversation mode resets on app restart. Scoping found a complete 1343-line SurrealDbProvider implementing all 45 PersistenceLayer methods behind the surreal-backend feature, whose constructor already supports embedded SurrealKV endpoints without auth, so 3.1 may be wiring rather than new implementation."
 }
