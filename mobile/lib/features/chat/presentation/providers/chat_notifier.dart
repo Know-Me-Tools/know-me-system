@@ -492,6 +492,16 @@ class ChatNotifier extends _$ChatNotifier {
     );
     final accepted = await _repository.cancelRun(runId);
     if (!ref.mounted || accepted) return;
+    // Rust reports `false` when the run is no longer registered — which is the
+    // normal outcome of a second stop tap, or of the run finishing in the gap
+    // before this call landed. Treating that as an error overwrote a
+    // legitimate stopped turn with a failure bubble and hid the work the user
+    // had just chosen to keep. Only surface an error if the turn is somehow
+    // still streaming; otherwise it already reached a terminal state.
+    final current = state.messages
+        .where((item) => item.id == messageId)
+        .firstOrNull;
+    if (current == null || !current.isStreaming) return;
     markRunError(
       messageId,
       const ChatRunError(

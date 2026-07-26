@@ -31,6 +31,7 @@ class ChatScreen extends ConsumerStatefulWidget {
 
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _controller = TextEditingController();
+  final _composerFocus = FocusNode();
   final _scrollController = ScrollController();
   final _attachments = <PlatformFile>[];
   bool _isSending = false;
@@ -49,8 +50,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   void dispose() {
     _controller.dispose();
+    _composerFocus.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  /// Hand the composer to the user after they stop a run.
+  ///
+  /// Steering is the point of stopping, so put the caret where the next
+  /// instruction goes rather than making them find it. The existing text is
+  /// left alone — a half-typed thought is theirs to keep.
+  void _focusComposerToSteer() {
+    _composerFocus.requestFocus();
+    _scrollToLatest();
   }
 
   @override
@@ -119,6 +131,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         onRegenerate: () => ref
                             .read(chatProvider.notifier)
                             .regenerateResponse(message.id),
+                        onSteer: _focusComposerToSteer,
                         onInteraction: (interaction) {
                           if (interaction['kind'] == 'local_tool_approve') {
                             final approvalId = interaction['approvalId']
@@ -224,6 +237,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       Expanded(
                         child: shad.TextField(
                           controller: _controller,
+                          focusNode: _composerFocus,
                           placeholder: const Text('Ask KnowMe anything…'),
                           minLines: 1,
                           maxLines: 5,
@@ -426,6 +440,7 @@ class _MessageBubble extends StatelessWidget {
     required this.onResubmit,
     required this.onDelete,
     required this.onRegenerate,
+    required this.onSteer,
     this.onInteraction,
     this.remoteResolver,
   });
@@ -434,6 +449,7 @@ class _MessageBubble extends StatelessWidget {
   final Future<void> Function() onResubmit;
   final Future<void> Function() onDelete;
   final Future<void> Function() onRegenerate;
+  final VoidCallback onSteer;
   final AgentInteractionCallback? onInteraction;
   final RemoteContentResolver? remoteResolver;
 
@@ -464,6 +480,7 @@ class _MessageBubble extends StatelessWidget {
               remoteResolver: remoteResolver,
               onDelete: onDelete,
               onRegenerate: onRegenerate,
+              onSteer: onSteer,
             ),
           ),
         ),
@@ -566,6 +583,7 @@ class _AssistantTurn extends StatelessWidget {
     required this.blocks,
     required this.onDelete,
     required this.onRegenerate,
+    required this.onSteer,
     this.onInteraction,
     this.remoteResolver,
   });
@@ -574,6 +592,10 @@ class _AssistantTurn extends StatelessWidget {
   final List<ContentBlock> blocks;
   final Future<void> Function() onDelete;
   final Future<void> Function() onRegenerate;
+
+  /// Hand the user the composer, pre-focused, so they can redirect from what
+  /// was already generated rather than starting over.
+  final VoidCallback onSteer;
   final AgentInteractionCallback? onInteraction;
   final RemoteContentResolver? remoteResolver;
 
@@ -642,8 +664,12 @@ class _AssistantTurn extends StatelessWidget {
       segments.add(_RunErrorBubble(error: message.error!));
     } else if (message.runStatus == 'cancelled') {
       segments.add(
-        _RunCancelledBubble(
-          message: message.statusMessage ?? 'Response cancelled',
+        _StoppedTurnBar(
+          message: message.statusMessage ?? 'Stopped',
+          keptBlocks: blocks.length,
+          onSteer: onSteer,
+          onRegenerate: onRegenerate,
+          onDelete: onDelete,
         ),
       );
     }
@@ -924,28 +950,128 @@ class _RunErrorBubble extends StatelessWidget {
   }
 }
 
-class _RunCancelledBubble extends StatelessWidget {
-  const _RunCancelledBubble({required this.message});
+/// Shown when a run was stopped, in place of the old bare "cancelled" label.
+///
+/// Stopping is how users steer: they see the model heading the wrong way and
+/// interrupt it, expecting the work so far to stay in play. This says so
+/// explicitly — what was kept, and the three things they can do next — because
+/// the previous label left regular users unsure whether their work survived.
+class _StoppedTurnBar extends StatelessWidget {
+  const _StoppedTurnBar({
+    required this.message,
+    required this.keptBlocks,
+    required this.onSteer,
+    required this.onRegenerate,
+    required this.onDelete,
+  });
+
   final String message;
+  final int keptBlocks;
+  final VoidCallback onSteer;
+  final Future<void> Function() onRegenerate;
+  final Future<void> Function() onDelete;
 
   @override
   Widget build(BuildContext context) {
     final colors = shad.Theme.of(context).colorScheme;
+    final kept = keptBlocks == 1 ? '1 block' : '$keptBlocks blocks';
+    // Only claim work was kept when there is some; a stop before the first
+    // block produced nothing, and saying otherwise would be a lie the user can
+    // see through.
+    final summary = keptBlocks > 0
+        ? '$message — kept $kept, still in context'
+        : message;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        // Flat 2.0: regions differ by background colour only — no border.
+        color: colors.secondary,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Semantics(
+            liveRegion: true,
+            child: Row(
+              children: [
+                // Icon plus text: state is never carried by colour alone.
+                const Icon(Icons.stop_circle_outlined),
+                const SizedBox(width: 10),
+                Expanded(child: Text(summary)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Wrap so the actions reflow instead of clipping at large text scales.
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _StoppedAction(
+                icon: Icons.edit_outlined,
+                label: 'Steer',
+                semanticLabel: 'Steer from here — write a new instruction',
+                onPressed: onSteer,
+                primary: true,
+              ),
+              _StoppedAction(
+                icon: Icons.refresh,
+                label: 'Retry',
+                semanticLabel: 'Retry this response',
+                onPressed: () => onRegenerate(),
+              ),
+              _StoppedAction(
+                icon: Icons.delete_outline,
+                label: 'Discard',
+                semanticLabel: 'Discard this stopped response',
+                onPressed: () => onDelete(),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StoppedAction extends StatelessWidget {
+  const _StoppedAction({
+    required this.icon,
+    required this.label,
+    required this.semanticLabel,
+    required this.onPressed,
+    this.primary = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final String semanticLabel;
+  final VoidCallback onPressed;
+  final bool primary;
+
+  @override
+  Widget build(BuildContext context) {
+    final child = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16),
+        const SizedBox(width: 6),
+        Text(label),
+      ],
+    );
     return Semantics(
-      liveRegion: true,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: colors.secondary,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.stop_circle_outlined),
-            const SizedBox(width: 10),
-            Expanded(child: Text(message)),
-          ],
-        ),
+      button: true,
+      label: semanticLabel,
+      // Excluded so each control announces once rather than doubling up its
+      // own visible label with the descriptive one.
+      excludeSemantics: true,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 48),
+        child: primary
+            ? shad.PrimaryButton(onPressed: onPressed, child: child)
+            : shad.SecondaryButton(onPressed: onPressed, child: child),
       ),
     );
   }
