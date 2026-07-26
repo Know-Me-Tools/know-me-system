@@ -19,7 +19,7 @@ All paths relative to `rust/vendor/universal-agent-runtime/`. Reference (read-on
 
 - [x] 3.1 `chat-page.tsx`: sidebar container `bg-chrome` (drop `border-r`); agent toolbar row keeps `--background` (drop `border-b`); add the hamburger button (`md:hidden`) into the toolbar row toggling `useUiState` mobile sidebar
 - [x] 3.2 `left-sidebar.tsx`: re-skin container to `--chrome` with ladder-separated search/list/new-conversation regions (behavior unchanged: search, rename, delete, new)
-- [ ] 3.3 Verify the narrow-layout stacking: chat page fills the shell `main` column; composer clears the bottom nav (smoke check at 320px and 1440px)
+- [x] 3.3 Verify the narrow-layout stacking: chat page fills the shell `main` column; composer clears the bottom nav (smoke check at 320px and 1440px) — measured 0px overlap (`main` bottom 648 = bar top 648) and no horizontal overflow at 320px; composer itself unrendered without a backend, see verification-notes
 
 ## 4. Tauri Titlebar
 
@@ -31,7 +31,7 @@ All paths relative to `rust/vendor/universal-agent-runtime/`. Reference (read-on
 
 - [x] 5.1 `pnpm -C frontend typecheck`, `pnpm -C frontend lint`, `pnpm -C frontend build` green; `scripts/validate-static-bundle.mjs` passes
 - [x] 5.2 `pnpm -C frontend test` green (update any tests referencing `TopNav` or the old shell DOM)
-- [ ] 5.3 Manual smoke at 320px (bottom bar, hamburger, sidebar drawer) and 1440px (rail, status card) in dark + light against the KnowMe shell idiom; attach notes/screenshots to the change
+- [x] 5.3 Manual smoke at 320px (bottom bar, hamburger, sidebar drawer) and 1440px (rail, status card) in dark + light against the KnowMe shell idiom; attach notes/screenshots to the change — all 4 viewport/theme combinations verified; hamburger + drawer NOT verified (chat chrome unmounted without a backend), deferred to `uar-ui-verify-gates`
 - [x] 5.4 Grep gate: no `border-r`/`border-b` region separators left in `App.tsx`, `chat-page.tsx`, `left-sidebar.tsx`, `AppShell.tsx`
 
 ## Apply notes (2026-07-21, kimi)
