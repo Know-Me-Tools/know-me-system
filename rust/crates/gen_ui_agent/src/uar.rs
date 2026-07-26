@@ -982,7 +982,17 @@ impl UarEmbeddedRuntime {
             .map_err(|error| AgentError::Config(format!("delete agent {id}: {error}")))
     }
 
-    /// Load the per-conversation run policy record, or `null` when none is saved.
+    /// Load the per-conversation run policy, or `null` when none is saved.
+    ///
+    /// Returns the **bare** `RunPolicy`, not the `ConversationPolicyRecord`
+    /// wrapper that persistence stores it in. The wrapper is a storage detail:
+    /// `save_conversation_policy` below accepts a bare policy, the TypeScript
+    /// binding declares `Promise<RunPolicy | null>`, and Flutter assigns the
+    /// result straight to its policy map. Leaking `{conversation_id, policy,
+    /// updated_at}` here broke all of them — and silently, because every
+    /// `RunPolicy` field is `#[serde(default)]`, so feeding the wrapper back to
+    /// save deserialized to defaults instead of erroring and quietly discarded
+    /// the user's selection.
     pub async fn conversation_policy(
         &self,
         conversation_id: &str,
@@ -992,11 +1002,17 @@ impl UarEmbeddedRuntime {
             .get_conversation_policy(conversation_id)
             .await
             .map_err(|error| AgentError::Config(format!("load conversation policy: {error}")))?;
-        serde_json::to_value(&record)
-            .map_err(|error| AgentError::Config(format!("serialize conversation policy: {error}")))
+        match record {
+            Some(record) => serde_json::to_value(&record.policy).map_err(|error| {
+                AgentError::Config(format!("serialize conversation policy: {error}"))
+            }),
+            None => Ok(serde_json::Value::Null),
+        }
     }
 
-    /// Save or replace the per-conversation run policy; echoes the stored record.
+    /// Save or replace the per-conversation run policy; echoes the stored policy
+    /// in the same bare shape [`Self::conversation_policy`] returns, so a client
+    /// can assign the result back over what it sent.
     pub async fn save_conversation_policy(
         &self,
         conversation_id: &str,
@@ -1009,7 +1025,7 @@ impl UarEmbeddedRuntime {
             .save_conversation_policy(conversation_id, run_policy)
             .await
             .map_err(|error| AgentError::Config(format!("save conversation policy: {error}")))?;
-        serde_json::to_value(&record)
+        serde_json::to_value(&record.policy)
             .map_err(|error| AgentError::Config(format!("serialize conversation policy: {error}")))
     }
 

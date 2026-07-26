@@ -80,9 +80,7 @@ class ChatControl extends _$ChatControl {
       state = state.copyWith(
         catalog: results[0]! as Map<String, dynamic>,
         laneAvailability: _laneAvailability(results[1]),
-        policy: results.length > 2
-            ? results[2] as Map<String, dynamic>? ?? _defaultPolicy()
-            : _defaultPolicy(),
+        policy: mergeConversationPolicy(results.length > 2 ? results[2] : null),
       );
     } catch (error) {
       state = state.copyWith(error: await _repository.errorMessage(error));
@@ -149,9 +147,14 @@ class ChatControl extends _$ChatControl {
     final policy = {...state.policy, ...values};
     state = state.copyWith(policy: policy, saving: true, clearError: true);
     try {
+      // `savePolicy` echoes the stored policy in the same bare shape it accepts,
+      // so it can be layered back over the defaults exactly like a fresh load.
       final saved = await _repository.savePolicy(conversationId, policy);
       final effective = await _repository.effective(conversationId);
-      state = state.copyWith(policy: saved, effective: effective);
+      state = state.copyWith(
+        policy: mergeConversationPolicy(saved),
+        effective: effective,
+      );
     } catch (error) {
       state = state.copyWith(error: await _repository.errorMessage(error));
     } finally {
@@ -179,6 +182,19 @@ Map<String, String?> _laneAvailability(Object? raw) {
   }
   return entries;
 }
+
+/// Layer a stored policy over the defaults.
+///
+/// Rust returns the **bare** `RunPolicy` (or null when the conversation has no
+/// saved policy), so its keys sit at the top level alongside the defaults'. A
+/// policy written before a field existed simply omits it, and the default fills
+/// in — which also keeps `savePolicy` receiving a complete `RunPolicy` rather
+/// than a sparse patch.
+@visibleForTesting
+Map<String, dynamic> mergeConversationPolicy(Object? stored) => {
+  ..._defaultPolicy(),
+  if (stored is Map<String, dynamic>) ...stored,
+};
 
 Map<String, dynamic> _defaultPolicy() => {
   'version': 1,

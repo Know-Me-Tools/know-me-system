@@ -1201,13 +1201,8 @@ fn lane_for_chat_mode(mode: &str) -> Option<&'static str> {
 /// modes existed keep their previous behavior.
 async fn resolve_lane_for_conversation(conversation_id: &str) -> Result<String, AgentError> {
     if !conversation_id.is_empty() {
-        if let Ok(record) = crate::control_plane::conversation_policy(conversation_id).await {
-            let lane = record
-                .get("policy")
-                .and_then(|policy| policy.get("chat_mode"))
-                .and_then(serde_json::Value::as_str)
-                .and_then(lane_for_chat_mode);
-            if let Some(lane) = lane {
+        if let Ok(policy) = crate::control_plane::conversation_policy(conversation_id).await {
+            if let Some(lane) = chat_mode_lane(&policy) {
                 return Ok(lane.to_string());
             }
         }
@@ -1218,6 +1213,19 @@ async fn resolve_lane_for_conversation(conversation_id: &str) -> Result<String, 
         .await?
         .and_then(|value| value.as_str().map(str::to_owned))
         .unwrap_or_else(default_lane))
+}
+
+/// The execution lane a stored conversation policy selects, if any.
+///
+/// Reads `chat_mode` from the **bare** `RunPolicy` — the shape the control plane
+/// returns and that `save_conversation_policy` accepts. Returns `None` when the
+/// policy stores no recognized mode, so the caller falls back to the global
+/// lane rather than inventing a route.
+fn chat_mode_lane(policy: &serde_json::Value) -> Option<&'static str> {
+    policy
+        .get("chat_mode")
+        .and_then(serde_json::Value::as_str)
+        .and_then(lane_for_chat_mode)
 }
 
 /// Whether a lane can be selected right now, and if not, why.
@@ -2922,6 +2930,34 @@ mod attachment_tests {
         // the global setting rather than silently routing somewhere unintended.
         assert_eq!(lane_for_chat_mode("nonsense"), None);
         assert_eq!(lane_for_chat_mode(""), None);
+    }
+
+    #[test]
+    fn conversation_chat_mode_is_read_from_the_bare_run_policy() {
+        // The control plane hands back the bare `RunPolicy`, not the storage
+        // `ConversationPolicyRecord` wrapper. This was the defect behind "Local
+        // does nothing": the accessor leaked `{conversation_id, policy, updated_at}`
+        // while every consumer — Dart's `state.policy`, the TypeScript binding's
+        // declared `Promise<RunPolicy | null>`, and `save_conversation_policy`'s
+        // own input — expects `chat_mode` at the top level. Because every
+        // `RunPolicy` field is `#[serde(default)]`, sending the wrapper back to
+        // save deserialized to defaults *without erroring*, silently discarding
+        // the selection.
+        let bare = serde_json::json!({"version": 1, "chat_mode": "local"});
+        assert_eq!(chat_mode_lane(&bare), Some(LANE_LOCAL));
+
+        // The wrapper must NOT resolve — if it ever reappears, this fails loudly
+        // instead of silently falling back to the global lane.
+        let wrapped = serde_json::json!({
+            "conversation_id": "c1",
+            "policy": {"version": 1, "chat_mode": "local"},
+            "updated_at": "2026-07-26T00:00:00Z",
+        });
+        assert_eq!(chat_mode_lane(&wrapped), None);
+
+        // A conversation with no stored mode falls through to the global lane.
+        assert_eq!(chat_mode_lane(&serde_json::json!({"version": 1})), None);
+        assert_eq!(chat_mode_lane(&serde_json::Value::Null), None);
     }
 
     #[test]
