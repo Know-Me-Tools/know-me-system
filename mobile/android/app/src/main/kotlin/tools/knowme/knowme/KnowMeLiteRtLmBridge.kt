@@ -8,6 +8,7 @@ import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
 import com.google.ai.edge.litertlm.Message
+import com.google.ai.edge.litertlm.MessageCallback
 import com.google.ai.edge.litertlm.OpenApiTool
 import com.google.ai.edge.litertlm.SamplerConfig
 import com.google.ai.edge.litertlm.ToolProvider
@@ -39,6 +40,15 @@ object KnowMeLiteRtLmBridge {
     // the comment there); every writer still holds it, so publication is safe.
     @Volatile
     private var conversation: Conversation? = null
+
+    // Streaming buffer. Written on the engine's callback thread, drained on the
+    // Rust polling thread, so every access takes `streamLock` — deliberately a
+    // separate lock from the object monitor, which `sendMessage` holds for a
+    // whole blocking generation.
+    private val streamLock = Any()
+    private val streamChunks = mutableListOf<String>()
+    private var streamDone = false
+    private var streamError: String? = null
     private var modelPath: String? = null
     private var cacheDir: String? = null
 
@@ -82,6 +92,84 @@ object KnowMeLiteRtLmBridge {
             ?: error("request contains no user prompt")
         val response = activeConversation.sendMessage(lastUser)
         return messageToJson(response)
+    }
+
+    /**
+     * Begin a streaming generation.
+     *
+     * The blocking [sendMessage] returns only when generation finishes, so
+     * cancelling it discarded everything the model had produced — the text never
+     * crossed the JNI boundary. `sendMessageAsync` delivers each chunk to a
+     * callback instead, and this buffers those chunks for Rust to drain, so a
+     * stop keeps whatever arrived before it.
+     *
+     * Deliberately NOT `@Synchronized`: it must return immediately so Rust can
+     * poll [drainStream] while generation continues. Holding the object lock for
+     * the whole run is what made the old `cancel()` unable to interrupt.
+     */
+    @JvmStatic
+    fun startStream(requestJson: String) {
+        val currentEngine = synchronized(this) { engine }
+            ?: error("LiteRT-LM engine is not loaded")
+        val request = JSONObject(requestJson)
+        val activeConversation = currentEngine.createConversation(
+            conversationConfigFromRequest(request),
+        )
+        synchronized(this) { conversation = activeConversation }
+
+        val messages = request.optJSONArray("messages") ?: JSONArray()
+        val lastUser = lastUserContent(messages)
+            ?: request.optString("prompt").takeIf { it.isNotBlank() }
+            ?: error("request contains no user prompt")
+
+        synchronized(streamLock) {
+            streamChunks.clear()
+            streamDone = false
+            streamError = null
+        }
+
+        activeConversation.sendMessageAsync(
+            Message.user(lastUser),
+            object : MessageCallback {
+                override fun onMessage(message: Message) {
+                    synchronized(streamLock) { streamChunks += messageToJson(message) }
+                }
+
+                override fun onDone() {
+                    synchronized(streamLock) { streamDone = true }
+                }
+
+                override fun onError(error: Throwable) {
+                    // Recorded rather than thrown: the throw would land on the
+                    // engine's callback thread where Rust cannot observe it.
+                    synchronized(streamLock) {
+                        streamError = error.message ?: error.toString()
+                        streamDone = true
+                    }
+                }
+            },
+        )
+    }
+
+    /**
+     * Hand Rust everything buffered since the last drain.
+     *
+     * Returns `{"chunks":[...],"done":bool,"error":string?}`. Chunks are removed
+     * as they are read, so a cancel mid-generation still yields whatever the
+     * model produced up to that point rather than losing the run.
+     */
+    @JvmStatic
+    fun drainStream(): String {
+        val payload = JSONObject()
+        val chunks = JSONArray()
+        synchronized(streamLock) {
+            streamChunks.forEach { chunks.put(JSONObject(it)) }
+            streamChunks.clear()
+            payload.put("done", streamDone)
+            streamError?.let { payload.put("error", it) }
+        }
+        payload.put("chunks", chunks)
+        return payload.toString()
     }
 
     @JvmStatic

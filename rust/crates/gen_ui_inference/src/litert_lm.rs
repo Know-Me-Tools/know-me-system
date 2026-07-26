@@ -440,6 +440,100 @@ fn push_litert_lm_response_events(
 }
 
 #[cfg(target_os = "android")]
+/// Why streaming could not be used, so the caller can fall back.
+#[cfg(target_os = "android")]
+enum StreamStartError {
+    /// The installed bridge predates `startStream`/`drainStream`.
+    Unsupported,
+}
+
+/// Run a generation through the streaming bridge, emitting each chunk as it
+/// arrives.
+///
+/// This is what makes stopping non-destructive on Android: text reaches the host
+/// incrementally, so a cancel keeps everything already emitted instead of
+/// discarding a whole in-flight response.
+///
+/// Polls rather than taking a callback because the JNI bridge is one-way
+/// (Rust → Kotlin static calls); Kotlin buffers chunks and this drains them.
+#[cfg(target_os = "android")]
+fn stream_litert_generation(
+    adapter: &crate::android_litert_jni::NativeLiteRtLmAdapter,
+    request: &InferenceRequest,
+    sender: &tokio::sync::mpsc::UnboundedSender<StreamEvent>,
+    generation_cancelled: &AtomicBool,
+    generate_started: Instant,
+    backend_self_test_passed: &AtomicBool,
+) -> Result<(), StreamStartError> {
+    // A bridge without `startStream` throws NoSuchMethodError, surfacing here as
+    // an error — treat that as "not supported" and let the caller fall back
+    // rather than failing a run that the blocking path can still serve.
+    if adapter.start_stream(request).is_err() {
+        return Err(StreamStartError::Unsupported);
+    }
+
+    let mut chars: usize = 0;
+    loop {
+        // Checked before draining so a cancel stops the loop promptly; whatever
+        // was already emitted stays in the conversation.
+        if generation_cancelled.load(Ordering::Acquire) {
+            tracing::info!(
+                target: "knowme_litert_lm",
+                chars,
+                "LiteRT-LM streaming stopped by user"
+            );
+            let _ = sender.send(StreamEvent::Cancelled {
+                message: "Cancelled by user".into(),
+            });
+            return Ok(());
+        }
+
+        let drain = match adapter.drain_stream() {
+            Ok(drain) => drain,
+            Err(error) => {
+                let _ = sender.send(StreamEvent::Error {
+                    message: error.to_string(),
+                });
+                return Ok(());
+            }
+        };
+
+        for chunk in drain.chunks {
+            chars += chunk.text.chars().count();
+            send_litert_response_events(chunk, sender, "initial", Some(backend_self_test_passed));
+        }
+
+        if drain.done {
+            if let Some(message) = drain.error {
+                tracing::error!(
+                    target: "knowme_litert_lm",
+                    error = %message,
+                    "LiteRT-LM streaming generation failed"
+                );
+                let _ = sender.send(StreamEvent::Error { message });
+                return Ok(());
+            }
+            let generate_ms = generate_started.elapsed().as_millis() as u64;
+            tracing::info!(
+                target: "knowme_litert_lm",
+                generate_ms,
+                chars,
+                chars_per_second = if generate_ms > 0 {
+                    (chars as u64) * 1000 / generate_ms
+                } else {
+                    0
+                },
+                "LiteRT-LM generation timing"
+            );
+            return Ok(());
+        }
+
+        // Short enough that a stop feels immediate, long enough not to spin the
+        // CPU against a model producing a token every few hundred milliseconds.
+        std::thread::sleep(std::time::Duration::from_millis(30));
+    }
+}
+
 fn send_litert_response_events(
     response: crate::android_litert_jni::NativeLiteRtLmResponse,
     sender: &tokio::sync::mpsc::UnboundedSender<StreamEvent>,
@@ -697,6 +791,31 @@ impl InferenceProvider for LiteRtLmEngine {
                     // generate, and throughput needs the duration paired with the
                     // char count the emitter already reports.
                     let generate_started = Instant::now();
+                    // Stream when the bridge supports it so a stop keeps what the
+                    // model already produced. `generate_text` only yields text
+                    // after generation completes, so cancelling it lost the whole
+                    // run — nothing had crossed the JNI boundary yet.
+                    match stream_litert_generation(
+                        &adapter,
+                        &request,
+                        &sender,
+                        &generation_cancelled,
+                        generate_started,
+                        &backend_self_test_passed,
+                    ) {
+                        Ok(()) => {
+                            let _ = sender.send(StreamEvent::Done);
+                            return;
+                        }
+                        Err(StreamStartError::Unsupported) => {
+                            // Older bridge without startStream/drainStream: fall
+                            // through to the blocking path rather than fail.
+                            tracing::warn!(
+                                target: "knowme_litert_lm",
+                                "LiteRT-LM streaming unavailable; falling back to blocking generation"
+                            );
+                        }
+                    }
                     match adapter.generate_text(&request) {
                         Ok(response) => {
                             let generate_ms = generate_started.elapsed().as_millis() as u64;
