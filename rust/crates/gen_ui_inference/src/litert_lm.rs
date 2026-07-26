@@ -895,6 +895,11 @@ impl InferenceProvider for LiteRtLmEngine {
         {
             if self.native.read().await.is_some() {
                 let results = results.to_vec();
+                // Deliberately NOT cleared here, unlike the initial generation:
+                // a stop during the first pass is exactly what lands in this
+                // continuation, so the flag must survive to classify the error
+                // that the cancelled JNI call is about to throw.
+                let generation_cancelled = Arc::clone(&self.generation_cancelled);
                 let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
                 gen_ui_runtime::spawn_blocking(move || {
                     let adapter = crate::android_litert_jni::NativeLiteRtLmAdapter;
@@ -903,19 +908,46 @@ impl InferenceProvider for LiteRtLmEngine {
                         tool_results = results.len(),
                         "LiteRT-LM tool-result continuation starting"
                     );
+                    // A tool call already stopped short of visible text, so a
+                    // stop here has nothing streamed to keep — but it must still
+                    // read as stopped, not failed. Before this, cancelling a
+                    // tool-result continuation surfaced the raw
+                    // "CANCELLED: Task cancelled" JNI exception as a terminal
+                    // error, which is what the device certification saw.
+                    if generation_cancelled.load(Ordering::Acquire) {
+                        tracing::info!(
+                            target: "knowme_litert_lm",
+                            "LiteRT-LM tool-result continuation cancelled by user before it started"
+                        );
+                        let _ = sender.send(StreamEvent::Cancelled {
+                            message: "Cancelled by user".into(),
+                        });
+                        let _ = sender.send(StreamEvent::Done);
+                        return;
+                    }
                     match adapter.continue_with_tool_results(&results) {
                         Ok(response) => {
                             send_litert_response_events(response, &sender, "tool_result", None);
                         }
                         Err(error) => {
-                            tracing::error!(
-                                target: "knowme_litert_lm",
-                                error = %error,
-                                "LiteRT-LM tool-result continuation failed"
-                            );
-                            let _ = sender.send(StreamEvent::Error {
-                                message: error.to_string(),
-                            });
+                            if generation_cancelled.load(Ordering::Acquire) {
+                                tracing::info!(
+                                    target: "knowme_litert_lm",
+                                    "LiteRT-LM tool-result continuation cancelled by user"
+                                );
+                                let _ = sender.send(StreamEvent::Cancelled {
+                                    message: "Cancelled by user".into(),
+                                });
+                            } else {
+                                tracing::error!(
+                                    target: "knowme_litert_lm",
+                                    error = %error,
+                                    "LiteRT-LM tool-result continuation failed"
+                                );
+                                let _ = sender.send(StreamEvent::Error {
+                                    message: error.to_string(),
+                                });
+                            }
                         }
                     }
                     let _ = sender.send(StreamEvent::Done);
