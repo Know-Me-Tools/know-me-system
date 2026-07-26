@@ -285,6 +285,32 @@ fn parse_json(value: &str) -> Result<serde_json::Value, CoreError> {
     serde_json::from_str(value).map_err(|error| CoreError::Serde(error.to_string()))
 }
 
+/// The local lane's system prompt, or the shipped default when unset.
+pub async fn local_system_prompt() -> Result<String, CoreError> {
+    gen_ui_agent::chat::local_system_prompt()
+        .await
+        .map_err(|error| {
+            tracing::error!(%error, "local system prompt read failed");
+            error.into()
+        })
+}
+
+/// Persist the local lane's system prompt; a blank value restores the default.
+pub async fn set_local_system_prompt(prompt: String) -> Result<(), CoreError> {
+    gen_ui_agent::chat::set_local_system_prompt(&prompt)
+        .await
+        .map_err(|error| {
+            tracing::error!(%error, "local system prompt write failed");
+            error.into()
+        })
+}
+
+/// The shipped default, so Settings can offer "reset" without hardcoding copy
+/// that would drift from Rust.
+pub fn default_local_system_prompt() -> String {
+    gen_ui_agent::chat::DEFAULT_LOCAL_SYSTEM_PROMPT.to_string()
+}
+
 pub async fn theme_mode() -> Result<String, CoreError> {
     gen_ui_agent::chat::theme_mode().await.map_err(|error| {
         tracing::error!(%error, "theme preference read failed");

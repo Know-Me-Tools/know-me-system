@@ -43,7 +43,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1504070726;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1138413851;
 
 // Section: executor
 
@@ -1420,6 +1420,39 @@ fn wire__crate__api__chat__core_error_message_impl(
         },
     )
 }
+fn wire__crate__api__chat__default_local_system_prompt_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "default_local_system_prompt",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok =
+                        Result::<_, ()>::Ok(crate::api::chat::default_local_system_prompt())?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__streams__entity_changes_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -1882,6 +1915,41 @@ fn wire__crate__api__chat__local_runtime_diagnostics_impl(
                 transform_result_sse::<_, CoreError>(
                     (move || async move {
                         let output_ok = crate::api::chat::local_runtime_diagnostics().await?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__chat__local_system_prompt_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "local_system_prompt",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, CoreError>(
+                    (move || async move {
+                        let output_ok = crate::api::chat::local_system_prompt().await?;
                         Ok(output_ok)
                     })()
                     .await,
@@ -2531,6 +2599,43 @@ fn wire__crate__api__chat__set_active_lane_impl(
                 transform_result_sse::<_, CoreError>(
                     (move || async move {
                         let output_ok = crate::api::chat::set_active_lane(api_lane).await?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__chat__set_local_system_prompt_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "set_local_system_prompt",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_prompt = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, CoreError>(
+                    (move || async move {
+                        let output_ok =
+                            crate::api::chat::set_local_system_prompt(api_prompt).await?;
                         Ok(output_ok)
                     })()
                     .await,
@@ -3911,96 +4016,106 @@ fn pde_ffi_dispatcher_primary_impl(
             wire__crate__api__chat__conversation_policy_save_impl(port, ptr, rust_vec_len, data_len)
         }
         30 => wire__crate__api__chat__core_error_message_impl(port, ptr, rust_vec_len, data_len),
-        31 => wire__crate__api__streams__entity_changes_impl(port, ptr, rust_vec_len, data_len),
-        32 => wire__crate__api__entity__entity_create_impl(port, ptr, rust_vec_len, data_len),
-        33 => wire__crate__api__entity__entity_delete_impl(port, ptr, rust_vec_len, data_len),
-        34 => wire__crate__api__entity__entity_get_impl(port, ptr, rust_vec_len, data_len),
-        35 => wire__crate__api__entity__entity_list_impl(port, ptr, rust_vec_len, data_len),
-        36 => wire__crate__api__entity__entity_update_impl(port, ptr, rust_vec_len, data_len),
-        37 => wire__crate__api__chat__graph_expand_impl(port, ptr, rust_vec_len, data_len),
-        38 => wire__crate__api__init_core_impl(port, ptr, rust_vec_len, data_len),
-        39 => wire__crate__api__chat__lane_availability_impl(port, ptr, rust_vec_len, data_len),
-        40 => wire__crate__api__boot__load_seeds_impl(port, ptr, rust_vec_len, data_len),
-        41 => wire__crate__api__chat__local_model_status_impl(port, ptr, rust_vec_len, data_len),
-        42 => wire__crate__api__streams__local_model_status_events_impl(
+        31 => wire__crate__api__chat__default_local_system_prompt_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        43 => wire__crate__api__chat__local_runtime_diagnostics_impl(
+        32 => wire__crate__api__streams__entity_changes_impl(port, ptr, rust_vec_len, data_len),
+        33 => wire__crate__api__entity__entity_create_impl(port, ptr, rust_vec_len, data_len),
+        34 => wire__crate__api__entity__entity_delete_impl(port, ptr, rust_vec_len, data_len),
+        35 => wire__crate__api__entity__entity_get_impl(port, ptr, rust_vec_len, data_len),
+        36 => wire__crate__api__entity__entity_list_impl(port, ptr, rust_vec_len, data_len),
+        37 => wire__crate__api__entity__entity_update_impl(port, ptr, rust_vec_len, data_len),
+        38 => wire__crate__api__chat__graph_expand_impl(port, ptr, rust_vec_len, data_len),
+        39 => wire__crate__api__init_core_impl(port, ptr, rust_vec_len, data_len),
+        40 => wire__crate__api__chat__lane_availability_impl(port, ptr, rust_vec_len, data_len),
+        41 => wire__crate__api__boot__load_seeds_impl(port, ptr, rust_vec_len, data_len),
+        42 => wire__crate__api__chat__local_model_status_impl(port, ptr, rust_vec_len, data_len),
+        43 => wire__crate__api__streams__local_model_status_events_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        44 => wire__crate__api__chat__memory_delete_conversation_context_impl(
+        44 => wire__crate__api__chat__local_runtime_diagnostics_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        45 => wire__crate__api__chat__memory_delete_message_context_impl(
+        45 => wire__crate__api__chat__local_system_prompt_impl(port, ptr, rust_vec_len, data_len),
+        46 => wire__crate__api__chat__memory_delete_conversation_context_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        46 => wire__crate__api__chat__memory_ingest_impl(port, ptr, rust_vec_len, data_len),
-        47 => {
+        47 => wire__crate__api__chat__memory_delete_message_context_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        48 => wire__crate__api__chat__memory_ingest_impl(port, ptr, rust_vec_len, data_len),
+        49 => {
             wire__crate__api__chat__memory_ingest_attachment_impl(port, ptr, rust_vec_len, data_len)
         }
-        48 => wire__crate__api__chat__memory_ingest_attachments_impl(
+        50 => wire__crate__api__chat__memory_ingest_attachments_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        49 => {
+        51 => {
             wire__crate__api__chat__memory_promote_context_impl(port, ptr, rust_vec_len, data_len)
         }
-        50 => {
+        52 => {
             wire__gen_ui_db_graph__memory_provenance_default_impl(port, ptr, rust_vec_len, data_len)
         }
-        51 => wire__crate__api__chat__memory_search_impl(port, ptr, rust_vec_len, data_len),
-        52 => wire__crate__api__chat__prepare_local_model_impl(port, ptr, rust_vec_len, data_len),
-        53 => wire__crate__api__chat__provider_catalog_impl(port, ptr, rust_vec_len, data_len),
-        54 => wire__crate__api__chat__provider_delete_impl(port, ptr, rust_vec_len, data_len),
-        55 => wire__crate__api__chat__provider_list_impl(port, ptr, rust_vec_len, data_len),
-        56 => wire__crate__api__chat__provider_save_impl(port, ptr, rust_vec_len, data_len),
-        57 => wire__crate__api__chat__provider_test_impl(port, ptr, rust_vec_len, data_len),
-        58 => {
+        53 => wire__crate__api__chat__memory_search_impl(port, ptr, rust_vec_len, data_len),
+        54 => wire__crate__api__chat__prepare_local_model_impl(port, ptr, rust_vec_len, data_len),
+        55 => wire__crate__api__chat__provider_catalog_impl(port, ptr, rust_vec_len, data_len),
+        56 => wire__crate__api__chat__provider_delete_impl(port, ptr, rust_vec_len, data_len),
+        57 => wire__crate__api__chat__provider_list_impl(port, ptr, rust_vec_len, data_len),
+        58 => wire__crate__api__chat__provider_save_impl(port, ptr, rust_vec_len, data_len),
+        59 => wire__crate__api__chat__provider_test_impl(port, ptr, rust_vec_len, data_len),
+        60 => {
             wire__crate__api__chat__resolve_remote_content_impl(port, ptr, rust_vec_len, data_len)
         }
-        59 => wire__crate__api__boot__run_migrations_impl(port, ptr, rust_vec_len, data_len),
-        60 => wire__gen_ui_db_graph__search_mode_default_impl(port, ptr, rust_vec_len, data_len),
-        61 => wire__crate__api__chat__set_active_lane_impl(port, ptr, rust_vec_len, data_len),
-        62 => wire__crate__api__chat__set_theme_mode_impl(port, ptr, rust_vec_len, data_len),
-        63 => wire__crate__api__streams__sync_status_impl(port, ptr, rust_vec_len, data_len),
-        64 => wire__crate__api__chat__theme_mode_impl(port, ptr, rust_vec_len, data_len),
-        65 => wire__crate__api__chat__uar_admin_snapshot_impl(port, ptr, rust_vec_len, data_len),
-        66 => wire__crate__api__chat__uar_agent_delete_impl(port, ptr, rust_vec_len, data_len),
-        67 => wire__crate__api__chat__uar_agent_save_impl(port, ptr, rust_vec_len, data_len),
-        68 => wire__crate__api__chat__uar_knowledge_base_create_impl(
+        61 => wire__crate__api__boot__run_migrations_impl(port, ptr, rust_vec_len, data_len),
+        62 => wire__gen_ui_db_graph__search_mode_default_impl(port, ptr, rust_vec_len, data_len),
+        63 => wire__crate__api__chat__set_active_lane_impl(port, ptr, rust_vec_len, data_len),
+        64 => {
+            wire__crate__api__chat__set_local_system_prompt_impl(port, ptr, rust_vec_len, data_len)
+        }
+        65 => wire__crate__api__chat__set_theme_mode_impl(port, ptr, rust_vec_len, data_len),
+        66 => wire__crate__api__streams__sync_status_impl(port, ptr, rust_vec_len, data_len),
+        67 => wire__crate__api__chat__theme_mode_impl(port, ptr, rust_vec_len, data_len),
+        68 => wire__crate__api__chat__uar_admin_snapshot_impl(port, ptr, rust_vec_len, data_len),
+        69 => wire__crate__api__chat__uar_agent_delete_impl(port, ptr, rust_vec_len, data_len),
+        70 => wire__crate__api__chat__uar_agent_save_impl(port, ptr, rust_vec_len, data_len),
+        71 => wire__crate__api__chat__uar_knowledge_base_create_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        69 => wire__crate__api__chat__uar_knowledge_base_delete_impl(
+        72 => wire__crate__api__chat__uar_knowledge_base_delete_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        70 => wire__crate__api__chat__uar_mcp_server_delete_impl(port, ptr, rust_vec_len, data_len),
-        71 => wire__crate__api__chat__uar_mcp_server_save_impl(port, ptr, rust_vec_len, data_len),
-        72 => wire__crate__api__chat__uar_memory_delete_impl(port, ptr, rust_vec_len, data_len),
-        73 => wire__crate__api__chat__uar_runtime_status_impl(port, ptr, rust_vec_len, data_len),
-        74 => wire__crate__api__chat__uar_service_config_impl(port, ptr, rust_vec_len, data_len),
-        75 => wire__crate__api__chat__uar_service_probe_impl(port, ptr, rust_vec_len, data_len),
-        76 => wire__crate__api__chat__uar_service_save_impl(port, ptr, rust_vec_len, data_len),
-        77 => wire__crate__api__chat__uar_setting_save_impl(port, ptr, rust_vec_len, data_len),
+        73 => wire__crate__api__chat__uar_mcp_server_delete_impl(port, ptr, rust_vec_len, data_len),
+        74 => wire__crate__api__chat__uar_mcp_server_save_impl(port, ptr, rust_vec_len, data_len),
+        75 => wire__crate__api__chat__uar_memory_delete_impl(port, ptr, rust_vec_len, data_len),
+        76 => wire__crate__api__chat__uar_runtime_status_impl(port, ptr, rust_vec_len, data_len),
+        77 => wire__crate__api__chat__uar_service_config_impl(port, ptr, rust_vec_len, data_len),
+        78 => wire__crate__api__chat__uar_service_probe_impl(port, ptr, rust_vec_len, data_len),
+        79 => wire__crate__api__chat__uar_service_save_impl(port, ptr, rust_vec_len, data_len),
+        80 => wire__crate__api__chat__uar_setting_save_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }

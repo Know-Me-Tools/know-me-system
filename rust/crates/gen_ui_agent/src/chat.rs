@@ -48,6 +48,14 @@ const LANE_UAR: &str = "uar";
 /// bundled local engine; cloud is BYOK and therefore cannot be the zero-config
 /// default. Builds without a local engine still fall back to cloud visibly.
 const SETTING_ACTIVE_LANE: &str = "active_lane";
+const SETTING_LOCAL_SYSTEM_PROMPT: &str = "local_system_prompt";
+
+/// Shipped default for the local lane's system prompt.
+///
+/// Stored in the local settings database on first read so the user can edit it
+/// in Settings; this constant is only the seed and the reset target, never a
+/// silent override of a saved value.
+pub const DEFAULT_LOCAL_SYSTEM_PROMPT: &str = "You are KnowMe, a helpful private assistant. Follow the user's instructions, use available tools when useful, and answer in the user's language.";
 const SETTING_THEME_MODE: &str = "theme_mode";
 const SETTING_UAR_SERVICE_URL: &str = "uar_service_url";
 const SETTING_UAR_SERVICE_API_KEY_REF: &str = "uar_service_api_key_ref";
@@ -981,6 +989,33 @@ pub async fn active_lane() -> Result<String, AgentError> {
         .await?
         .and_then(|v| v.as_str().map(str::to_owned))
         .unwrap_or_else(default_lane))
+}
+
+/// The local lane's system prompt, falling back to the shipped default.
+///
+/// A blank stored value also falls back: an empty system prompt would strip the
+/// assistant's entire framing, and the context assembler requires a leading
+/// system message, so "cleared" means "use the default" rather than "send
+/// nothing".
+pub async fn local_system_prompt() -> Result<String, AgentError> {
+    Ok(state::config()?
+        .get_setting(SETTING_LOCAL_SYSTEM_PROMPT)
+        .await?
+        .and_then(|value| value.as_str().map(str::to_owned))
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| DEFAULT_LOCAL_SYSTEM_PROMPT.to_string()))
+}
+
+/// Persist the local lane's system prompt. A blank value clears the override,
+/// restoring [`DEFAULT_LOCAL_SYSTEM_PROMPT`] on the next read.
+pub async fn set_local_system_prompt(prompt: &str) -> Result<(), AgentError> {
+    let trimmed = prompt.trim();
+    state::config()?
+        .set_setting(
+            SETTING_LOCAL_SYSTEM_PROMPT,
+            serde_json::Value::String(trimmed.to_string()),
+        )
+        .await
 }
 
 /// Persisted UI theme preference shared by all native clients.
@@ -2276,7 +2311,13 @@ async fn assemble_context(
         conversation_id: conversation_id.into(),
         branch_id: branch_id.into(),
         assistant_id: "local-assistant".into(),
-        system_prompt: "You are KnowMe, a helpful private assistant. Follow the user's instructions, use available tools when useful, and answer in the user's language.".into(),
+        // A settings-store failure is surfaced as a context source failure
+        // rather than silently falling back to the default: if the user edited
+        // the prompt and we cannot read it, running with different framing than
+        // they configured is worse than reporting the failure.
+        system_prompt: local_system_prompt()
+            .await
+            .map_err(|error| ContextError::Source(format!("local system prompt: {error}")))?,
         user_text: user_message.into(),
         thinking_requested: cloud
             || model_id == "qwen3.5-4b-mlx-4bit"

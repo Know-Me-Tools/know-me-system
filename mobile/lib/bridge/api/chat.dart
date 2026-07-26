@@ -204,6 +204,19 @@ Future<String> conversationEffectiveConfig({required String conversationId}) =>
       conversationId: conversationId,
     );
 
+/// The local lane's system prompt, or the shipped default when unset.
+Future<String> localSystemPrompt() =>
+    GenUiCore.instance.api.crateApiChatLocalSystemPrompt();
+
+/// Persist the local lane's system prompt; a blank value restores the default.
+Future<void> setLocalSystemPrompt({required String prompt}) =>
+    GenUiCore.instance.api.crateApiChatSetLocalSystemPrompt(prompt: prompt);
+
+/// The shipped default, so Settings can offer "reset" without hardcoding copy
+/// that would drift from Rust.
+Future<String> defaultLocalSystemPrompt() =>
+    GenUiCore.instance.api.crateApiChatDefaultLocalSystemPrompt();
+
 Future<String> themeMode() => GenUiCore.instance.api.crateApiChatThemeMode();
 
 Future<void> setThemeMode({required String mode}) =>
