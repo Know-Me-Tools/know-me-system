@@ -190,6 +190,20 @@ pub fn cancel_run(run_id: &str) -> Result<bool, AgentError> {
     let token = state.run_cancellations.lock().get(run_id).cloned();
     if let Some(token) = token {
         token.store(true, Ordering::Release);
+        // The token alone is not enough for a local run. Callers poll it at
+        // phase boundaries, but on-device generation is a single blocking call
+        // into the engine — on Android a JNI `generate_text` that can run for
+        // tens of seconds. Without signalling the engine itself, a stop tap
+        // does nothing until generation finishes on its own, which is what the
+        // device certification caught: the run completed with 1506 chars after
+        // cancel was tapped.
+        //
+        // `cancel_generation` is best-effort and idempotent: engines with no
+        // interruptible generation ignore it, and the token still governs the
+        // phase-boundary checks, so this only ever shortens a run.
+        if let Ok(inference) = inference() {
+            inference.cancel_generation();
+        }
         Ok(true)
     } else {
         Ok(false)

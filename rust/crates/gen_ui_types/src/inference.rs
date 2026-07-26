@@ -267,6 +267,18 @@ pub trait InferenceProvider: Send + Sync {
 
     fn cancel_model_operation(&self) {}
 
+    /// Interrupt an in-flight generation.
+    ///
+    /// Distinct from [`Self::cancel_model_operation`], which aborts model
+    /// *preparation* (download/verify/load). Local engines generate inside a
+    /// single blocking call, so a run-cancellation token polled between phases
+    /// cannot stop them — the host calls this to reach the engine itself.
+    ///
+    /// Best-effort and idempotent: the default is a no-op for engines with no
+    /// interruptible generation, and calling it when nothing is running must be
+    /// harmless. Implementations should leave the provider reusable afterwards.
+    fn cancel_generation(&self) {}
+
     async fn runtime_diagnostics(&self) -> Option<RuntimeDiagnostics> {
         None
     }

@@ -240,11 +240,33 @@ while (( SECONDS < deadline )); do
     echo "ui xml: $UI_XML_PATH" >&2
     exit 1
   fi
-  if rg -q "LiteRT-LM generation starting" "$LOG_PATH" &&
-     rg -q "LiteRT-LM generation produced text" "$LOG_PATH" &&
-     ui_contains_expected_substrings; then
-    echo "G5 PASS: LiteRT-LM generation started"
-    echo "G6 PASS: LiteRT-LM produced text"
+  # The rendered UI is the authoritative signal: it proves the answer reached
+  # the user regardless of which lane produced it. The LiteRT-LM log markers are
+  # corroboration for local-lane runs and are reported when present, but they
+  # must not gate success — requiring them made an Orchestrator-lane run poll
+  # until timeout while the expected text was already on screen, since those
+  # markers can never appear on that lane.
+  #
+  # Set REQUIRE_LOCAL_ENGINE=1 to insist on the local engine specifically (e.g.
+  # when certifying the on-device path itself rather than a tool flow).
+  if ui_contains_expected_substrings; then
+    local_started=0
+    rg -q "LiteRT-LM generation starting" "$LOG_PATH" && local_started=1
+    local_produced=0
+    rg -q "LiteRT-LM generation produced text" "$LOG_PATH" && local_produced=1
+    if [[ "${REQUIRE_LOCAL_ENGINE:-0}" == "1" ]] &&
+       (( local_started == 0 || local_produced == 0 )); then
+      sleep 2
+      continue
+    fi
+    if (( local_started == 1 )); then
+      echo "G5 PASS: LiteRT-LM generation started"
+    else
+      echo "G5 INFO: no local-engine generation marker (non-local lane)"
+    fi
+    if (( local_produced == 1 )); then
+      echo "G6 PASS: LiteRT-LM produced text"
+    fi
     echo "G6 PASS: expected visible UI text found: $EXPECTED_SUBSTRINGS"
     echo "prompt: $PROMPT"
     echo "logcat: $LOG_PATH"

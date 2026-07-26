@@ -1267,6 +1267,32 @@ pub struct A2uiAdapter {
     pending_tools: Vec<PendingTool>,
 }
 
+/// Render a partially-accumulated argument fragment as valid JSON.
+///
+/// Consumers parse `input_json`, so emitting a truncated fragment verbatim would
+/// make every one of them fail. If the fragment happens to already be valid JSON
+/// (the call completed its arguments but never got its `Complete` event) it is
+/// passed through with an incomplete marker; otherwise the raw fragment is
+/// preserved as a string field so nothing the model produced is lost.
+fn incomplete_tool_arguments(args: &str) -> String {
+    let trimmed = args.trim();
+    if trimmed.is_empty() {
+        return r#"{"_knowme_incomplete":true}"#.to_string();
+    }
+    match serde_json::from_str::<serde_json::Value>(trimmed) {
+        Ok(serde_json::Value::Object(mut map)) => {
+            map.insert("_knowme_incomplete".into(), serde_json::Value::Bool(true));
+            serde_json::to_string(&map)
+                .unwrap_or_else(|_| r#"{"_knowme_incomplete":true}"#.to_string())
+        }
+        _ => serde_json::to_string(&serde_json::json!({
+            "_knowme_incomplete": true,
+            "_knowme_partial_arguments": trimmed,
+        }))
+        .unwrap_or_else(|_| r#"{"_knowme_incomplete":true}"#.to_string()),
+    }
+}
+
 struct PendingTool {
     id: String,
     name: String,
@@ -1366,6 +1392,31 @@ impl A2uiAdapter {
             .map(|block| A2uiEvent::Block {
                 run_id: self.run_id.clone(),
                 block,
+            })
+            .collect()
+    }
+
+    /// Emit any tool call that was still accumulating when the run ended.
+    ///
+    /// Normally a `ToolUse` block is withheld until `ToolCallComplete`, because
+    /// partial arguments are not valid JSON. But when a run stops early those
+    /// calls used to vanish — the exact content a user is often looking at when
+    /// they hit stop, and it also desynced history by leaving tool *results*
+    /// with no matching call.
+    ///
+    /// The arguments are emitted as accumulated and the block is marked
+    /// incomplete, so nothing downstream mistakes a half-built call for one that
+    /// actually ran. Mirrors how `reasoning.flush()` is already handled.
+    fn flush_pending_tools(&mut self) -> Vec<A2uiEvent> {
+        self.pending_tools
+            .drain(..)
+            .map(|tool| A2uiEvent::Block {
+                run_id: self.run_id.clone(),
+                block: ContentBlock::ToolUse {
+                    id: tool.id,
+                    name: tool.name,
+                    input_json: incomplete_tool_arguments(&tool.args),
+                },
             })
             .collect()
     }
@@ -1535,6 +1586,7 @@ impl A2uiAdapter {
             StreamEvent::Error { message } => {
                 let pending = self.reasoning.flush();
                 let mut events = self.block_events(pending);
+                events.extend(self.flush_pending_tools());
                 events.push(A2uiEvent::RunError {
                     run_id: self.run_id.clone(),
                     error: RunError {
@@ -1550,6 +1602,7 @@ impl A2uiAdapter {
             StreamEvent::Cancelled { message } => {
                 let pending = self.reasoning.flush();
                 let mut events = self.block_events(pending);
+                events.extend(self.flush_pending_tools());
                 events.push(A2uiEvent::RunCancelled {
                     run_id: self.run_id.clone(),
                     phase: RunPhase::Generation,
@@ -1982,6 +2035,103 @@ impl UarLocalProviderEventBridge {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Drive an adapter to a tool call that never completes, then end the run
+    /// with `ev`. Returns the emitted events.
+    fn events_for_interrupted_tool_call(ev: StreamEvent) -> Vec<A2uiEvent> {
+        let mut adapter = A2uiAdapter::new("run-1".to_string());
+        let _ = adapter.ingest(&StreamEvent::MessageStart);
+        let _ = adapter.ingest(&StreamEvent::ToolCallStarted {
+            id: "call-1".into(),
+            name: "knowme_diagnostics__local_runtime_status".into(),
+        });
+        // Arguments arrive as a fragment — not yet valid JSON, which is exactly
+        // why the block was withheld before.
+        let _ = adapter.ingest(&StreamEvent::ToolCallDelta {
+            id: "call-1".into(),
+            delta: "{\"deta".into(),
+        });
+        adapter.ingest(&ev)
+    }
+
+    fn interrupted_tool_use(events: &[A2uiEvent]) -> Option<(&str, &str)> {
+        events.iter().find_map(|event| match event {
+            A2uiEvent::Block {
+                block: ContentBlock::ToolUse {
+                    name, input_json, ..
+                },
+                ..
+            } => Some((name.as_str(), input_json.as_str())),
+            _ => None,
+        })
+    }
+
+    #[test]
+    fn a_cancelled_run_keeps_its_in_flight_tool_call() {
+        // Users stop a run *because* they are steering — often while watching a
+        // tool call. That call used to vanish, and its absence also left any
+        // tool result in history with no matching call.
+        let events = events_for_interrupted_tool_call(StreamEvent::Cancelled {
+            message: "Stopped by you".into(),
+        });
+
+        let (name, input_json) =
+            interrupted_tool_use(&events).expect("in-flight tool call is preserved on cancel");
+        assert_eq!(name, "knowme_diagnostics__local_runtime_status");
+
+        // Emitted as valid JSON and explicitly marked incomplete, so nothing
+        // downstream mistakes it for a call that actually ran.
+        let parsed: serde_json::Value =
+            serde_json::from_str(input_json).expect("partial arguments are still valid JSON");
+        assert_eq!(parsed["_knowme_incomplete"], serde_json::Value::Bool(true));
+        assert_eq!(parsed["_knowme_partial_arguments"], "{\"deta");
+
+        assert!(events
+            .iter()
+            .any(|event| matches!(event, A2uiEvent::RunCancelled { .. })));
+    }
+
+    #[test]
+    fn a_failed_run_also_keeps_its_in_flight_tool_call() {
+        let events = events_for_interrupted_tool_call(StreamEvent::Error {
+            message: "engine exploded".into(),
+        });
+
+        assert!(
+            interrupted_tool_use(&events).is_some(),
+            "an errored run must not silently drop the tool call either"
+        );
+        assert!(events
+            .iter()
+            .any(|event| matches!(event, A2uiEvent::RunError { .. })));
+    }
+
+    #[test]
+    fn a_completed_tool_call_is_not_marked_incomplete() {
+        // The normal path must stay untouched: real arguments, no marker.
+        let mut adapter = A2uiAdapter::new("run-1".to_string());
+        let _ = adapter.ingest(&StreamEvent::ToolCallStarted {
+            id: "call-1".into(),
+            name: "tool".into(),
+        });
+        let _ = adapter.ingest(&StreamEvent::ToolCallDelta {
+            id: "call-1".into(),
+            delta: "{\"a\":1}".into(),
+        });
+        let events = adapter.ingest(&StreamEvent::ToolCallComplete {
+            id: "call-1".into(),
+        });
+
+        let (_, input_json) = interrupted_tool_use(&events).expect("completed call emits a block");
+        assert_eq!(input_json, "{\"a\":1}");
+        assert!(!input_json.contains("_knowme_incomplete"));
+
+        // Draining on completion means a later cancel has nothing left to flush.
+        let after = adapter.ingest(&StreamEvent::Cancelled {
+            message: "stop".into(),
+        });
+        assert!(interrupted_tool_use(&after).is_none());
+    }
 
     #[test]
     fn assistant_tool_calls_are_rendered_into_content() {

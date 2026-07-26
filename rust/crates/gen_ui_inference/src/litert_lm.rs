@@ -41,6 +41,14 @@ pub struct LiteRtLmEngine {
     diagnostics: RwLock<Option<RuntimeDiagnostics>>,
     model_operation: watch::Sender<ModelOperationState>,
     model_cancelled: AtomicBool,
+    /// Set by `cancel_generation`, cleared when a generation starts.
+    ///
+    /// LiteRT-LM is non-streaming: generation is one blocking JNI call, and
+    /// cancelling it makes that call throw. Without this flag the `Err` arm
+    /// cannot tell a deliberate interrupt from a genuine failure, so a stop tap
+    /// surfaced as a terminal error. Clearing it at generation start keeps a
+    /// stale cancel from masking a later real error.
+    generation_cancelled: Arc<AtomicBool>,
     #[cfg_attr(not(target_os = "android"), allow(dead_code))]
     backend_self_test_passed: Arc<AtomicBool>,
 }
@@ -63,6 +71,7 @@ impl LiteRtLmEngine {
             diagnostics: RwLock::new(None),
             model_operation,
             model_cancelled: AtomicBool::new(false),
+            generation_cancelled: Arc::new(AtomicBool::new(false)),
             backend_self_test_passed: Arc::new(AtomicBool::new(false)),
         }
     }
@@ -670,6 +679,11 @@ impl InferenceProvider for LiteRtLmEngine {
             if self.native.read().await.is_some() {
                 let request = request.clone();
                 let backend_self_test_passed = Arc::clone(&self.backend_self_test_passed);
+                // Clear any cancel left over from a previous run before this one
+                // starts, so a stale flag cannot misreport a genuine failure as
+                // a user interrupt.
+                self.generation_cancelled.store(false, Ordering::Release);
+                let generation_cancelled = Arc::clone(&self.generation_cancelled);
                 let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
                 gen_ui_runtime::spawn_blocking(move || {
                     let adapter = crate::android_litert_jni::NativeLiteRtLmAdapter;
@@ -706,14 +720,32 @@ impl InferenceProvider for LiteRtLmEngine {
                             );
                         }
                         Err(error) => {
-                            tracing::error!(
-                                target: "knowme_litert_lm",
-                                error = %error,
-                                "LiteRT-LM generation failed"
-                            );
-                            let _ = sender.send(StreamEvent::Error {
-                                message: error.to_string(),
-                            });
+                            // A cancel makes the in-flight JNI `sendMessage`
+                            // throw, so this arm is reached for BOTH a
+                            // deliberate stop and a genuine failure. The flag —
+                            // set before `cancel()` and cleared at generation
+                            // start — is what tells them apart. Reporting a stop
+                            // as `Error` is what made a cancelled turn render as
+                            // failed instead of stopped, discarding the user's
+                            // partial work from view.
+                            if generation_cancelled.load(Ordering::Acquire) {
+                                tracing::info!(
+                                    target: "knowme_litert_lm",
+                                    "LiteRT-LM generation cancelled by user"
+                                );
+                                let _ = sender.send(StreamEvent::Cancelled {
+                                    message: "Stopped by you".into(),
+                                });
+                            } else {
+                                tracing::error!(
+                                    target: "knowme_litert_lm",
+                                    error = %error,
+                                    "LiteRT-LM generation failed"
+                                );
+                                let _ = sender.send(StreamEvent::Error {
+                                    message: error.to_string(),
+                                });
+                            }
                         }
                     }
                     let _ = sender.send(StreamEvent::Done);
@@ -814,6 +846,28 @@ impl InferenceProvider for LiteRtLmEngine {
         #[cfg(target_os = "android")]
         crate::android_litert_jni::NativeLiteRtLmAdapter::cancel();
         let _ = self.model_operation.send(ModelOperationState::Cancelling);
+    }
+
+    /// Interrupt in-flight generation without disturbing model state.
+    ///
+    /// Deliberately narrower than [`Self::cancel_model_operation`]: it does not
+    /// set `model_cancelled` and does not publish `Cancelling`, because the
+    /// model stays loaded and ready for the next prompt — only the current
+    /// generation stops. Setting the download flag here would make a later
+    /// prepare/load appear cancelled.
+    fn cancel_generation(&self) {
+        // Set BEFORE the JNI call: cancelling makes the in-flight `sendMessage`
+        // throw, and the `Err` arm reads this flag to classify that throw as an
+        // interrupt rather than a failure. Setting it after would race.
+        self.generation_cancelled.store(true, Ordering::Release);
+        #[cfg(target_os = "android")]
+        {
+            tracing::info!(
+                target: "knowme_litert_lm",
+                "LiteRT-LM generation cancellation requested"
+            );
+            crate::android_litert_jni::NativeLiteRtLmAdapter::cancel();
+        }
     }
 
     async fn runtime_diagnostics(&self) -> Option<RuntimeDiagnostics> {

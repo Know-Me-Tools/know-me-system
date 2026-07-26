@@ -34,6 +34,10 @@ object KnowMeLiteRtLmBridge {
     private const val FORCE_TOOL_RESULT_FALLBACK_FILE = "knowme-force-litertlm-tool-result-fallback"
 
     private var engine: Engine? = null
+
+    // Volatile because `cancel` reads this WITHOUT holding the object lock (see
+    // the comment there); every writer still holds it, so publication is safe.
+    @Volatile
     private var conversation: Conversation? = null
     private var modelPath: String? = null
     private var cacheDir: String? = null
@@ -131,8 +135,20 @@ object KnowMeLiteRtLmBridge {
         }
     }
 
+    /**
+     * Interrupt an in-flight generation.
+     *
+     * Deliberately NOT `@Synchronized`. `sendMessage` holds the object lock for
+     * the whole generation — tens of seconds for a long answer — so a
+     * synchronized `cancel` would block until generation finished and then
+     * cancel nothing. Device certification caught exactly that: a run completed
+     * with 1506 characters after the stop tap.
+     *
+     * `conversation` is `@Volatile` and `cancelProcess` is the LiteRT-LM API's
+     * own thread-safe interrupt, so reading the reference without the lock is
+     * safe. Cancelling when nothing is running is a no-op.
+     */
     @JvmStatic
-    @Synchronized
     fun cancel() {
         conversation?.cancelProcess()
     }
