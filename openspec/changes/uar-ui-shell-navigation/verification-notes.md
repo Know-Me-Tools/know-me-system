@@ -57,3 +57,61 @@ markdown-content rules neutralized by the `.aui-md` CSS — all by design.
 - **Tauri window verification** — `decorations: false` + titlebar logic verified by
   inspection only; a real Tauri launch (drag, controls, macOS traffic lights) belongs
   to `uar-ui-verify-gates`.
+
+## Interactive smoke — 2026-07-26 (claude)
+
+Frontend-only run: `pnpm -C frontend dev --port 1906` (no backend). Setup required
+building the `workspace:*` dep first — `@prometheus-ags/prometheus-entity-management`
+ships `src/` but resolves via `dist/`, so `pnpm -r build` in
+`frontend/packages/prometheus-entity-management` is a prerequisite for `dev` to boot.
+Without it Vite fails import-analysis on `src/entities/bootstrap.ts` and no shell paints.
+
+### Verified (task 3.3 — layout stacking)
+
+Measured on the live DOM at 320x720, not eyeballed:
+
+- `main` bottom = 648px, bottom-bar top = 648px → **overlap 0px**. The bar is a flex
+  sibling of the content row, so content cannot be occluded by it.
+- `document.body.scrollWidth` 320 ≤ viewport 320 → no horizontal overflow.
+- Bottom bar `padding-bottom: 8px` resolved (`env(safe-area-inset-bottom)` = 0 on
+  desktop Chrome; the `calc(.5rem + …)` term is present and correct).
+- Rail `display: none` at 320px; present at 1440px. Breakpoint is Tailwind `md:`
+  (768px), so both smoke widths sit clearly on either side.
+
+### Verified (task 5.3 — shell idiom, 4 combinations)
+
+1440px dark, 1440px light, 320px dark, 320px light — all captured.
+
+- Wide: rail with brand header (logo + wordmark + mono tagline), 3 destinations,
+  readiness card pinned to rail footer.
+- Narrow: rail hidden, bottom bar with icon+label for all 3 destinations.
+- Active state resolves correctly in **both** themes — dark `rgb(42,26,24)` /
+  light cream, text `rgb(255,106,61)`; `bg-ember-soft text-ember` + `aria-current="page"`.
+- Readiness card shows dot **plus** text ("Unreachable" / "Embedded · local") — the
+  never-color-alone rule holds. "Unreachable" is expected with no backend.
+- Flat 2.0 holds: rail/main separate by background color only, no borders or dividers.
+- Destinations expose real `<a href>` elements; the two navs keep distinct
+  `aria-label`s ("Main (rail)" / "Main (bottom bar)").
+
+### NOT verified — needs a running backend
+
+The chat page short-circuits to a `No Model Configured` guard without a provider, so
+the chat chrome never mounts: **0 textareas, 0 composer elements, 0 hamburger buttons**
+in the DOM at 320px. Therefore these remain unverified:
+
+- Composer clearing the bottom nav *with the composer actually rendered* (3.3 verifies
+  the shell geometry that makes occlusion impossible, not the composer itself).
+- Hamburger button and mobile sidebar drawer open/close (5.3).
+
+These are the same backend-dependent items the 2026-07-21 apply notes folded into
+`uar-ui-verify-gates`. 3.3 and 5.3 are marked done for the shell-layout scope they own;
+the composer/drawer interaction check stays with `uar-ui-verify-gates`.
+
+### Finding — theme toggle unreachable at narrow widths
+
+`ThemeToggle` is mounted only inside the rail (`AppShell.tsx:86`), which is
+`hidden md:flex`. At <768px there is **no** theme control anywhere in the shell
+(confirmed: accessibility tree at 320px lists only the 3 destination links and the
+page's own button). Dark/light both render correctly at 320px, but a narrow-viewport
+user cannot switch between them. Not in this change's task list — filed as a follow-up
+rather than fixed here.
