@@ -72,6 +72,18 @@ function isRunnableUar(status: UarRuntimeStatus | null, config: ConfiguredUarSer
     || Boolean(config?.serviceUrl)
 }
 
+/**
+ * Whether a local-model operation is in flight.
+ *
+ * Mirrors Flutter's `_modelOperationBusy`: downloading, verifying, loading and
+ * cancelling all count. The composer is gated on this, because a send during a
+ * multi-gigabyte download reaches a lane whose weights are not resident — the
+ * turn fails for a reason the user was given no way to see.
+ */
+export function isModelOperationBusy(progress: LaneLoadProgress | null): boolean {
+  return progress !== null
+}
+
 function operationProgress(status: ModelOperationState): LaneLoadProgress | null {
   switch (status.state) {
     case 'downloading': return {

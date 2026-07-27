@@ -170,8 +170,18 @@ describe('chatStore A2UI interactions', () => {
     )
     const state = useChatStore.getState()
     const assistant = state.messages.at(-1)
+    const interactionTurn = state.messages.at(-2)
     expect(assistant?.role).toBe('assistant')
-    expect(assistant?.parentMessageId).toBe('assistant-artifact-1')
+    // The interaction itself is now a user turn, and the reply hangs off it.
+    // This used to parent onto the PREVIOUS assistant message, which made the
+    // transcript read as a reply to nothing.
+    expect(interactionTurn?.role).toBe('user')
+    expect(assistant?.parentMessageId).toBe(interactionTurn?.id)
+    // Recorded as an artifact block, so the model sees what the user chose
+    // rather than a gap in the transcript.
+    const block = interactionTurn?.content[0]
+    expect(block?.type).toBe('artifact')
+    expect(JSON.parse((block as { content: string }).content)).toEqual(interaction)
     expect(assistant?.runId).toBe('interaction-run-1')
     expect(assistant?.runStatus).toBe('queued')
     expect(assistant?.isStreaming).toBe(true)
@@ -569,5 +579,20 @@ describe('provenance persistence round-trip', () => {
 
     expect(useChatStore.getState().messages.find((item) => item.id === 'assistant-10')?.provenance)
       .toBeUndefined()
+  })
+})
+
+describe('lifecycle seed', () => {
+  it('seeds runPhase and statusMessage so the pending bubble says something', async () => {
+    // React seeded only runStatus, so the pending bubble showed a bare dot
+    // where Flutter says "Queued" and then "Preparing response".
+    useChatStore.setState({ messages: [], conversations: [conversation([])] })
+
+    await useChatStore.getState().sendMessage('hello')
+
+    const assistant = useChatStore.getState().messages.at(-1)
+    expect(assistant?.runStatus).toBe('queued')
+    expect(assistant?.runPhase).toBe('queued')
+    expect(assistant?.statusMessage).toBe('Queued')
   })
 })

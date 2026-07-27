@@ -503,6 +503,10 @@ export const useChatStore = create<ChatState & ChatActions>()(
         const assistantMsg: Message = {
           id: assistantId, role: 'assistant', content: [], timestamp: new Date().toISOString(),
           isStreaming: true, parentMessageId: userMsg.id, branchId, runStatus: 'queued',
+          // Seeded, not left blank: `statusMessage` is what the pending bubble
+          // renders, so without it React showed a bare dot where Flutter says
+          // "Queued" and then "Preparing response".
+          runPhase: 'queued', statusMessage: 'Queued',
         }
         set((s) => {
           s.messages.push(userMsg, assistantMsg)
@@ -622,6 +626,23 @@ export const useChatStore = create<ChatState & ChatActions>()(
           ? (interaction as Record<string, unknown>).sourceRunId as string
           : parent?.runId
         const branchId = parent?.branchId ?? get().activeConversationId
+        // Record what the user actually did. Without this the transcript jumped
+        // straight from the artifact to a spinner — a reply to nothing — and
+        // the interaction never entered history, so the next turn's model could
+        // not see the choice that produced it. Flutter has always recorded it
+        // (chat_notifier.dart submitInteraction).
+        const userMsg: Message = {
+          id: crypto.randomUUID(),
+          role: 'user',
+          content: [{
+            type: 'artifact',
+            id: crypto.randomUUID(),
+            kind: 'client_interaction',
+            content: JSON.stringify(interaction),
+          }],
+          timestamp: new Date().toISOString(),
+          branchId,
+        }
         const assistantId = crypto.randomUUID()
         const assistantMsg: Message = {
           id: assistantId,
@@ -629,13 +650,16 @@ export const useChatStore = create<ChatState & ChatActions>()(
           content: [],
           timestamp: new Date().toISOString(),
           isStreaming: true,
-          parentMessageId: parent?.id,
+          parentMessageId: userMsg.id,
           branchId,
           runStatus: 'queued',
+          runPhase: 'queued',
+          statusMessage: 'Queued',
         }
-        const history = inferenceHistory(get().messages, branchId)
+        // History is taken AFTER the user turn exists, so the interaction is in it.
+        const history = inferenceHistory([...get().messages, userMsg], branchId)
         set((s) => {
-          s.messages.push(assistantMsg)
+          s.messages.push(userMsg, assistantMsg)
           s.isStreaming = true
           const conversation = s.conversations.find((item) => item.id === s.activeConversationId)
           if (conversation) { conversation.messages = s.messages; conversation.updatedAt = new Date().toISOString() }

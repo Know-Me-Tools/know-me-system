@@ -24,6 +24,7 @@ import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useChatStore } from "@/features/chat/stores/chatStore";
+import { useLane } from "@/features/chat/hooks/useLane";
 import { StoppedTurnActions } from "@/features/chat/components/StoppedTurnActions";
 import {
   ActionBarMorePrimitive,
@@ -215,6 +216,7 @@ const ThreadSuggestionItem: FC = () => {
 
 const Composer: FC = () => {
   const pendingSteer = useChatStore((s) => s.pendingSteer);
+  const { modelBusy } = useLane();
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Steering is the point of stopping, so put the caret where the correction
@@ -233,19 +235,29 @@ const Composer: FC = () => {
                       rows={1}
                       autoFocus
                       enterKeyHint="send"
+                      // Gated while the local model is downloading, verifying or
+                      // loading: a send here reaches a lane whose weights are
+                      // not resident, and the turn fails for a reason the user
+                      // was given no way to see. Flutter gates the same four
+                      // controls (chat_screen.dart).
+                      disabled={modelBusy}
                       // The armed-steer mode is otherwise carried only by the
                       // placeholder, which screen readers do not re-announce —
                       // so name the mode on the field itself.
                       aria-label={pendingSteer ? "Steer the stopped response" : "Message input"}
-                    /><ComposerAction /></ComposerPrimitive.AttachmentDropzone>
+                    /><ComposerAction modelBusy={modelBusy} /></ComposerPrimitive.AttachmentDropzone>
     </ComposerPrimitive.Root>
   );
 };
 
-const ComposerAction: FC = () => {
+const ComposerAction: FC<{ modelBusy: boolean }> = ({ modelBusy }) => {
   return (
     <div className="aui-composer-action-wrapper relative flex items-center justify-between">
-      <ComposerAddAttachment />
+      {/* Attaching while the model loads would stage files for a turn that
+          cannot be sent yet. */}
+      <span aria-disabled={modelBusy} className={modelBusy ? 'pointer-events-none opacity-50' : undefined}>
+        <ComposerAddAttachment />
+      </span>
       <div className="flex items-center gap-1.5">
         <AuiIf condition={(s) => s.thread.capabilities.dictation}>
           <AuiIf condition={(s) => s.composer.dictation == null}>
@@ -256,7 +268,7 @@ const ComposerAction: FC = () => {
           </AuiIf>
         </AuiIf>
         <AuiIf condition={(s) => !s.thread.isRunning}>
-          <ComposerPrimitive.Send render={<TooltipIconButton tooltip="Send message" side="bottom" type="button" variant="default" size="icon" className="aui-composer-send size-7 rounded-full" aria-label="Send message" />}><ArrowUpIcon className="aui-composer-send-icon size-4.5" /></ComposerPrimitive.Send>
+          <ComposerPrimitive.Send disabled={modelBusy} render={<TooltipIconButton tooltip={modelBusy ? "Waiting for the local model" : "Send message"} side="bottom" type="button" variant="default" size="icon" className="aui-composer-send size-7 rounded-full" aria-label={modelBusy ? "Send message, unavailable while the local model loads" : "Send message"} />}><ArrowUpIcon className="aui-composer-send-icon size-4.5" /></ComposerPrimitive.Send>
         </AuiIf>
         <AuiIf condition={(s) => s.thread.isRunning}>
           <ComposerPrimitive.Cancel render={<Button type="button" variant="default" size="icon" className="aui-composer-cancel size-7 rounded-full" aria-label="Stop generating" />}><SquareIcon className="aui-composer-cancel-icon size-3.5 fill-current" /></ComposerPrimitive.Cancel>
