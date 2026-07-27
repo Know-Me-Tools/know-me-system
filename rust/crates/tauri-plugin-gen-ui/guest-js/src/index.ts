@@ -174,6 +174,36 @@ export function stageAttachment(fileName: string, bytes: Uint8Array): Promise<st
   // arrive as an object of index keys rather than a byte sequence.
   return invoke<string>(cmd("stage_attachment"), { fileName, bytes: Array.from(bytes) });
 }
+/** What a remote URL resolved to, fetched natively by Rust. */
+export interface ResolvedRemoteContent {
+  url: string;
+  mime: string;
+  /** Inline bytes when the content was small enough to embed. */
+  dataBase64?: string;
+  localPath?: string;
+  /** Link-preview metadata, present for the `link` kind. */
+  title?: string;
+  description?: string;
+  siteName?: string;
+  imageUrl?: string;
+}
+/** What sort of remote content to resolve. Rust applies a size cap per kind. */
+export type RemoteContentKind = "image" | "video" | "link" | "document";
+/**
+ * Fetch remote media natively rather than from the webview.
+ *
+ * The webview cannot always reach what the model references — CORS, mixed
+ * content, or an origin it holds no credentials for. Flutter has resolved
+ * through Rust since it shipped, which is why remote images and link previews
+ * rendered on mobile and appeared broken on desktop.
+ */
+export async function resolveRemoteContent(
+  url: string,
+  kind: RemoteContentKind,
+): Promise<ResolvedRemoteContent> {
+  const raw = await invoke<string>(cmd("resolve_remote_content"), { url, kind });
+  return JSON.parse(raw) as ResolvedRemoteContent;
+}
 export function chatApproveToolConfirmation(approvalId: string): Promise<string> {
   return invoke<string>(cmd("chat_approve_tool_confirmation"), { approvalId });
 }

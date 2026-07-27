@@ -31,6 +31,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::stream_agent_a2ui,
             commands::chat_approve_tool_confirmation,
             commands::stage_attachment,
+            commands::resolve_remote_content,
             commands::send_agent_interaction_a2ui,
             commands::promote_a2ui_component,
             commands::get_active_lane,

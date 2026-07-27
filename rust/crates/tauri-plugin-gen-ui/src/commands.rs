@@ -130,6 +130,22 @@ fn nanoid_like() -> String {
     format!("{nanos:x}")
 }
 
+/// Fetch remote media natively and return its resolved form.
+///
+/// The webview cannot always reach what the model references — CORS, mixed
+/// content, or an origin the embedded browser has no credentials for. Rust
+/// fetches it in-process instead, which is why Flutter has always rendered
+/// remote images, video and link previews that desktop showed broken.
+#[tauri::command]
+pub async fn resolve_remote_content(url: String, kind: String) -> Result<String> {
+    let resolved = gen_ui_agent::media::resolve(&url, &kind)
+        .await
+        .map_err(gen_ui_types::CoreError::from)?;
+    serde_json::to_string(&resolved)
+        .map_err(|error| gen_ui_types::CoreError::Serde(error.to_string()))
+        .map_err(Into::into)
+}
+
 /// Approve a tool call the local model proposed but KnowMe refused to run.
 ///
 /// Deliberately its own command rather than a variant of the interaction

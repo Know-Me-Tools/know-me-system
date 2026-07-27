@@ -18,6 +18,7 @@ import { FileText } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 
 import { MermaidBlock } from '@/components/assistant-ui/markdown-text'
+import { useRemoteContent } from '../hooks/useRemoteContent'
 
 /** What kind of body an artifact resolves to, after alias normalisation. */
 export type ArtifactKind =
@@ -179,6 +180,29 @@ function LinkBody({ content }: { content: string }) {
   )
 }
 
+function VideoBody({ url }: { url: string }) {
+  // Falls back to a native fetch when the webview cannot reach the origin —
+  // CORS or mixed content would otherwise render a permanently broken player.
+  const { src, failed, onError } = useRemoteContent(url, 'video')
+  if (failed) {
+    return (
+      <p role="alert" className="px-4 py-3 text-sm text-[color:var(--color-fg-sub)]">
+        This video could not be loaded.
+      </p>
+    )
+  }
+  return (
+    // eslint-disable-next-line jsx-a11y/media-has-caption -- the model supplies no track
+    <video
+      src={src}
+      onError={onError}
+      controls
+      className="max-h-[36rem] w-full"
+      aria-label="Generated video artifact"
+    />
+  )
+}
+
 function AguiBody({ kind, content }: { kind: string; content: string }) {
   const title = aguiTitle(kind)
   const summary = aguiSummary(content)
@@ -231,15 +255,7 @@ export const ArtifactKindBody: FC<ArtifactKindBodyProps> = ({ kind, rawKind, con
         />
       )
     case 'video':
-      return (
-        // eslint-disable-next-line jsx-a11y/media-has-caption -- the model supplies no track
-        <video
-          src={mediaUrl(content)}
-          controls
-          className="max-h-[36rem] w-full"
-          aria-label="Generated video artifact"
-        />
-      )
+      return <VideoBody url={mediaUrl(content)} />
     case 'link':
       return <LinkBody content={content} />
     case 'code':
