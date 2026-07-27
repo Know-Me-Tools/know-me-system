@@ -2403,10 +2403,10 @@
           "markdownDescription": "Denies the unminimize command without any pre-configured scope."
         },
         {
-          "description": "Default gen-ui permissions: startup/read/chat intents. Mutating ENTITY commands require the gen-ui:allow-write set explicitly. set-active-lane writes an app setting (a user preference), not entity data, so it belongs here alongside the other chat intents — same category as memory-ingest.\n#### This default permission set includes:\n\n- `allow-stream-agent-a2ui`\n- `allow-send-agent-interaction-a2ui`\n- `allow-get-active-lane`\n- `allow-set-active-lane`\n- `allow-has-local-engine`\n- `allow-cancel-agent-run`\n- `allow-prepare-local-model`\n- `allow-local-model-status`\n- `allow-cancel-model-operation`\n- `allow-local-runtime-diagnostics`\n- `allow-uar-runtime-status`\n- `allow-run-migrations`\n- `allow-load-seeds`\n- `allow-attach-sync-shapes`\n- `allow-memory-ingest`\n- `allow-entity-runtime-start`\n- `allow-entity-runtime-stop`\n- `allow-entity-list`\n- `allow-entity-get`\n- `allow-memory-search`\n- `allow-graph-expand`\n- `allow-scribe-start`\n- `allow-scribe-stop`",
+          "description": "Default gen-ui permissions: startup/read/chat intents. Mutating ENTITY commands require the gen-ui:allow-write set explicitly. set-active-lane writes an app setting (a user preference), not entity data, so it belongs here alongside the other chat intents — same category as memory-ingest.\n#### This default permission set includes:\n\n- `allow-stream-agent-a2ui`\n- `allow-chat-approve-tool-confirmation`\n- `allow-stage-attachment`\n- `allow-resolve-remote-content`\n- `allow-send-agent-interaction-a2ui`\n- `allow-get-active-lane`\n- `allow-set-active-lane`\n- `allow-lane-availability`\n- `allow-has-local-engine`\n- `allow-cancel-agent-run`\n- `allow-prepare-local-model`\n- `allow-local-model-status`\n- `allow-cancel-model-operation`\n- `allow-local-runtime-diagnostics`\n- `allow-uar-runtime-status`\n- `allow-run-migrations`\n- `allow-load-seeds`\n- `allow-attach-sync-shapes`\n- `allow-memory-ingest`\n- `allow-entity-runtime-start`\n- `allow-entity-runtime-stop`\n- `allow-entity-list`\n- `allow-entity-get`\n- `allow-memory-search`\n- `allow-graph-expand`\n- `allow-scribe-start`\n- `allow-scribe-stop`",
           "type": "string",
           "const": "gen-ui:default",
-          "markdownDescription": "Default gen-ui permissions: startup/read/chat intents. Mutating ENTITY commands require the gen-ui:allow-write set explicitly. set-active-lane writes an app setting (a user preference), not entity data, so it belongs here alongside the other chat intents — same category as memory-ingest.\n#### This default permission set includes:\n\n- `allow-stream-agent-a2ui`\n- `allow-send-agent-interaction-a2ui`\n- `allow-get-active-lane`\n- `allow-set-active-lane`\n- `allow-has-local-engine`\n- `allow-cancel-agent-run`\n- `allow-prepare-local-model`\n- `allow-local-model-status`\n- `allow-cancel-model-operation`\n- `allow-local-runtime-diagnostics`\n- `allow-uar-runtime-status`\n- `allow-run-migrations`\n- `allow-load-seeds`\n- `allow-attach-sync-shapes`\n- `allow-memory-ingest`\n- `allow-entity-runtime-start`\n- `allow-entity-runtime-stop`\n- `allow-entity-list`\n- `allow-entity-get`\n- `allow-memory-search`\n- `allow-graph-expand`\n- `allow-scribe-start`\n- `allow-scribe-stop`"
+          "markdownDescription": "Default gen-ui permissions: startup/read/chat intents. Mutating ENTITY commands require the gen-ui:allow-write set explicitly. set-active-lane writes an app setting (a user preference), not entity data, so it belongs here alongside the other chat intents — same category as memory-ingest.\n#### This default permission set includes:\n\n- `allow-stream-agent-a2ui`\n- `allow-chat-approve-tool-confirmation`\n- `allow-stage-attachment`\n- `allow-resolve-remote-content`\n- `allow-send-agent-interaction-a2ui`\n- `allow-get-active-lane`\n- `allow-set-active-lane`\n- `allow-lane-availability`\n- `allow-has-local-engine`\n- `allow-cancel-agent-run`\n- `allow-prepare-local-model`\n- `allow-local-model-status`\n- `allow-cancel-model-operation`\n- `allow-local-runtime-diagnostics`\n- `allow-uar-runtime-status`\n- `allow-run-migrations`\n- `allow-load-seeds`\n- `allow-attach-sync-shapes`\n- `allow-memory-ingest`\n- `allow-entity-runtime-start`\n- `allow-entity-runtime-stop`\n- `allow-entity-list`\n- `allow-entity-get`\n- `allow-memory-search`\n- `allow-graph-expand`\n- `allow-scribe-start`\n- `allow-scribe-stop`"
         },
         {
           "description": "Enables the attach_sync_shapes command without any pre-configured scope.",
@@ -2425,6 +2425,12 @@
           "type": "string",
           "const": "gen-ui:allow-cancel-model-operation",
           "markdownDescription": "Enables the cancel_model_operation command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the chat_approve_tool_confirmation command without any pre-configured scope.",
+          "type": "string",
+          "const": "gen-ui:allow-chat-approve-tool-confirmation",
+          "markdownDescription": "Enables the chat_approve_tool_confirmation command without any pre-configured scope."
         },
         {
           "description": "Enables the chat_control_catalog command without any pre-configured scope.",
@@ -2529,6 +2535,12 @@
           "markdownDescription": "Enables the has_local_engine command without any pre-configured scope."
         },
         {
+          "description": "Enables the lane_availability command without any pre-configured scope.",
+          "type": "string",
+          "const": "gen-ui:allow-lane-availability",
+          "markdownDescription": "Enables the lane_availability command without any pre-configured scope."
+        },
+        {
           "description": "Enables the load_seeds command without any pre-configured scope.",
           "type": "string",
           "const": "gen-ui:allow-load-seeds",
@@ -2619,6 +2631,12 @@
           "markdownDescription": "Enables the provider_test command without any pre-configured scope."
         },
         {
+          "description": "Enables the resolve_remote_content command without any pre-configured scope.",
+          "type": "string",
+          "const": "gen-ui:allow-resolve-remote-content",
+          "markdownDescription": "Enables the resolve_remote_content command without any pre-configured scope."
+        },
+        {
           "description": "Enables the run_migrations command without any pre-configured scope.",
           "type": "string",
           "const": "gen-ui:allow-run-migrations",
@@ -2653,6 +2671,12 @@
           "type": "string",
           "const": "gen-ui:allow-settings-admin",
           "markdownDescription": "Allow the settings overlay to administer UAR connectivity and UAR-owned provider/model configuration."
+        },
+        {
+          "description": "Enables the stage_attachment command without any pre-configured scope.",
+          "type": "string",
+          "const": "gen-ui:allow-stage-attachment",
+          "markdownDescription": "Enables the stage_attachment command without any pre-configured scope."
         },
         {
           "description": "Enables the stream_agent_a2ui command without any pre-configured scope.",
@@ -2763,6 +2787,12 @@
           "markdownDescription": "Denies the cancel_model_operation command without any pre-configured scope."
         },
         {
+          "description": "Denies the chat_approve_tool_confirmation command without any pre-configured scope.",
+          "type": "string",
+          "const": "gen-ui:deny-chat-approve-tool-confirmation",
+          "markdownDescription": "Denies the chat_approve_tool_confirmation command without any pre-configured scope."
+        },
+        {
           "description": "Denies the chat_control_catalog command without any pre-configured scope.",
           "type": "string",
           "const": "gen-ui:deny-chat-control-catalog",
@@ -2865,6 +2895,12 @@
           "markdownDescription": "Denies the has_local_engine command without any pre-configured scope."
         },
         {
+          "description": "Denies the lane_availability command without any pre-configured scope.",
+          "type": "string",
+          "const": "gen-ui:deny-lane-availability",
+          "markdownDescription": "Denies the lane_availability command without any pre-configured scope."
+        },
+        {
           "description": "Denies the load_seeds command without any pre-configured scope.",
           "type": "string",
           "const": "gen-ui:deny-load-seeds",
@@ -2955,6 +2991,12 @@
           "markdownDescription": "Denies the provider_test command without any pre-configured scope."
         },
         {
+          "description": "Denies the resolve_remote_content command without any pre-configured scope.",
+          "type": "string",
+          "const": "gen-ui:deny-resolve-remote-content",
+          "markdownDescription": "Denies the resolve_remote_content command without any pre-configured scope."
+        },
+        {
           "description": "Denies the run_migrations command without any pre-configured scope.",
           "type": "string",
           "const": "gen-ui:deny-run-migrations",
@@ -2983,6 +3025,12 @@
           "type": "string",
           "const": "gen-ui:deny-set-active-lane",
           "markdownDescription": "Denies the set_active_lane command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the stage_attachment command without any pre-configured scope.",
+          "type": "string",
+          "const": "gen-ui:deny-stage-attachment",
+          "markdownDescription": "Denies the stage_attachment command without any pre-configured scope."
         },
         {
           "description": "Denies the stream_agent_a2ui command without any pre-configured scope.",

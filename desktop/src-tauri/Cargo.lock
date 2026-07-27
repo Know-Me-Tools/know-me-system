@@ -4057,9 +4057,10 @@ dependencies = [
  "gen_ui_protocol",
  "gen_ui_runtime",
  "gen_ui_types",
+ "imagesize",
  "jsonschema",
  "keyring",
- "liter-llm 1.9.3 (git+https://github.com/GQAdonis/liter-llm.git?rev=78b7496ca7b09a1aa6c3c666af0a149bbdf5249f)",
+ "liter-llm 1.9.3 (git+https://github.com/GQAdonis/liter-llm.git?rev=c37e98411ff154fb2c256856428c15d7340b1325)",
  "once_cell",
  "parking_lot",
  "regex",
@@ -4088,7 +4089,7 @@ dependencies = [
  "gen_ui_types",
  "json-patch 4.2.0",
  "jsonwebtoken",
- "liter-llm 1.9.3 (git+https://github.com/GQAdonis/liter-llm.git?rev=78b7496ca7b09a1aa6c3c666af0a149bbdf5249f)",
+ "liter-llm 1.9.3 (git+https://github.com/GQAdonis/liter-llm.git?rev=c37e98411ff154fb2c256856428c15d7340b1325)",
  "parking_lot",
  "reqwest 0.13.4",
  "reqwest-eventsource",
@@ -5081,6 +5082,12 @@ dependencies = [
  "http-body 1.1.0",
  "pin-project-lite",
 ]
+
+[[package]]
+name = "http-range"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "21dec9db110f5f872ed9699c3ecf50cf16f423502706ba5c72462e28d3157573"
 
 [[package]]
 name = "httparse"
@@ -6379,6 +6386,7 @@ name = "liter-llm"
 version = "1.9.3"
 dependencies = [
  "ahash 0.8.12",
+ "arc-swap",
  "async-trait",
  "aws-credential-types",
  "aws-sigv4",
@@ -6415,9 +6423,10 @@ dependencies = [
 [[package]]
 name = "liter-llm"
 version = "1.9.3"
-source = "git+https://github.com/GQAdonis/liter-llm.git?rev=78b7496ca7b09a1aa6c3c666af0a149bbdf5249f#78b7496ca7b09a1aa6c3c666af0a149bbdf5249f"
+source = "git+https://github.com/GQAdonis/liter-llm.git?rev=c37e98411ff154fb2c256856428c15d7340b1325#c37e98411ff154fb2c256856428c15d7340b1325"
 dependencies = [
  "ahash 0.8.12",
+ "arc-swap",
  "async-trait",
  "base64 0.22.1",
  "bytes",
@@ -12132,6 +12141,7 @@ dependencies = [
  "gtk",
  "heck 0.5.0",
  "http 1.4.2",
+ "http-range",
  "jni 0.21.1",
  "libc",
  "log",
