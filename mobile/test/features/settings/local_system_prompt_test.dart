@@ -23,7 +23,10 @@ void main() {
     await repository.saveLocalSystemPrompt('Answer only in haiku.');
 
     expect(await repository.localSystemPrompt(), 'Answer only in haiku.');
-    expect((await repository.load()).localSystemPrompt, 'Answer only in haiku.');
+    expect(
+      (await repository.load()).localSystemPrompt,
+      'Answer only in haiku.',
+    );
   });
 
   test('clearing the prompt restores the shipped default', () async {

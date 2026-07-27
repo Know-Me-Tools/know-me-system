@@ -20,9 +20,9 @@ Duration? _noRetry(int retryCount, Object error) => null;
 
 @riverpod
 NotesRepository notesRepository(Ref ref) => PemNotesRepository(
-      transport: ref.watch(entityTransportProvider),
-      loadRecords: () => ref.read(entityListProvider(notesView).future),
-    );
+  transport: ref.watch(entityTransportProvider),
+  loadRecords: () => ref.read(entityListProvider(notesView).future),
+);
 
 @Riverpod(retry: _noRetry)
 Future<List<Note>> notes(Ref ref) {
@@ -39,10 +39,9 @@ class NotesActions extends _$NotesActions {
   Future<void> create() async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
-      await ref.read(notesRepositoryProvider).createNote(
-            title: 'New note',
-            body: '',
-          );
+      await ref
+          .read(notesRepositoryProvider)
+          .createNote(title: 'New note', body: '');
       ref.invalidate(notesProvider);
     });
   }

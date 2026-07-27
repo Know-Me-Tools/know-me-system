@@ -30,6 +30,10 @@ class PemChatRepository implements ChatRepository {
   }
 
   @override
+  Future<int> sweepOrphanAttachments(List<String> conversationIds) =>
+      bridge.sweepOrphanAttachments(conversationIds);
+
+  @override
   Future<String> startTurn({
     required String threadId,
     required String message,

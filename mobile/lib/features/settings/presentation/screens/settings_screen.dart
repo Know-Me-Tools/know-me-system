@@ -255,8 +255,7 @@ class _SectionContent extends ConsumerWidget {
       _Section.connections => _McpPanel(state: state),
       _Section.privacy => _RegistryPanel(
         title: 'Privacy & data',
-        caption:
-            'Device registration, peer discovery, CRDT/gossip keys, sync and data governance are persisted by UAR.',
+        caption: 'Device registration, peer discovery, CRDT/gossip keys, sync and data governance are persisted by UAR.',
         settings: _settings(state.snapshot.admin).where((item) {
           final key = item['key']?.toString() ?? '';
           return key.startsWith('privacy.') ||
@@ -267,15 +266,13 @@ class _SectionContent extends ConsumerWidget {
       _Section.appearance => const _AppearancePanel(),
       _Section.plugins => _ResourcePanel(
         title: 'Plugins',
-        caption:
-            'WASM plugin schemas are registered in UAR; operational plugin interfaces render through A2UI.',
+        caption: 'WASM plugin schemas are registered in UAR; operational plugin interfaces render through A2UI.',
         values: _objects(state.snapshot.admin['settingTypes']),
         icon: Icons.extension_outlined,
       ),
       _Section.system => _RegistryPanel(
         title: 'System & inference',
-        caption:
-            'Runtime ports, context policy, skill strategy and machine-facing settings supplied by UAR.',
+        caption: 'Runtime ports, context policy, skill strategy and machine-facing settings supplied by UAR.',
         settings: _settings(state.snapshot.admin),
       ),
     };
@@ -458,8 +455,7 @@ class _GlobalPolicyPanel extends ConsumerWidget {
       children: [
         const _PanelHeader(
           title: 'Global run policy',
-          caption:
-              'The UAR resolves these defaults with each agent and conversation override before it assembles context or exposes tools.',
+          caption: 'The UAR resolves these defaults with each agent and conversation override before it assembles context or exposes tools.',
           icon: Icons.account_tree_outlined,
         ),
         const SizedBox(height: 20),
@@ -534,7 +530,10 @@ Map<String, String>? _routeFromPolicy(dynamic policy) {
 
 /// Return a copy of the policy object with its `model` field set from a route
 /// (or cleared to null when the route is null).
-Map<String, dynamic> _policyWithModel(dynamic policy, Map<String, String>? route) {
+Map<String, dynamic> _policyWithModel(
+  dynamic policy,
+  Map<String, String>? route,
+) {
   final next = <String, dynamic>{
     if (policy is Map) ...policy.cast<String, dynamic>(),
   };
@@ -562,8 +561,7 @@ class _LocalModelsPanel extends ConsumerWidget {
       children: [
         const _PanelHeader(
           title: 'Local models',
-          caption:
-              'The KnowMe container owns local models and exposes them to UAR through the local provider contract.',
+          caption: 'The KnowMe container owns local models and exposes them to UAR through the local provider contract.',
           icon: Icons.memory_outlined,
         ),
         const SizedBox(height: 20),
@@ -710,7 +708,8 @@ class _LocalSystemPromptCardState
             textField: true,
             multiline: true,
             label: 'Local system prompt',
-            hint: 'Sent as the first message on every local run. '
+            hint:
+                'Sent as the first message on every local run. '
                 'Leave blank and save to restore the default.',
             child: shad.TextArea(
               controller: _controller,
@@ -1166,8 +1165,7 @@ class _SkillsPanel extends ConsumerWidget {
       children: [
         const _PanelHeader(
           title: 'Skills',
-          caption:
-              'UAR discovers, selects, activates and persists skills. These global switches feed the same resolver as agent and conversation policy.',
+          caption: 'UAR discovers, selects, activates and persists skills. These global switches feed the same resolver as agent and conversation policy.',
           icon: Icons.auto_awesome_outlined,
         ),
         const SizedBox(height: 20),
@@ -1225,8 +1223,7 @@ class _KnowledgePanelState extends ConsumerState<_KnowledgePanel> {
       children: [
         const _PanelHeader(
           title: 'Knowledge bases',
-          caption:
-              'UAR owns indexing, retrieval, citations and provenance. Conversation policy can inherit, select or deny any base.',
+          caption: 'UAR owns indexing, retrieval, citations and provenance. Conversation policy can inherit, select or deny any base.',
           icon: Icons.storage_outlined,
         ),
         const SizedBox(height: 20),
@@ -1286,17 +1283,16 @@ class _MemoryPanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final memoriesRoot = _map(state.snapshot.admin['memories']);
     final memories = _objects(memoriesRoot['items']);
-    final setting = _settings(
-      state.snapshot.admin,
-    ).where((item) => item['key'] == 'memory.enabled').firstOrNull;
+    final setting = _settings(state.snapshot.admin)
+        .where((item) => item['key'] == 'memory.enabled')
+        .firstOrNull;
     final enabled = setting?['data'] != false;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const _PanelHeader(
           title: 'Memories',
-          caption:
-              'Governed memories live in UAR storage. Model reasoning is never promoted to future context by default.',
+          caption: 'Governed memories live in UAR storage. Model reasoning is never promoted to future context by default.',
           icon: Icons.psychology_outlined,
         ),
         const SizedBox(height: 20),
@@ -1353,8 +1349,7 @@ class _McpPanelState extends ConsumerState<_McpPanel> {
       children: [
         const _PanelHeader(
           title: 'MCP & external access',
-          caption:
-              'UAR owns MCP connections, tool discovery, execution and credentials. Chat receives only policy-approved tools.',
+          caption: 'UAR owns MCP connections, tool discovery, execution and credentials. Chat receives only policy-approved tools.',
           icon: Icons.cable_outlined,
         ),
         const SizedBox(height: 20),
@@ -1378,15 +1373,16 @@ class _McpPanelState extends ConsumerState<_McpPanel> {
                 child: shad.PrimaryButton(
                   onPressed: widget.state.saving
                       ? null
-                      : () => ref
-                            .read(settingsProvider.notifier)
-                            .saveMcpServer(name.text.trim(), {
-                              'name': name.text.trim(),
-                              'enabled': true,
-                              'transport': 'remote_http',
-                              'url': endpoint.text.trim(),
-                              'env': <String, String>{},
-                            }),
+                      : () => ref.read(settingsProvider.notifier).saveMcpServer(
+                          name.text.trim(),
+                          {
+                            'name': name.text.trim(),
+                            'enabled': true,
+                            'transport': 'remote_http',
+                            'url': endpoint.text.trim(),
+                            'env': <String, String>{},
+                          },
+                        ),
                   child: const Text('Add server'),
                 ),
               ),
@@ -1664,9 +1660,8 @@ class _AgentsPanelState extends ConsumerState<_AgentsPanel> {
       title.text = metadata['title']?.toString() ?? selectedId ?? '';
       description.text = metadata['description']?.toString() ?? '';
       systemPrompt.text = prompt['system']?.toString() ?? '';
-      policy.text = const JsonEncoder.withIndent(
-        '  ',
-      ).convert(savedPolicy.isEmpty ? _defaultPolicy() : savedPolicy);
+      policy.text = const JsonEncoder.withIndent('  ')
+          .convert(savedPolicy.isEmpty ? _defaultPolicy() : savedPolicy);
     });
   }
 
@@ -1677,9 +1672,8 @@ class _AgentsPanelState extends ConsumerState<_AgentsPanel> {
       title.clear();
       description.clear();
       systemPrompt.clear();
-      policy.text = const JsonEncoder.withIndent(
-        '  ',
-      ).convert(_defaultPolicy());
+      policy.text = const JsonEncoder.withIndent('  ')
+          .convert(_defaultPolicy());
     });
   }
 
@@ -1803,8 +1797,7 @@ class _AgentsPanelState extends ConsumerState<_AgentsPanel> {
       children: [
         const _PanelHeader(
           title: 'Agents',
-          caption:
-              'Definitions, prompts, and effective execution policy are stored and enforced by UAR. Default and Orchestrator agents are protected.',
+          caption: 'Definitions, prompts, and effective execution policy are stored and enforced by UAR. Default and Orchestrator agents are protected.',
           icon: Icons.smart_toy_outlined,
         ),
         const SizedBox(height: 20),
@@ -1852,7 +1845,10 @@ class _AgentsPanelState extends ConsumerState<_AgentsPanel> {
                 decoration: const InputDecoration(labelText: 'System prompt'),
               ),
               const SizedBox(height: 12),
-              const Text('Model', style: TextStyle(fontWeight: FontWeight.w700)),
+              const Text(
+                'Model',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 4),
               Text(
                 'Overrides the global default for this agent. Leave on global '
@@ -1879,8 +1875,7 @@ class _AgentsPanelState extends ConsumerState<_AgentsPanel> {
                 style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
                 decoration: const InputDecoration(
                   labelText: 'UAR run policy (JSON)',
-                  helperText:
-                      'Controls model, skills, tools, MCP servers, knowledge, memory, context, and approval at agent scope.',
+                  helperText: 'Controls model, skills, tools, MCP servers, knowledge, memory, context, and approval at agent scope.',
                 ),
               ),
               const SizedBox(height: 16),

@@ -141,9 +141,8 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          chatControlProvider(
-            'conversation',
-          ).overrideWith(() => _FakeChatControl(state)),
+          chatControlProvider('conversation')
+              .overrideWith(() => _FakeChatControl(state)),
         ],
         child: MaterialApp(
           home: shad.Theme(

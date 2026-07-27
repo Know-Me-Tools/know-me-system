@@ -15,8 +15,7 @@ class HomeScreen extends StatelessWidget {
       title: 'Home',
       eyebrow: 'Your private intelligence',
       heading: 'Good to see you.',
-      body:
-          'Continue a conversation, revisit a memory, or ask KnowMe to connect what matters.',
+      body: 'Continue a conversation, revisit a memory, or ask KnowMe to connect what matters.',
       icon: Icons.auto_awesome,
     ),
   );
@@ -31,8 +30,7 @@ class HandsScreen extends StatelessWidget {
       title: 'Hands',
       eyebrow: 'Skills and actions',
       heading: 'Put context to work.',
-      body:
-          'Approved skills and tool activity appear here, with every action visible and under your control.',
+      body: 'Approved skills and tool activity appear here, with every action visible and under your control.',
       icon: Icons.back_hand_outlined,
     ),
   );
@@ -47,8 +45,7 @@ class ModelsScreen extends StatelessWidget {
       title: 'Models',
       eyebrow: 'Local by default',
       heading: 'Private intelligence, on device.',
-      body:
-          'KnowMe downloads and runs a compatible local model automatically. Cloud providers remain an explicit choice.',
+      body: 'KnowMe downloads and runs a compatible local model automatically. Cloud providers remain an explicit choice.',
       icon: Icons.memory,
     ),
   );

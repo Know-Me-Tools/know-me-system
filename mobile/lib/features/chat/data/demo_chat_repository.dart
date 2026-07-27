@@ -128,6 +128,9 @@ class DemoChatRepository implements ChatRepository {
   };
 
   @override
+  Future<int> sweepOrphanAttachments(List<String> conversationIds) async => 0;
+
+  @override
   Future<String> startTurn({
     required String threadId,
     required String message,

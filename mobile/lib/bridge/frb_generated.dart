@@ -81,7 +81,7 @@ class GenUiCore
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => -1577421946;
+  int get rustContentHash => 1204213197;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -319,6 +319,10 @@ abstract class GenUiCoreApi extends BaseApi {
   Future<String> crateApiChatStageAttachment({
     required String conversationId,
     required String sourcePath,
+  });
+
+  Future<int> crateApiChatSweepOrphanAttachments({
+    required List<String> knownConversationIds,
   });
 
   Stream<String> crateApiStreamsSyncStatus();
@@ -2592,6 +2596,40 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
       );
 
   @override
+  Future<int> crateApiChatSweepOrphanAttachments({
+    required List<String> knownConversationIds,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_list_String(knownConversationIds, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 67,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_u_32,
+          decodeErrorData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoreError,
+        ),
+        constMeta: kCrateApiChatSweepOrphanAttachmentsConstMeta,
+        argValues: [knownConversationIds],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiChatSweepOrphanAttachmentsConstMeta =>
+      const TaskConstMeta(
+        debugName: "sweep_orphan_attachments",
+        argNames: ["knownConversationIds"],
+      );
+
+  @override
   Stream<String> crateApiStreamsSyncStatus() {
     final sink = RustStreamSink<String>();
     unawaited(
@@ -2603,7 +2641,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 67,
+              funcId: 68,
               port: port_,
             );
           },
@@ -2632,7 +2670,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 68,
+            funcId: 69,
             port: port_,
           );
         },
@@ -2660,7 +2698,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 69,
+            funcId: 70,
             port: port_,
           );
         },
@@ -2689,7 +2727,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 70,
+            funcId: 71,
             port: port_,
           );
         },
@@ -2718,7 +2756,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 71,
+            funcId: 72,
             port: port_,
           );
         },
@@ -2749,7 +2787,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 72,
+            funcId: 73,
             port: port_,
           );
         },
@@ -2781,7 +2819,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 73,
+            funcId: 74,
             port: port_,
           );
         },
@@ -2813,7 +2851,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 74,
+            funcId: 75,
             port: port_,
           );
         },
@@ -2849,7 +2887,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 75,
+            funcId: 76,
             port: port_,
           );
         },
@@ -2881,7 +2919,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 76,
+            funcId: 77,
             port: port_,
           );
         },
@@ -2909,7 +2947,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 77,
+            funcId: 78,
             port: port_,
           );
         },
@@ -2937,7 +2975,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 78,
+            funcId: 79,
             port: port_,
           );
         },
@@ -2965,7 +3003,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 79,
+            funcId: 80,
             port: port_,
           );
         },
@@ -3000,7 +3038,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 80,
+            funcId: 81,
             port: port_,
           );
         },
@@ -3035,7 +3073,7 @@ class GenUiCoreApiImpl extends GenUiCoreApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 81,
+            funcId: 82,
             port: port_,
           );
         },

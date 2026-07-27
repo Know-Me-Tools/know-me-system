@@ -53,6 +53,12 @@ Future<String> chatSend(
 Future<String> stageAttachment(String conversationId, String sourcePath) =>
     ffi.stageAttachment(conversationId: conversationId, sourcePath: sourcePath);
 
+/// sweep_orphan_attachments(known_ids) -> count removed.
+Future<int> sweepOrphanAttachments(List<String> knownConversationIds) async =>
+    (await ffi.sweepOrphanAttachments(
+      knownConversationIds: knownConversationIds,
+    )).toInt();
+
 Future<String> chatAction(
   String threadId,
   String interactionJson,

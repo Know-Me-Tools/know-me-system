@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 import { useChatStore } from "@/features/chat/stores/chatStore";
 import { useLane } from "@/features/chat/hooks/useLane";
 import { StoppedTurnActions } from "@/features/chat/components/StoppedTurnActions";
+import { MediaWithActions } from "@/features/chat/components/MediaWithActions";
 import {
   ActionBarMorePrimitive,
   ActionBarPrimitive,
@@ -378,10 +379,10 @@ const AssistantMessage: FC = () => {
                 // error surface. Sizing mirrors Flutter's ContentBlockImage
                 // (max 420 / min 120) so a tall image cannot swallow the thread.
                 return (
-                  <img
+                  <MediaWithActions
                     src={part.image}
+                    fileName={part.filename ?? "image"}
                     alt={part.filename ? `Image from the assistant (${part.filename})` : "Image from the assistant"}
-                    className="my-2 max-h-[420px] min-h-[120px] w-auto max-w-full rounded-2xl object-contain"
                   />
                 );
               case "file":

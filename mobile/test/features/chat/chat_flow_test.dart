@@ -566,6 +566,16 @@ class _FakeChatRepository implements ChatRepository {
     );
   }
 
+  /// What the notifier told the sweep was still alive, so a test can assert
+  /// the live conversations are never handed over as orphans.
+  List<String>? sweptAgainst;
+
+  @override
+  Future<int> sweepOrphanAttachments(List<String> conversationIds) async {
+    sweptAgainst = conversationIds;
+    return 0;
+  }
+
   @override
   Future<String> approveToolConfirmation({required String approvalId}) async =>
       'approval-run';

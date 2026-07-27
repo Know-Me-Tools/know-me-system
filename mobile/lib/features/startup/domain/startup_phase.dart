@@ -6,15 +6,15 @@ enum StartupPhase { migrations, seeds, shapes, ready }
 
 extension StartupPhaseLabel on StartupPhase {
   String get label => switch (this) {
-        StartupPhase.migrations => 'Applying migrations',
-        StartupPhase.seeds => 'Loading seed data',
-        StartupPhase.shapes => 'Attaching sync shapes',
-        StartupPhase.ready => 'Ready',
-      };
+    StartupPhase.migrations => 'Applying migrations',
+    StartupPhase.seeds => 'Loading seed data',
+    StartupPhase.shapes => 'Attaching sync shapes',
+    StartupPhase.ready => 'Ready',
+  };
   double get progress => switch (this) {
-        StartupPhase.migrations => 0.25,
-        StartupPhase.seeds => 0.5,
-        StartupPhase.shapes => 0.85,
-        StartupPhase.ready => 1.0,
-      };
+    StartupPhase.migrations => 0.25,
+    StartupPhase.seeds => 0.5,
+    StartupPhase.shapes => 0.85,
+    StartupPhase.ready => 1.0,
+  };
 }

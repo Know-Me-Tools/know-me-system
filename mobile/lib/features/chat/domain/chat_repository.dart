@@ -73,6 +73,14 @@ abstract interface class ChatRepository {
     required String sourcePath,
   });
 
+  /// Delete stored attachment files whose conversation no longer exists.
+  ///
+  /// Takes the CURRENT conversation ids. Rust refuses an empty list, because
+  /// at the storage layer "nothing is known" means "everything is an orphan" —
+  /// and an empty list is far more likely a failed load than a user with no
+  /// conversations. Returns how many directories were removed.
+  Future<int> sweepOrphanAttachments(List<String> conversationIds);
+
   Future<List<ChatConversation>> listConversations();
   Future<ChatConversation> createConversation(String title);
   Future<void> saveConversation(ChatConversation conversation);

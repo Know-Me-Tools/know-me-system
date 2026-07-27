@@ -80,6 +80,25 @@ class ChatNotifier extends _$ChatNotifier {
       messages: messages,
       isLoading: false,
     );
+    // Reclaim attachment bytes whose conversation is gone. A crash between
+    // storing a file and committing its message row leaves bytes with no
+    // owner, and nothing else ever collects them.
+    //
+    // Done HERE because the conversation list is the authority on what still
+    // exists and it lives in the entity store, which Rust cannot enumerate at
+    // boot. Fire-and-forget: a failed sweep costs disk, and blocking the chat
+    // screen on housekeeping would cost the user their session.
+    unawaited(
+      _repository
+          .sweepOrphanAttachments(
+            conversations.map((conversation) => conversation.id).toList(),
+          )
+          // The ONLY error deliberately dropped in this notifier. A failed
+          // sweep costs disk space and nothing else: there is no user action
+          // to offer, and surfacing it would interrupt the chat load for
+          // housekeeping the user never asked for. It retries on next launch.
+          .catchError((Object _) => 0),
+    );
     _modelStatusSubscription ??= _repository.watchLocalModelStatus().listen(
       (operation) {
         if (!ref.mounted) return;

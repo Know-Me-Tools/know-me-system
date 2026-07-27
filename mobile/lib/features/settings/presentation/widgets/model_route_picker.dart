@@ -51,7 +51,10 @@ class ModelRoutePicker extends StatelessWidget {
         .firstOrNull;
     final raw = provider?['models'];
     if (raw is List) {
-      return raw.whereType<Map>().map((m) => m.cast<String, dynamic>()).toList();
+      return raw
+          .whereType<Map>()
+          .map((m) => m.cast<String, dynamic>())
+          .toList();
     }
     return const [];
   }
@@ -112,7 +115,9 @@ class ModelRoutePicker extends StatelessWidget {
           decoration: InputDecoration(
             labelText: 'Model',
             border: const OutlineInputBorder(),
-            hintText: value == null ? 'Select a provider first' : 'Choose a model',
+            hintText: value == null
+                ? 'Select a provider first'
+                : 'Choose a model',
           ),
           items: [
             for (final model in models)

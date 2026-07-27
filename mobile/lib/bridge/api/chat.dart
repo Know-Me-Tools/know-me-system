@@ -60,6 +60,20 @@ Future<String> stageAttachment({
   sourcePath: sourcePath,
 );
 
+/// Delete stored attachment files whose conversation no longer exists.
+///
+/// Called by the UI once it has loaded its conversation list, because that
+/// list lives in the entity store the UI owns — Rust cannot enumerate it at
+/// boot. A crash between writing a file and committing the message row leaves
+/// bytes with no owner; without this they accumulate forever.
+///
+/// Returns the number of conversation directories removed.
+Future<int> sweepOrphanAttachments({
+  required List<String> knownConversationIds,
+}) => GenUiCore.instance.api.crateApiChatSweepOrphanAttachments(
+  knownConversationIds: knownConversationIds,
+);
+
 /// Submit a typed A2UI/AG-UI user interaction and start the agent's response.
 /// The JSON envelope is preserved verbatim so Rust remains the sole transport
 /// boundary and the agent can correlate surface, component, and context IDs.

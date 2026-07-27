@@ -51,9 +51,8 @@ class AppRoot extends ConsumerWidget {
       darkTheme: KnowMeTheme.dark,
       themeMode: ref.watch(themeModeProvider),
       routerConfig: appRouter,
-      builder: (context, child) => StartupGate(
-        child: child ?? const SizedBox.shrink(),
-      ),
+      builder: (context, child) =>
+          StartupGate(child: child ?? const SizedBox.shrink()),
     );
   }
 }
