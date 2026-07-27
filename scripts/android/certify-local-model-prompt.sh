@@ -62,8 +62,12 @@ cleanup_force_litert_tool_result_fallback() {
 cleanup_all() {
   cleanup_force_litert_tool_result_fallback
   cert_restore_clean_chat_state "$PACKAGE"
+  cert_exit_offline
 }
 trap cleanup_all EXIT
+
+# Enforced BEFORE any assertion, so nothing is measured while the network is up.
+cert_enter_offline || exit 1
 
 if [[ "$CERT_CLEAN_CHAT_STATE" == "1" ]]; then
   cert_prepare_clean_chat_state "$PACKAGE"

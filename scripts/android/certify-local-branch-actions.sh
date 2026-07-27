@@ -37,9 +37,10 @@ if [[ ! -x "$PROMPT_GATE" ]]; then
 fi
 
 source "$SCRIPT_DIR/lib-chat-state.sh"
-trap 'cert_restore_clean_chat_state "$PACKAGE"' EXIT
+trap 'cert_restore_clean_chat_state "$PACKAGE"; cert_exit_offline' EXIT
 
 adb install -r "$APK" >/dev/null
+cert_enter_offline || exit 1
 cert_prepare_clean_chat_state "$PACKAGE"
 
 PROMPT="Reply exactly ${TOKEN}." \
