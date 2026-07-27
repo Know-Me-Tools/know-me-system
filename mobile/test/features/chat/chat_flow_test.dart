@@ -18,6 +18,13 @@ Stream<A2uiEvent> _cannedRun() async* {
   yield const RunFinished('run-1');
 }
 
+/// A run that starts and emits, but never finishes — the live-stream state the
+/// conversation-switch guard exists to protect.
+Stream<A2uiEvent> _neverFinishingRun() async* {
+  yield const RunStarted('run-live');
+  yield const BlockEvent('run-live', TextBlock('partial'));
+}
+
 Stream<A2uiEvent> _semanticRun() async* {
   yield const RunStarted('run-semantic');
   yield const BlockEvent('run-semantic', ThinkingBlock('reason '));
@@ -366,6 +373,83 @@ void main() {
     expect(sent.intent, isNull);
   });
 
+  test('renameConversation persists the new title', () async {
+    // The Flutter sheet showed the title as static text with only a delete
+    // button beside it, so a conversation kept whatever its first message
+    // auto-titled it forever. React has had rename since it shipped.
+    final repo = _FakeChatRepository();
+    final container = ProviderContainer(
+      overrides: [chatRepositoryProvider.overrideWithValue(repo)],
+    );
+    final subscription = container.listen(chatProvider, (_, _) {});
+    addTearDown(container.dispose);
+    addTearDown(subscription.close);
+
+    final notifier = container.read(chatProvider.notifier);
+    await notifier.load();
+    final id = container.read(chatProvider).threadId;
+
+    await notifier.renameConversation(id, '  Trip planning  ');
+
+    // Trimmed, because a title padded with spaces reads as misaligned in the list.
+    expect(repo.savedConversations.single.title, 'Trip planning');
+    expect(
+      container.read(chatProvider).conversations.first.title,
+      'Trip planning',
+    );
+  });
+
+  test('renameConversation ignores an empty title', () async {
+    // An empty title would leave a blank row the user cannot tell apart from
+    // its neighbours.
+    final repo = _FakeChatRepository();
+    final container = ProviderContainer(
+      overrides: [chatRepositoryProvider.overrideWithValue(repo)],
+    );
+    final subscription = container.listen(chatProvider, (_, _) {});
+    addTearDown(container.dispose);
+    addTearDown(subscription.close);
+
+    final notifier = container.read(chatProvider.notifier);
+    await notifier.load();
+    final before = container.read(chatProvider).conversations.first.title;
+
+    await notifier.renameConversation(container.read(chatProvider).threadId, '   ');
+
+    expect(repo.savedConversations, isEmpty);
+    expect(container.read(chatProvider).conversations.first.title, before);
+  });
+
+  test('selectConversation refuses to switch while a run is streaming', () async {
+    // Switching swaps state.messages out from under the driver still writing
+    // blocks to a message id no longer in the visible list — the tokens go
+    // nowhere and the turn is lost. React has always guarded this.
+    final repo = _FakeChatRepository();
+    final container = ProviderContainer(
+      overrides: [chatRepositoryProvider.overrideWithValue(repo)],
+    );
+    final subscription = container.listen(chatProvider, (_, _) {});
+    addTearDown(container.dispose);
+    addTearDown(subscription.close);
+
+    final notifier = container.read(chatProvider.notifier);
+    await notifier.load();
+    final original = container.read(chatProvider).threadId;
+    // Drive the streaming state directly. Sending would race the fake's canned
+    // run to completion, and the guard would then be tested against a turn that
+    // had already finished — a test that passes for the wrong reason.
+    await notifier.foldStream('streaming-1', _neverFinishingRun());
+    expect(
+      container.read(chatProvider).messages.any((message) => message.isStreaming),
+      isTrue,
+      reason: 'the guard is only meaningful against a live run',
+    );
+
+    await notifier.selectConversation('some-other-conversation');
+
+    expect(container.read(chatProvider).threadId, original);
+  });
+
   test('a failed submitInteraction ends the turn instead of spinning', () async {
     // The assistant placeholder is pushed into state BEFORE the call. An
     // uncaught throw left that bubble streaming forever with no way back —
@@ -500,8 +584,12 @@ class _FakeChatRepository implements ChatRepository {
     RemoteContentKind kind,
   ) async => ResolvedRemoteContent(url: url, mime: 'text/plain');
 
+  final savedConversations = <ChatConversation>[];
+
   @override
-  Future<void> saveConversation(ChatConversation conversation) async {}
+  Future<void> saveConversation(ChatConversation conversation) async {
+    savedConversations.add(conversation);
+  }
 
   @override
   Future<void> saveMessage(String conversationId, ChatMessage message) async {

@@ -1,4 +1,5 @@
 // TJ-ARCH-MOB-001 compliant
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
@@ -1266,15 +1267,104 @@ String _mimeFor(String? extension) => switch (extension?.toLowerCase()) {
   _ => 'application/octet-stream',
 };
 
-class _ConversationSheet extends ConsumerWidget {
+class _ConversationSheet extends ConsumerStatefulWidget {
   const _ConversationSheet({required this.close});
 
   final Future<void> Function() close;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ConversationSheet> createState() => _ConversationSheetState();
+}
+
+class _ConversationSheetState extends ConsumerState<_ConversationSheet> {
+  final _searchController = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  /// Rename in place, from a dialog seeded with the current title.
+  ///
+  /// React has had rename since it shipped; here the title was static text, so
+  /// a conversation kept whatever its first message auto-titled it forever.
+  Future<void> _rename(String id, String currentTitle) async {
+    final controller = TextEditingController(text: currentTitle);
+    // A sheet rather than a dialog: it is the overlay primitive this app
+    // already uses everywhere else, so focus, dismissal and theming behave the
+    // way the rest of the surface does.
+    // The overlay completer is not a Future, so the controller is disposed when
+    // the sheet reports closed rather than on a bogus await.
+    final sheet = shad.openSheetOverlay<void>(
+      context: context,
+      position: shad.OverlayPosition.bottom,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text('Rename conversation').semiBold(),
+              const SizedBox(height: 12),
+              shad.TextField(
+                controller: controller,
+                autofocus: true,
+                placeholder: const Text('Conversation title'),
+                onSubmitted: (value) {
+                  shad.closeSheet(sheetContext);
+                  unawaited(_submitRename(id, value));
+                },
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  shad.SecondaryButton(
+                    onPressed: () => shad.closeSheet(sheetContext),
+                    child: const Text('Cancel'),
+                  ),
+                  const SizedBox(width: 8),
+                  shad.PrimaryButton(
+                    onPressed: () {
+                      shad.closeSheet(sheetContext);
+                      unawaited(_submitRename(id, controller.text));
+                    },
+                    child: const Text('Rename'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await sheet.future;
+    controller.dispose();
+  }
+
+  Future<void> _submitRename(String id, String title) async {
+    if (!mounted) return;
+    await ref.read(chatProvider.notifier).renameConversation(id, title);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(chatProvider);
     final colors = shad.Theme.of(context).colorScheme;
+    // Case-insensitive substring on the title, matching React's thread search.
+    // Body text is deliberately not searched on either surface.
+    final query = _query.trim().toLowerCase();
+    final conversations = query.isEmpty
+        ? state.conversations
+        : state.conversations
+              .where(
+                (conversation) =>
+                    conversation.title.toLowerCase().contains(query),
+              )
+              .toList();
     return ColoredBox(
       color: colors.background,
       child: SafeArea(
@@ -1299,53 +1389,90 @@ class _ConversationSheet extends ConsumerWidget {
                       await ref
                           .read(chatProvider.notifier)
                           .createConversation();
-                      await close();
+                      await widget.close();
                     },
                     density: shad.ButtonDensity.icon,
                     child: const Icon(Icons.add),
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
-              Expanded(
-                child: ListView.separated(
-                  itemCount: state.conversations.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 8),
-                  itemBuilder: (context, index) {
-                    final conversation = state.conversations[index];
-                    final selected = conversation.id == state.threadId;
-                    return ColoredBox(
-                      color: selected ? colors.accent : colors.card,
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: shad.GhostButton(
-                              alignment: Alignment.centerLeft,
-                              onPressed: () async {
-                                await ref
-                                    .read(chatProvider.notifier)
-                                    .selectConversation(conversation.id);
-                                await close();
-                              },
-                              child: Text(
-                                conversation.title,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ),
-                          shad.GhostButton(
-                            onPressed: () => ref
-                                .read(chatProvider.notifier)
-                                .deleteConversation(conversation.id),
-                            density: shad.ButtonDensity.icon,
-                            child: const Icon(Icons.delete_outline),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
+              const SizedBox(height: 12),
+              // Only offered when there is something to search — a filter over
+              // an empty list is noise.
+              if (state.conversations.isNotEmpty) ...[
+                Semantics(
+                  textField: true,
+                  label: 'Search threads',
+                  child: shad.TextField(
+                    controller: _searchController,
+                    placeholder: const Text('Search threads'),
+                    features: const [shad.InputFeature.leading(Icon(Icons.search))],
+                    onChanged: (value) => setState(() => _query = value),
+                  ),
                 ),
+                const SizedBox(height: 12),
+              ],
+              Expanded(
+                child: conversations.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No threads found',
+                          style: TextStyle(color: colors.mutedForeground),
+                        ),
+                      )
+                    : ListView.separated(
+                        itemCount: conversations.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 8),
+                        itemBuilder: (context, index) {
+                          final conversation = conversations[index];
+                          final selected = conversation.id == state.threadId;
+                          return ColoredBox(
+                            color: selected ? colors.accent : colors.card,
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: shad.GhostButton(
+                                    alignment: Alignment.centerLeft,
+                                    onPressed: () async {
+                                      await ref
+                                          .read(chatProvider.notifier)
+                                          .selectConversation(conversation.id);
+                                      await widget.close();
+                                    },
+                                    child: Text(
+                                      conversation.title,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ),
+                                Semantics(
+                                  button: true,
+                                  label: 'Rename ${conversation.title}',
+                                  excludeSemantics: true,
+                                  child: shad.GhostButton(
+                                    onPressed: () => _rename(conversation.id, conversation.title),
+                                    density: shad.ButtonDensity.icon,
+                                    child: const Icon(Icons.edit_outlined),
+                                  ),
+                                ),
+                                Semantics(
+                                  button: true,
+                                  label: 'Delete ${conversation.title}',
+                                  excludeSemantics: true,
+                                  child: shad.GhostButton(
+                                    onPressed: () => ref
+                                        .read(chatProvider.notifier)
+                                        .deleteConversation(conversation.id),
+                                    density: shad.ButtonDensity.icon,
+                                    child: const Icon(Icons.delete_outline),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
               ),
             ],
           ),

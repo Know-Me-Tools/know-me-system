@@ -121,10 +121,42 @@ class ChatNotifier extends _$ChatNotifier {
 
   Future<void> selectConversation(String id) async {
     if (id == state.threadId) return;
+    // Refuse while a run is live. Switching swaps `state.messages` out from
+    // under the driver still writing blocks to a message id that is no longer
+    // in the visible list — the tokens go nowhere and the turn is lost.
+    // React has always guarded this (chatStore.ts switchConversation).
+    if (state.messages.any((message) => message.isStreaming)) return;
     state = state.copyWith(isLoading: true);
     final messages = await _repository.listMessages(id);
     if (!ref.mounted) return;
     state = state.copyWith(threadId: id, messages: messages, isLoading: false);
+  }
+
+  /// Rename a conversation.
+  ///
+  /// React has had this since it shipped; the Flutter sheet showed the title as
+  /// static text with only a delete affordance beside it, so a conversation
+  /// kept whatever the first message auto-titled it forever.
+  Future<void> renameConversation(String id, String title) async {
+    final trimmed = title.trim();
+    // An empty title would leave a blank row the user cannot tell apart from
+    // its neighbours; keep the existing one instead.
+    if (trimmed.isEmpty) return;
+    final existing = state.conversations
+        .where((conversation) => conversation.id == id)
+        .firstOrNull;
+    if (existing == null || existing.title == trimmed) return;
+    final updated = existing.copyWith(
+      title: trimmed,
+      updatedAt: DateTime.now().toUtc(),
+    );
+    state = state.copyWith(
+      conversations: [
+        for (final conversation in state.conversations)
+          if (conversation.id == id) updated else conversation,
+      ],
+    );
+    await _repository.saveConversation(updated);
   }
 
   Future<void> deleteConversation(String id) async {
