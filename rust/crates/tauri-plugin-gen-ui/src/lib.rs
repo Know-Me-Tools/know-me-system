@@ -33,6 +33,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::promote_a2ui_component,
             commands::get_active_lane,
             commands::set_active_lane,
+            commands::lane_availability,
             commands::has_local_engine,
             commands::cancel_agent_run,
             commands::prepare_local_model,

@@ -195,6 +195,27 @@ export function getActiveLane(): Promise<ChatLane> {
 export function setActiveLane(lane: ChatLane): Promise<void> {
   return invoke<void>(cmd("set_active_lane"), { lane });
 }
+/** Whether a lane can be selected right now, and the reason when it cannot. */
+export interface LaneAvailability {
+  lane: ChatLane;
+  available: boolean;
+  /** Human-readable reason when `available` is false; null when usable. */
+  reason: string | null;
+}
+/**
+ * Availability for every selectable lane, in one call.
+ *
+ * The mode picker renders an unavailable lane as disabled WITH its reason
+ * rather than offering a control that fails when clicked. Side-effect free —
+ * it probes registration state and never loads an engine, so it is safe to
+ * call on mount and after a failed switch.
+ */
+export async function laneAvailability(): Promise<LaneAvailability[]> {
+  // Rust hands back JSON text (the FFI surface does the same) so the shape
+  // stays serde-owned rather than duplicated across two bindings.
+  const raw = await invoke<string>(cmd("lane_availability"));
+  return JSON.parse(raw) as LaneAvailability[];
+}
 /** Whether this build has a local-inference engine — gate the toggle on this. */
 export function hasLocalEngine(): Promise<boolean> {
   return invoke<boolean>(cmd("has_local_engine"));

@@ -98,6 +98,23 @@ pub async fn get_active_lane() -> Result<String> {
         .map_err(Into::into)
 }
 
+/// Which lanes can be selected right now, and why not when they cannot.
+///
+/// The mode picker renders an unavailable lane as disabled with the reason
+/// rather than offering a control that fails when clicked. Side-effect free:
+/// it probes registration state and never loads an engine. Flutter has reached
+/// this through FFI since the picker shipped; this is the Tauri equivalent so
+/// desktop and web can render the same disabled rows instead of guessing.
+#[tauri::command]
+pub async fn lane_availability() -> Result<String> {
+    let value = gen_ui_agent::chat::lane_availability()
+        .await
+        .map_err(gen_ui_types::CoreError::from)?;
+    serde_json::to_string(&value)
+        .map_err(|error| gen_ui_types::CoreError::Serde(error.to_string()))
+        .map_err(Into::into)
+}
+
 /// Switch chat lanes. Errors on an unknown lane, or on "local" where this build
 /// has no engine — the toggle fails loudly here rather than silently answering
 /// from the cloud at the next turn.

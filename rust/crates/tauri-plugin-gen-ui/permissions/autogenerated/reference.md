@@ -8,6 +8,7 @@ Default gen-ui permissions: startup/read/chat intents. Mutating ENTITY commands 
 - `allow-send-agent-interaction-a2ui`
 - `allow-get-active-lane`
 - `allow-set-active-lane`
+- `allow-lane-availability`
 - `allow-has-local-engine`
 - `allow-cancel-agent-run`
 - `allow-prepare-local-model`

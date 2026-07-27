@@ -56,7 +56,10 @@ interface LaneState {
 
 interface LaneActions {
   init: () => Promise<void>
-  switchLane: (lane: ChatLane) => Promise<void>
+  /** Returns whether the lane actually changed — a refused switch reports
+   *  false so callers can leave their own selection where it was rather than
+   *  claiming a mode the runtime declined. */
+  switchLane: (lane: ChatLane) => Promise<boolean>
   prepareLocal: () => Promise<boolean>
   refreshUar: () => Promise<boolean>
   recordThroughput: (tokens: number, seconds: number) => void
@@ -187,16 +190,16 @@ export const useLaneStore = create<LaneState & LaneActions>()(
       set((s) => { s.error = null })
       if (lane === 'local') {
         const ready = await get().prepareLocal()
-        if (!ready) return
+        if (!ready) return false
       } else if (lane === 'uar') {
         const ready = await get().refreshUar()
         if (!ready) {
           set((s) => { s.error = 'Configure Universal Agent Runtime in Settings before using the UAR lane.' })
-          return
+          return false
         }
       } else if (isTauri()) {
         set((s) => { s.error = 'Desktop chat uses UAR or Local. Configure Liter-LLM providers under UAR settings.' })
-        return
+        return false
       } else if (lane === 'cloud') {
         await unloadWebLlm()
       }
@@ -206,11 +209,13 @@ export const useLaneStore = create<LaneState & LaneActions>()(
           s.lane = lane
           if (lane === 'cloud') s.throughput = null
         })
+        return true
       } catch (e: unknown) {
         // Stay on the current lane and say why. Never silently fall back to
         // cloud — a user who asked for on-device inference must not be quietly
         // switched to a network provider.
         set((s) => { s.error = e instanceof Error ? e.message : 'failed to switch lane' })
+        return false
       }
     },
 

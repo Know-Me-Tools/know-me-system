@@ -1,5 +1,5 @@
 // TJ-ARCH-MOB-001 compliant — conversation controls call hooks; UAR owns policy.
-import { Bot, BrainCircuit, Check, Database, Layers3, Plug, ShieldCheck, Sparkles, Wrench } from 'lucide-react'
+import { BrainCircuit, Check, Database, Layers3, Plug, ShieldCheck, Sparkles, Wrench } from 'lucide-react'
 import type { ResourceSelection, RunPolicy } from '@prometheus-ags/tauri-plugin-gen-ui'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ModelRoutePicker, type ModelRoute } from '@/features/settings/components/ModelRoutePicker'
 import { useChat } from '../hooks/useChat'
 import { useChatControl } from '../hooks/useChatControl'
-import { useLane } from '../hooks/useLane'
+import { ChatModePicker } from './ChatModePicker'
 import type { ResourceOption } from '../stores/chatControlStore'
 
 function conversationModelRoute(value: unknown): ModelRoute | null {
@@ -52,8 +52,6 @@ function ResourceControl({ label, icon: Icon, options, value, onChange }: { labe
 export function ChatPolicyToolbar() {
   const { activeConversationId } = useChat()
   const control = useChatControl(activeConversationId)
-  const { switchLane } = useLane()
-  const mode = control.policy.chat_mode ?? 'uar'
   const contextStrategy = control.policy.context_strategy && typeof control.policy.context_strategy === 'object'
     ? String((control.policy.context_strategy as Record<string, unknown>).type ?? 'inherit')
     : 'inherit'
@@ -69,21 +67,9 @@ export function ChatPolicyToolbar() {
     }
   }
 
-  async function setMode(next: 'local' | 'uar' | 'agent') {
-    if (next === 'local') await switchLane('local')
-    else await switchLane('uar')
-    await control.patchPolicy({
-      chat_mode: next,
-      agent_id: next === 'agent' ? (control.policy.agent_id && !['default-agent', 'orchestrator-agent'].includes(control.policy.agent_id) ? control.policy.agent_id : control.agents.find((agent) => !agent.protected)?.id ?? null) : next === 'uar' ? 'orchestrator-agent' : null,
-    })
-  }
-
   return (
     <div className="flex min-h-12 shrink-0 items-center gap-2 overflow-x-auto bg-[color:var(--color-bg-2)] px-4 py-2" aria-label="Conversation controls">
-      <div className="flex rounded-xl bg-[color:var(--color-surface)] p-1" role="group" aria-label="Chat mode">
-        {([['uar', 'Orchestrator', BrainCircuit], ['agent', 'Agent', Bot], ['local', 'Local', Database]] as const).map(([id, label, Icon]) => <button key={id} type="button" onClick={() => void setMode(id)} aria-pressed={mode === id} className={mode === id ? 'flex min-h-9 items-center gap-2 rounded-lg bg-[color:var(--color-ember)] px-3 text-xs font-bold text-white' : 'flex min-h-9 items-center gap-2 rounded-lg px-3 text-xs text-[color:var(--color-fg-sub)] hover:bg-[color:var(--color-card-hov)]'}><Icon aria-hidden className="size-4" />{label}</button>)}
-      </div>
-      {mode === 'agent' ? <Select value={control.policy.agent_id ?? ''} onValueChange={(agentId) => void control.patchPolicy({ agent_id: agentId ?? null })}><SelectTrigger className="h-11 w-52 border-0 bg-[color:var(--color-surface)] shadow-none"><SelectValue placeholder="Choose agent" /></SelectTrigger><SelectContent className="border-0 shadow-none ring-0">{control.agents.map((agent) => <SelectItem key={agent.id} value={agent.id}>{agent.label}{agent.protected ? ' · built-in' : ''}</SelectItem>)}</SelectContent></Select> : null}
+      <ChatModePicker />
       <Popover>
         <PopoverTrigger render={<Button variant="ghost" className="min-h-11 rounded-xl px-3 text-xs text-[color:var(--color-fg-sub)]" />}>
           <Layers3 aria-hidden className="size-4" /><span>Model</span><span className="rounded-full bg-[color:var(--color-muted)] px-2 py-0.5 text-[10px]">{modelSummary(conversationModelRoute(control.policy.model))}</span>
