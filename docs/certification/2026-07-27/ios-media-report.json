@@ -1,0 +1,18 @@
+{
+  "automated": {
+    "consoleNote": "devicectl device console streams live output only and captured 0 bytes on this device after the boot burst. unobserved means the console was silent, not that the check failed.",
+    "crashFree": "unobserved",
+    "ffiLoaded": "unobserved",
+    "installedAndLaunched": true,
+    "migrationsReady": "unobserved"
+  },
+  "bundleAgeMinutes": 2,
+  "consoleBytesCaptured": 0,
+  "device": "iPhone 17 Pro Max (iPhone18,2), iOS 27.0",
+  "operatorDriven": {
+    "note": "null until the operator reports it. iOS exposes no scriptable UI dump outside an XCUITest target, so these CANNOT be asserted here \u2014 recorded as unknown rather than assumed.",
+    "saveTapped": null,
+    "shareSheetOpened": null
+  },
+  "surface": "iOS"
+}
