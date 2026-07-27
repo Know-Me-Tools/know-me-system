@@ -35,11 +35,45 @@ function toAssistantPart(block: ContentBlock): AssistantPart {
     }
     case 'skill': return { type: 'data', name: 'skill', data: block }
     case 'artifact': return { type: 'data', name: 'artifact', data: block }
+    // `filename` is assistant-ui's only descriptive field on an image part
+    // (there is no `alt`), so the mime carries through as the accessible name's
+    // basis — matching Flutter's ContentBlockImage, which labels the block with
+    // its mime type.
     case 'image': return block.url
-      ? { type: 'image', image: block.url }
-      : { type: 'image', image: `data:${block.mime};base64,${block.dataBase64 ?? ''}` }
+      ? { type: 'image', image: block.url, filename: block.mime }
+      : { type: 'image', image: `data:${block.mime};base64,${block.dataBase64 ?? ''}`, filename: block.mime }
     case 'divider': return { type: 'text', text: '\n\n' }
   }
+}
+
+/**
+ * Merge adjacent text blocks, and adjacent thinking blocks, into one.
+ *
+ * A streamed turn arrives as many small deltas, and a transcript persisted by an
+ * older client keeps them as separate blocks. Rendered one-per-block, that is N
+ * chat bubbles where the user wrote one message — which reads as a layout bug
+ * rather than what it is. Flutter has always done this
+ * (`coalesceContentBlocks`, gen_ui_widgets/lib/src/content_block.dart:169);
+ * React had no equivalent.
+ *
+ * Only text and thinking merge. Every other variant is a semantic boundary and
+ * must survive intact.
+ */
+export function coalesceContentBlocks(blocks: ContentBlock[]): ContentBlock[] {
+  const merged: ContentBlock[] = []
+  for (const block of blocks) {
+    const previous = merged.at(-1)
+    if (block.type === 'text' && previous?.type === 'text') {
+      merged[merged.length - 1] = { type: 'text', text: previous.text + block.text }
+      continue
+    }
+    if (block.type === 'thinking' && previous?.type === 'thinking') {
+      merged[merged.length - 1] = { type: 'thinking', text: previous.text + block.text }
+      continue
+    }
+    merged.push(block)
+  }
+  return merged
 }
 
 /**
@@ -48,7 +82,8 @@ function toAssistantPart(block: ContentBlock): AssistantPart {
  * two ordered ContentBlocks, so join them at this adapter boundary instead of
  * exposing two resources with the same toolCallId.
  */
-function toAssistantParts(blocks: ContentBlock[]): AssistantPart[] {
+function toAssistantParts(input: ContentBlock[]): AssistantPart[] {
+  const blocks = coalesceContentBlocks(input)
   const toolUseIds = new Set(
     blocks
       .filter((block): block is Extract<ContentBlock, { type: 'toolUse' }> => block.type === 'toolUse')

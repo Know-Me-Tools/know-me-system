@@ -712,12 +712,32 @@ class ChatNotifier extends _$ChatNotifier {
       messages: [...state.messages, userMsg, assistantMsg],
     );
     await _repository.saveMessage(state.threadId, userMsg);
-    final runId = await _repository.submitInteraction(
-      threadId: state.threadId,
-      interactionJson: payload,
-      history: history,
-      branchId: userMsg.branchId,
-    );
+    // The assistant placeholder is already in state and streaming. A throw here
+    // used to escape uncaught, leaving that bubble spinning forever with no way
+    // back — this was the only action in the notifier without the guard its
+    // siblings have.
+    late final String runId;
+    try {
+      runId = await _repository.submitInteraction(
+        threadId: state.threadId,
+        interactionJson: payload,
+        history: history,
+        branchId: userMsg.branchId,
+      );
+    } catch (error, stackTrace) {
+      final message = await _repository.errorMessage(error);
+      markRunError(
+        assistantId,
+        ChatRunError(
+          code: 'interaction_submit_failed',
+          phase: 'queued',
+          message: message,
+          retryable: true,
+          diagnostics: stackTrace.toString(),
+        ),
+      );
+      return;
+    }
     if (!ref.mounted) return;
     final driver = A2uiContentDriver(
       messageId: assistantId,

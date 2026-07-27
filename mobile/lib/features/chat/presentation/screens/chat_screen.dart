@@ -328,6 +328,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   void _openConversations() {
+    // Steer is armed against the turn the user just stopped, in the
+    // conversation they were in. Every exit from this sheet either switches
+    // threads or starts a new one, and carrying the arming across would
+    // silently prefix the correction preamble onto a message in an unrelated
+    // conversation — where no stopped turn exists for the model to build on.
+    // React fixes this in the store; this is the Flutter equivalent, placed at
+    // the one door into thread switching rather than on each row.
+    if (_pendingSteer) {
+      setState(() => _pendingSteer = false);
+    }
     shad.openSheetOverlay<void>(
       context: context,
       position: shad.OverlayPosition.left,

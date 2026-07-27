@@ -359,8 +359,41 @@ const AssistantMessage: FC = () => {
                     {"●"}
                   </span>
                 );
-              default:
+              case "image":
+                // Was missing entirely: the adapter emits a well-formed image
+                // part and this switch dropped it through `default: return null`,
+                // so image blocks rendered NOTHING — silent data loss with no
+                // error surface. Sizing mirrors Flutter's ContentBlockImage
+                // (max 420 / min 120) so a tall image cannot swallow the thread.
+                return (
+                  <img
+                    src={part.image}
+                    alt={part.filename ? `Image from the assistant (${part.filename})` : "Image from the assistant"}
+                    className="my-2 max-h-[420px] min-h-[120px] w-auto max-w-full rounded-2xl object-contain"
+                  />
+                );
+              case "file":
+              case "source":
+              case "audio":
+              case "generative-ui":
+                // assistant-ui part kinds our ContentBlock union never produces.
+                // Listed explicitly so the `never` guard below stays reachable
+                // rather than being defeated by an unrelated library part.
                 return null;
+              default: {
+                // `GroupPart<`group-${string}`>` is an open template-literal
+                // type, so it can never narrow to `never` — an unmatched group
+                // falls here legitimately and renders its children.
+                if (part.type.startsWith("group-")) return children;
+                // Exhaustiveness guard for the CLOSED part union, per the
+                // ContentBlock contract. The image case above went missing
+                // precisely because a bare `default: return null` made a dropped
+                // variant look like ordinary code. Now a new variant is a
+                // COMPILE error, not a blank screen.
+                const exhaustive: never = part as never;
+                void exhaustive;
+                return null;
+              }
             }
           }}
         </MessagePrimitive.GroupedParts>

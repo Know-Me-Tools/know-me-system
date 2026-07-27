@@ -303,6 +303,33 @@ interface ChatActions {
   cancelActiveRun: () => Promise<void>
 }
 
+/**
+ * Decide whether a refused cancel is worth reporting.
+ *
+ * Rust returns `false` when the run is no longer registered — the NORMAL outcome
+ * of a second stop tap, or of the run finishing in the gap before the call
+ * landed. Treating that as an error would overwrite a legitimate stopped turn
+ * with a failure bubble and hide the work the user just chose to keep. So only
+ * surface an error when the turn is somehow STILL streaming; otherwise it has
+ * already reached a terminal state. Mirrors chat_notifier.dart:544-564.
+ */
+function settleCancel(
+  get: () => ChatState & ChatActions,
+  messageId: string | undefined,
+  accepted: boolean,
+): void {
+  if (accepted || !messageId) return
+  const current = get().messages.find((item) => item.id === messageId)
+  if (!current?.isStreaming) return
+  get().updateLifecycle({
+    type: 'error', messageId, runId: current.runId ?? messageId,
+    error: {
+      code: 'run_not_active', phase: 'generation', retryable: false,
+      message: 'This run already ended and could not be cancelled.',
+    },
+  })
+}
+
 export const useChatStore = create<ChatState & ChatActions>()(
   subscribeWithSelector(
     immer((set, get) => ({
@@ -753,15 +780,30 @@ export const useChatStore = create<ChatState & ChatActions>()(
         // isTauri(), so a Stop during a browser-local WebLLM run POSTed to the
         // remote UAR service for a run it had never heard of — while tokens kept
         // streaming and the UI showed "Cancelling", so it looked like it worked.
-        if (isTauri()) {
-          await cancelAgentRun(runId)
-          return
+        // Every branch's outcome is checked. Previously the return value and any
+        // rejection were both discarded, so a refused or failed cancel left the
+        // turn showing "Cancelling" forever with no way out.
+        try {
+          if (isTauri()) {
+            const accepted = await cancelAgentRun(runId)
+            settleCancel(get, message?.id, accepted)
+            return
+          }
+          if (useLaneStore.getState().lane === 'local') {
+            await interruptWebLlm()
+            return
+          }
+          await cancelHostedChat(get().activeConversationId)
+        } catch (error: unknown) {
+          if (!message) return
+          get().updateLifecycle({
+            type: 'error', messageId: message.id, runId,
+            error: {
+              code: 'run_cancel_failed', phase: 'generation', retryable: true,
+              message: error instanceof Error ? error.message : 'Cancelling this run failed.',
+            },
+          })
         }
-        if (useLaneStore.getState().lane === 'local') {
-          await interruptWebLlm()
-          return
-        }
-        await cancelHostedChat(get().activeConversationId)
       },
 
       initListeners: () => {

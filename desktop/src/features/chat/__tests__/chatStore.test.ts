@@ -342,3 +342,45 @@ describe('chatStore cancel lane routing', () => {
     expect(mocks.interruptWebLlm).not.toHaveBeenCalled()
   })
 })
+
+describe('chatStore cancel failure handling', () => {
+  it('surfaces an error when a refused cancel leaves the turn streaming', async () => {
+    // Rust returns false when the run is no longer registered. If the turn is
+    // somehow STILL streaming, the UI would otherwise sit on "Cancelling"
+    // forever — the return value used to be discarded entirely.
+    mocks.cancelAgentRun.mockResolvedValue(false)
+
+    await useChatStore.getState().cancelActiveRun()
+
+    const message = useChatStore.getState().messages.find((m) => m.id === 'assistant-1')
+    expect(message?.error?.code).toBe('run_not_active')
+    expect(message?.error?.retryable).toBe(false)
+  })
+
+  it('stays silent when a refused cancel followed a turn that already ended', async () => {
+    // The normal outcome of a second stop tap. Reporting it would overwrite a
+    // legitimate stopped turn with a failure bubble and hide the kept work.
+    mocks.cancelAgentRun.mockResolvedValue(false)
+    useChatStore.setState({
+      messages: [assistantMessage({ isStreaming: false, runStatus: 'cancelled' })],
+    })
+
+    await useChatStore.getState().cancelActiveRun()
+
+    // The assertion is on `error`, not `runStatus`: cancelActiveRun writes its
+    // own optimistic phase before dispatching, so runStatus is transient here.
+    // What must hold is that no failure bubble was minted.
+    const message = useChatStore.getState().messages.find((m) => m.id === 'assistant-1')
+    expect(message?.error).toBeUndefined()
+  })
+
+  it('reports a thrown cancel instead of hanging', async () => {
+    mocks.cancelAgentRun.mockRejectedValue(new Error('bridge is gone'))
+
+    await useChatStore.getState().cancelActiveRun()
+
+    const message = useChatStore.getState().messages.find((m) => m.id === 'assistant-1')
+    expect(message?.error?.code).toBe('run_cancel_failed')
+    expect(message?.error?.message).toContain('bridge is gone')
+  })
+})

@@ -365,6 +365,34 @@ void main() {
         .firstWhere((message) => message.id == request.userMessageId);
     expect(sent.intent, isNull);
   });
+
+  test('a failed submitInteraction ends the turn instead of spinning', () async {
+    // The assistant placeholder is pushed into state BEFORE the call. An
+    // uncaught throw left that bubble streaming forever with no way back —
+    // this was the only action in the notifier without the guard its siblings
+    // have, so the failure had no surface at all.
+    final repo = _FakeChatRepository()..failInteraction = true;
+    final container = ProviderContainer(
+      overrides: [chatRepositoryProvider.overrideWithValue(repo)],
+    );
+    final subscription = container.listen(chatProvider, (_, _) {});
+    addTearDown(container.dispose);
+    addTearDown(subscription.close);
+
+    final notifier = container.read(chatProvider.notifier);
+    await notifier.load();
+    await notifier.submitInteraction({'action': 'submit', 'value': 'yes'});
+    await _flushAsyncEvents();
+
+    final assistant = container
+        .read(chatProvider)
+        .messages
+        .lastWhere((message) => message.role == 'assistant');
+    expect(assistant.isStreaming, isFalse);
+    expect(assistant.runStatus, 'error');
+    expect(assistant.error?.code, 'interaction_submit_failed');
+    expect(assistant.error?.retryable, isTrue);
+  });
 }
 
 ChatMessage _message(
@@ -503,13 +531,20 @@ class _FakeChatRepository implements ChatRepository {
     return runId;
   }
 
+  /// Set to make the next `submitInteraction` throw, standing in for a dead
+  /// FFI bridge or a rejected run.
+  bool failInteraction = false;
+
   @override
   Future<String> submitInteraction({
     required String threadId,
     required String interactionJson,
     required List<ChatHistoryEntry> history,
     required String branchId,
-  }) async => 'interaction-run';
+  }) async {
+    if (failInteraction) throw StateError('bridge is gone');
+    return 'interaction-run';
+  }
 
   @override
   Stream<Map<String, dynamic>> watchLocalModelStatus() => const Stream.empty();
