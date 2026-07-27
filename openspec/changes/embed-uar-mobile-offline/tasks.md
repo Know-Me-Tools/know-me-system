@@ -56,7 +56,18 @@
     defect: identical prompt to multiturn-history, which passes. One run
     emitted a tool call instead of the marker; the re-run emitted none and
     passed. No assertion was loosened.
-  - REMAINING for 5.4: A2UI interaction and the default/orchestrator agent
-    checks have no offline gate yet.
+  - offline agents PASS: both UAR-seeded agents ("Default Assistant",
+    "Orchestrator") are listed in the mode picker with both radios down.
+    scripts/android/certify-offline-agents-and-a2ui.sh
+    docs/certification/2026-07-27/android-offline-agents-a2ui.json
+    Gate proven to FAIL on an empty registry: with the agent-context control
+    still rendered but no seeded agents, it exits 1. The control alone is
+    deliberately NOT accepted as proof — it renders either way.
+  - A2UI is asserted CONDITIONALLY and is currently UNVERIFIED: a 4B local
+    model is nondeterministic about emitting an artifact (same prompt gave 1
+    tool call on one run, 0 on the next). If a surface renders it must carry
+    its accessible name; if none is emitted that is reported as UNVERIFIED
+    rather than dressed up as a pass. Settling it needs a deterministic A2UI
+    fixture, not a louder prompt.
 - [ ] 5.5 Certify iOS device or simulator with networking disabled against the same functional suite
 - [ ] 5.6 Record logs, screenshots, performance, KBD reflection, Prometheus wiki entries, and Karpathy success/failure learning records

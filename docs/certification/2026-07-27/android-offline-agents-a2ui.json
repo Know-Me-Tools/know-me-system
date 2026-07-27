@@ -1,0 +1,29 @@
+{
+  "a2ui": {
+    "accessibleName": "Interactive agent interface",
+    "stillLoading": false,
+    "surfaceRendered": false,
+    "verdict": "UNVERIFIED \u2014 the model did not emit an A2UI artifact this run",
+    "whyConditional": "A 4B local model is nondeterministic about emitting an A2UI artifact \u2014 measured in this suite, the same prompt produced 1 tool call on one run and 0 on the next. Demanding one would make this gate flaky, and a flaky gate teaches people to ignore failures."
+  },
+  "device": {
+    "android": "16",
+    "model": "SM-S936U"
+  },
+  "offline": {
+    "enforced": true,
+    "method": "svc wifi disable + svc data disable, then a reachability probe",
+    "why": "svc wifi disable ALONE does not take this device offline: measured with wifi_on=0, ping 8.8.8.8 returned 0% packet loss over mobile data, so a flag-only gate would certify nothing."
+  },
+  "seededAgents": {
+    "agentContextControlVisible": true,
+    "claim": "the built-in agents are present and selectable with NO network",
+    "notAcceptedAsProof": "the agent-context control alone \u2014 it renders whether or not any agent was seeded, so passing on it would certify nothing",
+    "orchestratorVisible": true,
+    "source": "universal-agent-runtime src/uar/defaults.rs seeds default-agent + orchestrator-agent",
+    "visible": [
+      "Default Assistant",
+      "Orchestrator"
+    ]
+  }
+}
