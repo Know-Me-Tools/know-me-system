@@ -177,6 +177,16 @@ pub async fn run_migrations(data_dir: String) -> Result<(), CoreError> {
     if std::env::var_os("HOME").is_none() {
         std::env::set_var("HOME", &data_dir);
     }
+    // Mobile boots independently of gen_ui_host, so the attachment root must be
+    // configured HERE too — otherwise every Android/iOS attachment fails with
+    // "storage root is not configured" while desktop works fine.
+    //
+    // It must be the app data dir, never the cache dir: `file_picker` returns a
+    // purgeable cache path (it ships clearTemporaryFiles() for exactly that),
+    // so rendering from the picked path passes testing and breaks weeks later.
+    gen_ui_agent::attachment_store::set_root(
+        std::path::PathBuf::from(&data_dir).join("attachments"),
+    );
     crate::api::entity::init_store(
         std::path::PathBuf::from(&data_dir).join("entity-records.sqlite3"),
     )

@@ -238,6 +238,13 @@ async fn bootstrap_inner(
     std::fs::create_dir_all(&config.data_dir)
         .map_err(|error| HostError::Initialization(error.to_string()))?;
 
+    // Attachments live under the app's own data dir, never the OS cache: a
+    // picked file's path is purgeable (Android clears it out from under us),
+    // so a transcript that points at it renders now and breaks later.
+    // Configured before any store opens, because the first chat_send after
+    // bootstrap can already need it.
+    gen_ui_agent::attachment_store::set_root(config.data_dir.join("attachments"));
+
     let config_store = gen_ui_db::relational::PgliteStore::open(config.data_dir.join("config-db"))
         .await
         .map_err(|error| HostError::Initialization(error.to_string()))?;

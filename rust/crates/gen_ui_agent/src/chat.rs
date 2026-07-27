@@ -260,7 +260,7 @@ pub async fn send_with_attachments(
         local_prompt.push_str("\n\nAttached files (processed by xberg):\n");
         let mut images = Vec::new();
         for path in attachment_paths.into_iter().take(6) {
-            let attachment = read_attachment(&path).await?;
+            let attachment = read_attachment(&path, &conversation_id).await?;
             let processed = gen_ui_document::process_bytes(
                 attachment.file_name.clone(),
                 attachment.bytes.clone(),
@@ -313,7 +313,7 @@ pub async fn send_with_attachments(
     local_fallback.push_str("\n\nAttached files (xberg extraction):\n");
     let mut parts = vec![ContentPart::Text { text: user_message }];
     for path in attachment_paths.into_iter().take(6) {
-        let attachment = read_attachment(&path).await?;
+        let attachment = read_attachment(&path, &conversation_id).await?;
         local_fallback.push_str(&format!(
             "\n- {} ({} bytes)\n",
             attachment.file_name,
@@ -387,13 +387,22 @@ struct AttachmentData {
     mime: String,
     is_image: bool,
     is_document: bool,
+    is_video: bool,
     bytes: Vec<u8>,
+    /// Path inside app-owned storage — NOT the path the picker returned.
+    ///
+    /// The picked path is not safe to keep: on Android `file_picker` hands back
+    /// a purgeable cache path, so a transcript pointing at it renders during
+    /// testing and breaks after the cache is cleared. Blocks carry this path.
+    stored_path: std::path::PathBuf,
 }
 
-async fn read_attachment(path: &str) -> Result<AttachmentData, AgentError> {
+async fn read_attachment(path: &str, conversation_id: &str) -> Result<AttachmentData, AgentError> {
     let metadata = tokio::fs::metadata(path)
         .await
         .map_err(|error| AgentError::Attachment(format!("cannot open selected file: {error}")))?;
+    // Checked BEFORE reading or copying: an over-cap file must never be pulled
+    // into memory or written into app storage first and rejected after.
     if !metadata.is_file() || metadata.len() > gen_ui_document::MAX_INPUT_BYTES {
         return Err(AgentError::Attachment(
             "selected file is not a regular file or exceeds 25 MB".into(),
@@ -413,53 +422,65 @@ async fn read_attachment(path: &str) -> Result<AttachmentData, AgentError> {
     let bytes = tokio::fs::read(path)
         .await
         .map_err(|error| AgentError::Attachment(format!("cannot read selected file: {error}")))?;
-    let (mime, is_image, is_document) = attachment_kind(&extension);
+    let (mime, is_image, is_document, is_video) = attachment_kind(&extension);
+    let stored_path = crate::attachment_store::store(conversation_id, &extension, &bytes).await?;
     Ok(AttachmentData {
         file_name,
         extension,
         mime: mime.to_owned(),
         is_image,
         is_document,
+        is_video,
         bytes,
+        stored_path,
     })
 }
 
-fn attachment_kind(extension: &str) -> (&'static str, bool, bool) {
+/// `(mime, is_image, is_document, is_video)`.
+///
+/// Video is its own flag rather than something each renderer re-derives by
+/// string-matching the mime: three surfaces guessing at `mime.startsWith("video/")`
+/// is how the kind hardcodes got out of step in the first place.
+fn attachment_kind(extension: &str) -> (&'static str, bool, bool, bool) {
     match extension {
-        "png" => ("image/png", true, false),
-        "jpg" | "jpeg" => ("image/jpeg", true, false),
-        "gif" => ("image/gif", true, false),
-        "webp" => ("image/webp", true, false),
-        "svg" => ("image/svg+xml", true, false),
-        "pdf" => ("application/pdf", false, true),
-        "txt" => ("text/plain", false, true),
-        "md" => ("text/markdown", false, true),
-        "json" => ("application/json", false, true),
-        "csv" => ("text/csv", false, true),
-        "doc" => ("application/msword", false, true),
+        "png" => ("image/png", true, false, false),
+        "jpg" | "jpeg" => ("image/jpeg", true, false, false),
+        "gif" => ("image/gif", true, false, false),
+        "webp" => ("image/webp", true, false, false),
+        "svg" => ("image/svg+xml", true, false, false),
+        "pdf" => ("application/pdf", false, true, false),
+        "txt" => ("text/plain", false, true, false),
+        "md" => ("text/markdown", false, true, false),
+        "json" => ("application/json", false, true, false),
+        "csv" => ("text/csv", false, true, false),
+        "doc" => ("application/msword", false, true, false),
         "docx" => (
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             false,
             true,
+            false,
         ),
-        "xls" => ("application/vnd.ms-excel", false, true),
+        "xls" => ("application/vnd.ms-excel", false, true, false),
         "xlsx" => (
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             false,
             true,
+            false,
         ),
-        "ppt" => ("application/vnd.ms-powerpoint", false, true),
+        "ppt" => ("application/vnd.ms-powerpoint", false, true, false),
         "pptx" => (
             "application/vnd.openxmlformats-officedocument.presentationml.presentation",
             false,
             true,
+            false,
         ),
-        "html" | "htm" => ("text/html", false, true),
-        "xml" => ("application/xml", false, true),
-        "zip" => ("application/zip", false, true),
-        "mp4" => ("video/mp4", false, false),
-        "webm" => ("video/webm", false, false),
-        _ => ("application/octet-stream", false, false),
+        "html" | "htm" => ("text/html", false, true, false),
+        "xml" => ("application/xml", false, true, false),
+        "zip" => ("application/zip", false, true, false),
+        "mp4" => ("video/mp4", false, false, true),
+        "webm" => ("video/webm", false, false, true),
+        "mov" => ("video/quicktime", false, false, true),
+        _ => ("application/octet-stream", false, false, false),
     }
 }
 
@@ -3147,9 +3168,25 @@ mod attachment_tests {
 
     #[test]
     fn attachment_types_route_images_documents_and_video_safely() {
-        assert_eq!(attachment_kind("png"), ("image/png", true, false));
-        assert_eq!(attachment_kind("pdf"), ("application/pdf", false, true));
-        assert_eq!(attachment_kind("mp4"), ("video/mp4", false, false));
+        // (mime, is_image, is_document, is_video)
+        assert_eq!(attachment_kind("png"), ("image/png", true, false, false));
+        assert_eq!(
+            attachment_kind("pdf"),
+            ("application/pdf", false, true, false)
+        );
+        // Video previously reported false for every flag, so a renderer had to
+        // re-derive "is this video?" by string-matching the mime. It now says so.
+        assert_eq!(attachment_kind("mp4"), ("video/mp4", false, false, true));
+        assert_eq!(attachment_kind("webm"), ("video/webm", false, false, true));
+        assert_eq!(
+            attachment_kind("mov"),
+            ("video/quicktime", false, false, true)
+        );
+        // An unknown extension must claim nothing rather than guess.
+        assert_eq!(
+            attachment_kind("xyzzy"),
+            ("application/octet-stream", false, false, false)
+        );
     }
 
     #[test]
