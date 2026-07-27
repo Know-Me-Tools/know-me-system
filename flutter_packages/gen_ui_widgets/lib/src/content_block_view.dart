@@ -12,9 +12,11 @@ import 'package:video_player/video_player.dart';
 
 import 'a2ui_surface_view.dart';
 import 'content_block.dart';
+import 'local_media/local_image.dart';
 
-typedef AgentInteractionCallback =
-    FutureOr<void> Function(Map<String, Object?> interaction);
+typedef AgentInteractionCallback = FutureOr<void> Function(
+  Map<String, Object?> interaction,
+);
 
 enum RemoteContentKind { image, video, audio, opengraph }
 
@@ -53,8 +55,10 @@ class ResolvedRemoteContent {
   final String? imageUrl;
 }
 
-typedef RemoteContentResolver =
-    Future<ResolvedRemoteContent> Function(String url, RemoteContentKind kind);
+typedef RemoteContentResolver = Future<ResolvedRemoteContent> Function(
+  String url,
+  RemoteContentKind kind,
+);
 
 /// Exhaustive dispatcher for KnowMe's 11-variant A2UI projection.
 ///
@@ -117,12 +121,23 @@ class ContentBlockView extends StatelessWidget {
         onInteraction: onInteraction,
         remoteResolver: remoteResolver,
       ),
-    ImageBlock(:final url, :final dataBase64, :final mime) => ContentBlockImage(
-      url: url,
-      dataBase64: dataBase64,
-      mime: mime,
-      remoteResolver: remoteResolver,
-    ),
+    ImageBlock(
+      :final url,
+      :final dataBase64,
+      :final mime,
+      :final path,
+      :final alt,
+    ) =>
+      ContentBlockImage(
+        url: url,
+        dataBase64: dataBase64,
+        mime: mime,
+        path: path,
+        // Falls back to the default rather than passing null: every image
+        // needs an accessible name, and older blocks carry no alt.
+        alt: alt ?? 'Generated image',
+        remoteResolver: remoteResolver,
+      ),
     DividerBlock() => const ContentBlockDivider(),
   };
 }
@@ -874,6 +889,7 @@ class ContentBlockImage extends StatefulWidget {
     required this.url,
     required this.dataBase64,
     required this.mime,
+    this.path,
     this.alt = 'Generated image',
     this.remoteResolver,
     super.key,
@@ -882,6 +898,13 @@ class ContentBlockImage extends StatefulWidget {
   final String? url;
   final String? dataBase64;
   final String mime;
+
+  /// A file in app-owned storage, for user attachments.
+  ///
+  /// Never a path a picker returned: on Android those live in the purgeable
+  /// cache, so a transcript holding one renders during testing and shows a
+  /// broken image weeks later.
+  final String? path;
   final String alt;
   final RemoteContentResolver? remoteResolver;
 
@@ -931,6 +954,20 @@ class _ContentBlockImageState extends State<ContentBlockImage> {
         semanticLabel: widget.alt,
         errorBuilder: (_, __, ___) => const _MediaError(label: 'Image'),
       );
+    } else if (localImage(
+          widget.path ?? '',
+          semanticLabel: widget.alt,
+          onError: () => const _MediaError(label: 'Image'),
+        )
+        case final Widget local) {
+      // A user attachment stored on disk. Checked before the remote branch so
+      // a local file renders immediately instead of showing a spinner that
+      // waits on a resolver it will never need.
+      //
+      // `localImage` returns null on the web, where a filesystem path cannot
+      // be loaded at all — that falls through to the unavailable state below
+      // rather than pretending to load.
+      image = local;
     } else if (widget.url != null && widget.remoteResolver != null) {
       image = const SizedBox(
         height: 120,

@@ -13,7 +13,9 @@ import '../../../../bridge/a2ui/a2ui_event.dart';
 import '../../../../core/theme/tokens.dart';
 import '../../../../shared/widgets/knowme_screen.dart';
 import '../../../../shared/widgets/sync_chip.dart';
+import '../../domain/chat_repository.dart';
 import '../../domain/entities/chat_message.dart';
+import '../providers/chat_repository_provider.dart';
 import '../providers/chat_notifier.dart';
 import '../widgets/chat_policy_toolbar.dart';
 
@@ -34,7 +36,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _controller = TextEditingController();
   final _composerFocus = FocusNode();
   final _scrollController = ScrollController();
-  final _attachments = <PlatformFile>[];
+
+  /// Files already copied into app-owned storage by Rust.
+  ///
+  /// Deliberately NOT `PlatformFile`: the picker's path is purgeable, so
+  /// holding one until send time is the bug this whole flow exists to avoid.
+  final _attachments = <StagedAttachment>[];
   bool _isSending = false;
   bool _isNearBottom = true;
   String? _attachmentError;
@@ -360,19 +367,37 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (_modelOperationBusy(ref.read(chatProvider).modelOperation)) return;
     final text = _controller.text.trim();
     if (text.isEmpty && _attachments.isEmpty) return;
+    // Images become real image blocks; everything else stays an artifact. The
+    // kind used to be hardcoded 'attachment' for every file regardless of mime,
+    // which is why a picked PNG rendered as a grey document chip. Rust decided
+    // all of this at pick time, so both surfaces agree.
     final attachmentBlocks = [
-      for (final file in _attachments)
-        ArtifactBlock(
-          file.identifier ?? file.name,
-          'attachment',
-          jsonEncode({
-            'name': file.name,
-            'size': _formatBytes(file.size),
-            'mime': _mimeFor(file.extension),
-          }),
-        ),
+      for (final staged in _attachments)
+        if (staged.isImage)
+          ImageBlock(
+            null,
+            null,
+            staged.mime,
+            path: staged.path,
+            // The file name is the only description available at attach time,
+            // and an image with no accessible name fails the a11y gate.
+            alt: staged.fileName,
+            width: staged.width,
+            height: staged.height,
+          )
+        else
+          ArtifactBlock(
+            staged.path,
+            staged.isVideo ? 'video' : 'attachment',
+            jsonEncode({
+              'name': staged.fileName,
+              'size': _formatBytes(staged.sizeBytes),
+              'mime': staged.mime,
+              'path': staged.path,
+            }),
+          ),
     ];
-    final attachmentPaths = [for (final file in _attachments) ?file.path];
+    final attachmentPaths = [for (final staged in _attachments) staged.path];
     final isSteer = _pendingSteer;
     _controller.clear();
     setState(() {
@@ -422,23 +447,37 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
     if (!mounted || file == null) return;
     const maxBytes = 25 * 1024 * 1024;
-    final selectedFiles = [file];
-    final tooLarge = selectedFiles
-        .where((file) => file.size > maxBytes)
-        .toList();
-    final unavailable = selectedFiles
-        .where((file) => file.path == null)
-        .toList();
+    final sourcePath = file.path;
+    final tooLarge = file.size > maxBytes;
+    final unavailable = sourcePath == null;
+
+    // Copy into app-owned storage NOW, not at send time. `file_picker` returns
+    // a path in the app CACHE on Android — the package ships
+    // clearTemporaryFiles() for exactly this — so a transcript that kept the
+    // picked path would render during testing and break once the cache is
+    // cleared. Rust also classifies the file here, so Flutter never has to
+    // guess the mime or the block kind for itself.
+    StagedAttachment? staged;
+    var stageFailed = false;
+    if (!tooLarge && !unavailable && _attachments.length < 6) {
+      try {
+        staged = await ref
+            .read(chatRepositoryProvider)
+            .stageAttachment(
+              conversationId: ref.read(chatProvider).threadId,
+              sourcePath: sourcePath,
+            );
+      } on Object {
+        // Surfaced rather than swallowed: a file the app cannot store is a file
+        // the model will never see, and silently dropping it would leave the
+        // user believing it was attached.
+        stageFailed = true;
+      }
+    }
+    if (!mounted) return;
     setState(() {
-      _attachments.addAll(
-        selectedFiles
-            .where((file) => file.size <= maxBytes && file.path != null)
-            .take(6 - _attachments.length),
-      );
-      _attachmentError = switch ((
-        tooLarge.isNotEmpty,
-        unavailable.isNotEmpty,
-      )) {
+      if (staged != null) _attachments.add(staged);
+      _attachmentError = switch ((tooLarge, unavailable || stageFailed)) {
         (true, true) => 'Some files were too large or unavailable to the app.',
         (true, false) => 'Files larger than 25 MB were not attached.',
         (false, true) => 'Some files were unavailable to the app.',
@@ -1187,8 +1226,8 @@ class _StoppedAction extends StatelessWidget {
 class _AttachmentStrip extends StatelessWidget {
   const _AttachmentStrip({required this.files, required this.onRemove});
 
-  final List<PlatformFile> files;
-  final ValueChanged<PlatformFile> onRemove;
+  final List<StagedAttachment> files;
+  final ValueChanged<StagedAttachment> onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -1201,7 +1240,8 @@ class _AttachmentStrip extends StatelessWidget {
             Padding(
               padding: const EdgeInsetsDirectional.only(end: 8),
               child: Semantics(
-                label: '${file.name}, ${_formatBytes(file.size)} attachment',
+                label:
+                    '${file.fileName}, ${_formatBytes(file.sizeBytes)} attachment',
                 child: Container(
                   constraints: const BoxConstraints(maxWidth: 220),
                   padding: const EdgeInsetsDirectional.fromSTEB(10, 6, 4, 6),
@@ -1212,15 +1252,45 @@ class _AttachmentStrip extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        Icons.description_outlined,
-                        size: 18,
-                        color: colors.primary,
-                      ),
+                      // A thumbnail for images, so the composer shows WHICH
+                      // picture is attached rather than a generic document
+                      // glyph. Decorative: the chip's Semantics label already
+                      // names the file, so an image here would repeat it.
+                      if (file.isImage)
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: SizedBox(
+                            width: 24,
+                            height: 24,
+                            child:
+                                localImage(
+                                  file.path,
+                                  semanticLabel: '',
+                                  onError: () => Icon(
+                                    Icons.broken_image_outlined,
+                                    size: 18,
+                                    color: colors.primary,
+                                  ),
+                                ) ??
+                                Icon(
+                                  Icons.image_outlined,
+                                  size: 18,
+                                  color: colors.primary,
+                                ),
+                          ),
+                        )
+                      else
+                        Icon(
+                          file.isVideo
+                              ? Icons.movie_outlined
+                              : Icons.description_outlined,
+                          size: 18,
+                          color: colors.primary,
+                        ),
                       const SizedBox(width: 8),
                       Flexible(
                         child: Text(
-                          file.name,
+                          file.fileName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -1230,7 +1300,7 @@ class _AttachmentStrip extends StatelessWidget {
                         ),
                       ),
                       IconButton(
-                        tooltip: 'Remove ${file.name}',
+                        tooltip: 'Remove ${file.fileName}',
                         constraints: const BoxConstraints(
                           minWidth: 48,
                           minHeight: 48,
@@ -1261,19 +1331,8 @@ String _formatBytes(int bytes) {
   return '$bytes B';
 }
 
-String _mimeFor(String? extension) => switch (extension?.toLowerCase()) {
-  'png' => 'image/png',
-  'jpg' || 'jpeg' => 'image/jpeg',
-  'gif' => 'image/gif',
-  'webp' => 'image/webp',
-  'svg' => 'image/svg+xml',
-  'pdf' => 'application/pdf',
-  'md' => 'text/markdown',
-  'txt' => 'text/plain',
-  'mp4' => 'video/mp4',
-  'webm' => 'video/webm',
-  _ => 'application/octet-stream',
-};
+// `_mimeFor` lived here and is gone: Rust decides the mime when it stages the
+// file, and a second copy in Dart is how the two surfaces drifted apart.
 
 class _ConversationSheet extends ConsumerStatefulWidget {
   const _ConversationSheet({required this.close});
@@ -1419,7 +1478,9 @@ class _ConversationSheetState extends ConsumerState<_ConversationSheet> {
                   child: shad.TextField(
                     controller: _searchController,
                     placeholder: const Text('Search threads'),
-                    features: const [shad.InputFeature.leading(Icon(Icons.search))],
+                    features: const [
+                      shad.InputFeature.leading(Icon(Icons.search)),
+                    ],
                     onChanged: (value) => setState(() => _query = value),
                   ),
                 ),
@@ -1464,7 +1525,10 @@ class _ConversationSheetState extends ConsumerState<_ConversationSheet> {
                                   label: 'Rename ${conversation.title}',
                                   excludeSemantics: true,
                                   child: shad.GhostButton(
-                                    onPressed: () => _rename(conversation.id, conversation.title),
+                                    onPressed: () => _rename(
+                                      conversation.id,
+                                      conversation.title,
+                                    ),
                                     density: shad.ButtonDensity.icon,
                                     child: const Icon(Icons.edit_outlined),
                                   ),

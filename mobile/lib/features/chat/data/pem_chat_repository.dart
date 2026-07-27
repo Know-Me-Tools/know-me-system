@@ -21,6 +21,15 @@ class PemChatRepository implements ChatRepository {
   static const _messageType = 'chat_message';
 
   @override
+  Future<StagedAttachment> stageAttachment({
+    required String conversationId,
+    required String sourcePath,
+  }) async {
+    final json = await bridge.stageAttachment(conversationId, sourcePath);
+    return StagedAttachment.fromJson(jsonDecode(json) as Map<String, dynamic>);
+  }
+
+  @override
   Future<String> startTurn({
     required String threadId,
     required String message,

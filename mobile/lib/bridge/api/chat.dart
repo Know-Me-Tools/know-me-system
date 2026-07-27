@@ -37,6 +37,29 @@ Future<String> chatSend({
   userMessageId: userMessageId,
 );
 
+/// Copy a picked file into durable app storage and describe it as JSON.
+///
+/// Call this at PICK time, before the turn is sent. The path a picker returns
+/// is not safe to keep: on Android it lives in the app cache, which the OS or
+/// the user can clear, so a transcript holding it renders during testing and
+/// shows broken media later.
+///
+/// The JSON is a `StoredAttachment`: durable path, mime, size, image/video/
+/// document classification, and intrinsic pixel dimensions for images. Flutter
+/// renders from this instead of deciding the kind from the file extension
+/// itself — that duplicated decision is why a picked PNG became a grey
+/// document chip.
+///
+/// Returns a JSON string rather than a generated struct to match the existing
+/// FFI convention (`lane_availability`, `chat_control_catalog`).
+Future<String> stageAttachment({
+  required String conversationId,
+  required String sourcePath,
+}) => GenUiCore.instance.api.crateApiChatStageAttachment(
+  conversationId: conversationId,
+  sourcePath: sourcePath,
+);
+
 /// Submit a typed A2UI/AG-UI user interaction and start the agent's response.
 /// The JSON envelope is preserved verbatim so Rust remains the sole transport
 /// boundary and the agent can correlate surface, component, and context IDs.

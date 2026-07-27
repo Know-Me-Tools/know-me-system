@@ -86,6 +86,48 @@ class DemoChatRepository implements ChatRepository {
   }
 
   @override
+  Future<StagedAttachment> stageAttachment({
+    required String conversationId,
+    required String sourcePath,
+  }) async {
+    // The demo repository has no Rust behind it, so nothing is copied. It
+    // reports the source path back and classifies from the extension — enough
+    // for the demo transcript to render, and honest that no storage happened.
+    final name = sourcePath.split('/').last;
+    final extension = name.contains('.')
+        ? name.split('.').last.toLowerCase()
+        : '';
+    const imageExtensions = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'};
+    const videoExtensions = {'mp4', 'webm', 'mov'};
+    return StagedAttachment(
+      path: sourcePath,
+      fileName: name,
+      mime: _mimeForExtension(extension),
+      sizeBytes: 0,
+      isImage: imageExtensions.contains(extension),
+      isVideo: videoExtensions.contains(extension),
+      isDocument:
+          !imageExtensions.contains(extension) &&
+          !videoExtensions.contains(extension),
+    );
+  }
+
+  static String _mimeForExtension(String extension) => switch (extension) {
+    'png' => 'image/png',
+    'jpg' || 'jpeg' => 'image/jpeg',
+    'gif' => 'image/gif',
+    'webp' => 'image/webp',
+    'svg' => 'image/svg+xml',
+    'pdf' => 'application/pdf',
+    'md' => 'text/markdown',
+    'txt' => 'text/plain',
+    'mp4' => 'video/mp4',
+    'webm' => 'video/webm',
+    'mov' => 'video/quicktime',
+    _ => 'application/octet-stream',
+  };
+
+  @override
   Future<String> startTurn({
     required String threadId,
     required String message,

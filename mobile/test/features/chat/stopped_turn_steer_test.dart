@@ -22,21 +22,22 @@ import 'package:knowme_poc/features/chat/presentation/screens/chat_screen.dart';
 /// Adjacent TextBlocks are coalesced before rendering, so a run of plain text
 /// counts as one block — which is what the user sees and therefore what the bar
 /// should report. Dividers keep the blocks separate here.
-ChatMessage _stoppedTurn({int blocks = 2, String? statusMessage}) => ChatMessage(
-  id: 'assistant-1',
-  role: 'assistant',
-  content: [
-    for (var index = 0; index < blocks; index++) ...[
-      if (index > 0) const DividerBlock(),
-      TextBlock('partial answer $index'),
-    ],
-  ],
-  runId: 'run-1',
-  runStatus: 'cancelled',
-  // Matches what Rust durably writes for a cancelled run, which is also the
-  // widget's fallback — one state, one wording.
-  statusMessage: statusMessage ?? 'Cancelled by user',
-);
+ChatMessage _stoppedTurn({int blocks = 2, String? statusMessage}) =>
+    ChatMessage(
+      id: 'assistant-1',
+      role: 'assistant',
+      content: [
+        for (var index = 0; index < blocks; index++) ...[
+          if (index > 0) const DividerBlock(),
+          TextBlock('partial answer $index'),
+        ],
+      ],
+      runId: 'run-1',
+      runStatus: 'cancelled',
+      // Matches what Rust durably writes for a cancelled run, which is also the
+      // widget's fallback — one state, one wording.
+      statusMessage: statusMessage ?? 'Cancelled by user',
+    );
 
 Future<void> _pumpChat(WidgetTester tester, List<ChatMessage> messages) async {
   await tester.pumpWidget(
@@ -165,9 +166,7 @@ void main() {
         child: shad.ShadcnApp(
           theme: KnowMeTheme.dark,
           home: const shad.MediaQuery(
-            data: shad.MediaQueryData(
-              textScaler: shad.TextScaler.linear(2.0),
-            ),
+            data: shad.MediaQueryData(textScaler: shad.TextScaler.linear(2.0)),
             child: shad.DrawerOverlay(child: ChatScreen()),
           ),
         ),

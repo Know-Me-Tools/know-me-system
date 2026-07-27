@@ -45,6 +45,14 @@ Future<String> chatSend(
   userMessageId: userMessageId,
 );
 
+/// stage_attachment(conversation_id, source_path) -> StoredAttachment JSON.
+///
+/// Called at PICK time. The picker's own path is not durable — on Android it
+/// lives in the app cache, which the OS or the user can clear — so Rust copies
+/// the bytes into app-owned storage and returns the path that is safe to keep.
+Future<String> stageAttachment(String conversationId, String sourcePath) =>
+    ffi.stageAttachment(conversationId: conversationId, sourcePath: sourcePath);
+
 Future<String> chatAction(
   String threadId,
   String interactionJson,

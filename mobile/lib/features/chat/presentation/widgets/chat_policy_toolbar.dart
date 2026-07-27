@@ -76,17 +76,19 @@ class _ChatPolicyToolbarState extends ConsumerState<ChatPolicyToolbar> {
             .toList();
     // The catalog struct serializes camelCase (`knowledgeBases`); the policy
     // uses snake_case. Accept both so neither surface silently reads empty.
-    final knowledge = _objects(
-      state.catalog['knowledgeBases'] ?? state.catalog['knowledge_bases'],
-    )
-        .map(
-          (value) => _Option(
-            value['id']?.toString() ?? '',
-            value['name']?.toString() ?? value['id']?.toString() ?? '',
-          ),
-        )
-        .where((value) => value.id.isNotEmpty)
-        .toList();
+    final knowledge =
+        _objects(
+              state.catalog['knowledgeBases'] ??
+                  state.catalog['knowledge_bases'],
+            )
+            .map(
+              (value) => _Option(
+                value['id']?.toString() ?? '',
+                value['name']?.toString() ?? value['id']?.toString() ?? '',
+              ),
+            )
+            .where((value) => value.id.isNotEmpty)
+            .toList();
     return Semantics(
       label: 'Conversation agent and context controls',
       child: Material(
@@ -262,9 +264,7 @@ class _ChatPolicyToolbarState extends ConsumerState<ChatPolicyToolbar> {
                     'Agents run through the Universal Agent Runtime. '
                     'Local talks to the on-device model directly.',
                     style: shad.Theme.of(context).typography.small.copyWith(
-                      color: shad.Theme.of(
-                        context,
-                      ).colorScheme.mutedForeground,
+                      color: shad.Theme.of(context).colorScheme.mutedForeground,
                     ),
                   ),
                 ],
@@ -712,6 +712,7 @@ Map<String, dynamic> _map(Object? value) => value is Map<String, dynamic>
     : const {};
 List<Map<String, dynamic>> _objects(Object? value) =>
     value is List ? value.map(_map).toList() : const [];
+
 /// Read a `{ providerId, modelId }` route from a policy's `model` field.
 Map<String, String>? _conversationRoute(dynamic model) {
   if (model is Map) {

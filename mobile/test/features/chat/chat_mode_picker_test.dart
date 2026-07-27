@@ -99,9 +99,8 @@ void main() {
     await _pumpToolbar(
       tester,
       _FakeChatControl(
-        const ChatControlState(
-          catalog: _catalog,
-        ).copyWith(policy: _policy(chatMode: 'local', agentId: null)),
+        const ChatControlState(catalog: _catalog)
+            .copyWith(policy: _policy(chatMode: 'local', agentId: null)),
       ),
     );
 
