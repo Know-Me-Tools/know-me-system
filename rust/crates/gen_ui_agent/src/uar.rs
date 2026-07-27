@@ -921,11 +921,13 @@ impl UarEmbeddedRuntime {
             ))
         })?;
 
-        // `rocksdb://` is normalized to `surrealkv://` by the provider, and is
-        // the same scheme KnowMe already uses for its graph store — one endpoint
-        // convention across both instances rather than two spellings.
+        // `surrealkv://` names the engine UAR actually pins
+        // (surrealdb features = ["kv-surrealkv"]). KnowMe's graph store spells
+        // the same engine `rocksdb://`, which the provider silently rewrites to
+        // surrealkv:// — a legacy spelling that misleads readers into thinking
+        // RocksDB is involved. It is not; use the honest scheme here.
         // Embedded endpoints perform no authentication, so no credentials.
-        let endpoint = format!("rocksdb://{}", dir.display());
+        let endpoint = format!("surrealkv://{}", dir.display());
         let provider =
             universal_agent_runtime::uar::persistence::providers::surreal::SurrealDbProvider::new(
                 &endpoint, None, None, None, None,
@@ -2949,10 +2951,15 @@ mod tests {
             // `store` is dropped here — the process-death stand-in.
         }
 
-        // RocksDB holds an exclusive LOCK file and releasing it is NOT
-        // synchronous with dropping the Arc: SurrealDB tears the datastore down
-        // on a background task. A same-process reopen therefore races that
-        // teardown and fails with "already locked by another process".
+        // SurrealKV holds an exclusive lock on its directory and releasing it
+        // is NOT synchronous with dropping the Arc: SurrealDB tears the
+        // datastore down on a background task. A same-process reopen therefore
+        // races that teardown and fails with "already locked by another
+        // process".
+        //
+        // (An earlier comment here blamed RocksDB. Wrong engine — UAR pins
+        // surrealdb with kv-surrealkv only. The failure is real and was
+        // measured; only the attribution was mistaken.)
         //
         // This is a REAL operational constraint, not a test artifact. An app
         // that relaunches before the OS has reaped its previous process will
