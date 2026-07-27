@@ -25,7 +25,7 @@ use gen_ui_db_graph::{
 
 const DEV_PROVIDER_ID: &str = "dev-ollama";
 const DEV_API_KEY_REF: &str = "dev-ollama-noop";
-const KEYCHAIN_SERVICE: &str = "ai.prometheusags.knowme-poc";
+const KEYCHAIN_SERVICE: &str = "tools.knowme.knowme";
 
 #[derive(Debug)]
 struct DevOllamaConfigStore {

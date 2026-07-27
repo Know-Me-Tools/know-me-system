@@ -1,7 +1,7 @@
 {
   "productName": "knowme-poc",
   "version": "1.0.0",
-  "identifier": "ai.prometheusags.knowme-poc",
+  "identifier": "tools.knowme.knowme",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
