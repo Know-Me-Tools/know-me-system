@@ -285,6 +285,10 @@ async fn bootstrap_inner(
                     context_len: Some(8_192),
                 },
                 gen_ui_agent::uar::ios_qwen35_mlx_provider_config(MACOS_MLX_MODEL_ID),
+                // A sibling of memory-db, not a shared file: two SurrealDB
+                // instances keep their schemas independent, and consolidating
+                // later is easier than untangling one store two systems write.
+                Some(&config.data_dir.join("uar-db")),
             )
             .await
             .map_err(|error| HostError::Initialization(error.to_string()))?;

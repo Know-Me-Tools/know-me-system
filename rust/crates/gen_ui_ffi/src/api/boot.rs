@@ -310,6 +310,11 @@ pub async fn run_migrations(data_dir: String) -> Result<(), CoreError> {
                 context_len: Some(8_192),
             },
             crate::local_provider::android_litert_lm_uar_provider_config(),
+            // Mobile boots HERE and never touches gen_ui_host, so the storage
+            // path has to be threaded through both. Wiring only the host would
+            // leave Android and iOS discarding every agent on exit while
+            // desktop looked fixed.
+            Some(&std::path::PathBuf::from(&data_dir).join("uar-db")),
         )
         .await
         .map_err(|error| boot_fail("embedded UAR initialization", error))?,
@@ -323,6 +328,11 @@ pub async fn run_migrations(data_dir: String) -> Result<(), CoreError> {
                 context_len: Some(8_192),
             },
             crate::local_provider::ios_qwen35_mlx_uar_provider_config(),
+            // Mobile boots HERE and never touches gen_ui_host, so the storage
+            // path has to be threaded through both. Wiring only the host would
+            // leave Android and iOS discarding every agent on exit while
+            // desktop looked fixed.
+            Some(&std::path::PathBuf::from(&data_dir).join("uar-db")),
         )
         .await
         .map_err(|error| boot_fail("embedded UAR initialization", error))?,

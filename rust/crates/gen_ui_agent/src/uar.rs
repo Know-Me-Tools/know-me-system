@@ -855,13 +855,20 @@ impl std::fmt::Debug for UarEmbeddedRuntime {
 impl UarEmbeddedRuntime {
     /// Build a ready embedded runtime around the platform's local model.
     ///
-    /// The process-local persistence supplied here is intentionally isolated
-    /// behind UAR's `PersistenceLayer`; the next persistence milestone swaps
-    /// it for the mobile durable adapter without changing this facade or chat.
+    /// `storage_dir` is where the runtime's SurrealDB instance lives. Everything
+    /// the embedded runtime owns — agents, skills, policies, settings, memory,
+    /// knowledge, conversations, run state, A2UI — is written there and survives
+    /// process death. Passing `None` selects an in-memory store, which is
+    /// correct ONLY for tests: an agent the user configured would otherwise be
+    /// gone on next launch.
+    ///
+    /// SurrealDB rather than a plain key-value store because the runtime needs
+    /// graph and vector queries over that state, not just persistence.
     pub async fn build_local(
         provider: Arc<dyn InferenceProvider>,
         model_spec: LocalModelSpec,
         provider_config: UarProviderConfig,
+        storage_dir: Option<&std::path::Path>,
     ) -> Result<Self, AgentError> {
         // Wrap the on-device bridge in the routing driver so a single embedded
         // run can execute against the local model OR a configured cloud provider,
@@ -875,11 +882,7 @@ impl UarEmbeddedRuntime {
             Arc::new(ConfigActiveSelector),
         ));
         let driver: Arc<dyn LlmDriver> = routing.clone();
-        let persistence: Arc<dyn universal_agent_runtime::uar::persistence::PersistenceLayer> =
-            Arc::new(
-                universal_agent_runtime::uar::persistence::providers::memory::InMemoryProvider::new(
-                ),
-            );
+        let persistence = Self::open_persistence(storage_dir).await?;
         let runtime = universal_agent_runtime_sdk::Runtime::builder()
             .local_provider(driver, provider_config)
             .persistence(persistence)
@@ -888,6 +891,54 @@ impl UarEmbeddedRuntime {
             .await
             .map_err(|error| AgentError::Config(format!("embedded UAR: {error}")))?;
         Ok(Self { runtime, routing })
+    }
+
+    /// Open the runtime's persistence layer.
+    ///
+    /// A durable SurrealDB store when `storage_dir` is supplied; an in-memory
+    /// store only when it is not.
+    ///
+    /// There is deliberately NO fallback from a failed durable open to memory.
+    /// Falling back would leave the app running and apparently healthy while
+    /// silently discarding every agent, policy and conversation on exit — the
+    /// exact defect this change removes, but harder to notice because nothing
+    /// looks broken. A store that cannot be opened is a boot failure.
+    async fn open_persistence(
+        storage_dir: Option<&std::path::Path>,
+    ) -> Result<Arc<dyn universal_agent_runtime::uar::persistence::PersistenceLayer>, AgentError>
+    {
+        let Some(dir) = storage_dir else {
+            return Ok(Arc::new(
+                universal_agent_runtime::uar::persistence::providers::memory::InMemoryProvider::new(
+                ),
+            ));
+        };
+
+        tokio::fs::create_dir_all(dir).await.map_err(|error| {
+            AgentError::Config(format!(
+                "embedded UAR: cannot create persistence directory {}: {error}",
+                dir.display()
+            ))
+        })?;
+
+        // `rocksdb://` is normalized to `surrealkv://` by the provider, and is
+        // the same scheme KnowMe already uses for its graph store — one endpoint
+        // convention across both instances rather than two spellings.
+        // Embedded endpoints perform no authentication, so no credentials.
+        let endpoint = format!("rocksdb://{}", dir.display());
+        let provider =
+            universal_agent_runtime::uar::persistence::providers::surreal::SurrealDbProvider::new(
+                &endpoint, None, None, None, None,
+            )
+            .await
+            .map_err(|error| {
+                AgentError::Config(format!(
+                    "embedded UAR: cannot open persistent store at {}: {error}",
+                    dir.display()
+                ))
+            })?;
+        tracing::info!(path = %dir.display(), "embedded UAR persistence opened (SurrealDB)");
+        Ok(Arc::new(provider))
     }
 
     /// Register (or replace) a cloud provider in the embedded runtime's provider
@@ -2043,6 +2094,9 @@ mod tests {
                 context_len: Some(8_192),
             },
             android_litert_lm_provider_config("gemma-4-e2b-it-litertlm"),
+            // In-memory on purpose: this asserts the runtime builds without a
+            // transport, not that it persists. Durability has its own test.
+            None,
         )
         .await
         .expect("embedded UAR builds without a transport");
@@ -2868,6 +2922,92 @@ mod tests {
         assert!(
             !Arc::ptr_eq(&a, &d),
             "cache cleared ⇒ fresh driver after invalidate"
+        );
+    }
+
+    /// D4 — the durability proof, and the whole point of this change.
+    ///
+    /// Writes state through one persistence layer, DROPS it entirely, opens a
+    /// fresh one against the same directory, and reads the state back. If this
+    /// fails, agents and conversations do not survive process death and the
+    /// swap achieved nothing.
+    #[tokio::test]
+    async fn embedded_runtime_state_survives_a_dropped_store() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let dir = temp.path().join("uar-db");
+        let session_id = "durability-probe";
+        let prompt = "state written before the store was dropped";
+
+        {
+            let store = UarEmbeddedRuntime::open_persistence(Some(&dir))
+                .await
+                .expect("durable store opens");
+            let session =
+                universal_agent_runtime::session::SessionStore::new().create_with_id(session_id);
+            session.set_system_prompt(prompt.to_string());
+            store.save_session(&session).await.expect("save");
+            // `store` is dropped here — the process-death stand-in.
+        }
+
+        // RocksDB holds an exclusive LOCK file and releasing it is NOT
+        // synchronous with dropping the Arc: SurrealDB tears the datastore down
+        // on a background task. A same-process reopen therefore races that
+        // teardown and fails with "already locked by another process".
+        //
+        // This is a REAL operational constraint, not a test artifact. An app
+        // that relaunches before the OS has reaped its previous process will
+        // hit exactly this. Retrying with a short backoff is what a caller must
+        // do; encoding it here keeps the behaviour visible rather than hiding
+        // it behind a sleep.
+        let mut reopened = None;
+        for _ in 0..40 {
+            match UarEmbeddedRuntime::open_persistence(Some(&dir)).await {
+                Ok(store) => {
+                    reopened = Some(store);
+                    break;
+                }
+                Err(_) => tokio::time::sleep(std::time::Duration::from_millis(50)).await,
+            }
+        }
+        let reopened = reopened.expect(
+            "durable store reopens against the same directory within 2s of the previous \
+             handle being dropped",
+        );
+        let loaded = reopened
+            .load_session(session_id)
+            .await
+            .expect("load succeeds")
+            .expect("the session survived the drop");
+
+        assert_eq!(
+            loaded.system_prompt().as_deref(),
+            Some(prompt),
+            "state must round-trip through a dropped store, or nothing was persisted"
+        );
+    }
+
+    /// The in-memory path is still available, and is explicitly NOT durable —
+    /// which is why production must never select it.
+    #[tokio::test]
+    async fn no_storage_dir_yields_a_non_durable_store() {
+        let store = UarEmbeddedRuntime::open_persistence(None)
+            .await
+            .expect("in-memory store opens");
+        let session =
+            universal_agent_runtime::session::SessionStore::new().create_with_id("ephemeral");
+        store.save_session(&session).await.expect("save");
+        drop(store);
+
+        let fresh = UarEmbeddedRuntime::open_persistence(None)
+            .await
+            .expect("second in-memory store opens");
+        assert!(
+            fresh
+                .load_session("ephemeral")
+                .await
+                .expect("load")
+                .is_none(),
+            "in-memory state must NOT survive — if it did, this test proves nothing"
         );
     }
 }
