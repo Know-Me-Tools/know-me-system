@@ -7,12 +7,15 @@
     "migrationsReady": "unobserved"
   },
   "bundleAgeMinutes": 2,
+  "closes": "chat-media-rendering \u2014 the last unchecked task (save/share on hardware)",
   "consoleBytesCaptured": 0,
   "device": "iPhone 17 Pro Max (iPhone18,2), iOS 27.0",
   "operatorDriven": {
-    "note": "null until the operator reports it. iOS exposes no scriptable UI dump outside an XCUITest target, so these CANNOT be asserted here \u2014 recorded as unknown rather than assumed.",
-    "saveTapped": null,
-    "shareSheetOpened": null
+    "note": "Operator-observed, not script-asserted: iOS exposes no scriptable UI dump outside an XCUITest target. Recorded as a human observation rather than dressed up as an automated assertion.",
+    "observedBy": "operator, 2026-07-27, on the physical iPhone 17 Pro Max",
+    "reported": "save worked, share sheet opened with the image",
+    "saveTapped": true,
+    "shareSheetOpened": true
   },
   "surface": "iOS"
 }
