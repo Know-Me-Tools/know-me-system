@@ -314,12 +314,30 @@ class PemChatRepository implements ChatRepository {
       'kind': kind,
       'content': content,
     },
-    ImageBlock(:final url, :final dataBase64, :final mime) => {
-      'type': 'image',
-      'url': url,
-      'dataBase64': dataBase64,
-      'mime': mime,
-    },
+    // path/alt/width/height MUST be persisted. Dropping them made an attached
+    // image render correctly in-session and come back as "Image unavailable"
+    // after a restart: the durable path was written to disk, then thrown away
+    // on save, so the rehydrated block had no carrier at all. Caught on device
+    // — the transcript survived a cache purge, but the image did not.
+    ImageBlock(
+      :final url,
+      :final dataBase64,
+      :final mime,
+      :final path,
+      :final alt,
+      :final width,
+      :final height,
+    ) =>
+      {
+        'type': 'image',
+        'url': url,
+        'dataBase64': dataBase64,
+        'mime': mime,
+        'path': path,
+        'alt': alt,
+        'width': width,
+        'height': height,
+      },
     DividerBlock() => {'type': 'divider'},
   };
 }
