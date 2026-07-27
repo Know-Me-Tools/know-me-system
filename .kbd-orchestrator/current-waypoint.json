@@ -2,11 +2,11 @@
   "phase": "embedded-uar-offline-agents",
   "previousPhase": "on-device-qwen35",
   "change": "embed-uar-mobile-offline",
-  "status": "assessed",
-  "currentTask": "Plan embed-uar-mobile-offline. The ONE verified gap is task 3.1: uar.rs:880 builds the embedded runtime with InMemoryProvider, so all embedded-runtime state is lost on process death.",
+  "status": "implementation_ready",
+  "currentTask": "D1 \u2014 enable surreal-backend on the UAR dependency and verify cross-compilation for host + both mobile triples",
   "nextPendingChange": "embed-uar-mobile-offline",
   "sourceTool": "claude-code",
-  "exactNextCommand": "/kbd-plan embedded-uar-offline-agents",
+  "exactNextCommand": "/kbd-apply embedded-uar-offline-agents",
   "parentPhase": "model-runtime-per-device",
   "childPhases": [
     "embedded-uar-offline-agents"
@@ -33,11 +33,8 @@
     "evidence": "docs/certification/2026-07-27/ \u2014 Android, iOS and desktop reports",
     "note": "The counters BELOW describe the NEXT change (embed-uar-mobile-offline task 3.1) per main's retarget, not this closed phase. Recorded separately so a 0/1 reading is not mistaken for the phase reopening."
   },
-  "stage": "assess_complete",
-  "blockedOn": [
-    "Where does the mobile SurrealDB file live \u2014 KnowMe's existing instance or a second store?",
-    "What happens to in-memory state on upgrade? No RAM->disk migration exists.",
-    "Is desktop in scope for the same swap? It shares the embedded runtime path."
-  ],
-  "assessNote": "2026-07-27 assess found the 2026-07-20 assessment largely obsolete: four headline claims verified FALSE against code. The change's 14 open tasks are NOT trustworthy \u2014 re-verify each against code before planning."
+  "stage": "plan_complete",
+  "blockedOn": [],
+  "assessNote": "2026-07-27 assess found the 2026-07-20 assessment largely obsolete: four headline claims verified FALSE against code. The change's 14 open tasks are NOT trustworthy \u2014 re-verify each against code before planning.",
+  "planNote": "Operator answered all three questions 2026-07-27: embedded SurrealDB everywhere, no in-memory providers for agents, desktop in scope. D1-D4 planned; D1 is a hard prerequisite because surreal-backend is not currently enabled."
 }

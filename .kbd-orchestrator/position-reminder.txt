@@ -1,18 +1,23 @@
 POSITION REMINDER — read this as your FIRST tool call every turn
 Phase: embedded-uar-offline-agents (child of model-runtime-per-device)
 Step: 0 of 1
-Stage: assessed
-Next command: /kbd-plan embedded-uar-offline-agents
+Stage: plan_complete
+Next command: /kbd-apply embedded-uar-offline-agents
 
-BLOCKED ON OPERATOR — three questions from the 2026-07-27 assess:
-  1. Where does the mobile SurrealDB file live — KnowMe's existing
-     memory/graph-RAG instance, or a second store?
-  2. What happens to in-memory state on upgrade? No RAM->disk migration exists.
-  3. Is desktop in scope for the same swap? It shares the embedded runtime path.
+CURRENT TASK — D1: enable `surreal-backend` on the UAR dependency in
+gen_ui_agent/Cargo.toml, then verify it cross-compiles for host,
+aarch64-linux-android and aarch64-apple-ios.
 
-DO NOT run /opsx:apply from here. The assess found the change's 14 open tasks
-untrustworthy — several describe already-shipped, device-certified work.
-Applying would skip planning and redo completed work.
+WHY D1 FIRST: providers::surreal is behind #[cfg(feature = "surreal-backend")]
+and gen_ui_agent currently depends on UAR with only
+[embedded-mobile, in-memory-backend]. SurrealDbProvider does NOT exist in this
+build — swapping the constructor first will not compile.
+
+THEN D2 (uar.rs:880 swap), D3 (thread the path from BOTH gen_ui_host AND
+gen_ui_ffi::api::boot — mobile never touches gen_ui_host), D4 (durability proof).
+
+DO NOT plan the other 13 tasks from tasks.md — the assess found several
+describe already-shipped, device-certified work.
 
 Required signal format (emit BEFORE any tool call):
   Starting <kbd-skill> — embedded-uar-offline-agents (step 0 of 1)

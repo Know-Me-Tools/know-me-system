@@ -1,11 +1,14 @@
 {
   "stage": "plan",
-  "completedAt": "2026-07-20T20:32:46Z",
-  "outputs": [
-    "plan.md"
-  ],
-  "nextStage": "execute",
-  "summaryForNext": "1 atomic OpenSpec change with 5 gated milestones; UAR kernel first, host providers second, client routing and certification last",
-  "skipped": false,
-  "skipReason": null
+  "phase": "embedded-uar-offline-agents",
+  "timestamp": "2026-07-27T00:00:00Z",
+  "artifact": "plan.md",
+  "summary": "Plan APPENDED to the 07-20 baseline. Four ordered changes (D1-D4) for the operator-directed swap to embedded SurrealDB on mobile AND desktop, replacing InMemoryProvider at uar.rs:880. BLOCKER found while planning: providers::surreal is behind the surreal-backend feature gate, and gen_ui_agent depends on UAR with only [embedded-mobile, in-memory-backend] \u2014 so SurrealDbProvider does not exist in this build and a constructor swap would not compile. Enabling the feature (D1) must come first. Fortunate: SurrealDbProvider normalizes rocksdb:// to surrealkv://, the exact scheme KnowMe already uses at gen_ui_host:264.",
+  "next": "Apply D1: enable surreal-backend and verify it cross-compiles for host, aarch64-linux-android and aarch64-apple-ios.",
+  "warnings": [
+    "Cross-compilation is the live risk \u2014 SurrealKV for two mobile triples is unproven here; D1 exists to find out before any call-site edit.",
+    "TWO boot paths must be threaded: mobile uses gen_ui_ffi::api::boot and never touches gen_ui_host. Wiring only the host leaves Android and iOS broken while desktop looks fixed \u2014 the media work hit this exact trap.",
+    "A failed SurrealDB connection must surface as a visible boot failure, never a silent fallback to memory; a fallback would recreate the defect while appearing to work.",
+    "The other 13 tasks in tasks.md are NOT planned here and are untrustworthy as written \u2014 re-verify each against code first."
+  ]
 }
