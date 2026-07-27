@@ -40,7 +40,10 @@ fi
 
 APK="$1"
 PACKAGE="${2:-tools.knowme.knowme}"
-ATTACH_WAIT_SECONDS="${ATTACH_WAIT_SECONDS:-120}"
+# 120s was too short in practice: the operator has to notice the prompt, pick
+# up the phone, and drive an OEM picker. A gate that times out before a human
+# can reasonably act reports FAIL for the wrong reason.
+ATTACH_WAIT_SECONDS="${ATTACH_WAIT_SECONDS:-600}"
 SETTLE_SECONDS="${SETTLE_SECONDS:-8}"
 UI_XML_PATH="${UI_XML_PATH:-/tmp/knowme-image-rendering.xml}"
 REPORT="${REPORT:-/tmp/knowme-image-rendering.json}"
@@ -119,10 +122,15 @@ echo "=============================================================="
 echo ""
 
 attached=0
-for _ in $(seq 1 "$ATTACH_WAIT_SECONDS"); do
+for elapsed in $(seq 1 "$ATTACH_WAIT_SECONDS"); do
   if dump_ui && ui_has "knowme-image-certification"; then
     attached=1
     break
+  fi
+  # A silent wait is indistinguishable from a hung script, and the operator
+  # cannot tell how long they have left.
+  if (( elapsed % 30 == 0 )); then
+    echo "  still waiting for the pick... $((ATTACH_WAIT_SECONDS - elapsed))s remaining"
   fi
   sleep 1
 done
