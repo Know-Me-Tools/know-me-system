@@ -18,7 +18,28 @@ import {
   MAX_ATTACHMENT_BYTES,
   mimeFor,
   rejectionFor,
+  attachmentTypeFor,
 } from '../adapters/attachmentAdapter'
+
+describe('attachmentTypeFor', () => {
+  it('reports images as images so the composer can preview them', () => {
+    // NOT cosmetic: useAttachmentSrc gates the composer thumbnail and the
+    // preview dialog on type === 'image'. The adapter used to hardcode
+    // 'document' for every file, so a picked PNG showed a grey chip with no
+    // preview — before it also rendered wrong in the transcript.
+    expect(attachmentTypeFor('image/png')).toBe('image')
+    expect(attachmentTypeFor('image/jpeg')).toBe('image')
+    expect(attachmentTypeFor('image/svg+xml')).toBe('image')
+  })
+
+  it('separates video from documents', () => {
+    expect(attachmentTypeFor('video/mp4')).toBe('file')
+    expect(attachmentTypeFor('video/webm')).toBe('file')
+    expect(attachmentTypeFor('application/pdf')).toBe('document')
+    expect(attachmentTypeFor('text/markdown')).toBe('document')
+    expect(attachmentTypeFor('application/octet-stream')).toBe('document')
+  })
+})
 
 describe('attachment limits match Flutter', () => {
   it('accepts the same 13 extensions', () => {

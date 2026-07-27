@@ -159,20 +159,45 @@ export function streamAgentA2ui(
     userMessageId: userMessageId ?? null,
   });
 }
+/** A file copied into durable app storage, described by Rust. */
+export interface StoredAttachment {
+  /** Durable path in app-owned storage. Safe to persist in a transcript. */
+  path: string;
+  fileName: string;
+  mime: string;
+  sizeBytes: number;
+  isImage: boolean;
+  isVideo: boolean;
+  isDocument: boolean;
+  /** Intrinsic pixel dimensions, present for images with a readable header. */
+  width?: number;
+  height?: number;
+}
 /**
- * Approve a tool call the local model proposed but KnowMe refused to run.
+ * Copy a picked file into durable app storage and describe it.
  *
- * Its own command rather than a variant of the interaction channel: routing
- * approvals through free-form interaction text would let the UI spoof tool
- * execution. Returns the run id of the continuation.
+ * Call at PICK time, before sending the turn. A browser `File` holds bytes with
+ * no filesystem path, and Rust's attachment pipeline reads from disk — this
+ * bridges the two once instead of pushing megabytes through IPC every turn.
  *
- * Approvals are process-local — an approval card restored after a restart has
- * no pending registration behind it, and the call will fail.
+ * Returns metadata, not a bare path. The caller previously got only a string
+ * and had to infer the kind from the file name, which produced `document` for
+ * every attachment — that is why a picked PNG rendered as a grey chip. Mime,
+ * image/video classification and dimensions are decided once in Rust and used
+ * by both UIs.
  */
-export function stageAttachment(fileName: string, bytes: Uint8Array): Promise<string> {
+export function stageAttachment(
+  conversationId: string,
+  fileName: string,
+  bytes: Uint8Array,
+): Promise<StoredAttachment> {
   // Array.from because Tauri's IPC serialises to JSON — a Uint8Array would
   // arrive as an object of index keys rather than a byte sequence.
-  return invoke<string>(cmd("stage_attachment"), { fileName, bytes: Array.from(bytes) });
+  return invoke<StoredAttachment>(cmd("stage_attachment"), {
+    conversationId,
+    fileName,
+    bytes: Array.from(bytes),
+  });
 }
 /** What a remote URL resolved to, fetched natively by Rust. */
 export interface ResolvedRemoteContent {

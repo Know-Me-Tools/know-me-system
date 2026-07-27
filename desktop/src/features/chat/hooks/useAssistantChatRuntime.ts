@@ -284,7 +284,10 @@ export function useAssistantChatRuntime() {
       // Registered at last: the Plus button, the dropzone and the chip row have
       // always rendered, but with no adapter behind them picking a file did
       // nothing at all.
-      attachments: createAttachmentAdapter(),
+      // Reads the id at pick time rather than closing over it: the adapter
+      // outlives any single conversation, so a captured value would file a
+      // late attachment under whichever thread was open when it was built.
+      attachments: createAttachmentAdapter(() => useChatStore.getState().activeConversationId),
       threadList: {
         threadId: activeConversationId,
         threads: conversations.map((conversation) => ({

@@ -198,12 +198,20 @@ function inferenceHistory(messages: Message[], branchId: string): InferenceHisto
 
 /** One file the user attached, as the composer adapter resolved it. */
 export interface AttachmentInput {
-  /** Absolute filesystem path. Rust reads the file from here. */
+  /** Durable path in app-owned storage. Rust reads the file from here, and the
+   *  transcript can keep it — unlike a picker path, which is purgeable. */
   path: string
   name: string
   /** Size in bytes; formatted for display when the block is rendered. */
   size: number
   mime: string
+  /** Classification decided by Rust, not re-derived from the mime string here.
+   *  Optional so the web build, which has no Rust, can omit them. */
+  isImage?: boolean
+  isVideo?: boolean
+  /** Intrinsic pixel dimensions, so the renderer reserves space before decode. */
+  width?: number
+  height?: number
 }
 
 /** Human-readable size, matching Flutter's `_formatBytes` exactly. */
@@ -213,17 +221,44 @@ export function formatBytes(bytes: number): string {
   return `${bytes} B`
 }
 
-/** The transcript record of an attachment — same artifact shape Flutter emits,
- *  so a conversation started on either surface renders on both. */
-function attachmentBlock(attachment: AttachmentInput): ContentBlock {
+/** The transcript record of an attachment — same shape Flutter emits, so a
+ *  conversation started on either surface renders on both.
+ *
+ *  Images become a real `image` block carrying the durable path. This used to
+ *  hardcode `kind: 'attachment'` for every file regardless of mime, which is
+ *  why a picked PNG rendered as a grey document chip: `ContentBlock.Image` was
+ *  defined in Rust and decoded by both UIs, but nothing ever constructed one.
+ *
+ *  The classification comes from Rust (`isImage`/`isVideo`) and falls back to
+ *  the mime prefix only on the web build, where there is no Rust to ask. */
+export function attachmentBlock(attachment: AttachmentInput): ContentBlock {
+  const isImage = attachment.isImage ?? attachment.mime.startsWith('image/')
+  const isVideo = attachment.isVideo ?? attachment.mime.startsWith('video/')
+
+  if (isImage) {
+    return {
+      type: 'image',
+      url: null,
+      dataBase64: null,
+      mime: attachment.mime,
+      path: attachment.path,
+      // Mandatory: a missing accessible name fails the a11y gate, and the file
+      // name is the only description available at attach time.
+      alt: attachment.name,
+      width: attachment.width,
+      height: attachment.height,
+    }
+  }
+
   return {
     type: 'artifact',
     id: attachment.path,
-    kind: 'attachment',
+    kind: isVideo ? 'video' : 'attachment',
     content: JSON.stringify({
       name: attachment.name,
       size: formatBytes(attachment.size),
       mime: attachment.mime,
+      path: attachment.path,
     }),
   }
 }

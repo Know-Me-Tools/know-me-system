@@ -419,12 +419,30 @@ describe('attachment persistence round-trip', () => {
     }
 
     const rows = mocks.saveMessageRecords.mock.calls.at(-1)?.[0] as
-      { role: string; attachments: unknown; blocks: { type: string; kind?: string }[] }[] | undefined
+      | {
+          role: string
+          attachments: unknown
+          blocks: { type: string; kind?: string; path?: string; alt?: string }[]
+        }[]
+      | undefined
     const userRow = rows?.find((row) => row.role === 'user')
     expect(userRow?.attachments).toEqual(['/tmp/a.pdf', '/tmp/b.png'])
     // The blocks are the transcript half of the same turn: they lead the
     // content so the files read as sent alongside the prompt, as on Flutter.
-    expect(userRow?.blocks.filter((block) => block.kind === 'attachment')).toHaveLength(2)
+    //
+    // Two files, two blocks — but of DIFFERENT kinds. The PNG is an image
+    // block; it used to be a second `kind: 'attachment'` artifact, which is
+    // precisely why a picked image rendered as a grey document chip.
+    const pdf = userRow?.blocks.find((block) => block.kind === 'attachment')
+    expect(pdf).toBeDefined()
+
+    const image = userRow?.blocks.find((block) => block.type === 'image')
+    expect(image, 'a PNG must produce an image block, not an attachment artifact').toBeDefined()
+    // Carries the durable path so the bubble can render it after a reload.
+    expect(image?.path).toBe('/tmp/b.png')
+    // Alt text is mandatory for the a11y gate.
+    expect(image?.alt).toBe('b.png')
+
     expect(userRow?.blocks.at(-1)?.type).toBe('text')
   })
 

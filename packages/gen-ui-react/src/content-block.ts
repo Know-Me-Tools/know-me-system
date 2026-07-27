@@ -13,5 +13,26 @@ export type ContentBlock =
   | { type: "toolResult"; toolUseId: string; outputJson: string; isError: boolean }
   | { type: "skill"; name: string; status: string }
   | { type: "artifact"; id: string; kind: string; content: string }
-  | { type: "image"; url: string | null; dataBase64: string | null; mime: string }
+  /**
+   * Renderable media. Exactly one of `url`, `dataBase64` or `path` carries the
+   * bytes.
+   *
+   * `path` points into app-owned storage, never at a path a file picker
+   * returned — a picked path is purgeable on Android and expires on iOS, so a
+   * transcript holding one renders now and breaks later.
+   *
+   * `alt` is required for any image a user can see; a missing accessible name
+   * fails the a11y gate. `width`/`height` let the renderer reserve space before
+   * the bytes decode, so an arriving image does not shift the layout.
+   */
+  | {
+      type: "image"
+      url: string | null
+      dataBase64: string | null
+      mime: string
+      path?: string
+      alt?: string
+      width?: number
+      height?: number
+    }
   | { type: "divider" };

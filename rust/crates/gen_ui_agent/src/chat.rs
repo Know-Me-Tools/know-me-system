@@ -441,7 +441,7 @@ async fn read_attachment(path: &str, conversation_id: &str) -> Result<Attachment
 /// Video is its own flag rather than something each renderer re-derives by
 /// string-matching the mime: three surfaces guessing at `mime.startsWith("video/")`
 /// is how the kind hardcodes got out of step in the first place.
-fn attachment_kind(extension: &str) -> (&'static str, bool, bool, bool) {
+pub(crate) fn attachment_kind(extension: &str) -> (&'static str, bool, bool, bool) {
     match extension {
         "png" => ("image/png", true, false, false),
         "jpg" | "jpeg" => ("image/jpeg", true, false, false),

@@ -52,13 +52,18 @@ pub fn set_root(root: impl Into<PathBuf>) {
 /// the exact bug this module exists to prevent, but harder to spot because
 /// everything would appear to work.
 fn root() -> Result<&'static Path, AgentError> {
-    ATTACHMENT_ROOT.get().map(PathBuf::as_path).ok_or_else(|| {
-        AgentError::Attachment(
-            "attachment storage root is not configured; \
-             call gen_ui_agent::attachment_store::set_root during host bootstrap"
-                .into(),
-        )
-    })
+    ATTACHMENT_ROOT
+        .get()
+        .map(PathBuf::as_path)
+        .ok_or_else(unconfigured_root_error)
+}
+
+fn unconfigured_root_error() -> AgentError {
+    AgentError::Attachment(
+        "attachment storage root is not configured; \
+         call gen_ui_agent::attachment_store::set_root during host bootstrap"
+            .into(),
+    )
 }
 
 /// Sanitise a path component so a hostile or odd conversation id cannot escape
@@ -116,11 +121,12 @@ async fn store_in(
 
     let digest = Sha256::digest(bytes);
     let stem = hex_encode(&digest);
-    let extension = safe_component(extension);
+    // An extensionless file gets no extension. Routing through safe_component
+    // would turn "" into its "unscoped" placeholder and produce `<hash>.unscoped`.
     let file_name = if extension.is_empty() {
         stem
     } else {
-        format!("{stem}.{extension}")
+        format!("{stem}.{}", safe_component(extension))
     };
     let destination = dir.join(file_name);
 
@@ -136,6 +142,80 @@ async fn store_in(
         .await
         .map_err(|error| AgentError::Attachment(format!("cannot store attachment: {error}")))?;
     Ok(destination)
+}
+
+/// Store raw bytes a UI already holds and describe the result.
+///
+/// The web/desktop composer hands React a `File` whose bytes are in memory with
+/// no filesystem path; this is the entry point for that case.
+pub async fn stage_bytes(
+    conversation_id: &str,
+    file_name: &str,
+    bytes: &[u8],
+) -> Result<StoredAttachment, AgentError> {
+    if bytes.len() as u64 > gen_ui_document::MAX_INPUT_BYTES {
+        return Err(AgentError::Attachment(format!(
+            "{file_name} exceeds the 25 MB attachment limit"
+        )));
+    }
+    // Only the final component: a crafted name like "../../etc/passwd" must not
+    // escape, and the extension drives the mime.
+    let base = std::path::Path::new(file_name)
+        .file_name()
+        .and_then(std::ffi::OsStr::to_str)
+        .filter(|name| !name.is_empty())
+        .unwrap_or("attachment");
+    let extension = std::path::Path::new(base)
+        .extension()
+        .and_then(std::ffi::OsStr::to_str)
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+
+    let path = store(conversation_id, &extension, bytes).await?;
+    let (mime, is_image, is_document, is_video) = crate::chat::attachment_kind(&extension);
+    let (width, height) = if is_image {
+        image_dimensions(bytes).map_or((None, None), |(w, h)| (Some(w), Some(h)))
+    } else {
+        (None, None)
+    };
+
+    Ok(StoredAttachment {
+        path: path.to_string_lossy().into_owned(),
+        file_name: base.to_owned(),
+        mime: mime.to_owned(),
+        size_bytes: bytes.len() as u64,
+        is_image,
+        is_video,
+        is_document,
+        width,
+        height,
+    })
+}
+
+/// Store a file the user picked from the filesystem and describe the result.
+pub async fn stage_path(
+    conversation_id: &str,
+    source_path: &str,
+) -> Result<StoredAttachment, AgentError> {
+    let metadata = tokio::fs::metadata(source_path)
+        .await
+        .map_err(|error| AgentError::Attachment(format!("cannot open selected file: {error}")))?;
+    // Rejected before the read: an over-cap file must never be pulled into
+    // memory first and refused after.
+    if !metadata.is_file() || metadata.len() > gen_ui_document::MAX_INPUT_BYTES {
+        return Err(AgentError::Attachment(
+            "selected file is not a regular file or exceeds 25 MB".into(),
+        ));
+    }
+    let file_name = std::path::Path::new(source_path)
+        .file_name()
+        .and_then(std::ffi::OsStr::to_str)
+        .unwrap_or("attachment")
+        .to_owned();
+    let bytes = tokio::fs::read(source_path)
+        .await
+        .map_err(|error| AgentError::Attachment(format!("cannot read selected file: {error}")))?;
+    stage_bytes(conversation_id, &file_name, &bytes).await
 }
 
 /// Remove every stored attachment for a conversation. Missing is success —
@@ -204,6 +284,82 @@ async fn sweep_orphans_in(
         }
     }
     Ok(removed)
+}
+
+/// What a UI needs to render an attachment the moment it is picked, without
+/// guessing anything from the file name.
+///
+/// Every field is decided ONCE here, in Rust. The alternative — each surface
+/// deciding for itself — is what produced five separate hardcodes of the kind
+/// `attachment`, which is why a PNG rendered as a grey document chip on every
+/// platform.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct StoredAttachment {
+    /// Durable path in app-owned storage. Safe to persist in a transcript.
+    pub path: String,
+    pub file_name: String,
+    pub mime: String,
+    pub size_bytes: u64,
+    pub is_image: bool,
+    pub is_video: bool,
+    pub is_document: bool,
+    /// Intrinsic pixel width, when the bytes are an image whose header we read.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub width: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub height: Option<u32>,
+}
+
+impl StoredAttachment {
+    /// The block a UI should render for this attachment.
+    ///
+    /// Images become a real `ContentBlock::Image` carrying the durable path;
+    /// everything else stays an artifact. This is the single place that
+    /// decision is made.
+    pub fn to_content_block(&self) -> gen_ui_types::ContentBlock {
+        if self.is_image {
+            gen_ui_types::ContentBlock::Image {
+                url: None,
+                data_base64: None,
+                mime: self.mime.clone(),
+                path: Some(self.path.clone()),
+                // The file name is the only honest alt text available at pick
+                // time. It is a weak description, but a missing accessible
+                // name fails the a11y gate outright.
+                alt: Some(self.file_name.clone()),
+                width: self.width,
+                height: self.height,
+            }
+        } else {
+            gen_ui_types::ContentBlock::Artifact {
+                id: self.path.clone(),
+                kind: if self.is_video { "video" } else { "attachment" }.to_owned(),
+                content: serde_json::json!({
+                    "name": self.file_name,
+                    "mime": self.mime,
+                    "size": self.size_bytes,
+                    "path": self.path,
+                })
+                .to_string(),
+            }
+        }
+    }
+}
+
+/// Read intrinsic dimensions from an image header.
+///
+/// Header-only on purpose: decoding a 25 MB photo to learn it is 4032x3024
+/// would cost hundreds of milliseconds and a large allocation on the attach
+/// path. Returns `None` for formats without a readable header (SVG has no
+/// intrinsic pixel size at all) rather than guessing — a wrong dimension is
+/// worse than none, because the renderer reserves the wrong space.
+pub fn image_dimensions(bytes: &[u8]) -> Option<(u32, u32)> {
+    let size = imagesize::blob_size(bytes).ok()?;
+    Some((
+        u32::try_from(size.width).ok()?,
+        u32::try_from(size.height).ok()?,
+    ))
 }
 
 fn hex_encode(bytes: &[u8]) -> String {
@@ -345,16 +501,177 @@ mod tests {
         assert!(!conversation_dir_in(temp.path(), "orphan").exists());
     }
 
+    /// Smallest valid PNG: 1x1, so the header parse is real rather than mocked.
+    const TINY_PNG: &[u8] = &[
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44,
+        0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F,
+        0x15, 0xC4, 0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x00,
+        0x01, 0x00, 0x00, 0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49,
+        0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+    ];
+
+    #[test]
+    fn a_png_becomes_an_image_block_carrying_its_durable_path() {
+        // THE regression guard for the reported defect: a PNG rendered as a
+        // grey document chip because nothing ever built an Image block.
+        let stored = StoredAttachment {
+            path: "/data/attachments/conv/abc.png".into(),
+            file_name: "holiday.png".into(),
+            mime: "image/png".into(),
+            size_bytes: 1234,
+            is_image: true,
+            is_video: false,
+            is_document: false,
+            width: Some(800),
+            height: Some(600),
+        };
+
+        let block = stored.to_content_block();
+
+        let gen_ui_types::ContentBlock::Image {
+            path,
+            alt,
+            mime,
+            width,
+            height,
+            url,
+            data_base64,
+        } = block
+        else {
+            panic!("a PNG must produce an Image block, not {block:?}");
+        };
+        assert_eq!(path.as_deref(), Some("/data/attachments/conv/abc.png"));
+        assert_eq!(mime, "image/png");
+        assert_eq!((width, height), (Some(800), Some(600)));
+        // Alt text is mandatory for the a11y gate; the file name is the only
+        // description available at pick time.
+        assert_eq!(alt.as_deref(), Some("holiday.png"));
+        // The bytes live on disk, so neither inline carrier is populated.
+        assert_eq!(url, None);
+        assert_eq!(data_base64, None);
+    }
+
+    #[test]
+    fn non_images_stay_artifacts_and_video_is_labelled_as_such() {
+        let pdf = StoredAttachment {
+            path: "/data/a/report.pdf".into(),
+            file_name: "report.pdf".into(),
+            mime: "application/pdf".into(),
+            size_bytes: 10,
+            is_image: false,
+            is_video: false,
+            is_document: true,
+            width: None,
+            height: None,
+        };
+        let video = StoredAttachment {
+            is_document: false,
+            is_video: true,
+            mime: "video/mp4".into(),
+            file_name: "clip.mp4".into(),
+            path: "/data/a/clip.mp4".into(),
+            ..pdf.clone()
+        };
+
+        match pdf.to_content_block() {
+            gen_ui_types::ContentBlock::Artifact { kind, .. } => assert_eq!(kind, "attachment"),
+            other => panic!("a PDF must stay an artifact, got {other:?}"),
+        }
+        match video.to_content_block() {
+            gen_ui_types::ContentBlock::Artifact { kind, content, .. } => {
+                assert_eq!(kind, "video");
+                // The renderer needs the path from the payload, not the id.
+                assert!(content.contains("/data/a/clip.mp4"), "payload: {content}");
+            }
+            other => panic!("video must be labelled video, got {other:?}"),
+        }
+    }
+
+    /// `stage_*` reads the process-wide root, and these tests share a process,
+    /// so the FIRST test to set it wins. Each of these seeds a tempdir and then
+    /// asserts against whichever root actually took effect — asserting against
+    /// its own tempdir would fail purely on test ordering.
+    fn shared_root() -> &'static Path {
+        static SHARED: OnceCell<tempfile::TempDir> = OnceCell::new();
+        let dir = SHARED.get_or_init(|| tempfile::tempdir().expect("tempdir"));
+        let _ = ATTACHMENT_ROOT.set(dir.path().to_path_buf());
+        root().expect("a root is configured by now")
+    }
+
     #[tokio::test]
-    async fn store_reports_a_clear_error_when_the_root_is_unconfigured() {
+    async fn staging_a_png_reads_its_real_dimensions() {
+        shared_root();
+
+        let stored = stage_bytes("dims-conv", "tiny.png", TINY_PNG)
+            .await
+            .expect("stage");
+
+        assert!(stored.is_image);
+        assert_eq!(stored.mime, "image/png");
+        // Read from the header, never guessed: a wrong dimension makes the
+        // renderer reserve the wrong space, which is worse than none.
+        assert_eq!((stored.width, stored.height), (Some(1), Some(1)));
+        assert_eq!(stored.size_bytes, TINY_PNG.len() as u64);
+    }
+
+    #[test]
+    fn dimensions_are_none_rather_than_guessed_for_unreadable_bytes() {
+        assert_eq!(image_dimensions(b"not an image at all"), None);
+        // SVG has no intrinsic pixel size; claiming one would be a lie.
+        assert_eq!(
+            image_dimensions(b"<svg xmlns='http://www.w3.org/2000/svg'/>"),
+            None
+        );
+    }
+
+    #[tokio::test]
+    async fn staging_rejects_a_traversal_filename_without_escaping() {
+        let active_root = shared_root();
+
+        let stored = stage_bytes("trav-conv", "../../../etc/passwd", b"x")
+            .await
+            .expect("stage");
+
+        assert_eq!(stored.file_name, "passwd");
+        assert!(
+            std::path::Path::new(&stored.path).starts_with(active_root),
+            "stored outside the root {}: {}",
+            active_root.display(),
+            stored.path
+        );
+        // An extensionless name must not acquire a placeholder extension.
+        assert!(
+            !stored.path.ends_with(".unscoped"),
+            "extensionless file gained a bogus extension: {}",
+            stored.path
+        );
+    }
+
+    #[test]
+    fn an_unconfigured_root_reports_a_clear_error_rather_than_falling_back() {
         // The failure mode this guards against is a SILENT fallback to a temp
         // directory, which would put attachments somewhere that gets cleared —
         // reintroducing the exact bug this module prevents, but invisibly.
-        let error = store("conv", "png", b"bytes").await.unwrap_err();
+        //
+        // Asserted against the error constructor rather than by calling
+        // `store()` with the cell unset: the cell is process-wide and other
+        // tests in this binary set it, so a test that depends on it being
+        // EMPTY passes or fails purely on test ordering.
+        let unset: OnceCell<PathBuf> = OnceCell::new();
+        let error = unset
+            .get()
+            .map(PathBuf::as_path)
+            .ok_or_else(unconfigured_root_error)
+            .unwrap_err();
+
         let message = error.to_string();
         assert!(
             message.contains("attachment storage root is not configured"),
             "unhelpful error: {message}"
+        );
+        assert!(
+            message.contains("set_root"),
+            "the error must name the missing call: {message}"
         );
     }
 }

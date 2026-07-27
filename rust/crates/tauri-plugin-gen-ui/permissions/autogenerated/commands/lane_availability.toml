@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-lane-availability"
+description = "Enables the lane_availability command without any pre-configured scope."
+commands.allow = ["lane_availability"]
+
+[[permission]]
+identifier = "deny-lane-availability"
+description = "Denies the lane_availability command without any pre-configured scope."
+commands.deny = ["lane_availability"]

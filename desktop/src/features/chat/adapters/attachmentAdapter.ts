@@ -94,14 +94,40 @@ export function takeStagedAttachments(ids: string[]): AttachmentInput[] {
 }
 
 /**
+ * assistant-ui's attachment type for a mime.
+ *
+ * NOT cosmetic: `useAttachmentSrc` (components/assistant-ui/attachment.tsx)
+ * gates the composer thumbnail and the preview dialog on `type === 'image'`.
+ * This adapter used to hardcode `'document'` for everything, so a picked PNG
+ * showed a grey chip with no preview — on top of rendering as a document in
+ * the transcript.
+ */
+export function attachmentTypeFor(mime: string): 'image' | 'document' | 'file' {
+  if (mime.startsWith('image/')) return 'image'
+  if (mime.startsWith('video/')) return 'file'
+  return 'document'
+}
+
+/**
  * Stage a picked file and remember where it landed.
  *
- * On Tauri the bytes go to a temp path under the app data dir, because Rust's
- * attachment pipeline reads from the filesystem. On the web there is no such
- * pipeline, so the file is accepted into the transcript but carries no path —
- * the turn still sends, without file content.
+ * On Tauri the bytes are copied into app-owned storage by Rust, which also
+ * decides the mime, whether it is an image or video, and its pixel dimensions.
+ * Those answers are used verbatim — the previous code inferred the type here
+ * and always said `document`, which is exactly the duplicated decision that
+ * broke image rendering on every surface.
+ *
+ * On the web there is no Rust: the file is accepted into the transcript and
+ * previewed from an object URL, but carries no durable path, so the turn sends
+ * without file content. That degradation is honest rather than silent — the
+ * composer still shows the thumbnail it can produce locally.
  */
-export function createAttachmentAdapter(): AttachmentAdapter {
+export function createAttachmentAdapter(
+  /** Reads the conversation the file is being attached to, at pick time.
+   *  A getter rather than a value: the adapter is constructed once per runtime
+   *  but the active conversation changes underneath it. */
+  conversationId: () => string,
+): AttachmentAdapter {
   return {
     accept: ACCEPT,
 
@@ -110,17 +136,30 @@ export function createAttachmentAdapter(): AttachmentAdapter {
       if (rejection) throw new Error(rejection)
 
       const id = crypto.randomUUID()
+      // Fallback for the web build, where Rust cannot classify the bytes.
+      let mime = mimeFor(file.name)
+
       if (isTauri()) {
         const bytes = new Uint8Array(await file.arrayBuffer())
-        const path = await stageAttachment(file.name, bytes)
-        stagedPaths.set(id, { path, name: file.name, size: file.size, mime: mimeFor(file.name) })
+        const stored = await stageAttachment(conversationId(), file.name, bytes)
+        mime = stored.mime
+        stagedPaths.set(id, {
+          path: stored.path,
+          name: stored.fileName,
+          size: stored.sizeBytes,
+          mime: stored.mime,
+          isImage: stored.isImage,
+          isVideo: stored.isVideo,
+          width: stored.width,
+          height: stored.height,
+        })
       }
 
       return {
         id,
-        type: 'document',
+        type: attachmentTypeFor(mime),
         name: file.name,
-        contentType: mimeFor(file.name),
+        contentType: mime,
         file,
         status: { type: 'requires-action', reason: 'composer-send' },
       }

@@ -122,6 +122,32 @@ Denies the cancel_model_operation command without any pre-configured scope.
 <tr>
 <td>
 
+`gen-ui:allow-chat-approve-tool-confirmation`
+
+</td>
+<td>
+
+Enables the chat_approve_tool_confirmation command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-chat-approve-tool-confirmation`
+
+</td>
+<td>
+
+Denies the chat_approve_tool_confirmation command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `gen-ui:allow-chat-control-catalog`
 
 </td>
@@ -564,6 +590,32 @@ Denies the has_local_engine command without any pre-configured scope.
 <tr>
 <td>
 
+`gen-ui:allow-lane-availability`
+
+</td>
+<td>
+
+Enables the lane_availability command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-lane-availability`
+
+</td>
+<td>
+
+Denies the lane_availability command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `gen-ui:allow-load-seeds`
 
 </td>
@@ -954,6 +1006,32 @@ Denies the provider_test command without any pre-configured scope.
 <tr>
 <td>
 
+`gen-ui:allow-resolve-remote-content`
+
+</td>
+<td>
+
+Enables the resolve_remote_content command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-resolve-remote-content`
+
+</td>
+<td>
+
+Denies the resolve_remote_content command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `gen-ui:allow-run-migrations`
 
 </td>
@@ -1077,6 +1155,32 @@ Enables the set_active_lane command without any pre-configured scope.
 <td>
 
 Denies the set_active_lane command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:allow-stage-attachment`
+
+</td>
+<td>
+
+Enables the stage_attachment command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-stage-attachment`
+
+</td>
+<td>
+
+Denies the stage_attachment command without any pre-configured scope.
 
 </td>
 </tr>

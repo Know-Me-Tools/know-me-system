@@ -79,55 +79,30 @@ pub async fn stream_agent_a2ui(
     Ok(run_id)
 }
 
-/// Stage an attachment the user picked in the browser, returning its path.
+/// Stage an attachment the user picked in the browser and describe it.
 ///
 /// The web composer hands React a `File` (bytes in memory); Rust's attachment
 /// pipeline reads from the filesystem, because copying multi-megabyte files
 /// through IPC on every turn would be wasteful. This bridges the two once, at
-/// pick time: write the bytes under the app data dir and hand back the path
-/// that `stream_agent_a2ui` will read.
+/// pick time.
 ///
-/// The 25 MB ceiling matches the composer's own limit and is enforced here too
-/// — a client-side check is a courtesy, not a control.
+/// Returns full metadata, not a bare path. React previously got only a string,
+/// so it had to guess the kind from the file name — and guessed `document` for
+/// every attachment, which is why a picked PNG rendered as a grey chip. Mime,
+/// image/video classification and intrinsic dimensions are all decided once, in
+/// `gen_ui_agent::attachment_store`, and both UIs consume the same answer.
+///
+/// The 25 MB ceiling is enforced inside the store — a client-side check is a
+/// courtesy, not a control.
 #[tauri::command]
-pub async fn stage_attachment<R: Runtime>(
-    app: tauri::AppHandle<R>,
+pub async fn stage_attachment(
+    conversation_id: String,
     file_name: String,
     bytes: Vec<u8>,
-) -> Result<String> {
-    const MAX_BYTES: usize = 25 * 1024 * 1024;
-    if bytes.len() > MAX_BYTES {
-        return Err(gen_ui_types::CoreError::Terminal(format!(
-            "{file_name} is larger than the 25 MB attachment limit"
-        ))
-        .into());
-    }
-    let dir = app_data_dir(&app)?.join("attachments");
-    std::fs::create_dir_all(&dir).map_err(|error| gen_ui_types::CoreError::Io(error.to_string()))?;
-    // Take only the final component: a crafted name like "../../etc/passwd"
-    // must not escape the staging directory.
-    let base = std::path::Path::new(&file_name)
-        .file_name()
-        .map(|name| name.to_string_lossy().to_string())
-        .filter(|name| !name.is_empty())
-        .unwrap_or_else(|| "attachment".to_string());
-    // Prefix with a fresh id so two files of the same name in one turn — or
-    // across turns — cannot overwrite each other.
-    let path = dir.join(format!("{}-{}", nanoid_like(), base));
-    std::fs::write(&path, &bytes)
-        .map_err(|error| gen_ui_types::CoreError::Io(error.to_string()))?;
-    Ok(path.to_string_lossy().to_string())
-}
-
-/// Short unique prefix for staged attachment filenames. Avoids taking a uuid
-/// dependency on this crate for one call site.
-fn nanoid_like() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_nanos())
-        .unwrap_or_default();
-    format!("{nanos:x}")
+) -> Result<gen_ui_agent::attachment_store::StoredAttachment> {
+    gen_ui_agent::attachment_store::stage_bytes(&conversation_id, &file_name, &bytes)
+        .await
+        .map_err(|error| gen_ui_types::CoreError::Terminal(error.to_string()).into())
 }
 
 /// Fetch remote media natively and return its resolved form.
