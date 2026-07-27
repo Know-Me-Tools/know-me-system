@@ -24,6 +24,13 @@ import 'package:knowme_poc/features/chat/presentation/providers/chat_notifier.da
 import 'package:knowme_poc/features/chat/presentation/screens/chat_screen.dart';
 import 'package:knowme_poc/main.dart' as app;
 
+/// Text characters that must have streamed before the stop is worth taking.
+///
+/// More than a token or two, so "kept work" means something a user would
+/// recognise on screen, but far short of the full answer so the stop is still
+/// genuinely mid-stream.
+const _minCharsBeforeStop = 80;
+
 /// Long enough that a stop always lands mid-stream rather than after the run.
 const _longPrompt =
     'Tell me a long continuous story about a lighthouse keeper. Write at '
@@ -35,6 +42,11 @@ void main() {
   testWidgets('a stopped turn keeps its work and offers four intents', (
     tester,
   ) async {
+    // A tap that misses only *warns* by default, so an un-hittable button reads
+    // as "tapped" and the run fails ten minutes later at an unrelated timeout.
+    // Make the miss the error it actually is.
+    WidgetController.hitTestWarningShouldBeFatal = true;
+
     await app.main();
     await tester.pumpAndSettle(const Duration(seconds: 30));
 
@@ -69,7 +81,8 @@ void main() {
     expect(
       controlState.policy['chat_mode'],
       'local',
-      reason: 'lane is "${controlState.policy['chat_mode']}", not local; '
+      reason:
+          'lane is "${controlState.policy['chat_mode']}", not local; '
           'refusing to certify another lane',
     );
     debugPrint('KnowMe intents: lane=local confirmed on thread $threadId');
@@ -79,12 +92,20 @@ void main() {
     await tester.tap(find.byIcon(Icons.arrow_upward));
     await tester.pump();
 
-    // Wait for real streamed text, not merely for the run to start. Stopping
-    // before the first block arrives would prove nothing about preservation.
+    // Wait for streamed CHARACTERS, not merely for a block to exist.
+    //
+    // `content.isNotEmpty` fires on the first non-text block — a thinking block
+    // arrives first on this model — so the stop landed at "1 blocks / 0 chars"
+    // and the preservation assertion then failed on a run that had produced no
+    // text to preserve. The precondition, not the assertion, was wrong.
     final streamed = await _pumpUntil(
       tester,
       timeout: const Duration(minutes: 8),
-      condition: () => _streamingAssistant(container)?.content.isNotEmpty == true,
+      condition: () {
+        final assistant = _streamingAssistant(container);
+        return assistant != null &&
+            _charCount(assistant) >= _minCharsBeforeStop;
+      },
       describe: () => _diagnostics(container.read(chatProvider)),
     );
     expect(
@@ -131,11 +152,17 @@ void main() {
     // ---- the four intents are on screen ----------------------------------
     await tester.pumpAndSettle();
     for (final label in const ['Steer', 'Resume', 'Retry', 'Discard']) {
+      final action = find.text(label);
       expect(
-        find.text(label),
+        action,
         findsOneWidget,
         reason: '"$label" is missing from the stopped turn',
       );
+      // Present in the tree is NOT the same as reachable. These assertions all
+      // passed on a run where Resume sat outside the viewport and its tap did
+      // nothing, so each action has to be scrollable into view to count.
+      await tester.ensureVisible(action);
+      await tester.pumpAndSettle();
     }
     // The kept-count line is the reassurance that the work survived; without it
     // the four actions are buttons with no stated consequence.
@@ -143,7 +170,16 @@ void main() {
 
     // ---- Resume continues rather than restarting -------------------------
     final keptText = _plainText(stopped);
-    await tester.tap(find.text('Resume'));
+
+    // Scroll the button into view before tapping. The bar renders below a long
+    // assistant message, so Resume sits outside the viewport: `tap` then finds
+    // the widget, derives an offset that "would not hit test", warns, and does
+    // NOTHING — the run silently produced no turn and only the 10-minute
+    // timeout revealed it. `ensureVisible` is what makes the tap real.
+    final resumeButton = find.text('Resume');
+    await tester.ensureVisible(resumeButton);
+    await tester.pumpAndSettle();
+    await tester.tap(resumeButton);
     await tester.pump();
 
     final resumed = await _pumpUntil(
@@ -235,10 +271,8 @@ ChatMessage? _latestAssistant(ProviderContainer container) => container
     .where((message) => message.role == 'assistant')
     .lastOrNull;
 
-String _plainText(ChatMessage message) => message.content
-    .whereType<TextBlock>()
-    .map((block) => block.text)
-    .join();
+String _plainText(ChatMessage message) =>
+    message.content.whereType<TextBlock>().map((block) => block.text).join();
 
 int _charCount(ChatMessage message) => _plainText(message).length;
 
