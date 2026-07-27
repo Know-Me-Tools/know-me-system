@@ -6,7 +6,7 @@
   "currentTask": "D1 \u2014 enable surreal-backend on the UAR dependency and verify cross-compilation for host + both mobile triples",
   "nextPendingChange": "embed-uar-mobile-offline",
   "sourceTool": "claude-code",
-  "exactNextCommand": "/kbd-apply embedded-uar-offline-agents",
+  "exactNextCommand": "certify durable persistence on device (Android SM-S936U and/or iPhone)",
   "parentPhase": "model-runtime-per-device",
   "childPhases": [
     "embedded-uar-offline-agents"
