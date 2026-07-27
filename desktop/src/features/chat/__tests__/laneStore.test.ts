@@ -140,6 +140,28 @@ describe('laneStore UAR lane', () => {
     expect(mocks.setActiveLane).not.toHaveBeenCalledWith('uar')
   })
 
+  it('does not tell an embedded host to configure a service that cannot exist', async () => {
+    // macOS hosts the UAR in-process, so there is no service URL to enter.
+    // The generic "Configure Universal Agent Runtime in Settings" message sends
+    // the user hunting for a field this platform does not render.
+    mocks.getActiveLane.mockResolvedValue('local')
+    mocks.uarRuntimeStatus.mockResolvedValue(runtime({
+      currentState: 'projection_only',
+      targetMode: 'embedded_library',
+    }))
+    mocks.uarServiceConfig.mockResolvedValue(config({
+      serviceUrl: null,
+      hasAgentArtifact: false,
+    }))
+
+    await useLaneStore.getState().init()
+    await useLaneStore.getState().switchLane('uar')
+
+    const state = useLaneStore.getState()
+    expect(state.error).toContain('embedded runtime')
+    expect(state.error).not.toContain('Configure Universal Agent Runtime')
+  })
+
   it('rejects cloud selection on Tauri desktop', async () => {
     mocks.getActiveLane.mockResolvedValue('local')
 

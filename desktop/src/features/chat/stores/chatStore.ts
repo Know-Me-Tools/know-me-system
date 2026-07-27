@@ -17,7 +17,7 @@ import type { ContentBlock, Message, MessageIntent, MessageUsage } from '@/bridg
 import { applyA2uiEvent, createA2uiWireAdapter, type A2uiWireEvent, type RunLifecycleUpdate } from '@/bridge/a2ui/driver'
 import { interruptWebLlm, streamWebLlm } from '../api/webllmLane'
 import { cancelHostedChat, streamHostedA2uiAction, streamHostedChat } from '../api/hostedLane'
-import { useLaneStore } from './laneStore'
+import { uarUnavailableMessage, useLaneStore } from './laneStore'
 import {
   deleteConversationRecord,
   deleteMessageRecords,
@@ -319,7 +319,7 @@ async function runInferenceTurn(
     }
     if (lane === 'uar' && !laneState.uarConfigured) {
       store.updateLifecycle({ type: 'error', messageId: assistantId, runId: assistantId,
-        error: { code: 'uar_not_configured', phase: 'queued', message: 'Configure Universal Agent Runtime in Settings before using the UAR lane.', retryable: true } })
+        error: { code: 'uar_not_configured', phase: 'queued', message: uarUnavailableMessage(laneState.uarStatus), retryable: true } })
       return
     }
     if (lane === 'local' && !laneState.localAvailable) {

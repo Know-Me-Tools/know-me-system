@@ -2,7 +2,11 @@
 
 - [x] 1.1 Add a transport-independent UAR `EmbeddedRuntimeBuilder` with explicit host driver, provider/model metadata, persistence, embeddings, tools, skills, policy, and A2UI composition
 - [x] 1.2 Replace the Rust SDK `Runtime` stub with direct operations over the initialized embedded kernel and separate server startup behind a server feature
-- [x] 1.3 Add `embedded-mobile` feature profiles and gate transport-only/server dependencies until Android and iOS targets compile
+- [/] 1.3 Add `embedded-mobile` feature profiles and gate transport-only/server dependencies until Android and iOS targets compile
+  - profiles exist, but the GATING half is false: tokio(full)/reqwest/rmcp/liter-llm
+    are unconditional and `surreal-memory` drags axum+tonic in
+    (`cargo tree --no-default-features --features embedded-mobile -i axum` resolves).
+    Two ungated bins break `cargo check` under the profile. Only `--lib` builds.
 - [x] 1.4 Add UAR tests for build readiness, provider routing, agent run streaming/replay, cancellation, tool approval, skill events, A2UI continuation, and restart persistence
 
 ## 2. Connect KnowMe Local Inference
@@ -14,15 +18,15 @@
 
 ## 3. Offline Data and Control Plane
 
-- [ ] 3.1 Inject durable sandboxed persistence for agents, skills, policies, settings, memory, knowledge, conversations, run state, and A2UI data
+- [x] 3.1 Inject durable sandboxed persistence for agents, skills, policies, settings, memory, knowledge, conversations, run state, and A2UI data
 - [ ] 3.2 Expose direct FFI operations for agent administration, provider/model catalog, settings, skills, MCP/native tools, knowledge, memory, run policy, and A2UI registry/actions
 - [ ] 3.3 Ensure network/process-dependent resources advertise requirements and are visibly unavailable under offline mobile policy
-- [ ] 3.4 Verify built-in default and orchestrator agents are seeded, protected from deletion, and default to the local model without keys
+- [x] 3.4 Verify built-in default and orchestrator agents are seeded, protected from deletion, and default to the local model without keys
 
 ## 4. Client Integration
 
-- [ ] 4.1 Wire Flutter repositories/providers to embedded UAR operations using the required Widget → Riverpod → Repository → FFI layering
-- [ ] 4.2 Preserve ordered thinking, skill activation, citations, tools, memory, errors, cancellation, AG-UI, and rendered A2UI artifacts in mobile chat
+- [x] 4.1 Wire Flutter repositories/providers to embedded UAR operations using the required Widget → Riverpod → Repository → FFI layering
+- [x] 4.2 Preserve ordered thinking, skill activation, citations, tools, memory, errors, cancellation, AG-UI, and rendered A2UI artifacts in mobile chat
 - [ ] 4.3 Update diagnostics/settings to distinguish embedded local, optional remote UAR, and optional BYOK providers without suggesting network is required
 - [ ] 4.4 Keep desktop embedded runtime behavior aligned and verify HTTP mode remains an explicit compatible adapter
 
@@ -30,7 +34,11 @@
 
 - [ ] 5.1 Fix the pinned UAR dependency graph and pass UAR/SDK host tests plus KnowMe Rust workspace tests
 - [ ] 5.2 Cross-compile the shared library for `aarch64-linux-android`, `aarch64-apple-ios`, and iOS simulator architectures
-- [ ] 5.3 Certify desktop offline local-agent prompting, tool loop, A2UI interaction, cancellation, and persistence
+- [/] 5.3 Certify desktop offline local-agent prompting, tool loop, A2UI interaction, cancellation, and persistence
+  - persistence: CERTIFIED (scripts/desktop/certify-durable-uar-persistence.sh;
+    /tmp/knowme-desktop-uar-persistence.json). Gate proven in both directions —
+    it FAILS when state is wiped between phases. Prompting/tool loop/A2UI/
+    cancellation remain uncertified on desktop.
 - [ ] 5.4 Install and certify physical Android with networking disabled, including local default/orchestrator agents, tools, A2UI, cancellation, and restart restoration
 - [ ] 5.5 Certify iOS device or simulator with networking disabled against the same functional suite
 - [ ] 5.6 Record logs, screenshots, performance, KBD reflection, Prometheus wiki entries, and Karpathy success/failure learning records

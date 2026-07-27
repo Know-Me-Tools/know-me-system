@@ -1,0 +1,18 @@
+{
+  "coldStart": {
+    "booted": true,
+    "persistenceError": null
+  },
+  "device": {
+    "model": "SM-S936U",
+    "soc": "SM8750"
+  },
+  "engine": "SurrealKV (surrealdb kv-surrealkv); NOT RocksDB",
+  "fastRelaunch": {
+    "booted": true,
+    "persistenceError": null,
+    "why": "SurrealKV releases its directory lock on a background task, not synchronously with the handle drop. This is the case that could fail on hardware while the unit test passes."
+  },
+  "storeListing": [],
+  "storeListingNote": "empty when run-as refuses a release build \u2014 UNVERIFIED, not a failure; the boot marker carries the proof"
+}

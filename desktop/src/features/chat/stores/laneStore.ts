@@ -73,6 +73,24 @@ function isRunnableUar(status: UarRuntimeStatus | null, config: ConfiguredUarSer
 }
 
 /**
+ * Why the UAR lane is unavailable, in terms the current host can act on.
+ *
+ * macOS hosts the runtime IN-PROCESS, so it renders no service-URL field at
+ * all — telling those users to "configure UAR in Settings" sends them hunting
+ * for a control that does not exist. Windows and Linux are genuine service
+ * clients, where that instruction is correct.
+ *
+ * Exported and shared because this message is produced from three places
+ * (lane init, switchLane, and a queued run in chatStore); three copies of the
+ * string is how the embedded case came to be wrong in all of them.
+ */
+export function uarUnavailableMessage(status: UarRuntimeStatus | null): string {
+  return status?.targetMode === 'embedded_library'
+    ? 'The embedded runtime is not ready yet. Check Settings → Model providers for the on-device model.'
+    : 'Configure Universal Agent Runtime in Settings before using the UAR lane.'
+}
+
+/**
  * Whether a local-model operation is in flight.
  *
  * Mirrors Flutter's `_modelOperationBusy`: downloading, verifying, loading and
@@ -130,7 +148,7 @@ export const useLaneStore = create<LaneState & LaneActions>()(
           s.uarConfig = uarConfigValue
           s.lane = desktopLane
           if (desktopLane === 'uar' && !configured) {
-            s.error = 'Configure Universal Agent Runtime in Settings before using the UAR lane.'
+            s.error = uarUnavailableMessage(uarStatusValue)
           } else if (lane === 'cloud') {
             s.error = null
           }
@@ -206,7 +224,7 @@ export const useLaneStore = create<LaneState & LaneActions>()(
       } else if (lane === 'uar') {
         const ready = await get().refreshUar()
         if (!ready) {
-          set((s) => { s.error = 'Configure Universal Agent Runtime in Settings before using the UAR lane.' })
+          set((s) => { s.error = uarUnavailableMessage(s.uarStatus) })
           return false
         }
       } else if (isTauri()) {

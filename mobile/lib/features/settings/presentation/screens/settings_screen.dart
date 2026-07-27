@@ -462,7 +462,12 @@ class _GlobalPolicyPanel extends ConsumerWidget {
         if (setting == null)
           const _Card(
             child: Text(
-              'The connected UAR has not registered run_policy.global yet. Restart or update the UAR service, then refresh.',
+              // There is no service to restart: on mobile the UAR is ALWAYS
+              // the embedded in-process runtime (see the note above). Telling
+              // the user to restart one sends them looking for something that
+              // does not exist on this platform.
+              'The embedded runtime has not registered run_policy.global yet. '
+              'Pull to refresh; if it persists, restart the app.',
             ),
           )
         else ...[
