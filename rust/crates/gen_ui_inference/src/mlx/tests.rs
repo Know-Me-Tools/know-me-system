@@ -17,6 +17,11 @@ struct MockMlxBridge {
     events: Mutex<Vec<MlxBridgeEvent>>,
     load_calls: Mutex<Vec<(PathBuf, String)>>,
     generate_calls: Mutex<Vec<String>>,
+    /// Counts `cancel` so a test can prove the engine actually reached the
+    /// bridge. Before `cancel_generation` was overridden, the trait default
+    /// swallowed the request and MLX generated to completion — a silent gap that
+    /// only a call-count assertion catches.
+    cancel_calls: Mutex<usize>,
     available: bool,
     fail_load: bool,
 }
@@ -27,6 +32,7 @@ impl MockMlxBridge {
             events: Mutex::new(events),
             load_calls: Mutex::new(Vec::new()),
             generate_calls: Mutex::new(Vec::new()),
+            cancel_calls: Mutex::new(0),
             available: true,
             fail_load: false,
         }
@@ -57,7 +63,9 @@ impl MlxBridge for MockMlxBridge {
         Ok(())
     }
 
-    fn cancel(&self) {}
+    fn cancel(&self) {
+        *self.cancel_calls.lock_ok() += 1;
+    }
     fn close(&self) {}
     fn available(&self) -> bool {
         self.available
@@ -422,4 +430,45 @@ fn explicit_think_open_is_still_absorbed() {
     let events = parse_all_reasoning(&["<think>explicit open</think>and the answer"]);
     assert_eq!(thinking_of(&events), "explicit open");
     assert_eq!(text_of(&events), "and the answer");
+}
+
+#[tokio::test]
+async fn cancel_generation_reaches_the_bridge() {
+    init_runtime();
+    // The trait default for `cancel_generation` is a no-op, so an engine that
+    // forgets to override it accepts a stop and keeps generating. Only the
+    // bridge call count distinguishes "wired" from "silently ignored".
+    let bridge = Arc::new(MockMlxBridge::with_events(vec![MlxBridgeEvent::Final]));
+    let engine = MlxEngine::with_bridge("/tmp/knowme-mlx-test", bridge.clone());
+
+    assert_eq!(*bridge.cancel_calls.lock_ok(), 0);
+    engine.cancel_generation();
+    assert_eq!(
+        *bridge.cancel_calls.lock_ok(),
+        1,
+        "cancel_generation must ask the bridge to stop the in-flight generate"
+    );
+}
+
+#[tokio::test]
+async fn cancelled_generation_uses_the_shared_wording() {
+    init_runtime();
+    // One state, one phrase. The engine name has no place in what the user
+    // reads, and the device certification asserts this exact string.
+    let bridge = Arc::new(MockMlxBridge::with_events(vec![
+        MlxBridgeEvent::Delta {
+            text: "partial".into(),
+        },
+        MlxBridgeEvent::Cancelled,
+    ]));
+    let engine = MlxEngine::with_bridge("/tmp/knowme-mlx-test", bridge.clone());
+    let events = collect(engine.generate_request(&text_request("hi")).await.unwrap()).await;
+
+    let cancelled = events.iter().find_map(|event| match event {
+        StreamEvent::Cancelled { message } => Some(message.clone()),
+        _ => None,
+    });
+    assert_eq!(cancelled.as_deref(), Some("Cancelled by user"));
+    // The partial text must survive the cancel — that is the whole point.
+    assert_eq!(text_of(&events), "partial");
 }
