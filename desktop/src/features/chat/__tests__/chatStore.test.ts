@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   onChatEvent: vi.fn(),
   sendAgentInteractionA2ui: vi.fn(),
   streamAgentA2ui: vi.fn(),
+  chatApproveToolConfirmation: vi.fn(),
   deleteConversationRecord: vi.fn(),
   deleteMessageRecords: vi.fn(),
   listConversationRecords: vi.fn(),
@@ -33,6 +34,7 @@ vi.mock('@prometheus-ags/tauri-plugin-gen-ui', () => ({
   onChatEvent: mocks.onChatEvent,
   sendAgentInteractionA2ui: mocks.sendAgentInteractionA2ui,
   streamAgentA2ui: mocks.streamAgentA2ui,
+  chatApproveToolConfirmation: mocks.chatApproveToolConfirmation,
   // laneStore imports from this same module, and `runInferenceTurn` calls
   // `laneStore.init()`. Without these the send tests reach real IPC and throw.
   cancelModelOperation: vi.fn(),
@@ -112,6 +114,7 @@ beforeEach(() => {
   mocks.cancelHostedChat.mockResolvedValue(undefined)
   mocks.interruptWebLlm.mockResolvedValue(undefined)
   mocks.streamAgentA2ui.mockResolvedValue('run-2')
+  mocks.chatApproveToolConfirmation.mockResolvedValue('approval-run-1')
   // Local is the lane these tests certify; leaving it unset would silently
   // exercise a different one.
   mocks.getActiveLane.mockResolvedValue('local')
@@ -460,5 +463,60 @@ describe('attachment persistence round-trip', () => {
 
     const message = useChatStore.getState().messages.find((item) => item.id === 'user-2')
     expect(message?.attachmentPaths).toBeUndefined()
+  })
+})
+
+describe('approveToolConfirmation', () => {
+  it('starts the continuation run and shows the tool-execution phase', async () => {
+    const source = assistantMessage({ id: 'assistant-1', isStreaming: false, runStatus: 'complete' })
+    useChatStore.setState({
+      messages: [source],
+      conversations: [conversation([source])],
+      activeConversationId: 'conversation-1',
+      activeRunId: null,
+      isStreaming: false,
+      isHydrated: true,
+    })
+
+    await useChatStore.getState().approveToolConfirmation('assistant-1', 'approval-1')
+
+    expect(mocks.chatApproveToolConfirmation).toHaveBeenCalledWith('approval-1')
+    const placeholder = useChatStore.getState().messages.at(-1)
+    expect(placeholder?.parentMessageId).toBe('assistant-1')
+    expect(placeholder?.runPhase).toBe('tool_execution')
+    expect(placeholder?.statusMessage).toBe('Approving tool call')
+  })
+
+  it('refuses to approve against a turn that is still streaming', async () => {
+    // Approving mid-stream would race the run that is still producing the card.
+    await useChatStore.getState().approveToolConfirmation('assistant-1', 'approval-1')
+
+    expect(mocks.chatApproveToolConfirmation).not.toHaveBeenCalled()
+  })
+
+  it('ignores an empty approval id rather than calling Rust with one', async () => {
+    const source = assistantMessage({ isStreaming: false, runStatus: 'complete' })
+    useChatStore.setState({ messages: [source], conversations: [conversation([source])] })
+
+    await useChatStore.getState().approveToolConfirmation('assistant-1', '')
+
+    expect(mocks.chatApproveToolConfirmation).not.toHaveBeenCalled()
+  })
+
+  it('surfaces a stale approval instead of leaving the bubble spinning', async () => {
+    // Approvals are process-local: a card restored after a restart has no
+    // pending registration behind it, and this is where the user finds out.
+    mocks.chatApproveToolConfirmation.mockRejectedValue(new Error('unknown approval id'))
+    const source = assistantMessage({ isStreaming: false, runStatus: 'complete' })
+    useChatStore.setState({
+      messages: [source], conversations: [conversation([source])], isStreaming: false,
+    })
+
+    await useChatStore.getState().approveToolConfirmation('assistant-1', 'approval-stale')
+
+    const placeholder = useChatStore.getState().messages.at(-1)
+    expect(placeholder?.runStatus).toBe('error')
+    expect(placeholder?.isStreaming).toBe(false)
+    expect(placeholder?.error?.code).toBe('tool_approval_start_failed')
   })
 })

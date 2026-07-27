@@ -78,6 +78,27 @@ export function coalesceContentBlocks(blocks: ContentBlock[]): ContentBlock[] {
 }
 
 /**
+ * Whether a tool result is the local engine asking for approval rather than
+ * reporting an outcome.
+ *
+ * Rust returns this shape when a proposed tool call is not provably read-only,
+ * non-destructive and closed-world: the call is stored, NOT executed, and the
+ * user decides. Mirrors Flutter's `_isToolConfirmationRequired`
+ * (gen_ui_widgets/lib/src/content_block_view.dart) field for field — a looser
+ * check here would make React offer approval for results Flutter treats as
+ * plain failures.
+ */
+export function toolApprovalRequest(output: Record<string, unknown>): string | null {
+  if (output.code !== 'local_tool_requires_confirmation') return null
+  if (output.requiresConfirmation !== true) return null
+  if (output.executionStatus !== 'not_executed') return null
+  const approvalId = output.approvalId
+  // Without an id there is nothing to approve — showing the card anyway would
+  // be a button that cannot work.
+  return typeof approvalId === 'string' && approvalId ? approvalId : null
+}
+
+/**
  * Assistant UI models a tool invocation and its eventual result as one
  * `tool-call` resource. The canonical transcript deliberately stores them as
  * two ordered ContentBlocks, so join them at this adapter boundary instead of
@@ -101,12 +122,20 @@ function toAssistantParts(input: ContentBlock[]): AssistantPart[] {
     if (block.type !== 'toolUse') return [toAssistantPart(block)]
 
     const result = results.get(block.id)
+    const output = result ? parseObject(result.outputJson) : null
+    const approvalId = output ? toolApprovalRequest(output) : null
     return [{
       type: 'tool-call',
       toolCallId: block.id,
       toolName: block.name,
       argsText: block.inputJson,
-      ...(result ? { result: parseObject(result.outputJson), isError: result.isError } : {}),
+      ...(result ? { result: output, isError: result.isError } : {}),
+      // React has had the whole approval card built since it shipped; it fires
+      // on `requires-action`, which nothing ever emitted. Setting
+      // `tool_approval: 'ask'` from React's OWN toolbar therefore produced an
+      // unresolvable stall — the model waited on a decision the UI could not
+      // offer.
+      ...(approvalId ? { status: { type: 'requires-action' as const, reason: 'tool-approval' as const } } : {}),
     }]
   })
 }
@@ -165,6 +194,23 @@ function textFromComposer(content: readonly { type: string; text?: string }[]): 
   return content.filter((part) => part.type === 'text').map((part) => part.text ?? '').join('\n').trim()
 }
 
+/** The literal the approval card sends on Allow (tool-fallback.tsx). */
+const APPROVED_RESULT = 'Approved by user'
+
+/** Find the approval id behind a tool call, so a decision can be routed to Rust.
+ *
+ *  The id lives in the toolResult payload rather than on the part, because the
+ *  part is assistant-ui's shape and the payload is Rust's. */
+function approvalIdFor(messages: Message[], messageId: string, toolCallId: string): string | null {
+  const message = messages.find((item) => item.id === messageId)
+  if (!message) return null
+  for (const block of message.content) {
+    if (block.type !== 'toolResult' || block.toolUseId !== toolCallId) continue
+    return toolApprovalRequest(parseObject(block.outputJson))
+  }
+  return null
+}
+
 export function useAssistantChatRuntime() {
   const messages = useChatStore((state) => state.messages)
   const isStreaming = useChatStore((state) => state.isStreaming)
@@ -180,6 +226,7 @@ export function useAssistantChatRuntime() {
   const sendSteer = useChatStore((state) => state.sendSteer)
   const pendingSteer = useChatStore((state) => state.pendingSteer)
   const disarmSteer = useChatStore((state) => state.disarmSteer)
+  const approveToolConfirmation = useChatStore((state) => state.approveToolConfirmation)
   const initLane = useLaneStore((state) => state.init)
 
   useEffect(() => {
@@ -219,6 +266,20 @@ export function useAssistantChatRuntime() {
       await sendMessage(body, attachments.length > 0 ? { attachments } : undefined)
     },
     onCancel: cancelActiveRun,
+    // The approval card's Allow/Deny lands here. React has always HAD the card;
+    // with nothing emitting `requires-action` and nothing receiving the answer,
+    // setting `tool_approval: 'ask'` from React's own toolbar was a stall the
+    // user could not resolve.
+    onAddToolResult: async ({ messageId, toolCallId, result }) => {
+      const approvalId = approvalIdFor(useChatStore.getState().messages, messageId, toolCallId)
+      if (!approvalId) return
+      // Denial needs no round trip: the call was never executed, so there is
+      // nothing to undo and no continuation to start. Rust keeps the pending
+      // registration until the process ends, which is the correct outcome for
+      // a call the user rejected.
+      if (result !== APPROVED_RESULT) return
+      await approveToolConfirmation(messageId, approvalId)
+    },
     adapters: {
       // Registered at last: the Plus button, the dropzone and the chip row have
       // always rendered, but with no adapter behind them picking a file did

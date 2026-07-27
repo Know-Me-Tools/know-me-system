@@ -5,6 +5,7 @@ import { subscribeWithSelector } from 'zustand/middleware'
 import { isTauri } from '@tauri-apps/api/core'
 import {
   cancelAgentRun,
+  chatApproveToolConfirmation,
   memoryDeleteConversationContext,
   memoryDeleteMessageContext,
   onChatEvent,
@@ -335,6 +336,8 @@ interface ChatActions {
   armSteer: () => void
   disarmSteer: () => void
   submitInteraction: (interaction: unknown) => Promise<void>
+  /** Run a tool call the local model proposed and KnowMe refused to auto-run. */
+  approveToolConfirmation: (sourceMessageId: string, approvalId: string) => Promise<void>
   resubmitMessage: (userMessageId: string) => Promise<void>
   deleteResponse: (assistantMessageId: string) => Promise<void>
   regenerateResponse: (assistantMessageId: string) => Promise<void>
@@ -553,6 +556,61 @@ export const useChatStore = create<ChatState & ChatActions>()(
 
       armSteer: () => set((s) => { s.pendingSteer = true }),
       disarmSteer: () => set((s) => { s.pendingSteer = false }),
+
+      approveToolConfirmation: async (sourceMessageId: string, approvalId: string) => {
+        if (!approvalId) return
+        const source = get().messages.find((item) => item.id === sourceMessageId)
+        // Only a settled assistant turn can be approved: approving mid-stream
+        // would race the run that is still producing the card.
+        if (!source || source.role !== 'assistant' || source.isStreaming) return
+
+        const branchId = source.branchId ?? get().activeConversationId
+        const assistantId = crypto.randomUUID()
+        const assistantMsg: Message = {
+          id: assistantId,
+          role: 'assistant',
+          content: [],
+          timestamp: new Date().toISOString(),
+          isStreaming: true,
+          parentMessageId: source.id,
+          branchId,
+          runStatus: 'queued',
+          runPhase: 'tool_execution',
+          statusMessage: 'Approving tool call',
+        }
+        set((s) => {
+          s.messages.push(assistantMsg)
+          s.isStreaming = true
+          const conversation = s.conversations.find((item) => item.id === s.activeConversationId)
+          if (conversation) { conversation.messages = s.messages; conversation.updatedAt = new Date().toISOString() }
+        })
+        persistActiveConversation()
+
+        if (!isTauri()) {
+          // Approvals live in the Rust process registry; the browser lane has
+          // no engine proposing local tool calls in the first place.
+          get().updateLifecycle({ type: 'error', messageId: assistantId, runId: assistantId, error: {
+            code: 'tool_approval_unavailable', phase: 'tool_execution',
+            message: 'Tool approval requires the desktop app.', retryable: false,
+          } })
+          return
+        }
+
+        wireAdapter.bind(assistantId)
+        try {
+          await chatApproveToolConfirmation(approvalId)
+        } catch (error) {
+          get().updateLifecycle({ type: 'error', messageId: assistantId, runId: assistantId, error: {
+            code: 'tool_approval_start_failed', phase: 'tool_execution',
+            // Approvals are process-local: a card restored after a restart has
+            // no pending registration behind it, and this is where the user
+            // finds that out rather than watching a bubble spin.
+            message: error instanceof Error ? error.message : 'The tool approval could not be started.',
+            retryable: false,
+          } })
+        }
+        persistActiveConversation()
+      },
 
       submitInteraction: async (interaction: unknown) => {
         const parent = get().messages.at(-1)
