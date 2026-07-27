@@ -11,7 +11,7 @@
 // desktop that reads as a modal interruption for a routine choice, so this uses
 // a dropdown at pointer widths and falls back to a bottom drawer on narrow
 // viewports where a dropdown would be a cramped popover.
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Cpu, Network } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -205,6 +205,9 @@ export function ChatModePicker() {
   // The radio group is keyed by choice, so the selected row is the selected key.
   const selectedKey = choices.find((choice) => choice.selected)?.key ?? ''
 
+  // Set by the keyboard handler so the click it also generates is ignored.
+  const keyboardActivated = useRef(false)
+
   function choose(choice: ModeChoice) {
     void control.setMode(choice.mode, choice.agentId)
   }
@@ -257,27 +260,44 @@ export function ChatModePicker() {
             raw buttons rendered a menu the arrow keys could not move within —
             open but keyboard-inert. The primitives supply the role, aria-checked
             and focus management; the visual row stays ours. */}
-        <DropdownMenuRadioGroup
-          value={selectedKey}
-          // Base UI dispatches selection through onValueChange, NOT a raw
-          // onClick on the item: an onClick handler fires but leaves the menu's
-          // own state untouched, so the menu stayed open and keyboard Enter —
-          // which never synthesises a click — did nothing at all. Going through
-          // the group's contract fixes activation and dismissal together.
-          onValueChange={(value) => {
-            const picked = choices.find((choice) => choice.key === value)
-            if (picked) choose(picked)
-          }}
-        >
+        <DropdownMenuRadioGroup value={selectedKey}>
           {choices.map((choice) => (
             <DropdownMenuRadioItem
               key={choice.key}
               value={choice.key}
               disabled={Boolean(choice.blockedReason)}
-              // Radio items default to closeOnClick:false so a menu can hold
+              // Radio items default to closeOnClick:false so one menu can hold
               // several groups. This menu is a single either/or choice, so
               // leaving it open after a pick reads as the click not registering.
               closeOnClick
+              // Keyboard activation, explicitly.
+              //
+              // Base UI's button layer routes Enter on a non-native element to
+              // the item's EXTERNAL onClick, but MenuRadioItem installs its own
+              // onClick earlier in the merge chain and that one wins — so Enter
+              // reached nothing, and a row was arrow-reachable yet impossible
+              // to activate (WCAG 2.1.1). onKeyDown is passed through ahead of
+              // the library's handling, so it is the hook that reliably fires.
+              //
+              // Both handlers are required and they overlap: Enter also
+              // produces a click here, so the two together fired `choose` TWICE
+              // — two lane switches and two policy writes for one pick. The
+              // keyboard handler claims the activation and the click handler
+              // stands down for it, rather than dropping either one (keyboard
+              // alone breaks the mouse; click alone is the original bug).
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return
+                event.preventDefault()
+                keyboardActivated.current = true
+                choose(choice)
+              }}
+              onClick={() => {
+                if (keyboardActivated.current) {
+                  keyboardActivated.current = false
+                  return
+                }
+                choose(choice)
+              }}
               className={
                 choice.blockedReason
                   ? 'min-h-11 gap-3 px-3 py-2 text-[color:var(--color-fg-sub)]'
