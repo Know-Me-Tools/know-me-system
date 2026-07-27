@@ -584,6 +584,25 @@ class _LocalModelsPanel extends ConsumerWidget {
               Text(
                 'State: ${model['state'] ?? 'notInstalled'} · Backend: ${diagnostics['backend'] ?? diagnostics['activeBackend'] ?? 'not loaded'}',
               ),
+              // Rust computes a fallback reason whenever the engine runs on
+              // something other than its first choice — CPU instead of GPU/NPU,
+              // or a smaller model after a memory preflight refusal. It was
+              // never rendered, so the one place a user (or a certification
+              // run) could see WHY the device is on this backend showed only
+              // the backend itself.
+              if (diagnostics['fallback_reason'] != null ||
+                  diagnostics['fallbackReason'] != null) ...[
+                const SizedBox(height: 4),
+                Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    'Fallback: ${diagnostics['fallback_reason'] ?? diagnostics['fallbackReason']}',
+                    style: TextStyle(
+                      color: shad.Theme.of(context).colorScheme.mutedForeground,
+                    ),
+                  ),
+                ),
+              ],
               if (model['progress'] is num) ...[
                 const SizedBox(height: 12),
                 LinearProgressIndicator(

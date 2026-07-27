@@ -668,6 +668,21 @@ impl InferenceProvider for LiteRtLmEngine {
             gate_report: litert_lm_gate_report(None, false, false),
         };
 
+        // Emit the backend choice AND why it is not on a faster one. The reason
+        // was computed here from the start but only ever reached the Settings
+        // screen, so a device certification run had no way to record which
+        // backend was selected or what it fell back from — the one line that
+        // makes the fallback contract observable off-device.
+        tracing::info!(
+            target: "knowme_litert_lm",
+            backend = %diagnostics.backend,
+            fallback_reason = %diagnostics
+                .fallback_reason
+                .as_deref()
+                .unwrap_or("none"),
+            "LiteRT-LM runtime diagnostics"
+        );
+
         #[cfg(target_os = "android")]
         {
             let runtime_cache = self.cache_dir.join("runtime-cache");

@@ -95,10 +95,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     return KnowMeScreen(
       title: 'Chat',
       trailing: [
-        shad.GhostButton(
-          onPressed: _openConversations,
-          density: shad.ButtonDensity.icon,
-          child: const Icon(Icons.forum_outlined),
+        // Icon-only, so it carried no accessible name at all: a screen reader
+        // announced nothing, and a certification run had no way to find the one
+        // control that opens the thread list.
+        Semantics(
+          button: true,
+          label: 'Conversations',
+          excludeSemantics: true,
+          child: shad.GhostButton(
+            onPressed: _openConversations,
+            density: shad.ButtonDensity.icon,
+            child: const Icon(Icons.forum_outlined),
+          ),
         ),
         const SyncChip(),
       ],
@@ -1384,15 +1392,20 @@ class _ConversationSheetState extends ConsumerState<_ConversationSheet> {
                       ),
                     ),
                   ),
-                  shad.PrimaryButton(
-                    onPressed: () async {
-                      await ref
-                          .read(chatProvider.notifier)
-                          .createConversation();
-                      await widget.close();
-                    },
-                    density: shad.ButtonDensity.icon,
-                    child: const Icon(Icons.add),
+                  Semantics(
+                    button: true,
+                    label: 'New conversation',
+                    excludeSemantics: true,
+                    child: shad.PrimaryButton(
+                      onPressed: () async {
+                        await ref
+                            .read(chatProvider.notifier)
+                            .createConversation();
+                        await widget.close();
+                      },
+                      density: shad.ButtonDensity.icon,
+                      child: const Icon(Icons.add),
+                    ),
                   ),
                 ],
               ),

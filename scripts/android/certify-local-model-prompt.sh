@@ -188,6 +188,33 @@ if ! tap_matching_node "Ask KnowMe anything"; then
   sleep 1
 fi
 
+# Start a fresh conversation when asked. A long-running device carries the whole
+# session's prior turns: an observed run reached history_count=108, and the model
+# emitted 4-, 6- and 2-character fragments with tool_calls=0 — the instruction was
+# drowned by context rather than refused. Gates that depend on the model FOLLOWING
+# an instruction need a clean thread; gates that only need a reply do not, so this
+# is opt-in.
+if [[ "${CERT_NEW_CONVERSATION:-0}" == "1" ]]; then
+  if tap_matching_node "Conversations"; then
+    sleep 1
+    if tap_matching_node "New conversation" || tap_matching_node "New Thread"; then
+      echo "started a fresh conversation for this run" >&2
+      sleep 2
+    else
+      echo "CERT FAIL: found the conversations sheet but not its new-conversation control" >&2
+      exit 70
+    fi
+  else
+    # Hard failure, not a warning. A run that silently falls back to existing
+    # history looks like a model failure when it is really an unexercised setup
+    # step — three runs were spent that way before this was caught.
+    echo "CERT FAIL: CERT_NEW_CONVERSATION=1 but the conversations control was not found" >&2
+    echo "  the run would have used existing history, which invalidates any gate" >&2
+    echo "  that depends on the model following an instruction" >&2
+    exit 70
+  fi
+fi
+
 if ! tap_matching_node "Ask KnowMe anything"; then
   echo "composer placeholder not found; using bottom-screen tap fallback" >&2
   tap_composer_fallback
