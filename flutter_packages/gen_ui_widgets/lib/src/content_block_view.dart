@@ -71,6 +71,7 @@ class ContentBlockView extends StatelessWidget {
     this.isStreaming = false,
     this.onInteraction,
     this.remoteResolver,
+    this.mediaActionsBuilder,
     super.key,
   });
 
@@ -78,6 +79,10 @@ class ContentBlockView extends StatelessWidget {
   final bool isStreaming;
   final AgentInteractionCallback? onInteraction;
   final RemoteContentResolver? remoteResolver;
+
+  /// Supplies Save/Share controls for media stored on disk. Null renders none,
+  /// which is right for surfaces with no filesystem access.
+  final MediaActionsBuilder? mediaActionsBuilder;
 
   @override
   Widget build(BuildContext context) => switch (block) {
@@ -137,6 +142,7 @@ class ContentBlockView extends StatelessWidget {
         // needs an accessible name, and older blocks carry no alt.
         alt: alt ?? 'Generated image',
         remoteResolver: remoteResolver,
+        mediaActionsBuilder: mediaActionsBuilder,
       ),
     DividerBlock() => const ContentBlockDivider(),
   };
@@ -884,6 +890,15 @@ String _activityTitle(String kind) {
   return '${name.isEmpty ? 'Agent' : name[0].toUpperCase() + name.substring(1)} activity';
 }
 
+/// Builds the Save/Share controls for a file in app-owned storage.
+///
+/// The app supplies this; the widget package has no plugins of its own.
+typedef MediaActionsBuilder = List<Widget> Function({
+  required String path,
+  required String fileName,
+  required String mime,
+});
+
 class ContentBlockImage extends StatefulWidget {
   const ContentBlockImage({
     required this.url,
@@ -892,6 +907,7 @@ class ContentBlockImage extends StatefulWidget {
     this.path,
     this.alt = 'Generated image',
     this.remoteResolver,
+    this.mediaActionsBuilder,
     super.key,
   });
 
@@ -907,6 +923,14 @@ class ContentBlockImage extends StatefulWidget {
   final String? path;
   final String alt;
   final RemoteContentResolver? remoteResolver;
+
+  /// Builds Save/Share controls for a stored file.
+  ///
+  /// Injected because this package cannot depend on the app's plugins, and
+  /// because what is offerable differs by platform. Null (the default) renders
+  /// no media actions at all, which is correct for remote images that were
+  /// never written to disk.
+  final MediaActionsBuilder? mediaActionsBuilder;
 
   @override
   State<ContentBlockImage> createState() => _ContentBlockImageState();
@@ -983,6 +1007,15 @@ class _ContentBlockImageState extends State<ContentBlockImage> {
         icon: Icons.image_outlined,
         label: mime,
         copyValue: widget.url ?? dataBase64 ?? '',
+        // Only for media that actually exists on disk. A remote image was
+        // never written locally, so offering Save would promise something
+        // this block cannot deliver.
+        actions: switch ((widget.path, widget.mediaActionsBuilder)) {
+          (final String path, final MediaActionsBuilder build)
+              when path.isNotEmpty =>
+            build(path: path, fileName: widget.alt, mime: widget.mime),
+          _ => const [],
+        },
       ),
       child: Padding(
         padding: const EdgeInsets.only(top: 8),
@@ -1578,12 +1611,20 @@ class _BlockHeader extends StatelessWidget {
     required this.label,
     required this.copyValue,
     this.status,
+    this.actions = const [],
   });
 
   final IconData icon;
   final String label;
   final String copyValue;
   final String? status;
+
+  /// Extra controls beside Copy — Save and Share for media.
+  ///
+  /// Supplied by the app rather than built here: this package must not depend
+  /// on the app's plugins, and the platform capabilities differ per surface
+  /// (Linux has no file share sheet at all).
+  final List<Widget> actions;
 
   @override
   Widget build(BuildContext context) {
@@ -1604,6 +1645,7 @@ class _BlockHeader extends StatelessWidget {
             ),
           ),
         ),
+        ...actions,
         _CopyButton(value: copyValue, label: 'Copy $label'),
       ],
     );

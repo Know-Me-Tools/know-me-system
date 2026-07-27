@@ -18,6 +18,7 @@ import '../../domain/entities/chat_message.dart';
 import '../providers/chat_repository_provider.dart';
 import '../providers/chat_notifier.dart';
 import '../widgets/chat_policy_toolbar.dart';
+import '../widgets/media_action_buttons.dart';
 
 /// Chat surface. Renders each message's ContentBlocks with the shared
 /// ContentBlockView (exhaustive over all 11 variants — a compile-time contract).
@@ -608,6 +609,7 @@ class _MessageBubble extends StatelessWidget {
                   isStreaming: message.isStreaming && i == blocks.length - 1,
                   onInteraction: onInteraction,
                   remoteResolver: remoteResolver,
+                  mediaActionsBuilder: buildMediaActionButtons,
                 ),
               if (message.isStreaming && message.content.isEmpty)
                 Semantics(
@@ -725,6 +727,7 @@ class _AssistantTurn extends StatelessWidget {
                       message.isStreaming && index == snapshot.length - 1,
                   onInteraction: onInteraction,
                   remoteResolver: remoteResolver,
+                  mediaActionsBuilder: buildMediaActionButtons,
                 ),
             ],
           ),
