@@ -468,11 +468,17 @@ export interface RunPolicy {
   context_strategy: unknown | null;
   tool_approval: "inherit" | "auto" | "ask" | "deny";
 }
+export interface UnavailableResource {
+  resource: string;
+  reason: string;
+  platformLimitation: boolean;
+}
 export interface ChatControlPlaneCatalog {
   agents: unknown;
   skills: unknown;
   tools: unknown;
   knowledgeBases: unknown;
+  unavailable?: UnavailableResource[];
 }
 export interface UarAdminSnapshot {
   settings: unknown;
@@ -483,6 +489,7 @@ export interface UarAdminSnapshot {
   knowledgeBases: unknown;
   mcpServers: unknown;
   memories: unknown;
+  unavailable?: UnavailableResource[];
 }
 export function chatControlCatalog(): Promise<ChatControlPlaneCatalog> {
   return invoke<ChatControlPlaneCatalog>(cmd("chat_control_catalog"));

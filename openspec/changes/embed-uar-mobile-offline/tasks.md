@@ -20,16 +20,23 @@
 
 - [x] 3.1 Inject durable sandboxed persistence for agents, skills, policies, settings, memory, knowledge, conversations, run state, and A2UI data
 - [ ] 3.2 Expose direct FFI operations for agent administration, provider/model catalog, settings, skills, MCP/native tools, knowledge, memory, run policy, and A2UI registry/actions
-- [/] 3.3 Ensure network/process-dependent resources advertise requirements and are visibly unavailable under offline mobile policy
+- [x] 3.3 Ensure network/process-dependent resources advertise requirements and are visibly unavailable under offline mobile policy
   - RUST DONE: ChatControlPlaneCatalog and UarAdminSnapshot now carry an
     `unavailable: [{resource, reason, platformLimitation}]` list. Previously a
     client could not tell "no skills configured" from "skills unavailable
     here" — both arrived as []. Carried ALONGSIDE the arrays so existing
     consumers keep working; omitted entirely when nothing is unavailable.
     2 contract tests; 92/92 gen_ui_agent tests pass.
-  - REMAINING: neither UI consumes it yet. Flutter and React still render the
-    empty arrays without the reason, so the user-visible half of this task is
-    not done.
+  - UI DONE both surfaces. React ChatPolicyToolbar and the Flutter resource
+    sheet now render "Not available on this device" plus the runtime's reason
+    instead of an empty list. React previously said "No enabled resources are
+    advertised by UAR" (reads as "none configured"); Flutter rendered nothing
+    at all. platformLimitation decides whether "try again" is offered, so the
+    UI never suggests a retry that cannot work.
+    Tests: 3 React + 3 Flutter, incl. matching the sheet's snake_case policy
+    key against the camelCase wire name — a mismatch there would silently show
+    no reason. 161/161 desktop, 53/53 flutter chat, 92/92 rust, tsc + analyze
+    clean. a11y: Semantics label / role="note", heading text not colour alone.
 - [x] 3.4 Verify built-in default and orchestrator agents are seeded, protected from deletion, and default to the local model without keys
 
 ## 4. Client Integration
