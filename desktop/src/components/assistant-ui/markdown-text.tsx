@@ -76,7 +76,10 @@ const useCopyToClipboard = ({
   return { isCopied, copyToClipboard };
 };
 
-const MermaidBlock: FC<{ source: string }> = ({ source }) => {
+/** Exported so the artifact renderer can reuse it: a `mermaid` artifact and a
+ *  mermaid fence inside markdown must render identically, and duplicating the
+ *  loader would give them two different themes and two different error states. */
+export const MermaidBlock: FC<{ source: string }> = ({ source }) => {
   const reactId = useId();
   const [svg, setSvg] = useState<string>("");
   const [error, setError] = useState<string | null>(null);

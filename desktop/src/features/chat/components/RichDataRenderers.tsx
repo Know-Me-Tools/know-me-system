@@ -1,12 +1,12 @@
 // TJ-ARCH-MOB-001 compliant — Assistant UI data-part registration.
 import { useAssistantDataUI, type DataMessagePartComponent } from '@assistant-ui/react'
-import DOMPurify from 'dompurify'
 import { useMemo, useState } from 'react'
 import { AlertTriangle, Ban, BookOpenText, Brain, LoaderCircle, PackageOpen, Send, Sparkles } from 'lucide-react'
 import type { ContentBlock } from '@/bridge/a2ui/types'
 import { Button } from '@/components/ui/button'
 import { useChat } from '../hooks/useChat'
 import { A2uiArtifactRenderer } from './A2uiArtifactRenderer'
+import { ArtifactKindBody, artifactKind } from './ArtifactKindBody'
 
 type BlockOf<T extends ContentBlock['type']> = Extract<ContentBlock, { type: T }>
 
@@ -69,17 +69,14 @@ function isInteractiveArtifact(kind: string, payload: Record<string, unknown> | 
 
 const ArtifactData: DataMessagePartComponent<BlockOf<'artifact'>> = ({ data }) => {
   const { submitInteraction } = useChat()
-  const isSvg = data.kind.toLowerCase() === 'svg'
-  const isA2ui = /(^a2ui$|application\/a2ui\+json)/i.test(data.kind)
+  const kind = artifactKind(data.kind)
+  const isA2ui = kind === 'a2ui'
   const payload = useMemo(() => parseJsonObject(data.content), [data.content])
   const interactive = isInteractiveArtifact(data.kind, payload)
   const [responseJson, setResponseJson] = useState(() => defaultArtifactResponse(payload))
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
-  const safeSvg = isSvg
-    ? DOMPurify.sanitize(data.content, { USE_PROFILES: { svg: true, svgFilters: true } })
-    : ''
   const submitResponse = async () => {
     const response = parseJsonObject(responseJson)
     if (!response) {
@@ -109,20 +106,8 @@ const ArtifactData: DataMessagePartComponent<BlockOf<'artifact'>> = ({ data }) =
       <div className="flex items-center gap-2 bg-[color:var(--color-card)] px-4 py-3"><PackageOpen className="size-4 text-[color:var(--color-ember)]" /><span className="eyebrow">Artifact · {data.kind}</span></div>
       {isA2ui ? (
         <A2uiArtifactRenderer source={data.content} title={`Artifact ${data.id}`} sourceRunId={data.id} onAction={submitInteraction} />
-      ) : isSvg ? (
-        <div
-          className="max-h-[36rem] overflow-auto bg-[color:var(--color-muted)] p-4 [&_svg]:mx-auto [&_svg]:max-w-full"
-          role="img"
-          aria-label="Generated SVG artifact"
-          dangerouslySetInnerHTML={{ __html: safeSvg }}
-        />
       ) : (
-        <details className="group bg-[color:var(--color-bg-2)]">
-          <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-[color:var(--color-fg-sub)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[color:var(--color-ember)]">
-            View event payload
-          </summary>
-          <pre className="max-h-80 overflow-auto whitespace-pre-wrap px-4 pb-4 font-mono text-xs text-[color:var(--color-fg-sub)]">{data.content}</pre>
-        </details>
+        <ArtifactKindBody kind={kind} rawKind={data.kind} content={data.content} />
       )}
       {interactive && !isA2ui ? (
         <div className="space-y-3 bg-[color:var(--color-bg-2)] p-4">
