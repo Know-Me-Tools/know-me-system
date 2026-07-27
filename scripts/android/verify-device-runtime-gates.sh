@@ -34,8 +34,16 @@ ABI="$(adb shell getprop ro.product.cpu.abi | tr -d '\r')"
 SOC="$(adb shell getprop ro.soc.model | tr -d '\r')"
 
 echo "Device: ${MANUFACTURER:-unknown} ${DEVICE:-unknown}, Android ${RELEASE:-unknown}/API ${SDK:-unknown}, ABI ${ABI:-unknown}, SoC ${SOC:-unknown}"
-echo "Installing: $APK"
-adb install -r "$APK" >/dev/null
+# Reinstalling resets per-conversation state, including the chat mode. A gate
+# that needs the CURRENT Local selection preserved (the fallback gate, which can
+# only observe a local-engine load) sets CERT_SKIP_INSTALL=1; every other caller
+# still gets a clean install by default.
+if [[ "${CERT_SKIP_INSTALL:-0}" == "1" ]]; then
+  echo "Skipping install (CERT_SKIP_INSTALL=1); using the build already on device"
+else
+  echo "Installing: $APK"
+  adb install -r "$APK" >/dev/null
+fi
 
 adb shell am force-stop "$PACKAGE" >/dev/null 2>&1 || true
 adb logcat -c

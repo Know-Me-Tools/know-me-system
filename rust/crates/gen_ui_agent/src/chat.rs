@@ -48,6 +48,14 @@ const LANE_UAR: &str = "uar";
 /// bundled local engine; cloud is BYOK and therefore cannot be the zero-config
 /// default. Builds without a local engine still fall back to cloud visibly.
 const SETTING_ACTIVE_LANE: &str = "active_lane";
+const SETTING_LOCAL_SYSTEM_PROMPT: &str = "local_system_prompt";
+
+/// Shipped default for the local lane's system prompt.
+///
+/// Stored in the local settings database on first read so the user can edit it
+/// in Settings; this constant is only the seed and the reset target, never a
+/// silent override of a saved value.
+pub const DEFAULT_LOCAL_SYSTEM_PROMPT: &str = "You are KnowMe, a helpful private assistant. Follow the user's instructions, use available tools when useful, and answer in the user's language.";
 const SETTING_THEME_MODE: &str = "theme_mode";
 const SETTING_UAR_SERVICE_URL: &str = "uar_service_url";
 const SETTING_UAR_SERVICE_API_KEY_REF: &str = "uar_service_api_key_ref";
@@ -58,7 +66,13 @@ const SETTING_UAR_DEPLOYMENT_MODE: &str = "uar_deployment_mode";
 const DEFAULT_LOCAL_MODEL: &str = "qwen3.5-4b-mlx-4bit";
 #[cfg(target_os = "android")]
 const DEFAULT_LOCAL_MODEL: &str = "gemma-4-e2b-it-litertlm";
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
+// macOS desktop runs the MLX (mlex) engine, so its default must be an MLX
+// catalog id (the same Qwen3-4B MLX set iOS uses) — a GGUF id would not resolve
+// against `mlx_artifact_set_for_id` and would fail to prepare local inference.
+#[cfg(target_os = "macos")]
+const DEFAULT_LOCAL_MODEL: &str = "qwen3.5-4b-mlx-4bit";
+// Windows/Linux desktop runs llama.cpp, so its default is the pinned GGUF model.
+#[cfg(not(any(target_os = "ios", target_os = "android", target_os = "macos")))]
 const DEFAULT_LOCAL_MODEL: &str = "qwen3-4b-instruct-2507-q5-k-m";
 
 /// Sampling defaults for the local lane, used when a model_pref's `params`
@@ -70,6 +84,10 @@ const DEFAULT_TOP_K: i32 = 20;
 const DEFAULT_MIN_P: f32 = 0.0;
 const DEFAULT_MAX_TOKENS: u32 = 1024;
 const MAX_LOCAL_TOOL_REPAIR_ATTEMPTS: u8 = 2;
+/// Upper bound on tool declarations sent to a local model in one turn. Local
+/// models (notably the Android LiteRT-LM Gemma lane) have a small context
+/// window, so an unbounded registry would crowd out the conversation itself.
+const MAX_LOCAL_TOOL_DECLARATIONS: usize = 16;
 
 /// Request-scoped cloud credentials for anonymous hosted-web BYOK. The Axum
 /// leaf owns the lifetime: this value is never persisted or placed in global
@@ -172,13 +190,7 @@ pub async fn send(
 ) -> Result<String, AgentError> {
     let run_id = uuid::Uuid::new_v4().to_string();
 
-    // Which lane? Unset → local when this surface ships an engine. This makes
-    // first-run chat functional without a provider account or API key.
-    let lane = state::config()?
-        .get_setting(SETTING_ACTIVE_LANE)
-        .await?
-        .and_then(|v| v.as_str().map(str::to_owned))
-        .unwrap_or_else(default_lane);
+    let lane = resolve_lane_for_conversation(&conversation_id).await?;
 
     if lane == LANE_LOCAL {
         return send_local(
@@ -192,7 +204,7 @@ pub async fn send(
         .await;
     }
     if lane == LANE_UAR {
-        return send_uar(user_message, conversation_id, run_id).await;
+        return send_uar(user_message, history, conversation_id, run_id).await;
     }
 
     let pref = state::config()?
@@ -242,17 +254,13 @@ pub async fn send_with_attachments(
     use base64::Engine as _;
     let run_id = uuid::Uuid::new_v4().to_string();
 
-    let lane = state::config()?
-        .get_setting(SETTING_ACTIVE_LANE)
-        .await?
-        .and_then(|value| value.as_str().map(str::to_owned))
-        .unwrap_or_else(default_lane);
+    let lane = resolve_lane_for_conversation(&conversation_id).await?;
     if lane == LANE_LOCAL {
         let mut local_prompt = user_message.clone();
         local_prompt.push_str("\n\nAttached files (processed by xberg):\n");
         let mut images = Vec::new();
         for path in attachment_paths.into_iter().take(6) {
-            let attachment = read_attachment(&path).await?;
+            let attachment = read_attachment(&path, &conversation_id).await?;
             let processed = gen_ui_document::process_bytes(
                 attachment.file_name.clone(),
                 attachment.bytes.clone(),
@@ -305,7 +313,7 @@ pub async fn send_with_attachments(
     local_fallback.push_str("\n\nAttached files (xberg extraction):\n");
     let mut parts = vec![ContentPart::Text { text: user_message }];
     for path in attachment_paths.into_iter().take(6) {
-        let attachment = read_attachment(&path).await?;
+        let attachment = read_attachment(&path, &conversation_id).await?;
         local_fallback.push_str(&format!(
             "\n- {} ({} bytes)\n",
             attachment.file_name,
@@ -379,13 +387,22 @@ struct AttachmentData {
     mime: String,
     is_image: bool,
     is_document: bool,
+    is_video: bool,
     bytes: Vec<u8>,
+    /// Path inside app-owned storage — NOT the path the picker returned.
+    ///
+    /// The picked path is not safe to keep: on Android `file_picker` hands back
+    /// a purgeable cache path, so a transcript pointing at it renders during
+    /// testing and breaks after the cache is cleared. Blocks carry this path.
+    stored_path: std::path::PathBuf,
 }
 
-async fn read_attachment(path: &str) -> Result<AttachmentData, AgentError> {
+async fn read_attachment(path: &str, conversation_id: &str) -> Result<AttachmentData, AgentError> {
     let metadata = tokio::fs::metadata(path)
         .await
         .map_err(|error| AgentError::Attachment(format!("cannot open selected file: {error}")))?;
+    // Checked BEFORE reading or copying: an over-cap file must never be pulled
+    // into memory or written into app storage first and rejected after.
     if !metadata.is_file() || metadata.len() > gen_ui_document::MAX_INPUT_BYTES {
         return Err(AgentError::Attachment(
             "selected file is not a regular file or exceeds 25 MB".into(),
@@ -405,53 +422,65 @@ async fn read_attachment(path: &str) -> Result<AttachmentData, AgentError> {
     let bytes = tokio::fs::read(path)
         .await
         .map_err(|error| AgentError::Attachment(format!("cannot read selected file: {error}")))?;
-    let (mime, is_image, is_document) = attachment_kind(&extension);
+    let (mime, is_image, is_document, is_video) = attachment_kind(&extension);
+    let stored_path = crate::attachment_store::store(conversation_id, &extension, &bytes).await?;
     Ok(AttachmentData {
         file_name,
         extension,
         mime: mime.to_owned(),
         is_image,
         is_document,
+        is_video,
         bytes,
+        stored_path,
     })
 }
 
-fn attachment_kind(extension: &str) -> (&'static str, bool, bool) {
+/// `(mime, is_image, is_document, is_video)`.
+///
+/// Video is its own flag rather than something each renderer re-derives by
+/// string-matching the mime: three surfaces guessing at `mime.startsWith("video/")`
+/// is how the kind hardcodes got out of step in the first place.
+pub(crate) fn attachment_kind(extension: &str) -> (&'static str, bool, bool, bool) {
     match extension {
-        "png" => ("image/png", true, false),
-        "jpg" | "jpeg" => ("image/jpeg", true, false),
-        "gif" => ("image/gif", true, false),
-        "webp" => ("image/webp", true, false),
-        "svg" => ("image/svg+xml", true, false),
-        "pdf" => ("application/pdf", false, true),
-        "txt" => ("text/plain", false, true),
-        "md" => ("text/markdown", false, true),
-        "json" => ("application/json", false, true),
-        "csv" => ("text/csv", false, true),
-        "doc" => ("application/msword", false, true),
+        "png" => ("image/png", true, false, false),
+        "jpg" | "jpeg" => ("image/jpeg", true, false, false),
+        "gif" => ("image/gif", true, false, false),
+        "webp" => ("image/webp", true, false, false),
+        "svg" => ("image/svg+xml", true, false, false),
+        "pdf" => ("application/pdf", false, true, false),
+        "txt" => ("text/plain", false, true, false),
+        "md" => ("text/markdown", false, true, false),
+        "json" => ("application/json", false, true, false),
+        "csv" => ("text/csv", false, true, false),
+        "doc" => ("application/msword", false, true, false),
         "docx" => (
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             false,
             true,
+            false,
         ),
-        "xls" => ("application/vnd.ms-excel", false, true),
+        "xls" => ("application/vnd.ms-excel", false, true, false),
         "xlsx" => (
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             false,
             true,
+            false,
         ),
-        "ppt" => ("application/vnd.ms-powerpoint", false, true),
+        "ppt" => ("application/vnd.ms-powerpoint", false, true, false),
         "pptx" => (
             "application/vnd.openxmlformats-officedocument.presentationml.presentation",
             false,
             true,
+            false,
         ),
-        "html" | "htm" => ("text/html", false, true),
-        "xml" => ("application/xml", false, true),
-        "zip" => ("application/zip", false, true),
-        "mp4" => ("video/mp4", false, false),
-        "webm" => ("video/webm", false, false),
-        _ => ("application/octet-stream", false, false),
+        "html" | "htm" => ("text/html", false, true, false),
+        "xml" => ("application/xml", false, true, false),
+        "zip" => ("application/zip", false, true, false),
+        "mp4" => ("video/mp4", false, false, true),
+        "webm" => ("video/webm", false, false, true),
+        "mov" => ("video/quicktime", false, false, true),
+        _ => ("application/octet-stream", false, false, false),
     }
 }
 
@@ -463,11 +492,7 @@ async fn send_content(
     branch_id: String,
     run_id: String,
 ) -> Result<String, AgentError> {
-    let lane = state::config()?
-        .get_setting(SETTING_ACTIVE_LANE)
-        .await?
-        .and_then(|value| value.as_str().map(str::to_owned))
-        .unwrap_or_else(default_lane);
+    let lane = resolve_lane_for_conversation(&conversation_id).await?;
     if lane == LANE_LOCAL {
         return send_local(
             local_fallback,
@@ -480,7 +505,7 @@ async fn send_content(
         .await;
     }
     if lane == LANE_UAR {
-        return send_uar(local_fallback, conversation_id, run_id).await;
+        return send_uar(local_fallback, history, conversation_id, run_id).await;
     }
     let pref = state::config()?
         .get_model_pref(SURFACE_CHAT, LANE_CLOUD)
@@ -529,11 +554,7 @@ pub async fn send_interaction(
             "interaction payload must be a JSON object".into(),
         ));
     }
-    let lane = state::config()?
-        .get_setting(SETTING_ACTIVE_LANE)
-        .await?
-        .and_then(|value| value.as_str().map(str::to_owned))
-        .unwrap_or_else(default_lane);
+    let lane = resolve_lane_for_conversation(&conversation_id).await?;
     if lane == LANE_UAR {
         let run_id = uuid::Uuid::new_v4().to_string();
         return submit_uar_interaction(run_id, conversation_id, value).await;
@@ -991,6 +1012,33 @@ pub async fn active_lane() -> Result<String, AgentError> {
         .unwrap_or_else(default_lane))
 }
 
+/// The local lane's system prompt, falling back to the shipped default.
+///
+/// A blank stored value also falls back: an empty system prompt would strip the
+/// assistant's entire framing, and the context assembler requires a leading
+/// system message, so "cleared" means "use the default" rather than "send
+/// nothing".
+pub async fn local_system_prompt() -> Result<String, AgentError> {
+    Ok(state::config()?
+        .get_setting(SETTING_LOCAL_SYSTEM_PROMPT)
+        .await?
+        .and_then(|value| value.as_str().map(str::to_owned))
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| DEFAULT_LOCAL_SYSTEM_PROMPT.to_string()))
+}
+
+/// Persist the local lane's system prompt. A blank value clears the override,
+/// restoring [`DEFAULT_LOCAL_SYSTEM_PROMPT`] on the next read.
+pub async fn set_local_system_prompt(prompt: &str) -> Result<(), AgentError> {
+    let trimmed = prompt.trim();
+    state::config()?
+        .set_setting(
+            SETTING_LOCAL_SYSTEM_PROMPT,
+            serde_json::Value::String(trimmed.to_string()),
+        )
+        .await
+}
+
 /// Persisted UI theme preference shared by all native clients.
 pub async fn theme_mode() -> Result<String, AgentError> {
     let value = state::config()?
@@ -1097,19 +1145,22 @@ pub async fn save_uar_service_config(request: SaveUarServiceRequest) -> Result<(
                 .unwrap_or(serde_json::Value::Null),
         )
         .await?;
+    // iOS/Android AND macOS host the UAR as the embedded in-process kernel — there
+    // is no service URL and no remote deployment. Writing a remote deployment mode
+    // here would flip them out of `EmbeddedLibrary` (the default from
+    // `selected_uar_deployment_mode`) and make every subsequent chat turn demand
+    // `uar_service_url`, which does not exist there. So only the Windows/Linux
+    // service clients persist a remote deployment mode; embedded hosts keep their
+    // embedded default untouched.
+    #[cfg(not(any(target_os = "ios", target_os = "android", target_os = "macos")))]
     config
         .set_setting(
             SETTING_UAR_DEPLOYMENT_MODE,
-            serde_json::Value::String(
-                if cfg!(any(target_os = "ios", target_os = "android")) {
-                    "cloud_service"
-                } else {
-                    "http_service"
-                }
-                .to_owned(),
-            ),
+            serde_json::Value::String("http_service".to_owned()),
         )
-        .await
+        .await?;
+
+    Ok(())
 }
 
 pub async fn probe_uar_service_config() -> Result<UarServiceProbeResult, AgentError> {
@@ -1181,6 +1232,103 @@ fn default_lane() -> String {
     }
 }
 
+/// Map a conversation policy `chat_mode` onto an execution lane.
+///
+/// The UI's mode vocabulary is user-facing (`local`, `uar`, `agent`); the lanes
+/// are execution paths. `agent` and `uar` both run through the embedded UAR —
+/// they differ only in which agent artifact the run resolves — so both map to
+/// [`LANE_UAR`]. An unrecognized mode yields `None` so the caller falls back
+/// rather than inventing a lane.
+fn lane_for_chat_mode(mode: &str) -> Option<&'static str> {
+    match mode {
+        "local" => Some(LANE_LOCAL),
+        "uar" | "agent" => Some(LANE_UAR),
+        "cloud" => Some(LANE_CLOUD),
+        _ => None,
+    }
+}
+
+/// Resolve which lane a turn in this conversation runs on.
+///
+/// Precedence: the conversation's own `chat_mode` → the global
+/// `active_lane` setting → [`default_lane`]. Conversation scope comes first so
+/// one chat can be on-device while another uses the orchestrator; the global
+/// setting remains the fallback so conversations saved before per-conversation
+/// modes existed keep their previous behavior.
+async fn resolve_lane_for_conversation(conversation_id: &str) -> Result<String, AgentError> {
+    if !conversation_id.is_empty() {
+        if let Ok(policy) = crate::control_plane::conversation_policy(conversation_id).await {
+            if let Some(lane) = chat_mode_lane(&policy) {
+                return Ok(lane.to_string());
+            }
+        }
+    }
+
+    Ok(state::config()?
+        .get_setting(SETTING_ACTIVE_LANE)
+        .await?
+        .and_then(|value| value.as_str().map(str::to_owned))
+        .unwrap_or_else(default_lane))
+}
+
+/// The execution lane a stored conversation policy selects, if any.
+///
+/// Reads `chat_mode` from the **bare** `RunPolicy` — the shape the control plane
+/// returns and that `save_conversation_policy` accepts. Returns `None` when the
+/// policy stores no recognized mode, so the caller falls back to the global
+/// lane rather than inventing a route.
+fn chat_mode_lane(policy: &serde_json::Value) -> Option<&'static str> {
+    policy
+        .get("chat_mode")
+        .and_then(serde_json::Value::as_str)
+        .and_then(lane_for_chat_mode)
+}
+
+/// Whether a lane can be selected right now, and if not, why.
+///
+/// The UI calls this to render unavailable modes as disabled with a reason
+/// instead of letting the user tap a control that will fail. It performs the
+/// same checks [`set_active_lane`] does, but is side-effect free: it never
+/// registers, loads, or mutates anything.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct LaneAvailability {
+    pub lane: String,
+    pub available: bool,
+    /// Human-readable reason when `available` is false; `None` when usable.
+    pub reason: Option<String>,
+}
+
+/// Report availability for every selectable lane in one call, so the mode
+/// picker can render its whole list without a round-trip per entry.
+pub async fn lane_availability() -> Result<Vec<LaneAvailability>, AgentError> {
+    let local = match state::inference() {
+        Ok(_) => LaneAvailability {
+            lane: LANE_LOCAL.to_string(),
+            available: true,
+            reason: None,
+        },
+        Err(error) => LaneAvailability {
+            lane: LANE_LOCAL.to_string(),
+            available: false,
+            reason: Some(error.to_string()),
+        },
+    };
+    let uar = match ensure_uar_lane_supported().await {
+        Ok(()) => LaneAvailability {
+            lane: LANE_UAR.to_string(),
+            available: true,
+            reason: None,
+        },
+        Err(error) => LaneAvailability {
+            lane: LANE_UAR.to_string(),
+            available: false,
+            reason: Some(error.to_string()),
+        },
+    };
+    Ok(vec![local, uar])
+}
+
 /// Switch lanes. Rejects unknown values rather than persisting a string that
 /// would silently fall back to cloud on the next turn — a user who asked for
 /// on-device inference must not be quietly answered by a network provider.
@@ -1227,7 +1375,8 @@ struct UarServiceChatConfig {
     session_id: Option<String>,
 }
 
-async fn selected_uar_deployment_mode() -> Result<crate::uar::UarDeploymentMode, AgentError> {
+pub(crate) async fn selected_uar_deployment_mode(
+) -> Result<crate::uar::UarDeploymentMode, AgentError> {
     let configured = string_setting(SETTING_UAR_DEPLOYMENT_MODE)
         .await?
         .or_else(|| std::env::var("KNOWME_UAR_DEPLOYMENT_MODE").ok());
@@ -1242,7 +1391,13 @@ async fn selected_uar_deployment_mode() -> Result<crate::uar::UarDeploymentMode,
         Some(other) => Err(AgentError::Config(format!(
             "unknown UAR deployment mode '{other}'"
         ))),
-        None if cfg!(any(target_os = "ios", target_os = "android")) => {
+        None if cfg!(any(
+            target_os = "ios",
+            target_os = "android",
+            target_os = "macos"
+        )) =>
+        {
+            // iOS/Android and now macOS host the embedded UAR kernel in-process.
             Ok(crate::uar::UarDeploymentMode::EmbeddedLibrary)
         }
         None => Ok(crate::uar::UarDeploymentMode::HttpService),
@@ -1296,6 +1451,7 @@ async fn selected_uar_runtime() -> Result<
 
 async fn send_uar(
     user_message: String,
+    history: Vec<InferenceMessage>,
     conversation_id: String,
     run_id: String,
 ) -> Result<String, AgentError> {
@@ -1345,13 +1501,33 @@ async fn send_uar(
             message: "Starting Universal Agent Runtime run".into(),
         });
 
+        // Key the session strictly by the per-conversation id. A global
+        // `uar_session_id` setting (a service-era concept) must NOT collapse every
+        // conversation into one shared session on the embedded runtime — that
+        // bleeds context across conversations. Only honor it on the service path,
+        // where the session id is the caller's contract with a remote UAR.
+        let session_id = match runtime_mode {
+            "embedded_library" => Some(conversation_id.clone()),
+            _ => config.session_id.clone().or(Some(conversation_id.clone())),
+        };
+        // Seed the embedded session from the host's durable history so a
+        // cold-started conversation still presents the full thread to the model.
+        let seed_history = history
+            .into_iter()
+            .map(|message| crate::uar::UarSeedMessage {
+                role: message.role.as_str().to_owned(),
+                content: message.content,
+                tool_call_id: message.tool_call_id,
+            })
+            .collect::<Vec<_>>();
         let projected = match runtime
             .start_run(crate::uar::UarRunRequest {
                 artifact: config.artifact,
                 input: user_message,
-                session_id: config.session_id.or(Some(conversation_id.clone())),
+                session_id,
                 agent_id: None,
                 run_policy: None,
+                history: seed_history,
             })
             .await
         {
@@ -2156,7 +2332,13 @@ async fn assemble_context(
         conversation_id: conversation_id.into(),
         branch_id: branch_id.into(),
         assistant_id: "local-assistant".into(),
-        system_prompt: "You are KnowMe, a helpful private assistant. Follow the user's instructions, use available tools when useful, and answer in the user's language.".into(),
+        // A settings-store failure is surfaced as a context source failure
+        // rather than silently falling back to the default: if the user edited
+        // the prompt and we cannot read it, running with different framing than
+        // they configured is worse than reporting the failure.
+        system_prompt: local_system_prompt()
+            .await
+            .map_err(|error| ContextError::Source(format!("local system prompt: {error}")))?,
         user_text: user_message.into(),
         thinking_requested: cloud
             || model_id == "qwen3.5-4b-mlx-4bit"
@@ -2190,17 +2372,37 @@ fn param_i32(params: &serde_json::Value, key: &str, default: i32) -> i32 {
         .unwrap_or(default)
 }
 
+/// Build the shortlisted tool declarations sent to a local model for one turn.
+///
+/// Local models run in a tight context budget — the Android LiteRT-LM lane in
+/// particular — so declaring every cached tool from every registered server
+/// crowds out the conversation and degrades tool selection. The shortlist is
+/// therefore **bounded** at [`MAX_LOCAL_TOOL_DECLARATIONS`] and ordered
+/// **trusted-first**: tools from trusted-local servers are declared before
+/// untrusted ones, so the safest and most likely-useful tools survive the cap.
+///
+/// Ordering is a stable sort over the registry's deterministic server/tool
+/// order, so the same registry always yields the same shortlist. Tools beyond
+/// the cap are simply not declared this turn; if the model nonetheless asks for
+/// one, [`LocalToolCallGate`] already rejects it as outside the shortlisted set.
 fn local_tool_definitions(registry: &gen_ui_mcp::McpRegistry) -> Vec<InferenceTool> {
-    let mut definitions = Vec::new();
+    let mut candidates: Vec<(bool, InferenceTool)> = Vec::new();
     for server_name in registry.server_names() {
         let Some(server) = registry.get(&server_name) else {
             continue;
         };
+        let trusted = server.trust() == gen_ui_mcp::McpServerTrust::TrustedLocal;
         for tool in server.cached_tools() {
-            definitions.push(inference_tool_from_mcp(&server_name, tool));
+            candidates.push((trusted, inference_tool_from_mcp(&server_name, tool)));
         }
     }
-    definitions
+    // Stable sort keeps registry order within each trust tier.
+    candidates.sort_by_key(|(trusted, _)| !*trusted);
+    candidates.truncate(MAX_LOCAL_TOOL_DECLARATIONS);
+    candidates
+        .into_iter()
+        .map(|(_, definition)| definition)
+        .collect()
 }
 
 fn local_tool_policies(registry: &gen_ui_mcp::McpRegistry) -> BTreeMap<String, LocalToolPolicy> {
@@ -2778,6 +2980,79 @@ mod attachment_tests {
     };
 
     #[test]
+    fn chat_modes_map_onto_execution_lanes() {
+        // The picker's vocabulary is user-facing; lanes are execution paths.
+        assert_eq!(lane_for_chat_mode("local"), Some(LANE_LOCAL));
+        // `agent` and `uar` both run through the embedded UAR — they differ only
+        // in which agent artifact the run resolves — so both are LANE_UAR.
+        assert_eq!(lane_for_chat_mode("uar"), Some(LANE_UAR));
+        assert_eq!(lane_for_chat_mode("agent"), Some(LANE_UAR));
+        assert_eq!(lane_for_chat_mode("cloud"), Some(LANE_CLOUD));
+        // An unrecognized mode must NOT invent a lane; the caller falls back to
+        // the global setting rather than silently routing somewhere unintended.
+        assert_eq!(lane_for_chat_mode("nonsense"), None);
+        assert_eq!(lane_for_chat_mode(""), None);
+    }
+
+    #[test]
+    fn conversation_chat_mode_is_read_from_the_bare_run_policy() {
+        // The control plane hands back the bare `RunPolicy`, not the storage
+        // `ConversationPolicyRecord` wrapper. This was the defect behind "Local
+        // does nothing": the accessor leaked `{conversation_id, policy, updated_at}`
+        // while every consumer — Dart's `state.policy`, the TypeScript binding's
+        // declared `Promise<RunPolicy | null>`, and `save_conversation_policy`'s
+        // own input — expects `chat_mode` at the top level. Because every
+        // `RunPolicy` field is `#[serde(default)]`, sending the wrapper back to
+        // save deserialized to defaults *without erroring*, silently discarding
+        // the selection.
+        let bare = serde_json::json!({"version": 1, "chat_mode": "local"});
+        assert_eq!(chat_mode_lane(&bare), Some(LANE_LOCAL));
+
+        // The wrapper must NOT resolve — if it ever reappears, this fails loudly
+        // instead of silently falling back to the global lane.
+        let wrapped = serde_json::json!({
+            "conversation_id": "c1",
+            "policy": {"version": 1, "chat_mode": "local"},
+            "updated_at": "2026-07-26T00:00:00Z",
+        });
+        assert_eq!(chat_mode_lane(&wrapped), None);
+
+        // A conversation with no stored mode falls through to the global lane.
+        assert_eq!(chat_mode_lane(&serde_json::json!({"version": 1})), None);
+        assert_eq!(chat_mode_lane(&serde_json::Value::Null), None);
+    }
+
+    #[test]
+    fn every_send_path_resolves_the_lane_per_conversation() {
+        // Routing must not depend on which entry point the UI happened to call:
+        // `send` was fixed first while `send_with_attachments`, `send_content`
+        // and `send_interaction` still read the global setting, so sending an
+        // attachment from a Local conversation silently ran on the global lane.
+        //
+        // Resolving the lane needs a live config and control plane, so this
+        // guards the source instead. Only two places may *read* the global
+        // setting: the `active_lane()` getter and the resolver's own fallback.
+        // Count `get_setting(SETTING_ACTIVE_LANE)` call sites specifically —
+        // the bare constant also appears in its own declaration and in
+        // `set_active_lane`'s write. The test module is excluded so this
+        // assertion does not count its own source.
+        let source = include_str!("chat.rs");
+        let production_source = source
+            .split_once("mod attachment_tests {")
+            .map(|(before, _)| before)
+            .expect("test module marks the end of production source");
+        let global_reads = production_source
+            .matches(".get_setting(SETTING_ACTIVE_LANE)")
+            .count();
+        assert_eq!(
+            global_reads, 2,
+            "the global active_lane setting may only be read by active_lane() \
+             and resolve_lane_for_conversation()'s fallback; a send path \
+             reading it directly bypasses per-conversation scope"
+        );
+    }
+
+    #[test]
     fn a2ui_interaction_keeps_the_completed_source_uar_run() {
         let interaction = serde_json::json!({
             "kind": "a2ui",
@@ -2893,9 +3168,25 @@ mod attachment_tests {
 
     #[test]
     fn attachment_types_route_images_documents_and_video_safely() {
-        assert_eq!(attachment_kind("png"), ("image/png", true, false));
-        assert_eq!(attachment_kind("pdf"), ("application/pdf", false, true));
-        assert_eq!(attachment_kind("mp4"), ("video/mp4", false, false));
+        // (mime, is_image, is_document, is_video)
+        assert_eq!(attachment_kind("png"), ("image/png", true, false, false));
+        assert_eq!(
+            attachment_kind("pdf"),
+            ("application/pdf", false, true, false)
+        );
+        // Video previously reported false for every flag, so a renderer had to
+        // re-derive "is this video?" by string-matching the mime. It now says so.
+        assert_eq!(attachment_kind("mp4"), ("video/mp4", false, false, true));
+        assert_eq!(attachment_kind("webm"), ("video/webm", false, false, true));
+        assert_eq!(
+            attachment_kind("mov"),
+            ("video/quicktime", false, false, true)
+        );
+        // An unknown extension must claim nothing rather than guess.
+        assert_eq!(
+            attachment_kind("xyzzy"),
+            ("application/octet-stream", false, false, false)
+        );
     }
 
     #[test]
@@ -3195,6 +3486,83 @@ mod attachment_tests {
             }
             other => panic!("expected ToolResult, got {other:?}"),
         }
+    }
+
+    #[tokio::test]
+    async fn local_tool_shortlist_is_bounded_and_prefers_trusted_servers() {
+        // A transport that advertises `count` tools, so a server can exceed the
+        // per-turn declaration cap on its own.
+        #[derive(Debug)]
+        struct BulkTransport {
+            prefix: &'static str,
+            count: usize,
+        }
+
+        #[async_trait::async_trait]
+        impl gen_ui_mcp::McpTransport for BulkTransport {
+            async fn request(
+                &self,
+                method: &str,
+                _params: Option<serde_json::Value>,
+            ) -> gen_ui_types::CoreResult<serde_json::Value> {
+                match method {
+                    "tools/list" => Ok(serde_json::json!({
+                        "tools": (0..self.count)
+                            .map(|index| serde_json::json!({
+                                "name": format!("{}_{index}", self.prefix),
+                                "description": "bulk tool",
+                                "inputSchema": {"type": "object"}
+                            }))
+                            .collect::<Vec<_>>()
+                    })),
+                    other => Err(gen_ui_types::CoreError::Terminal(format!(
+                        "unexpected MCP method {other}"
+                    ))),
+                }
+            }
+        }
+
+        let registry = gen_ui_mcp::McpRegistry::new();
+        // Register the UNTRUSTED server first so plain registry order would put
+        // its tools ahead of the trusted server's — the shortlist must reorder.
+        let untrusted = registry.register(gen_ui_mcp::McpServerHandle::new(
+            "untrusted",
+            Box::new(BulkTransport {
+                prefix: "untrusted",
+                count: MAX_LOCAL_TOOL_DECLARATIONS,
+            }),
+        ));
+        untrusted.refresh_tools().await.expect("untrusted tools");
+        let trusted = registry.register(gen_ui_mcp::McpServerHandle::new_trusted_local(
+            "trusted",
+            Box::new(BulkTransport {
+                prefix: "trusted",
+                count: 4,
+            }),
+        ));
+        trusted.refresh_tools().await.expect("trusted tools");
+
+        let shortlist = local_tool_definitions(&registry);
+
+        // Bounded: never more declarations than the per-turn cap, even though
+        // the registry advertises more.
+        assert_eq!(shortlist.len(), MAX_LOCAL_TOOL_DECLARATIONS);
+
+        // Trusted-first: every tool from the trusted server survives the cap and
+        // is declared before any untrusted tool.
+        let trusted_count = shortlist
+            .iter()
+            .filter(|tool| tool.name.starts_with("trusted__"))
+            .count();
+        assert_eq!(trusted_count, 4, "all trusted tools survive the cap");
+        let first_untrusted = shortlist
+            .iter()
+            .position(|tool| tool.name.starts_with("untrusted__"))
+            .expect("untrusted tools fill the remainder");
+        assert_eq!(
+            first_untrusted, 4,
+            "trusted declarations precede untrusted ones"
+        );
     }
 
     #[tokio::test]

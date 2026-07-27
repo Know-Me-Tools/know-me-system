@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-chat-approve-tool-confirmation"
+description = "Enables the chat_approve_tool_confirmation command without any pre-configured scope."
+commands.allow = ["chat_approve_tool_confirmation"]
+
+[[permission]]
+identifier = "deny-chat-approve-tool-confirmation"
+description = "Denies the chat_approve_tool_confirmation command without any pre-configured scope."
+commands.deny = ["chat_approve_tool_confirmation"]

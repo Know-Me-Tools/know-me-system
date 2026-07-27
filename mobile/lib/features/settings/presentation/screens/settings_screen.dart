@@ -9,10 +9,16 @@ import 'package:shadcn_flutter/shadcn_flutter.dart' as shad;
 import '../../../../core/theme/theme_mode_provider.dart';
 import '../../../../shared/widgets/knowme_screen.dart';
 import '../providers/settings_notifier.dart';
+import '../widgets/model_route_picker.dart';
+
+/// The well-known id of the on-device local provider in the unified picker.
+/// Mirrors the Rust `LOCAL_PROVIDER_ID`; selecting it routes the embedded
+/// runtime to the on-device model rather than a cloud provider.
+const _localProviderId = 'on-device';
 
 enum _Section {
   providers('Model providers', Icons.cloud_outlined),
-  runtime('Universal Agent Runtime', Icons.hub_outlined),
+  runtime('Runtime & policy', Icons.hub_outlined),
   localModels('Local models', Icons.memory_outlined),
   agents('Agents', Icons.smart_toy_outlined),
   skills('Skills', Icons.auto_awesome_outlined),
@@ -249,8 +255,7 @@ class _SectionContent extends ConsumerWidget {
       _Section.connections => _McpPanel(state: state),
       _Section.privacy => _RegistryPanel(
         title: 'Privacy & data',
-        caption:
-            'Device registration, peer discovery, CRDT/gossip keys, sync and data governance are persisted by UAR.',
+        caption: 'Device registration, peer discovery, CRDT/gossip keys, sync and data governance are persisted by UAR.',
         settings: _settings(state.snapshot.admin).where((item) {
           final key = item['key']?.toString() ?? '';
           return key.startsWith('privacy.') ||
@@ -261,15 +266,13 @@ class _SectionContent extends ConsumerWidget {
       _Section.appearance => const _AppearancePanel(),
       _Section.plugins => _ResourcePanel(
         title: 'Plugins',
-        caption:
-            'WASM plugin schemas are registered in UAR; operational plugin interfaces render through A2UI.',
+        caption: 'WASM plugin schemas are registered in UAR; operational plugin interfaces render through A2UI.',
         values: _objects(state.snapshot.admin['settingTypes']),
         icon: Icons.extension_outlined,
       ),
       _Section.system => _RegistryPanel(
         title: 'System & inference',
-        caption:
-            'Runtime ports, context policy, skill strategy and machine-facing settings supplied by UAR.',
+        caption: 'Runtime ports, context policy, skill strategy and machine-facing settings supplied by UAR.',
         settings: _settings(state.snapshot.admin),
       ),
     };
@@ -338,134 +341,99 @@ class _PanelHeader extends StatelessWidget {
   }
 }
 
-class _RuntimePanel extends ConsumerStatefulWidget {
+/// On mobile the Universal Agent Runtime is ALWAYS the embedded in-process
+/// kernel — there is no service URL, API key, or session to configure. This
+/// panel is a read-only status surface; the model the runtime uses is chosen in
+/// the "Model providers" tab (on-device or a configured cloud provider).
+class _RuntimePanel extends ConsumerWidget {
   const _RuntimePanel({required this.state});
   final SettingsState state;
-  @override
-  ConsumerState<_RuntimePanel> createState() => _RuntimePanelState();
-}
-
-class _RuntimePanelState extends ConsumerState<_RuntimePanel> {
-  late final TextEditingController url;
-  final key = TextEditingController();
-  final session = TextEditingController();
-  @override
-  void initState() {
-    super.initState();
-    url = TextEditingController(
-      text: widget.state.snapshot.uarConfig['serviceUrl']?.toString() ?? '',
-    );
-    session.text =
-        widget.state.snapshot.uarConfig['sessionId']?.toString() ?? '';
-  }
 
   @override
-  void dispose() {
-    url.dispose();
-    key.dispose();
-    session.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final notifier = ref.read(settingsProvider.notifier);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final cloudModel = state.snapshot.cloudModel;
+    final activeLabel = switch (cloudModel) {
+      {'providerId': final String provider, 'modelId': final String model}
+          when provider.isNotEmpty && model.isNotEmpty =>
+        '$provider / $model',
+      _ => 'On-device model',
+    };
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const _PanelHeader(
-          title: 'Universal Agent Runtime',
+          title: 'Runtime & policy',
           caption:
-              'UAR is the only cloud-LLM path. It owns providers, real agents, skills, tools, memory, knowledge, A2UI and policy.',
+              'KnowMe runs the Universal Agent Runtime in-process on this '
+              'device — agents, skills, tools, memory, knowledge, A2UI and '
+              'policy. Choose which model it uses under Model providers.',
           icon: Icons.hub_outlined,
         ),
         const SizedBox(height: 20),
         _Card(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: Row(
             children: [
-              const Text(
-                'Chat runtime',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 10),
-              SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(
-                    value: 'uar',
-                    label: Text('UAR'),
-                    icon: Icon(Icons.hub_outlined),
-                  ),
-                  ButtonSegment(
-                    value: 'local',
-                    label: Text('Local'),
-                    icon: Icon(Icons.memory_outlined),
-                  ),
-                ],
-                selected: {
-                  widget.state.snapshot.activeLane == 'uar' ? 'uar' : 'local',
-                },
-                onSelectionChanged: widget.state.saving
-                    ? null
-                    : (value) => notifier.selectLane(value.first),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: url,
-                decoration: const InputDecoration(
-                  labelText: 'UAR service URL',
-                  hintText: 'http://127.0.0.1:1906',
+              Icon(Icons.memory_outlined, color: colors.primary),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Embedded · on-device',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Active model: $activeLabel',
+                      style: TextStyle(color: colors.onSurfaceVariant),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: key,
-                obscureText: true,
-                decoration: InputDecoration(
-                  labelText: 'Service API key · optional',
-                  hintText: widget.state.snapshot.uarConfig['hasApiKey'] == true
-                      ? 'Configured · enter to replace'
-                      : 'Credential',
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: session,
-                decoration: const InputDecoration(
-                  labelText: 'Session ID · optional',
-                ),
-              ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  shad.PrimaryButton(
-                    onPressed: widget.state.saving || url.text.trim().isEmpty
-                        ? null
-                        : () => notifier.saveRuntime(
-                            serviceUrl: url.text.trim(),
-                            apiKey: key.text.trim().isEmpty
-                                ? null
-                                : key.text.trim(),
-                            sessionId: session.text.trim().isEmpty
-                                ? null
-                                : session.text.trim(),
-                          ),
-                    child: const Text('Save runtime'),
-                  ),
-                  shad.SecondaryButton(
-                    onPressed: widget.state.saving
-                        ? null
-                        : notifier.probeRuntime,
-                    child: const Text('Test runtime'),
-                  ),
-                ],
-              ),
+              const SizedBox(width: 12),
+              _StatusPill(label: 'Active', color: colors.primary),
             ],
           ),
         ),
       ],
+    );
+  }
+}
+
+/// A small text-first status pill. Status is conveyed by the label text (not
+/// color alone) to satisfy the WCAG "status not by color alone" rule.
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.label, required this.color});
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.check_circle_outline, size: 14, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -487,8 +455,7 @@ class _GlobalPolicyPanel extends ConsumerWidget {
       children: [
         const _PanelHeader(
           title: 'Global run policy',
-          caption:
-              'The UAR resolves these defaults with each agent and conversation override before it assembles context or exposes tools.',
+          caption: 'The UAR resolves these defaults with each agent and conversation override before it assembles context or exposes tools.',
           icon: Icons.account_tree_outlined,
         ),
         const SizedBox(height: 20),
@@ -498,16 +465,82 @@ class _GlobalPolicyPanel extends ConsumerWidget {
               'The connected UAR has not registered run_policy.global yet. Restart or update the UAR service, then refresh.',
             ),
           )
-        else
+        else ...[
+          _Card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Default model',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'The model every conversation uses unless an agent or '
+                  'conversation overrides it. Leave on runtime default to use '
+                  'the on-device model.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ModelRoutePicker(
+                  providers: state.snapshot.providers,
+                  value: _routeFromPolicy(setting['data']),
+                  inheritLabel: 'Runtime default',
+                  enabled: !state.saving,
+                  onChanged: (route) => ref
+                      .read(settingsProvider.notifier)
+                      .saveSetting(
+                        'run_policy.global',
+                        _policyWithModel(setting['data'], route),
+                      ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
           _SettingEditor(
             setting: setting,
             save: (value) => ref
                 .read(settingsProvider.notifier)
                 .saveSetting('run_policy.global', value),
           ),
+        ],
       ],
     );
   }
+}
+
+/// Read a `{ providerId, modelId }` route from a policy value's `model` field.
+Map<String, String>? _routeFromPolicy(dynamic policy) {
+  if (policy is Map) {
+    final model = policy['model'];
+    if (model is Map) {
+      final provider = model['provider_id']?.toString() ?? '';
+      final id = model['model_id']?.toString() ?? '';
+      if (provider.isNotEmpty && id.isNotEmpty) {
+        return {'providerId': provider, 'modelId': id};
+      }
+    }
+  }
+  return null;
+}
+
+/// Return a copy of the policy object with its `model` field set from a route
+/// (or cleared to null when the route is null).
+Map<String, dynamic> _policyWithModel(
+  dynamic policy,
+  Map<String, String>? route,
+) {
+  final next = <String, dynamic>{
+    if (policy is Map) ...policy.cast<String, dynamic>(),
+  };
+  next['model'] = route == null
+      ? null
+      : {'provider_id': route['providerId'], 'model_id': route['modelId']};
+  return next;
 }
 
 class _LocalModelsPanel extends ConsumerWidget {
@@ -528,8 +561,7 @@ class _LocalModelsPanel extends ConsumerWidget {
       children: [
         const _PanelHeader(
           title: 'Local models',
-          caption:
-              'The KnowMe container owns local models and exposes them to UAR through the local provider contract.',
+          caption: 'The KnowMe container owns local models and exposes them to UAR through the local provider contract.',
           icon: Icons.memory_outlined,
         ),
         const SizedBox(height: 20),
@@ -550,6 +582,25 @@ class _LocalModelsPanel extends ConsumerWidget {
               Text(
                 'State: ${model['state'] ?? 'notInstalled'} · Backend: ${diagnostics['backend'] ?? diagnostics['activeBackend'] ?? 'not loaded'}',
               ),
+              // Rust computes a fallback reason whenever the engine runs on
+              // something other than its first choice — CPU instead of GPU/NPU,
+              // or a smaller model after a memory preflight refusal. It was
+              // never rendered, so the one place a user (or a certification
+              // run) could see WHY the device is on this backend showed only
+              // the backend itself.
+              if (diagnostics['fallback_reason'] != null ||
+                  diagnostics['fallbackReason'] != null) ...[
+                const SizedBox(height: 4),
+                Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    'Fallback: ${diagnostics['fallback_reason'] ?? diagnostics['fallbackReason']}',
+                    style: TextStyle(
+                      color: shad.Theme.of(context).colorScheme.mutedForeground,
+                    ),
+                  ),
+                ),
+              ],
               if (model['progress'] is num) ...[
                 const SizedBox(height: 12),
                 LinearProgressIndicator(
@@ -578,7 +629,130 @@ class _LocalModelsPanel extends ConsumerWidget {
             ],
           ),
         ),
+        const SizedBox(height: 16),
+        _LocalSystemPromptCard(state: state),
       ],
+    );
+  }
+}
+
+/// Editor for the local lane's system prompt.
+///
+/// Stateful because the field owns a controller: rebuilding from `state` on
+/// every keystroke would fight the user's cursor. The controller is re-synced
+/// only when the saved value actually changes (a save or a reset), so in-progress
+/// edits survive unrelated Settings rebuilds.
+class _LocalSystemPromptCard extends ConsumerStatefulWidget {
+  const _LocalSystemPromptCard({required this.state});
+  final SettingsState state;
+
+  @override
+  ConsumerState<_LocalSystemPromptCard> createState() =>
+      _LocalSystemPromptCardState();
+}
+
+class _LocalSystemPromptCardState
+    extends ConsumerState<_LocalSystemPromptCard> {
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.state.snapshot.localSystemPrompt,
+  );
+
+  @override
+  void didUpdateWidget(_LocalSystemPromptCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final saved = widget.state.snapshot.localSystemPrompt;
+    if (saved != oldWidget.state.snapshot.localSystemPrompt &&
+        saved != _controller.text) {
+      _controller.text = saved;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _reset() async {
+    final notifier = ref.read(settingsProvider.notifier);
+    // Ask Rust for the default rather than hardcoding the copy here, so the two
+    // cannot drift.
+    final shipped = await notifier.defaultLocalSystemPrompt();
+    if (!mounted) return;
+    _controller.text = shipped;
+    await notifier.saveLocalSystemPrompt(shipped);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final notifier = ref.read(settingsProvider.notifier);
+    final saving = widget.state.saving;
+    return _Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Local system prompt',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Sent as the first message on every local run. Leave it blank and '
+            'save to restore the shipped default.',
+          ),
+          const SizedBox(height: 12),
+          // The visible heading above is not programmatically tied to the field,
+          // and a placeholder vanishes once text is entered — so the accessible
+          // name lives here rather than relying on either.
+          Semantics(
+            textField: true,
+            multiline: true,
+            label: 'Local system prompt',
+            hint:
+                'Sent as the first message on every local run. '
+                'Leave blank and save to restore the default.',
+            child: shad.TextArea(
+              controller: _controller,
+              initialHeight: 140,
+              expandableHeight: true,
+              placeholder: const Text('System prompt for the on-device model'),
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Wrap, so the two actions reflow instead of overflowing at large
+          // text scales rather than clipping.
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              Semantics(
+                button: true,
+                enabled: !saving,
+                label: 'Save local system prompt',
+                // Excluded so the row announces one name, not "Save local
+                // system prompt, Save prompt".
+                excludeSemantics: true,
+                child: shad.PrimaryButton(
+                  onPressed: saving
+                      ? null
+                      : () => notifier.saveLocalSystemPrompt(_controller.text),
+                  child: const Text('Save prompt'),
+                ),
+              ),
+              Semantics(
+                button: true,
+                enabled: !saving,
+                label: 'Reset local system prompt to the default',
+                excludeSemantics: true,
+                child: shad.SecondaryButton(
+                  onPressed: saving ? null : _reset,
+                  child: const Text('Reset to default'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
@@ -606,6 +780,38 @@ class _ProvidersPanelState extends ConsumerState<_ProvidersPanel> {
     super.dispose();
   }
 
+  /// Trailing marker for a provider row. Prefers the ACTIVE marker, then the
+  /// ON-DEVICE tag, then the configured "ON" badge. Text-based so status is
+  /// never conveyed by color alone.
+  Widget? _providerListMarker(
+    BuildContext context, {
+    required bool isActive,
+    required bool isLocal,
+    required bool isConfigured,
+  }) {
+    final colors = Theme.of(context).colorScheme;
+    if (isActive) {
+      return _StatusPill(label: 'Active', color: colors.primary);
+    }
+    if (isLocal) {
+      return Text(
+        'ON-DEVICE',
+        style: TextStyle(
+          color: colors.onSurfaceVariant,
+          fontWeight: FontWeight.w700,
+          fontSize: 11,
+        ),
+      );
+    }
+    if (isConfigured) {
+      return Text(
+        'ON',
+        style: TextStyle(color: colors.primary, fontWeight: FontWeight.w700),
+      );
+    }
+    return null;
+  }
+
   void _select(Map<String, dynamic> provider) {
     final configured = widget.state.snapshot.configuredProviders
         .where((item) => item['id'] == provider['id'])
@@ -631,13 +837,23 @@ class _ProvidersPanelState extends ConsumerState<_ProvidersPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final providers = widget.state.snapshot.providers.where((provider) {
-      final q = search.text.trim().toLowerCase();
-      return q.isEmpty ||
-          '${provider['displayName']} ${provider['id']}'.toLowerCase().contains(
-            q,
-          );
-    }).toList();
+    final providers =
+        widget.state.snapshot.providers.where((provider) {
+            final q = search.text.trim().toLowerCase();
+            return q.isEmpty ||
+                '${provider['displayName']} ${provider['id']}'
+                    .toLowerCase()
+                    .contains(q);
+          }).toList()
+          // The on-device model is pinned first so "both" reads as one unified
+          // picker; the rest keep the catalog order (configured-first from Rust).
+          ..sort((a, b) {
+            final aLocal = a['id'] == _localProviderId ? 0 : 1;
+            final bLocal = b['id'] == _localProviderId ? 0 : 1;
+            return aLocal.compareTo(bLocal);
+          });
+    final activeProviderId = widget.state.snapshot.cloudModel?['providerId']
+        ?.toString();
     final selected =
         providers.where((item) => item['id'] == selectedId).firstOrNull ??
         providers.firstOrNull;
@@ -653,14 +869,18 @@ class _ProvidersPanelState extends ConsumerState<_ProvidersPanel> {
         const _PanelHeader(
           title: 'Model providers',
           caption:
-              'All provider metadata and credentials are owned by UAR/Liter-LLM. Only enabled providers and models are exposed to agents.',
+              'Choose the model the on-device runtime uses: the built-in '
+              'on-device model, or a cloud provider you configure with an API '
+              'key. Keys are stored securely on this device.',
           icon: Icons.cloud_outlined,
         ),
         const SizedBox(height: 20),
         if (providers.isEmpty)
           _Card(
             child: const Text(
-              'Connect and test a UAR service to load its provider catalog.',
+              'Loading models from the on-device runtime… The on-device model '
+              'works offline with no key; add a cloud provider below to use a '
+              'hosted model.',
             ),
           )
         else
@@ -681,31 +901,33 @@ class _ProvidersPanelState extends ConsumerState<_ProvidersPanel> {
                   for (final provider in providers)
                     ListTile(
                       selected: provider['id'] == selected?['id'],
-                      leading: CircleAvatar(
-                        child: Text(
-                          (provider['displayName']?.toString() ??
-                                  provider['id'].toString())
-                              .substring(0, 1)
-                              .toUpperCase(),
-                        ),
-                      ),
+                      leading: provider['id'] == _localProviderId
+                          ? const CircleAvatar(
+                              child: Icon(Icons.memory_outlined, size: 20),
+                            )
+                          : CircleAvatar(
+                              child: Text(
+                                (provider['displayName']?.toString() ??
+                                        provider['id'].toString())
+                                    .substring(0, 1)
+                                    .toUpperCase(),
+                              ),
+                            ),
                       title: Text(
                         provider['displayName']?.toString() ??
                             provider['id'].toString(),
                       ),
-                      trailing: provider['configured'] == true
-                          ? const Text(
-                              'ON',
-                              style: TextStyle(
-                                color: Colors.green,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            )
-                          : null,
+                      trailing: _providerListMarker(
+                        context,
+                        isActive: provider['id'] == activeProviderId,
+                        isLocal: provider['id'] == _localProviderId,
+                        isConfigured: provider['configured'] == true,
+                      ),
                       onTap: () => _select(provider),
                     ),
                 ],
               );
+              final isLocal = selected?['id'] == _localProviderId;
               final detail = selected == null
                   ? const SizedBox.shrink()
                   : _Card(
@@ -724,28 +946,40 @@ class _ProvidersPanelState extends ConsumerState<_ProvidersPanel> {
                                   ),
                                 ),
                               ),
-                              Switch(
-                                value: enabled,
-                                onChanged: (value) =>
-                                    setState(() => enabled = value),
-                              ),
+                              if (selected['id'] == activeProviderId ||
+                                  (isLocal && activeProviderId == null))
+                                _StatusPill(
+                                  label: 'Active',
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                              // The on-device provider is always enabled and has
+                              // no credential to toggle.
+                              if (!isLocal)
+                                Switch(
+                                  value: enabled,
+                                  onChanged: (value) =>
+                                      setState(() => enabled = value),
+                                ),
                             ],
                           ),
-                          TextField(
-                            controller: apiKey,
-                            obscureText: true,
-                            decoration: const InputDecoration(
-                              labelText: 'API key',
-                              hintText: 'Stored only by UAR',
+                          // The on-device model needs no API key or host.
+                          if (!isLocal) ...[
+                            TextField(
+                              controller: apiKey,
+                              obscureText: true,
+                              decoration: const InputDecoration(
+                                labelText: 'API key',
+                                hintText: 'Stored securely on this device',
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 10),
-                          TextField(
-                            controller: baseUrl,
-                            decoration: const InputDecoration(
-                              labelText: 'API host · optional',
+                            const SizedBox(height: 10),
+                            TextField(
+                              controller: baseUrl,
+                              decoration: const InputDecoration(
+                                labelText: 'API host · optional',
+                              ),
                             ),
-                          ),
+                          ],
                           const SizedBox(height: 16),
                           const Text(
                             'Models',
@@ -801,63 +1035,90 @@ class _ProvidersPanelState extends ConsumerState<_ProvidersPanel> {
                             spacing: 8,
                             runSpacing: 8,
                             children: [
+                              // "Use this model" makes the selected provider +
+                              // its default model the active route for the
+                              // embedded runtime. Available for both local and
+                              // cloud (one unified selection).
                               shad.PrimaryButton(
-                                onPressed: widget.state.saving
-                                    ? null
-                                    : () {
-                                        final modelValues = models
-                                            .map(
-                                              (model) => {
-                                                ...model,
-                                                'enabled': enabledModels
-                                                    .contains(
-                                                      model['id'].toString(),
-                                                    ),
-                                              },
-                                            )
-                                            .toList();
-                                        ref
-                                            .read(settingsProvider.notifier)
-                                            .saveProvider({
-                                              'id': selected['id'],
-                                              'kind': selected['id'],
-                                              'displayName':
-                                                  selected['displayName'],
-                                              'baseUrl':
-                                                  baseUrl.text.trim().isEmpty
-                                                  ? null
-                                                  : baseUrl.text.trim(),
-                                              'apiKey':
-                                                  apiKey.text.trim().isEmpty
-                                                  ? null
-                                                  : apiKey.text.trim(),
-                                              'enabled': enabled,
-                                              'defaultModel': defaultModel,
-                                              'models': modelValues,
-                                            });
-                                      },
-                                child: const Text('Save provider'),
-                              ),
-                              shad.SecondaryButton(
-                                onPressed: widget.state.saving
+                                onPressed:
+                                    widget.state.saving ||
+                                        (!isLocal && defaultModel == null)
                                     ? null
                                     : () => ref
                                           .read(settingsProvider.notifier)
-                                          .testProvider(
+                                          .setActiveRoute(
                                             selected['id'].toString(),
-                                            defaultModel,
+                                            isLocal
+                                                ? (defaultModel ??
+                                                      (models.isNotEmpty
+                                                          ? models.first['id']
+                                                                .toString()
+                                                          : ''))
+                                                : defaultModel!,
                                           ),
-                                child: const Text('Test connection'),
+                                child: const Text('Use this model'),
                               ),
-                              if (selected['configured'] == true)
-                                shad.GhostButton(
-                                  onPressed: () => ref
-                                      .read(settingsProvider.notifier)
-                                      .deleteProvider(
-                                        selected['id'].toString(),
-                                      ),
-                                  child: const Text('Remove'),
+                              // Local has no credential/host to save, no remote
+                              // to test, and cannot be removed.
+                              if (!isLocal) ...[
+                                shad.SecondaryButton(
+                                  onPressed: widget.state.saving
+                                      ? null
+                                      : () {
+                                          final modelValues = models
+                                              .map(
+                                                (model) => {
+                                                  ...model,
+                                                  'enabled': enabledModels
+                                                      .contains(
+                                                        model['id'].toString(),
+                                                      ),
+                                                },
+                                              )
+                                              .toList();
+                                          ref
+                                              .read(settingsProvider.notifier)
+                                              .saveProvider({
+                                                'id': selected['id'],
+                                                'kind': selected['id'],
+                                                'displayName':
+                                                    selected['displayName'],
+                                                'baseUrl':
+                                                    baseUrl.text.trim().isEmpty
+                                                    ? null
+                                                    : baseUrl.text.trim(),
+                                                'apiKey':
+                                                    apiKey.text.trim().isEmpty
+                                                    ? null
+                                                    : apiKey.text.trim(),
+                                                'enabled': enabled,
+                                                'defaultModel': defaultModel,
+                                                'models': modelValues,
+                                              });
+                                        },
+                                  child: const Text('Save provider'),
                                 ),
+                                shad.SecondaryButton(
+                                  onPressed: widget.state.saving
+                                      ? null
+                                      : () => ref
+                                            .read(settingsProvider.notifier)
+                                            .testProvider(
+                                              selected['id'].toString(),
+                                              defaultModel,
+                                            ),
+                                  child: const Text('Test connection'),
+                                ),
+                                if (selected['configured'] == true)
+                                  shad.GhostButton(
+                                    onPressed: () => ref
+                                        .read(settingsProvider.notifier)
+                                        .deleteProvider(
+                                          selected['id'].toString(),
+                                        ),
+                                    child: const Text('Remove'),
+                                  ),
+                              ],
                             ],
                           ),
                         ],
@@ -904,8 +1165,7 @@ class _SkillsPanel extends ConsumerWidget {
       children: [
         const _PanelHeader(
           title: 'Skills',
-          caption:
-              'UAR discovers, selects, activates and persists skills. These global switches feed the same resolver as agent and conversation policy.',
+          caption: 'UAR discovers, selects, activates and persists skills. These global switches feed the same resolver as agent and conversation policy.',
           icon: Icons.auto_awesome_outlined,
         ),
         const SizedBox(height: 20),
@@ -963,8 +1223,7 @@ class _KnowledgePanelState extends ConsumerState<_KnowledgePanel> {
       children: [
         const _PanelHeader(
           title: 'Knowledge bases',
-          caption:
-              'UAR owns indexing, retrieval, citations and provenance. Conversation policy can inherit, select or deny any base.',
+          caption: 'UAR owns indexing, retrieval, citations and provenance. Conversation policy can inherit, select or deny any base.',
           icon: Icons.storage_outlined,
         ),
         const SizedBox(height: 20),
@@ -1024,17 +1283,16 @@ class _MemoryPanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final memoriesRoot = _map(state.snapshot.admin['memories']);
     final memories = _objects(memoriesRoot['items']);
-    final setting = _settings(
-      state.snapshot.admin,
-    ).where((item) => item['key'] == 'memory.enabled').firstOrNull;
+    final setting = _settings(state.snapshot.admin)
+        .where((item) => item['key'] == 'memory.enabled')
+        .firstOrNull;
     final enabled = setting?['data'] != false;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const _PanelHeader(
           title: 'Memories',
-          caption:
-              'Governed memories live in UAR storage. Model reasoning is never promoted to future context by default.',
+          caption: 'Governed memories live in UAR storage. Model reasoning is never promoted to future context by default.',
           icon: Icons.psychology_outlined,
         ),
         const SizedBox(height: 20),
@@ -1091,8 +1349,7 @@ class _McpPanelState extends ConsumerState<_McpPanel> {
       children: [
         const _PanelHeader(
           title: 'MCP & external access',
-          caption:
-              'UAR owns MCP connections, tool discovery, execution and credentials. Chat receives only policy-approved tools.',
+          caption: 'UAR owns MCP connections, tool discovery, execution and credentials. Chat receives only policy-approved tools.',
           icon: Icons.cable_outlined,
         ),
         const SizedBox(height: 20),
@@ -1116,15 +1373,16 @@ class _McpPanelState extends ConsumerState<_McpPanel> {
                 child: shad.PrimaryButton(
                   onPressed: widget.state.saving
                       ? null
-                      : () => ref
-                            .read(settingsProvider.notifier)
-                            .saveMcpServer(name.text.trim(), {
-                              'name': name.text.trim(),
-                              'enabled': true,
-                              'transport': 'remote_http',
-                              'url': endpoint.text.trim(),
-                              'env': <String, String>{},
-                            }),
+                      : () => ref.read(settingsProvider.notifier).saveMcpServer(
+                          name.text.trim(),
+                          {
+                            'name': name.text.trim(),
+                            'enabled': true,
+                            'transport': 'remote_http',
+                            'url': endpoint.text.trim(),
+                            'env': <String, String>{},
+                          },
+                        ),
                   child: const Text('Add server'),
                 ),
               ),
@@ -1402,9 +1660,8 @@ class _AgentsPanelState extends ConsumerState<_AgentsPanel> {
       title.text = metadata['title']?.toString() ?? selectedId ?? '';
       description.text = metadata['description']?.toString() ?? '';
       systemPrompt.text = prompt['system']?.toString() ?? '';
-      policy.text = const JsonEncoder.withIndent(
-        '  ',
-      ).convert(savedPolicy.isEmpty ? _defaultPolicy() : savedPolicy);
+      policy.text = const JsonEncoder.withIndent('  ')
+          .convert(savedPolicy.isEmpty ? _defaultPolicy() : savedPolicy);
     });
   }
 
@@ -1415,9 +1672,28 @@ class _AgentsPanelState extends ConsumerState<_AgentsPanel> {
       title.clear();
       description.clear();
       systemPrompt.clear();
-      policy.text = const JsonEncoder.withIndent(
-        '  ',
-      ).convert(_defaultPolicy());
+      policy.text = const JsonEncoder.withIndent('  ')
+          .convert(_defaultPolicy());
+    });
+  }
+
+  /// Decode the current policy JSON in the editor, or an empty map if invalid.
+  Map<String, dynamic> _decodePolicy() {
+    try {
+      final decoded = jsonDecode(policy.text);
+      if (decoded is Map<String, dynamic>) return decoded;
+    } on FormatException {
+      // Fall through to empty — the picker degrades to "Global default".
+    }
+    return {};
+  }
+
+  /// Write a `{ provider_id, model_id }` model (or null) into the editor JSON,
+  /// keeping the rest of the policy intact so the raw editor stays authoritative.
+  void _setPolicyModel(Map<String, String>? route) {
+    final next = _policyWithModel(_decodePolicy(), route);
+    setState(() {
+      policy.text = const JsonEncoder.withIndent('  ').convert(next);
     });
   }
 
@@ -1521,8 +1797,7 @@ class _AgentsPanelState extends ConsumerState<_AgentsPanel> {
       children: [
         const _PanelHeader(
           title: 'Agents',
-          caption:
-              'Definitions, prompts, and effective execution policy are stored and enforced by UAR. Default and Orchestrator agents are protected.',
+          caption: 'Definitions, prompts, and effective execution policy are stored and enforced by UAR. Default and Orchestrator agents are protected.',
           icon: Icons.smart_toy_outlined,
         ),
         const SizedBox(height: 20),
@@ -1570,6 +1845,28 @@ class _AgentsPanelState extends ConsumerState<_AgentsPanel> {
                 decoration: const InputDecoration(labelText: 'System prompt'),
               ),
               const SizedBox(height: 12),
+              const Text(
+                'Model',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Overrides the global default for this agent. Leave on global '
+                'default to inherit.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ModelRoutePicker(
+                providers: widget.state.snapshot.providers,
+                value: _routeFromPolicy(_decodePolicy()),
+                inheritLabel: 'Global default',
+                enabled: !widget.state.saving,
+                onChanged: _setPolicyModel,
+              ),
+              const SizedBox(height: 12),
               TextField(
                 controller: policy,
                 minLines: 10,
@@ -1578,8 +1875,7 @@ class _AgentsPanelState extends ConsumerState<_AgentsPanel> {
                 style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
                 decoration: const InputDecoration(
                   labelText: 'UAR run policy (JSON)',
-                  helperText:
-                      'Controls model, skills, tools, MCP servers, knowledge, memory, context, and approval at agent scope.',
+                  helperText: 'Controls model, skills, tools, MCP servers, knowledge, memory, context, and approval at agent scope.',
                 ),
               ),
               const SizedBox(height: 16),

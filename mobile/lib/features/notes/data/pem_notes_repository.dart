@@ -17,14 +17,16 @@ class PemNotesRepository implements NotesRepository {
   @override
   Future<List<Note>> listNotes() async {
     final result = await loadRecords();
-    return result.items.map((record) {
-      final data = jsonDecode(record.dataJson) as Map<String, Object?>;
-      return Note(
-        id: record.id,
-        title: data['title']?.toString() ?? record.id,
-        body: data['body']?.toString() ?? '',
-      );
-    }).toList(growable: false);
+    return result.items
+        .map((record) {
+          final data = jsonDecode(record.dataJson) as Map<String, Object?>;
+          return Note(
+            id: record.id,
+            title: data['title']?.toString() ?? record.id,
+            body: data['body']?.toString() ?? '',
+          );
+        })
+        .toList(growable: false);
   }
 
   @override

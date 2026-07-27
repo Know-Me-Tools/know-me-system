@@ -7,6 +7,7 @@ import '../frb_generated.dart';
 import '../third_party/gen_ui_db_graph.dart';
 import '../third_party/gen_ui_types/error.dart';
 import '../third_party/gen_ui_types/inference.dart';
+
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `parse_json`
@@ -34,6 +35,43 @@ Future<String> chatSend({
   attachmentPaths: attachmentPaths,
   branchId: branchId,
   userMessageId: userMessageId,
+);
+
+/// Copy a picked file into durable app storage and describe it as JSON.
+///
+/// Call this at PICK time, before the turn is sent. The path a picker returns
+/// is not safe to keep: on Android it lives in the app cache, which the OS or
+/// the user can clear, so a transcript holding it renders during testing and
+/// shows broken media later.
+///
+/// The JSON is a `StoredAttachment`: durable path, mime, size, image/video/
+/// document classification, and intrinsic pixel dimensions for images. Flutter
+/// renders from this instead of deciding the kind from the file extension
+/// itself — that duplicated decision is why a picked PNG became a grey
+/// document chip.
+///
+/// Returns a JSON string rather than a generated struct to match the existing
+/// FFI convention (`lane_availability`, `chat_control_catalog`).
+Future<String> stageAttachment({
+  required String conversationId,
+  required String sourcePath,
+}) => GenUiCore.instance.api.crateApiChatStageAttachment(
+  conversationId: conversationId,
+  sourcePath: sourcePath,
+);
+
+/// Delete stored attachment files whose conversation no longer exists.
+///
+/// Called by the UI once it has loaded its conversation list, because that
+/// list lives in the entity store the UI owns — Rust cannot enumerate it at
+/// boot. A crash between writing a file and committing the message row leaves
+/// bytes with no owner; without this they accumulate forever.
+///
+/// Returns the number of conversation directories removed.
+Future<int> sweepOrphanAttachments({
+  required List<String> knownConversationIds,
+}) => GenUiCore.instance.api.crateApiChatSweepOrphanAttachments(
+  knownConversationIds: knownConversationIds,
 );
 
 /// Submit a typed A2UI/AG-UI user interaction and start the agent's response.
@@ -87,6 +125,14 @@ Future<String> activeLane() => GenUiCore.instance.api.crateApiChatActiveLane();
 
 Future<void> setActiveLane({required String lane}) =>
     GenUiCore.instance.api.crateApiChatSetActiveLane(lane: lane);
+
+/// Which lanes can be selected right now, and why not when they cannot.
+///
+/// The mode picker calls this to render unavailable modes as disabled with a
+/// reason, instead of offering a control that fails when tapped. Side-effect
+/// free: it probes registration state only and never loads an engine.
+Future<String> laneAvailability() =>
+    GenUiCore.instance.api.crateApiChatLaneAvailability();
 
 Future<String> uarServiceConfig() =>
     GenUiCore.instance.api.crateApiChatUarServiceConfig();
@@ -194,6 +240,19 @@ Future<String> conversationEffectiveConfig({required String conversationId}) =>
     GenUiCore.instance.api.crateApiChatConversationEffectiveConfig(
       conversationId: conversationId,
     );
+
+/// The local lane's system prompt, or the shipped default when unset.
+Future<String> localSystemPrompt() =>
+    GenUiCore.instance.api.crateApiChatLocalSystemPrompt();
+
+/// Persist the local lane's system prompt; a blank value restores the default.
+Future<void> setLocalSystemPrompt({required String prompt}) =>
+    GenUiCore.instance.api.crateApiChatSetLocalSystemPrompt(prompt: prompt);
+
+/// The shipped default, so Settings can offer "reset" without hardcoding copy
+/// that would drift from Rust.
+Future<String> defaultLocalSystemPrompt() =>
+    GenUiCore.instance.api.crateApiChatDefaultLocalSystemPrompt();
 
 Future<String> themeMode() => GenUiCore.instance.api.crateApiChatThemeMode();
 

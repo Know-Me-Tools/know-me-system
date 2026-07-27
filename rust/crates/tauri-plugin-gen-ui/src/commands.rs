@@ -29,20 +29,112 @@ fn app_data_dir<R: Runtime>(app: &tauri::AppHandle<R>) -> Result<std::path::Path
 // frontend — mobile's frb bridge calls the equivalent Rust fn `chat_send`
 // directly by name (no separate invoke-key layer), so the two ecosystems
 // have different but internally consistent naming.
+///
+/// `attachment_paths` and `user_message_id` mirror mobile's `chat_send`. When
+/// there are no attachments this takes the same path it always has; with them
+/// it reaches `send_with_attachments`, which extracts file content and
+/// correlates it to the user message for memory ingest. Desktop previously had
+/// no way to reach that function at all, so the composer's attachment UI was a
+/// dead control.
 #[tauri::command]
 pub async fn stream_agent_a2ui(
     user_message: String,
     messages: Vec<gen_ui_types::inference::InferenceMessage>,
     conversation_id: String,
     branch_id: String,
+    attachment_paths: Option<Vec<String>>,
+    user_message_id: Option<String>,
 ) -> Result<String> {
-    tracing::info!(history_items = messages.len(), "desktop chat turn starting");
-    let run_id = gen_ui_agent::chat::send(user_message, messages, conversation_id, branch_id)
+    let attachment_paths = attachment_paths.unwrap_or_default();
+    tracing::info!(
+        history_items = messages.len(),
+        attachments = attachment_paths.len(),
+        "desktop chat turn starting"
+    );
+    let run_id = if attachment_paths.is_empty() {
+        gen_ui_agent::chat::send(user_message, messages, conversation_id, branch_id).await
+    } else {
+        // `send_with_attachments` correlates extracted content to the user
+        // message, so it needs that id. Every real caller supplies one; require
+        // it rather than inventing a value that would silently mis-correlate
+        // the extracted content against a message that does not exist.
+        let user_message_id = user_message_id.ok_or_else(|| {
+            gen_ui_types::CoreError::Terminal(
+                "user_message_id is required when sending attachments".to_string(),
+            )
+        })?;
+        gen_ui_agent::chat::send_with_attachments(
+            user_message,
+            messages,
+            attachment_paths,
+            conversation_id,
+            branch_id,
+            user_message_id,
+        )
         .await
-        .map_err(gen_ui_types::CoreError::from)
-        .map_err(crate::Error::from)?;
+    }
+    .map_err(gen_ui_types::CoreError::from)
+    .map_err(crate::Error::from)?;
     tracing::info!(run_id = %run_id, "desktop chat run started");
     Ok(run_id)
+}
+
+/// Stage an attachment the user picked in the browser and describe it.
+///
+/// The web composer hands React a `File` (bytes in memory); Rust's attachment
+/// pipeline reads from the filesystem, because copying multi-megabyte files
+/// through IPC on every turn would be wasteful. This bridges the two once, at
+/// pick time.
+///
+/// Returns full metadata, not a bare path. React previously got only a string,
+/// so it had to guess the kind from the file name — and guessed `document` for
+/// every attachment, which is why a picked PNG rendered as a grey chip. Mime,
+/// image/video classification and intrinsic dimensions are all decided once, in
+/// `gen_ui_agent::attachment_store`, and both UIs consume the same answer.
+///
+/// The 25 MB ceiling is enforced inside the store — a client-side check is a
+/// courtesy, not a control.
+#[tauri::command]
+pub async fn stage_attachment(
+    conversation_id: String,
+    file_name: String,
+    bytes: Vec<u8>,
+) -> Result<gen_ui_agent::attachment_store::StoredAttachment> {
+    gen_ui_agent::attachment_store::stage_bytes(&conversation_id, &file_name, &bytes)
+        .await
+        .map_err(|error| gen_ui_types::CoreError::Terminal(error.to_string()).into())
+}
+
+/// Fetch remote media natively and return its resolved form.
+///
+/// The webview cannot always reach what the model references — CORS, mixed
+/// content, or an origin the embedded browser has no credentials for. Rust
+/// fetches it in-process instead, which is why Flutter has always rendered
+/// remote images, video and link previews that desktop showed broken.
+#[tauri::command]
+pub async fn resolve_remote_content(url: String, kind: String) -> Result<String> {
+    let resolved = gen_ui_agent::media::resolve(&url, &kind)
+        .await
+        .map_err(gen_ui_types::CoreError::from)?;
+    serde_json::to_string(&resolved)
+        .map_err(|error| gen_ui_types::CoreError::Serde(error.to_string()))
+        .map_err(Into::into)
+}
+
+/// Approve a tool call the local model proposed but KnowMe refused to run.
+///
+/// Deliberately its own command rather than a variant of the interaction
+/// channel: routing approvals through free-form interaction text would let the
+/// UI spoof tool execution. Mirrors mobile's `chat_approve_tool_confirmation`.
+/// Desktop already had the whole approval CARD built and could set
+/// `tool_approval: 'ask'` from its own toolbar — with no command behind it,
+/// that combination was an unresolvable stall.
+#[tauri::command]
+pub async fn chat_approve_tool_confirmation(approval_id: String) -> Result<String> {
+    gen_ui_agent::chat::approve_tool_confirmation(approval_id)
+        .await
+        .map_err(gen_ui_types::CoreError::from)
+        .map_err(Into::into)
 }
 
 /// Continue a conversation from a structured A2UI/client interaction.
@@ -95,6 +187,23 @@ pub async fn get_active_lane() -> Result<String> {
     gen_ui_agent::chat::active_lane()
         .await
         .map_err(gen_ui_types::CoreError::from)
+        .map_err(Into::into)
+}
+
+/// Which lanes can be selected right now, and why not when they cannot.
+///
+/// The mode picker renders an unavailable lane as disabled with the reason
+/// rather than offering a control that fails when clicked. Side-effect free:
+/// it probes registration state and never loads an engine. Flutter has reached
+/// this through FFI since the picker shipped; this is the Tauri equivalent so
+/// desktop and web can render the same disabled rows instead of guessing.
+#[tauri::command]
+pub async fn lane_availability() -> Result<String> {
+    let value = gen_ui_agent::chat::lane_availability()
+        .await
+        .map_err(gen_ui_types::CoreError::from)?;
+    serde_json::to_string(&value)
+        .map_err(|error| gen_ui_types::CoreError::Serde(error.to_string()))
         .map_err(Into::into)
 }
 
@@ -391,9 +500,16 @@ pub async fn run_migrations<R: Runtime>(app: tauri::AppHandle<R>) -> Result<()> 
     std::fs::create_dir_all(&data_dir).map_err(|e| {
         tauri::Error::from(std::io::Error::new(e.kind(), format!("app data dir: {e}")))
     })?;
-    // Desktop's zero-configuration local-inference lane. It shares the same
-    // revision-pinned, checksum-gated Qwen GGUF engine as mobile; the first local
-    // turn downloads into app data, and later turns reuse that durable cache.
+    // Desktop's zero-configuration local-inference lane, selected per platform
+    // (the engine matrix): macOS runs MLX in-process via the mlex (mlx-c) crate
+    // to match iOS; Windows/Linux run llama.cpp. Both share the revision-pinned,
+    // checksum-gated catalog and the InferenceProvider seam, so the first local
+    // turn downloads into app data and later turns reuse that durable cache.
+    #[cfg(target_os = "macos")]
+    let inference: Arc<dyn gen_ui_types::inference::InferenceProvider> = Arc::new(
+        gen_ui_inference::MlxcEngine::new(data_dir.join("model-cache/mlx")),
+    );
+    #[cfg(not(target_os = "macos"))]
     let inference: Arc<dyn gen_ui_types::inference::InferenceProvider> = Arc::new(
         gen_ui_inference::LlamaCppEngine::new(data_dir.join("model-cache")),
     );

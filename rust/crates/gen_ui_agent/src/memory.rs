@@ -129,6 +129,21 @@ pub async fn search_with(
 }
 
 pub async fn delete_conversation_context(conversation_id: String) -> Result<usize, AgentError> {
+    // Attachment BYTES go with the conversation. Both UIs already call this on
+    // conversation delete, and without it every stored file leaks forever: the
+    // rows disappear from the transcript while the disk keeps growing.
+    //
+    // Deliberately best-effort. Failing the whole delete because a file could
+    // not be unlinked would leave the user unable to remove a conversation at
+    // all — the worse outcome — so the failure is logged and the memory
+    // deletion below still runs.
+    if let Err(error) = crate::attachment_store::remove_conversation(&conversation_id).await {
+        tracing::warn!(
+            conversation = %conversation_id,
+            %error,
+            "could not remove stored attachments; conversation delete continues"
+        );
+    }
     state::memory()?
         .delete_conversation_context(&conversation_id)
         .await

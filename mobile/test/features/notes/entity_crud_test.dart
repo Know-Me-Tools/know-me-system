@@ -20,38 +20,41 @@ class _FailingTransport implements EntityTransport {
 }
 
 void main() {
-  test('EntityCrud rolls back the edit buffer when the transport fails',
-      () async {
-    final container = ProviderContainer(
-      overrides: [
-        entityTransportProvider.overrideWithValue(_FailingTransport()),
-      ],
-    );
-    addTearDown(container.dispose);
+  test(
+    'EntityCrud rolls back the edit buffer when the transport fails',
+    () async {
+      final container = ProviderContainer(
+        overrides: [
+          entityTransportProvider.overrideWithValue(_FailingTransport()),
+        ],
+      );
+      addTearDown(container.dispose);
 
-    final ctrl = container.read(
-      entityCrudProvider('note', 'n1', const {'title': 'Original'}).notifier,
-    );
-    ctrl.edit('title', 'Edited');
-    expect(
-      container
-          .read(entityCrudProvider('note', 'n1', const {'title': 'Original'}))
-          .isDirty,
-      isTrue,
-    );
+      final ctrl = container.read(
+        entityCrudProvider('note', 'n1', const {'title': 'Original'}).notifier,
+      );
+      ctrl.edit('title', 'Edited');
+      expect(
+        container
+            .read(entityCrudProvider('note', 'n1', const {'title': 'Original'}))
+            .isDirty,
+        isTrue,
+      );
 
-    await expectLater(
-      ctrl.save((m) => m.toString()),
-      throwsA(isA<StateError>()),
-    );
+      await expectLater(
+        ctrl.save((m) => m.toString()),
+        throwsA(isA<StateError>()),
+      );
 
-    final buffer = container
-        .read(entityCrudProvider('note', 'n1', const {'title': 'Original'}));
-    expect(
-      buffer.isDirty,
-      isTrue,
-      reason: 'save rolled back — edits are dirty again',
-    );
-    expect(buffer.value('title'), 'Edited');
-  });
+      final buffer = container.read(
+        entityCrudProvider('note', 'n1', const {'title': 'Original'}),
+      );
+      expect(
+        buffer.isDirty,
+        isTrue,
+        reason: 'save rolled back — edits are dirty again',
+      );
+      expect(buffer.value('title'), 'Edited');
+    },
+  );
 }

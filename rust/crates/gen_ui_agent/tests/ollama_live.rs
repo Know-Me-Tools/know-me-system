@@ -23,7 +23,7 @@ use gen_ui_types::events::A2uiEvent;
 
 const PROVIDER_ID: &str = "test-ollama";
 const API_KEY_REF: &str = "test-ollama-noop";
-const SERVICE: &str = "ai.prometheusags.knowme-poc";
+const SERVICE: &str = "tools.knowme.knowme";
 
 /// This test never exercises memory/graph-RAG — a real fastembed model would
 /// be pure overhead. A deterministic zero-vector fake keeps state::init's

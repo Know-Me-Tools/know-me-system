@@ -1,0 +1,10 @@
+POSITION REMINDER — read this as your FIRST tool call every turn
+Phase: model-runtime-per-device
+Step: 4 of 5
+Stage: executing
+Next command: unknown
+
+Required signal format (emit BEFORE any tool call):
+  Starting <kbd-skill> — model-runtime-per-device (step 4 of 5)
+  [do work]
+  Completed <kbd-skill> — model-runtime-per-device (step 4 of 5)

@@ -21,6 +21,20 @@ part 'chat_notifier.g.dart';
 
 const _uuid = Uuid();
 
+/// Prefixed to a steer so the model treats the stopped turn as work to build on.
+///
+/// Worded for the model, but it stays visible in the transcript, so it also has
+/// to read sensibly to the user who sent it.
+const _steerPreamble =
+    'I stopped your previous response part-way through. Keep the work you had '
+    'already done in mind, then follow this correction instead of continuing '
+    'the direction you were heading:';
+
+/// Sent verbatim when the user resumes a stopped turn.
+const _resumeInstruction =
+    'Continue your previous response from where you stopped. Do not start over '
+    'or repeat what you already wrote.';
+
 // ChatNotifier.build() is synchronous (never throws), so provider-level retry
 // does not apply here. The FFI terminality that matters lives on the async
 // FFI-backed providers (entityList/entity/syncStatus) and on the Mutation's
@@ -66,6 +80,25 @@ class ChatNotifier extends _$ChatNotifier {
       messages: messages,
       isLoading: false,
     );
+    // Reclaim attachment bytes whose conversation is gone. A crash between
+    // storing a file and committing its message row leaves bytes with no
+    // owner, and nothing else ever collects them.
+    //
+    // Done HERE because the conversation list is the authority on what still
+    // exists and it lives in the entity store, which Rust cannot enumerate at
+    // boot. Fire-and-forget: a failed sweep costs disk, and blocking the chat
+    // screen on housekeeping would cost the user their session.
+    unawaited(
+      _repository
+          .sweepOrphanAttachments(
+            conversations.map((conversation) => conversation.id).toList(),
+          )
+          // The ONLY error deliberately dropped in this notifier. A failed
+          // sweep costs disk space and nothing else: there is no user action
+          // to offer, and surfacing it would interrupt the chat load for
+          // housekeeping the user never asked for. It retries on next launch.
+          .catchError((Object _) => 0),
+    );
     _modelStatusSubscription ??= _repository.watchLocalModelStatus().listen(
       (operation) {
         if (!ref.mounted) return;
@@ -107,10 +140,42 @@ class ChatNotifier extends _$ChatNotifier {
 
   Future<void> selectConversation(String id) async {
     if (id == state.threadId) return;
+    // Refuse while a run is live. Switching swaps `state.messages` out from
+    // under the driver still writing blocks to a message id that is no longer
+    // in the visible list — the tokens go nowhere and the turn is lost.
+    // React has always guarded this (chatStore.ts switchConversation).
+    if (state.messages.any((message) => message.isStreaming)) return;
     state = state.copyWith(isLoading: true);
     final messages = await _repository.listMessages(id);
     if (!ref.mounted) return;
     state = state.copyWith(threadId: id, messages: messages, isLoading: false);
+  }
+
+  /// Rename a conversation.
+  ///
+  /// React has had this since it shipped; the Flutter sheet showed the title as
+  /// static text with only a delete affordance beside it, so a conversation
+  /// kept whatever the first message auto-titled it forever.
+  Future<void> renameConversation(String id, String title) async {
+    final trimmed = title.trim();
+    // An empty title would leave a blank row the user cannot tell apart from
+    // its neighbours; keep the existing one instead.
+    if (trimmed.isEmpty) return;
+    final existing = state.conversations
+        .where((conversation) => conversation.id == id)
+        .firstOrNull;
+    if (existing == null || existing.title == trimmed) return;
+    final updated = existing.copyWith(
+      title: trimmed,
+      updatedAt: DateTime.now().toUtc(),
+    );
+    state = state.copyWith(
+      conversations: [
+        for (final conversation in state.conversations)
+          if (conversation.id == id) updated else conversation,
+      ],
+    );
+    await _repository.saveConversation(updated);
   }
 
   Future<void> deleteConversation(String id) async {
@@ -208,13 +273,29 @@ class ChatNotifier extends _$ChatNotifier {
   }
 
   void updateContextTelemetry(String messageId, ContextTelemetry event) {
+    // Provenance (which agent + provider + model produced the turn) is projected
+    // onto the same ContextTelemetry channel under a `provenance` key. Capture it
+    // into the typed field when present; otherwise leave provenance untouched so a
+    // later real telemetry event does not clear it.
+    final provenance = event.payload['provenance'];
+    final provenanceMap = provenance is Map
+        ? provenance.cast<String, Object?>()
+        : null;
+    final isProvenanceOnly = event.payload['kind'] == 'provenance';
     state = state.copyWith(
       messages: [
         for (final message in state.messages)
           if (message.id == messageId)
             message.copyWith(
-              contextPlanVersion: event.payload['planVersion']?.toString(),
-              contextTelemetry: event.payload.cast<String, Object?>(),
+              // A provenance-only telemetry event carries no context plan/version
+              // and should not overwrite the real context telemetry.
+              contextPlanVersion: isProvenanceOnly
+                  ? message.contextPlanVersion
+                  : event.payload['planVersion']?.toString(),
+              contextTelemetry: isProvenanceOnly
+                  ? message.contextTelemetry
+                  : event.payload.cast<String, Object?>(),
+              provenance: provenanceMap ?? message.provenance,
             )
           else
             message,
@@ -293,6 +374,7 @@ class ChatNotifier extends _$ChatNotifier {
     List<ContentBlock> attachments = const [],
     List<String> attachmentPaths = const [],
     String branchId = 'main',
+    String? intent,
   }) async {
     await load();
     if (!ref.mounted || state.threadId.isEmpty) return;
@@ -304,6 +386,7 @@ class ChatNotifier extends _$ChatNotifier {
       createdAt: DateTime.now().toUtc(),
       branchId: branchId,
       attachmentPaths: attachmentPaths,
+      intent: intent,
     );
     final assistantId = _uuid.v4();
     final assistantMsg = ChatMessage(
@@ -367,6 +450,41 @@ class ChatNotifier extends _$ChatNotifier {
     _drivers[assistantId] = driver;
     ref.onDispose(() => driver.dispose());
   }
+
+  /// Course-correct after a stop, keeping the partial work in play.
+  ///
+  /// The user stopped *because* they were steering — they read the partial answer
+  /// or a tool call and want a different direction. The preamble tells the model
+  /// that plainly, so the stopped turn reads as work-in-progress to build on
+  /// rather than a failed attempt to ignore.
+  ///
+  /// The tag travels in the content because that is the only carrier every lane
+  /// forwards verbatim — see [ChatMessage.intent] for why `name` and a new role
+  /// string both fail silently.
+  Future<void> sendSteer(
+    String text, {
+    List<ContentBlock> attachments = const [],
+    List<String> attachmentPaths = const [],
+    String branchId = 'main',
+  }) => sendMessage(
+    '$_steerPreamble\n\n$text',
+    attachments: attachments,
+    attachmentPaths: attachmentPaths,
+    branchId: branchId,
+    intent: 'steer',
+  );
+
+  /// Carry on from where a stop landed.
+  ///
+  /// For the user who stopped and changed their mind. No Rust changes are needed:
+  /// [_historyForRust] filters only on `branchId` and non-empty text — there is
+  /// no `runStatus` filter — so the cancelled partial turn is already in history
+  /// and the model sees `[… assistant(partial), user(continue)]`.
+  ///
+  /// The instruction stays visible in the transcript rather than being hidden, so
+  /// the conversation remains honest about what was actually sent.
+  Future<void> sendResume({String branchId = 'main'}) =>
+      sendMessage(_resumeInstruction, branchId: branchId, intent: 'resume');
 
   Future<void> resubmitMessage(String messageId) async {
     final message = state.messages
@@ -476,6 +594,16 @@ class ChatNotifier extends _$ChatNotifier {
     );
     final accepted = await _repository.cancelRun(runId);
     if (!ref.mounted || accepted) return;
+    // Rust reports `false` when the run is no longer registered — which is the
+    // normal outcome of a second stop tap, or of the run finishing in the gap
+    // before this call landed. Treating that as an error overwrote a
+    // legitimate stopped turn with a failure bubble and hid the work the user
+    // had just chosen to keep. Only surface an error if the turn is somehow
+    // still streaming; otherwise it already reached a terminal state.
+    final current = state.messages
+        .where((item) => item.id == messageId)
+        .firstOrNull;
+    if (current == null || !current.isStreaming) return;
     markRunError(
       messageId,
       const ChatRunError(
@@ -635,12 +763,32 @@ class ChatNotifier extends _$ChatNotifier {
       messages: [...state.messages, userMsg, assistantMsg],
     );
     await _repository.saveMessage(state.threadId, userMsg);
-    final runId = await _repository.submitInteraction(
-      threadId: state.threadId,
-      interactionJson: payload,
-      history: history,
-      branchId: userMsg.branchId,
-    );
+    // The assistant placeholder is already in state and streaming. A throw here
+    // used to escape uncaught, leaving that bubble spinning forever with no way
+    // back — this was the only action in the notifier without the guard its
+    // siblings have.
+    late final String runId;
+    try {
+      runId = await _repository.submitInteraction(
+        threadId: state.threadId,
+        interactionJson: payload,
+        history: history,
+        branchId: userMsg.branchId,
+      );
+    } catch (error, stackTrace) {
+      final message = await _repository.errorMessage(error);
+      markRunError(
+        assistantId,
+        ChatRunError(
+          code: 'interaction_submit_failed',
+          phase: 'queued',
+          message: message,
+          retryable: true,
+          diagnostics: stackTrace.toString(),
+        ),
+      );
+      return;
+    }
     if (!ref.mounted) return;
     final driver = A2uiContentDriver(
       messageId: assistantId,
@@ -823,6 +971,7 @@ class ChatNotifier extends _$ChatNotifier {
       messageId: messageId,
       onBlock: streamBlock,
       onFinalize: finalizeMessage,
+      onTelemetry: updateContextTelemetry,
     );
     _drivers[messageId] = driver;
     await driver.connect(stream);

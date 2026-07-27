@@ -40,6 +40,15 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+            // R8 runs on release and shrinks anything it cannot prove reachable.
+            // The LiteRT-LM bridge is reached only from Rust via JNI reflection,
+            // so without these keep rules it is stripped and release builds fail
+            // at load with ClassNotFoundException (debug is unaffected because
+            // R8 does not run there). See proguard-rules.pro.
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 

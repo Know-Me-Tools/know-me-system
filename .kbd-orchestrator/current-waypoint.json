@@ -3,7 +3,7 @@
   "previousPhase": "on-device-qwen35",
   "change": "embed-uar-mobile-offline",
   "status": "implementation_ready",
-  "currentTask": "embed-uar-mobile-offline task 3.1 — inject durable sandboxed persistence (swap InMemoryProvider for SurrealDbProvider)",
+  "currentTask": "embed-uar-mobile-offline task 3.1 \u2014 inject durable sandboxed persistence (swap InMemoryProvider for SurrealDbProvider)",
   "nextPendingChange": "embed-uar-mobile-offline",
   "sourceTool": "claude-code",
   "exactNextCommand": "/opsx:apply embed-uar-mobile-offline",
@@ -19,9 +19,18 @@
   "publicationStatus": "NOT_TRACKED",
   "changesCompleted": 0,
   "changesTotal": 1,
-  "updatedAt": "2026-07-26T00:00:00Z",
+  "updatedAt": "2026-07-27T00:00:00Z",
   "path": [
     "model-runtime-per-device",
     "embedded-uar-offline-agents"
-  ]
+  ],
+  "previousPhaseCompletion": {
+    "phase": "model-runtime-per-device",
+    "implementationCompleted": 5,
+    "implementationTotal": 5,
+    "status": "COMPLETE",
+    "closedAt": "2026-07-27",
+    "evidence": "docs/certification/2026-07-27/ \u2014 Android, iOS and desktop reports",
+    "note": "The counters BELOW describe the NEXT change (embed-uar-mobile-offline task 3.1) per main's retarget, not this closed phase. Recorded separately so a 0/1 reading is not mistaken for the phase reopening."
+  }
 }

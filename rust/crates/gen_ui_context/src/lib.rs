@@ -870,6 +870,10 @@ impl ContextBuilder<'_> {
             .get(&SliceKind::History)
             .copied()
             .unwrap_or_default();
+        // Applied once here, after every slice has contributed, so all three
+        // mid-list system producers (summary, omission marker, memory/knowledge)
+        // are covered by one guarantee instead of each learning about placement.
+        let messages = hoist_system_messages(messages);
         Ok(AssembledContext {
             plan: plan.clone(),
             prompt: PromptPlan {
@@ -1052,6 +1056,50 @@ fn admit_ranked_section(
     }
 }
 
+/// Fold every non-leading `System` message into the leading one.
+///
+/// Several slices legitimately want to speak with system authority — the
+/// conversation summary, the "N earlier messages omitted" marker, and the
+/// memory/knowledge blocks all push `InferenceRole::System` *after* history has
+/// begun. Strict chat templates reject that: MLX raises
+/// `TemplateException("System message must be at the beginning.")`, which
+/// surfaced on iOS only for conversations long enough to trigger compaction —
+/// a fresh chat has no history to compact, so it never reproduced.
+///
+/// Rather than strip the content (it is load-bearing context) or teach each
+/// producer about placement, merge it into the leading system message and keep
+/// the conversational turns in order. Content and order are both preserved;
+/// only the role placement changes.
+fn hoist_system_messages(messages: Vec<InferenceMessage>) -> Vec<InferenceMessage> {
+    let leading_is_system = messages
+        .first()
+        .is_some_and(|message| message.role == InferenceRole::System);
+    if !leading_is_system {
+        // No leading system message to merge into. Only the first message may be
+        // System, so anything later would still violate the template — but
+        // inventing a system message here would change the prompt contract, so
+        // leave the list alone and let the caller's own shape stand.
+        return messages;
+    }
+    let mut iter = messages.into_iter();
+    let mut leading = iter.next().expect("checked non-empty above");
+    let mut rest = Vec::new();
+    for message in iter {
+        if message.role == InferenceRole::System {
+            if !message.content.trim().is_empty() {
+                leading.content.push_str("\n\n");
+                leading.content.push_str(&message.content);
+            }
+        } else {
+            rest.push(message);
+        }
+    }
+    let mut merged = Vec::with_capacity(rest.len() + 1);
+    merged.push(leading);
+    merged.extend(rest);
+    merged
+}
+
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum ContextError {
     #[error("context slices commit {committed} tokens above ceiling {ceiling}")]
@@ -1071,6 +1119,92 @@ pub enum ContextError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn message(role: InferenceRole, content: &str) -> InferenceMessage {
+        InferenceMessage {
+            role,
+            content: content.into(),
+            name: None,
+            tool_call_id: None,
+        }
+    }
+
+    #[test]
+    fn mid_list_system_messages_are_folded_into_the_leading_one() {
+        // Reproduces the iOS crash: MLX rejects a System message after history
+        // has begun with `TemplateException("System message must be at the
+        // beginning.")`. Compaction and retrieval both emit exactly this shape.
+        let merged = hoist_system_messages(vec![
+            message(InferenceRole::System, "You are KnowMe."),
+            message(InferenceRole::User, "first question"),
+            message(InferenceRole::Assistant, "first answer"),
+            message(InferenceRole::System, "[… 4 earlier messages omitted …]"),
+            message(InferenceRole::System, "Relevant memories:\nlikes tea"),
+            message(InferenceRole::User, "what is this conversation about?"),
+        ]);
+
+        // Exactly one System message, and it leads.
+        assert_eq!(merged[0].role, InferenceRole::System);
+        assert_eq!(
+            merged
+                .iter()
+                .filter(|m| m.role == InferenceRole::System)
+                .count(),
+            1
+        );
+
+        // The system content is load-bearing context — merged, never dropped.
+        assert!(merged[0].content.contains("You are KnowMe."));
+        assert!(merged[0].content.contains("earlier messages omitted"));
+        assert!(merged[0].content.contains("likes tea"));
+
+        // Conversational turns keep their relative order.
+        let turns: Vec<_> = merged[1..]
+            .iter()
+            .map(|m| (m.role.clone(), m.content.as_str()))
+            .collect();
+        assert_eq!(
+            turns,
+            vec![
+                (InferenceRole::User, "first question"),
+                (InferenceRole::Assistant, "first answer"),
+                (InferenceRole::User, "what is this conversation about?"),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_short_conversation_is_left_untouched() {
+        // A fresh chat never compacts, which is why this bug only reproduced on
+        // existing conversations — pin that the common path is a no-op.
+        let original = vec![
+            message(InferenceRole::System, "You are KnowMe."),
+            message(InferenceRole::User, "hello"),
+        ];
+        assert_eq!(hoist_system_messages(original.clone()), original);
+    }
+
+    #[test]
+    fn a_list_without_a_leading_system_message_is_left_alone() {
+        // Inventing a system message here would change the prompt contract, so
+        // the caller's own shape stands rather than being silently rewritten.
+        let original = vec![
+            message(InferenceRole::User, "hello"),
+            message(InferenceRole::System, "late system"),
+        ];
+        assert_eq!(hoist_system_messages(original.clone()), original);
+    }
+
+    #[test]
+    fn blank_system_slices_do_not_pad_the_leading_message() {
+        let merged = hoist_system_messages(vec![
+            message(InferenceRole::System, "You are KnowMe."),
+            message(InferenceRole::User, "hello"),
+            message(InferenceRole::System, "   "),
+        ]);
+        assert_eq!(merged[0].content, "You are KnowMe.");
+        assert_eq!(merged.len(), 2);
+    }
 
     struct Sources {
         history: Vec<Turn>,

@@ -41,6 +41,14 @@ pub struct LiteRtLmEngine {
     diagnostics: RwLock<Option<RuntimeDiagnostics>>,
     model_operation: watch::Sender<ModelOperationState>,
     model_cancelled: AtomicBool,
+    /// Set by `cancel_generation`, cleared when a generation starts.
+    ///
+    /// LiteRT-LM is non-streaming: generation is one blocking JNI call, and
+    /// cancelling it makes that call throw. Without this flag the `Err` arm
+    /// cannot tell a deliberate interrupt from a genuine failure, so a stop tap
+    /// surfaced as a terminal error. Clearing it at generation start keeps a
+    /// stale cancel from masking a later real error.
+    generation_cancelled: Arc<AtomicBool>,
     #[cfg_attr(not(target_os = "android"), allow(dead_code))]
     backend_self_test_passed: Arc<AtomicBool>,
 }
@@ -63,6 +71,7 @@ impl LiteRtLmEngine {
             diagnostics: RwLock::new(None),
             model_operation,
             model_cancelled: AtomicBool::new(false),
+            generation_cancelled: Arc::new(AtomicBool::new(false)),
             backend_self_test_passed: Arc::new(AtomicBool::new(false)),
         }
     }
@@ -431,6 +440,100 @@ fn push_litert_lm_response_events(
 }
 
 #[cfg(target_os = "android")]
+/// Why streaming could not be used, so the caller can fall back.
+#[cfg(target_os = "android")]
+enum StreamStartError {
+    /// The installed bridge predates `startStream`/`drainStream`.
+    Unsupported,
+}
+
+/// Run a generation through the streaming bridge, emitting each chunk as it
+/// arrives.
+///
+/// This is what makes stopping non-destructive on Android: text reaches the host
+/// incrementally, so a cancel keeps everything already emitted instead of
+/// discarding a whole in-flight response.
+///
+/// Polls rather than taking a callback because the JNI bridge is one-way
+/// (Rust → Kotlin static calls); Kotlin buffers chunks and this drains them.
+#[cfg(target_os = "android")]
+fn stream_litert_generation(
+    adapter: &crate::android_litert_jni::NativeLiteRtLmAdapter,
+    request: &InferenceRequest,
+    sender: &tokio::sync::mpsc::UnboundedSender<StreamEvent>,
+    generation_cancelled: &AtomicBool,
+    generate_started: Instant,
+    backend_self_test_passed: &AtomicBool,
+) -> Result<(), StreamStartError> {
+    // A bridge without `startStream` throws NoSuchMethodError, surfacing here as
+    // an error — treat that as "not supported" and let the caller fall back
+    // rather than failing a run that the blocking path can still serve.
+    if adapter.start_stream(request).is_err() {
+        return Err(StreamStartError::Unsupported);
+    }
+
+    let mut chars: usize = 0;
+    loop {
+        // Checked before draining so a cancel stops the loop promptly; whatever
+        // was already emitted stays in the conversation.
+        if generation_cancelled.load(Ordering::Acquire) {
+            tracing::info!(
+                target: "knowme_litert_lm",
+                chars,
+                "LiteRT-LM streaming stopped by user"
+            );
+            let _ = sender.send(StreamEvent::Cancelled {
+                message: "Cancelled by user".into(),
+            });
+            return Ok(());
+        }
+
+        let drain = match adapter.drain_stream() {
+            Ok(drain) => drain,
+            Err(error) => {
+                let _ = sender.send(StreamEvent::Error {
+                    message: error.to_string(),
+                });
+                return Ok(());
+            }
+        };
+
+        for chunk in drain.chunks {
+            chars += chunk.text.chars().count();
+            send_litert_response_events(chunk, sender, "initial", Some(backend_self_test_passed));
+        }
+
+        if drain.done {
+            if let Some(message) = drain.error {
+                tracing::error!(
+                    target: "knowme_litert_lm",
+                    error = %message,
+                    "LiteRT-LM streaming generation failed"
+                );
+                let _ = sender.send(StreamEvent::Error { message });
+                return Ok(());
+            }
+            let generate_ms = generate_started.elapsed().as_millis() as u64;
+            tracing::info!(
+                target: "knowme_litert_lm",
+                generate_ms,
+                chars,
+                chars_per_second = if generate_ms > 0 {
+                    (chars as u64) * 1000 / generate_ms
+                } else {
+                    0
+                },
+                "LiteRT-LM generation timing"
+            );
+            return Ok(());
+        }
+
+        // Short enough that a stop feels immediate, long enough not to spin the
+        // CPU against a model producing a token every few hundred milliseconds.
+        std::thread::sleep(std::time::Duration::from_millis(30));
+    }
+}
+
 fn send_litert_response_events(
     response: crate::android_litert_jni::NativeLiteRtLmResponse,
     sender: &tokio::sync::mpsc::UnboundedSender<StreamEvent>,
@@ -565,6 +668,21 @@ impl InferenceProvider for LiteRtLmEngine {
             gate_report: litert_lm_gate_report(None, false, false),
         };
 
+        // Emit the backend choice AND why it is not on a faster one. The reason
+        // was computed here from the start but only ever reached the Settings
+        // screen, so a device certification run had no way to record which
+        // backend was selected or what it fell back from — the one line that
+        // makes the fallback contract observable off-device.
+        tracing::info!(
+            target: "knowme_litert_lm",
+            backend = %diagnostics.backend,
+            fallback_reason = %diagnostics
+                .fallback_reason
+                .as_deref()
+                .unwrap_or("none"),
+            "LiteRT-LM runtime diagnostics"
+        );
+
         #[cfg(target_os = "android")]
         {
             let runtime_cache = self.cache_dir.join("runtime-cache");
@@ -581,6 +699,10 @@ impl InferenceProvider for LiteRtLmEngine {
                 });
                 return Err(CoreError::Transient(run_error.message));
             }
+            // Model load is the dominant cold-start cost and a certification
+            // metric in its own right, so time it rather than inferring it from
+            // surrounding log timestamps.
+            let load_started = Instant::now();
             match crate::android_litert_jni::NativeLiteRtLmAdapter::load(&path, &runtime_cache) {
                 Ok(adapter) => {
                     tracing::info!(
@@ -588,6 +710,7 @@ impl InferenceProvider for LiteRtLmEngine {
                         model = %spec.model,
                         path = %path.display(),
                         cache = %runtime_cache.display(),
+                        load_ms = load_started.elapsed().as_millis() as u64,
                         "LiteRT-LM native adapter loaded"
                     );
                     let mut diagnostics = diagnostics;
@@ -665,6 +788,11 @@ impl InferenceProvider for LiteRtLmEngine {
             if self.native.read().await.is_some() {
                 let request = request.clone();
                 let backend_self_test_passed = Arc::clone(&self.backend_self_test_passed);
+                // Clear any cancel left over from a previous run before this one
+                // starts, so a stale flag cannot misreport a genuine failure as
+                // a user interrupt.
+                self.generation_cancelled.store(false, Ordering::Release);
+                let generation_cancelled = Arc::clone(&self.generation_cancelled);
                 let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
                 gen_ui_runtime::spawn_blocking(move || {
                     let adapter = crate::android_litert_jni::NativeLiteRtLmAdapter;
@@ -673,8 +801,51 @@ impl InferenceProvider for LiteRtLmEngine {
                         target: "knowme_litert_lm",
                         "LiteRT-LM generation starting"
                     );
+                    // Timed here rather than inside `send_litert_response_events`:
+                    // this call site is the only one that brackets the blocking
+                    // generate, and throughput needs the duration paired with the
+                    // char count the emitter already reports.
+                    let generate_started = Instant::now();
+                    // Stream when the bridge supports it so a stop keeps what the
+                    // model already produced. `generate_text` only yields text
+                    // after generation completes, so cancelling it lost the whole
+                    // run — nothing had crossed the JNI boundary yet.
+                    match stream_litert_generation(
+                        &adapter,
+                        &request,
+                        &sender,
+                        &generation_cancelled,
+                        generate_started,
+                        &backend_self_test_passed,
+                    ) {
+                        Ok(()) => {
+                            let _ = sender.send(StreamEvent::Done);
+                            return;
+                        }
+                        Err(StreamStartError::Unsupported) => {
+                            // Older bridge without startStream/drainStream: fall
+                            // through to the blocking path rather than fail.
+                            tracing::warn!(
+                                target: "knowme_litert_lm",
+                                "LiteRT-LM streaming unavailable; falling back to blocking generation"
+                            );
+                        }
+                    }
                     match adapter.generate_text(&request) {
                         Ok(response) => {
+                            let generate_ms = generate_started.elapsed().as_millis() as u64;
+                            let chars = response.text.chars().count();
+                            tracing::info!(
+                                target: "knowme_litert_lm",
+                                generate_ms,
+                                chars,
+                                chars_per_second = if generate_ms > 0 {
+                                    (chars as u64) * 1000 / generate_ms
+                                } else {
+                                    0
+                                },
+                                "LiteRT-LM generation timing"
+                            );
                             send_litert_response_events(
                                 response,
                                 &sender,
@@ -683,14 +854,32 @@ impl InferenceProvider for LiteRtLmEngine {
                             );
                         }
                         Err(error) => {
-                            tracing::error!(
-                                target: "knowme_litert_lm",
-                                error = %error,
-                                "LiteRT-LM generation failed"
-                            );
-                            let _ = sender.send(StreamEvent::Error {
-                                message: error.to_string(),
-                            });
+                            // A cancel makes the in-flight JNI `sendMessage`
+                            // throw, so this arm is reached for BOTH a
+                            // deliberate stop and a genuine failure. The flag —
+                            // set before `cancel()` and cleared at generation
+                            // start — is what tells them apart. Reporting a stop
+                            // as `Error` is what made a cancelled turn render as
+                            // failed instead of stopped, discarding the user's
+                            // partial work from view.
+                            if generation_cancelled.load(Ordering::Acquire) {
+                                tracing::info!(
+                                    target: "knowme_litert_lm",
+                                    "LiteRT-LM generation cancelled by user"
+                                );
+                                let _ = sender.send(StreamEvent::Cancelled {
+                                    message: "Cancelled by user".into(),
+                                });
+                            } else {
+                                tracing::error!(
+                                    target: "knowme_litert_lm",
+                                    error = %error,
+                                    "LiteRT-LM generation failed"
+                                );
+                                let _ = sender.send(StreamEvent::Error {
+                                    message: error.to_string(),
+                                });
+                            }
                         }
                     }
                     let _ = sender.send(StreamEvent::Done);
@@ -721,6 +910,11 @@ impl InferenceProvider for LiteRtLmEngine {
         {
             if self.native.read().await.is_some() {
                 let results = results.to_vec();
+                // Deliberately NOT cleared here, unlike the initial generation:
+                // a stop during the first pass is exactly what lands in this
+                // continuation, so the flag must survive to classify the error
+                // that the cancelled JNI call is about to throw.
+                let generation_cancelled = Arc::clone(&self.generation_cancelled);
                 let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
                 gen_ui_runtime::spawn_blocking(move || {
                     let adapter = crate::android_litert_jni::NativeLiteRtLmAdapter;
@@ -729,19 +923,46 @@ impl InferenceProvider for LiteRtLmEngine {
                         tool_results = results.len(),
                         "LiteRT-LM tool-result continuation starting"
                     );
+                    // A tool call already stopped short of visible text, so a
+                    // stop here has nothing streamed to keep — but it must still
+                    // read as stopped, not failed. Before this, cancelling a
+                    // tool-result continuation surfaced the raw
+                    // "CANCELLED: Task cancelled" JNI exception as a terminal
+                    // error, which is what the device certification saw.
+                    if generation_cancelled.load(Ordering::Acquire) {
+                        tracing::info!(
+                            target: "knowme_litert_lm",
+                            "LiteRT-LM tool-result continuation cancelled by user before it started"
+                        );
+                        let _ = sender.send(StreamEvent::Cancelled {
+                            message: "Cancelled by user".into(),
+                        });
+                        let _ = sender.send(StreamEvent::Done);
+                        return;
+                    }
                     match adapter.continue_with_tool_results(&results) {
                         Ok(response) => {
                             send_litert_response_events(response, &sender, "tool_result", None);
                         }
                         Err(error) => {
-                            tracing::error!(
-                                target: "knowme_litert_lm",
-                                error = %error,
-                                "LiteRT-LM tool-result continuation failed"
-                            );
-                            let _ = sender.send(StreamEvent::Error {
-                                message: error.to_string(),
-                            });
+                            if generation_cancelled.load(Ordering::Acquire) {
+                                tracing::info!(
+                                    target: "knowme_litert_lm",
+                                    "LiteRT-LM tool-result continuation cancelled by user"
+                                );
+                                let _ = sender.send(StreamEvent::Cancelled {
+                                    message: "Cancelled by user".into(),
+                                });
+                            } else {
+                                tracing::error!(
+                                    target: "knowme_litert_lm",
+                                    error = %error,
+                                    "LiteRT-LM tool-result continuation failed"
+                                );
+                                let _ = sender.send(StreamEvent::Error {
+                                    message: error.to_string(),
+                                });
+                            }
                         }
                     }
                     let _ = sender.send(StreamEvent::Done);
@@ -791,6 +1012,28 @@ impl InferenceProvider for LiteRtLmEngine {
         #[cfg(target_os = "android")]
         crate::android_litert_jni::NativeLiteRtLmAdapter::cancel();
         let _ = self.model_operation.send(ModelOperationState::Cancelling);
+    }
+
+    /// Interrupt in-flight generation without disturbing model state.
+    ///
+    /// Deliberately narrower than [`Self::cancel_model_operation`]: it does not
+    /// set `model_cancelled` and does not publish `Cancelling`, because the
+    /// model stays loaded and ready for the next prompt — only the current
+    /// generation stops. Setting the download flag here would make a later
+    /// prepare/load appear cancelled.
+    fn cancel_generation(&self) {
+        // Set BEFORE the JNI call: cancelling makes the in-flight `sendMessage`
+        // throw, and the `Err` arm reads this flag to classify that throw as an
+        // interrupt rather than a failure. Setting it after would race.
+        self.generation_cancelled.store(true, Ordering::Release);
+        #[cfg(target_os = "android")]
+        {
+            tracing::info!(
+                target: "knowme_litert_lm",
+                "LiteRT-LM generation cancellation requested"
+            );
+            crate::android_litert_jni::NativeLiteRtLmAdapter::cancel();
+        }
     }
 
     async fn runtime_diagnostics(&self) -> Option<RuntimeDiagnostics> {

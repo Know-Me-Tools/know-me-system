@@ -1,4 +1,5 @@
 // TJ-ARCH-MOB-001 compliant
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
@@ -12,9 +13,12 @@ import '../../../../bridge/a2ui/a2ui_event.dart';
 import '../../../../core/theme/tokens.dart';
 import '../../../../shared/widgets/knowme_screen.dart';
 import '../../../../shared/widgets/sync_chip.dart';
+import '../../domain/chat_repository.dart';
 import '../../domain/entities/chat_message.dart';
+import '../providers/chat_repository_provider.dart';
 import '../providers/chat_notifier.dart';
 import '../widgets/chat_policy_toolbar.dart';
+import '../widgets/media_action_buttons.dart';
 
 /// Chat surface. Renders each message's ContentBlocks with the shared
 /// ContentBlockView (exhaustive over all 11 variants — a compile-time contract).
@@ -31,8 +35,14 @@ class ChatScreen extends ConsumerStatefulWidget {
 
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _controller = TextEditingController();
+  final _composerFocus = FocusNode();
   final _scrollController = ScrollController();
-  final _attachments = <PlatformFile>[];
+
+  /// Files already copied into app-owned storage by Rust.
+  ///
+  /// Deliberately NOT `PlatformFile`: the picker's path is purgeable, so
+  /// holding one until send time is the bug this whole flow exists to avoid.
+  final _attachments = <StagedAttachment>[];
   bool _isSending = false;
   bool _isNearBottom = true;
   String? _attachmentError;
@@ -49,8 +59,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   void dispose() {
     _controller.dispose();
+    _composerFocus.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  /// Set when the user taps Steer, cleared once that send goes out.
+  ///
+  /// Tapping Steer only focuses the composer; the intent has to survive until
+  /// the user finishes typing and submits, otherwise the correction goes out as
+  /// an anonymous new question and the model has no reason to treat the stopped
+  /// turn as work to build on.
+  bool _pendingSteer = false;
+
+  /// Hand the composer to the user after they stop a run.
+  ///
+  /// Steering is the point of stopping, so put the caret where the next
+  /// instruction goes rather than making them find it. The existing text is
+  /// left alone — a half-typed thought is theirs to keep.
+  void _focusComposerToSteer() {
+    setState(() => _pendingSteer = true);
+    _composerFocus.requestFocus();
+    _scrollToLatest();
   }
 
   @override
@@ -73,10 +103,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     return KnowMeScreen(
       title: 'Chat',
       trailing: [
-        shad.GhostButton(
-          onPressed: _openConversations,
-          density: shad.ButtonDensity.icon,
-          child: const Icon(Icons.forum_outlined),
+        // Icon-only, so it carried no accessible name at all: a screen reader
+        // announced nothing, and a certification run had no way to find the one
+        // control that opens the thread list.
+        Semantics(
+          button: true,
+          label: 'Conversations',
+          excludeSemantics: true,
+          child: shad.GhostButton(
+            onPressed: _openConversations,
+            density: shad.ButtonDensity.icon,
+            child: const Icon(Icons.forum_outlined),
+          ),
         ),
         const SyncChip(),
       ],
@@ -119,6 +157,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         onRegenerate: () => ref
                             .read(chatProvider.notifier)
                             .regenerateResponse(message.id),
+                        onSteer: _focusComposerToSteer,
+                        onResume: () =>
+                            ref.read(chatProvider.notifier).sendResume(),
                         onInteraction: (interaction) {
                           if (interaction['kind'] == 'local_tool_approve') {
                             final approvalId = interaction['approvalId']
@@ -222,15 +263,39 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: shad.TextField(
-                          controller: _controller,
-                          placeholder: const Text('Ask KnowMe anything…'),
-                          minLines: 1,
-                          maxLines: 5,
-                          enabled: !modelBusy,
-                          onSubmitted: _isSending || modelBusy
-                              ? null
-                              : (_) => _send(),
+                        // The armed-steer state is otherwise carried only by the
+                        // placeholder, which a screen reader does not re-announce
+                        // — so name the mode on the field itself.
+                        child: Semantics(
+                          textField: true,
+                          label: _pendingSteer
+                              ? 'Steer the stopped response'
+                              : 'Message KnowMe',
+                          child: shad.TextField(
+                            controller: _controller,
+                            focusNode: _composerFocus,
+                            // Name the mode while it is armed. Steering is a
+                            // different act from asking, and the whole point of
+                            // making it explicit is that a regular user can tell
+                            // which one they are about to do.
+                            placeholder: Text(
+                              _pendingSteer
+                                  ? 'Steer the stopped response…'
+                                  : 'Ask KnowMe anything…',
+                            ),
+                            minLines: 1,
+                            maxLines: 5,
+                            enabled: !modelBusy,
+                            // shadcn_flutter defaults contextMenuBuilder to null,
+                            // which suppresses the platform selection toolbar — so
+                            // long-press showed no Paste/Copy/Select All callout.
+                            // Restore the native adaptive toolbar so paste works.
+                            contextMenuBuilder:
+                                shad.TextField.nativeContextMenuBuilder(),
+                            onSubmitted: _isSending || modelBusy
+                                ? null
+                                : (_) => _send(),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -280,6 +345,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   void _openConversations() {
+    // Steer is armed against the turn the user just stopped, in the
+    // conversation they were in. Every exit from this sheet either switches
+    // threads or starts a new one, and carrying the arming across would
+    // silently prefix the correction preamble onto a message in an unrelated
+    // conversation — where no stopped turn exists for the model to build on.
+    // React fixes this in the store; this is the Flutter equivalent, placed at
+    // the one door into thread switching rather than on each row.
+    if (_pendingSteer) {
+      setState(() => _pendingSteer = false);
+    }
     shad.openSheetOverlay<void>(
       context: context,
       position: shad.OverlayPosition.left,
@@ -293,34 +368,60 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (_modelOperationBusy(ref.read(chatProvider).modelOperation)) return;
     final text = _controller.text.trim();
     if (text.isEmpty && _attachments.isEmpty) return;
+    // Images become real image blocks; everything else stays an artifact. The
+    // kind used to be hardcoded 'attachment' for every file regardless of mime,
+    // which is why a picked PNG rendered as a grey document chip. Rust decided
+    // all of this at pick time, so both surfaces agree.
     final attachmentBlocks = [
-      for (final file in _attachments)
-        ArtifactBlock(
-          file.identifier ?? file.name,
-          'attachment',
-          jsonEncode({
-            'name': file.name,
-            'size': _formatBytes(file.size),
-            'mime': _mimeFor(file.extension),
-          }),
-        ),
+      for (final staged in _attachments)
+        if (staged.isImage)
+          ImageBlock(
+            null,
+            null,
+            staged.mime,
+            path: staged.path,
+            // The file name is the only description available at attach time,
+            // and an image with no accessible name fails the a11y gate.
+            alt: staged.fileName,
+            width: staged.width,
+            height: staged.height,
+          )
+        else
+          ArtifactBlock(
+            staged.path,
+            staged.isVideo ? 'video' : 'attachment',
+            jsonEncode({
+              'name': staged.fileName,
+              'size': _formatBytes(staged.sizeBytes),
+              'mime': staged.mime,
+              'path': staged.path,
+            }),
+          ),
     ];
-    final attachmentPaths = [for (final file in _attachments) ?file.path];
+    final attachmentPaths = [for (final staged in _attachments) staged.path];
+    final isSteer = _pendingSteer;
     _controller.clear();
     setState(() {
       _attachments.clear();
       _attachmentError = null;
       _isSending = true;
       _isNearBottom = true;
+      _pendingSteer = false;
     });
+    final body = text.isEmpty ? 'Please review the attached files.' : text;
+    final notifier = ref.read(chatProvider.notifier);
     try {
-      await ref
-          .read(chatProvider.notifier)
-          .sendMessage(
-            text.isEmpty ? 'Please review the attached files.' : text,
-            attachments: attachmentBlocks,
-            attachmentPaths: attachmentPaths,
-          );
+      await (isSteer
+          ? notifier.sendSteer(
+              body,
+              attachments: attachmentBlocks,
+              attachmentPaths: attachmentPaths,
+            )
+          : notifier.sendMessage(
+              body,
+              attachments: attachmentBlocks,
+              attachmentPaths: attachmentPaths,
+            ));
     } finally {
       if (mounted) setState(() => _isSending = false);
     }
@@ -347,23 +448,37 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
     if (!mounted || file == null) return;
     const maxBytes = 25 * 1024 * 1024;
-    final selectedFiles = [file];
-    final tooLarge = selectedFiles
-        .where((file) => file.size > maxBytes)
-        .toList();
-    final unavailable = selectedFiles
-        .where((file) => file.path == null)
-        .toList();
+    final sourcePath = file.path;
+    final tooLarge = file.size > maxBytes;
+    final unavailable = sourcePath == null;
+
+    // Copy into app-owned storage NOW, not at send time. `file_picker` returns
+    // a path in the app CACHE on Android — the package ships
+    // clearTemporaryFiles() for exactly this — so a transcript that kept the
+    // picked path would render during testing and break once the cache is
+    // cleared. Rust also classifies the file here, so Flutter never has to
+    // guess the mime or the block kind for itself.
+    StagedAttachment? staged;
+    var stageFailed = false;
+    if (!tooLarge && !unavailable && _attachments.length < 6) {
+      try {
+        staged = await ref
+            .read(chatRepositoryProvider)
+            .stageAttachment(
+              conversationId: ref.read(chatProvider).threadId,
+              sourcePath: sourcePath,
+            );
+      } on Object {
+        // Surfaced rather than swallowed: a file the app cannot store is a file
+        // the model will never see, and silently dropping it would leave the
+        // user believing it was attached.
+        stageFailed = true;
+      }
+    }
+    if (!mounted) return;
     setState(() {
-      _attachments.addAll(
-        selectedFiles
-            .where((file) => file.size <= maxBytes && file.path != null)
-            .take(6 - _attachments.length),
-      );
-      _attachmentError = switch ((
-        tooLarge.isNotEmpty,
-        unavailable.isNotEmpty,
-      )) {
+      if (staged != null) _attachments.add(staged);
+      _attachmentError = switch ((tooLarge, unavailable || stageFailed)) {
         (true, true) => 'Some files were too large or unavailable to the app.',
         (true, false) => 'Files larger than 25 MB were not attached.',
         (false, true) => 'Some files were unavailable to the app.',
@@ -420,6 +535,8 @@ class _MessageBubble extends StatelessWidget {
     required this.onResubmit,
     required this.onDelete,
     required this.onRegenerate,
+    required this.onSteer,
+    required this.onResume,
     this.onInteraction,
     this.remoteResolver,
   });
@@ -428,6 +545,8 @@ class _MessageBubble extends StatelessWidget {
   final Future<void> Function() onResubmit;
   final Future<void> Function() onDelete;
   final Future<void> Function() onRegenerate;
+  final VoidCallback onSteer;
+  final Future<void> Function() onResume;
   final AgentInteractionCallback? onInteraction;
   final RemoteContentResolver? remoteResolver;
 
@@ -458,6 +577,8 @@ class _MessageBubble extends StatelessWidget {
               remoteResolver: remoteResolver,
               onDelete: onDelete,
               onRegenerate: onRegenerate,
+              onSteer: onSteer,
+              onResume: onResume,
             ),
           ),
         ),
@@ -488,6 +609,7 @@ class _MessageBubble extends StatelessWidget {
                   isStreaming: message.isStreaming && i == blocks.length - 1,
                   onInteraction: onInteraction,
                   remoteResolver: remoteResolver,
+                  mediaActionsBuilder: buildMediaActionButtons,
                 ),
               if (message.isStreaming && message.content.isEmpty)
                 Semantics(
@@ -560,6 +682,8 @@ class _AssistantTurn extends StatelessWidget {
     required this.blocks,
     required this.onDelete,
     required this.onRegenerate,
+    required this.onSteer,
+    required this.onResume,
     this.onInteraction,
     this.remoteResolver,
   });
@@ -568,6 +692,11 @@ class _AssistantTurn extends StatelessWidget {
   final List<ContentBlock> blocks;
   final Future<void> Function() onDelete;
   final Future<void> Function() onRegenerate;
+
+  /// Hand the user the composer, pre-focused, so they can redirect from what
+  /// was already generated rather than starting over.
+  final VoidCallback onSteer;
+  final Future<void> Function() onResume;
   final AgentInteractionCallback? onInteraction;
   final RemoteContentResolver? remoteResolver;
 
@@ -598,6 +727,7 @@ class _AssistantTurn extends StatelessWidget {
                       message.isStreaming && index == snapshot.length - 1,
                   onInteraction: onInteraction,
                   remoteResolver: remoteResolver,
+                  mediaActionsBuilder: buildMediaActionButtons,
                 ),
             ],
           ),
@@ -636,8 +766,16 @@ class _AssistantTurn extends StatelessWidget {
       segments.add(_RunErrorBubble(error: message.error!));
     } else if (message.runStatus == 'cancelled') {
       segments.add(
-        _RunCancelledBubble(
-          message: message.statusMessage ?? 'Response cancelled',
+        _StoppedTurnBar(
+          // Matches the durable status Rust writes ("Cancelled by user",
+          // chat.rs:151) so one state never shows two different words. Reached
+          // only if a cancel arrives with no message at all.
+          message: message.statusMessage ?? 'Cancelled by user',
+          keptBlocks: blocks.length,
+          onSteer: onSteer,
+          onResume: onResume,
+          onRegenerate: onRegenerate,
+          onDelete: onDelete,
         ),
       );
     }
@@ -653,6 +791,7 @@ class _AssistantTurn extends StatelessWidget {
           segments[index],
           if (index != segments.length - 1) const SizedBox(height: 8),
         ],
+        _ProvenanceChip(provenance: message.provenance),
         Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
@@ -706,6 +845,64 @@ class _AssistantTurn extends StatelessWidget {
       ],
     );
   }
+}
+
+/// A subtle, text-first footer showing which agent + provider/model produced the
+/// response. Renders nothing until provenance resolves. Status is text (not color
+/// alone) and the label ellipsizes so it survives large Dynamic Type.
+class _ProvenanceChip extends StatelessWidget {
+  const _ProvenanceChip({required this.provenance});
+
+  final Map<String, Object?> provenance;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = _provenanceLabel(provenance);
+    if (label == null) return const SizedBox.shrink();
+    final colors = shad.Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(left: 14, top: 4, bottom: 2),
+      child: Row(
+        children: [
+          Icon(Icons.memory_outlined, size: 12, color: colors.mutedForeground),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: colors.mutedForeground, fontSize: 11),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Build the "agent · provider/model" label, or null when there is nothing to
+/// show. The on-device provider id renders as "On-device"; missing parts are
+/// omitted rather than shown as nulls.
+String? _provenanceLabel(Map<String, Object?> provenance) {
+  String? str(String key) {
+    final value = provenance[key]?.toString().trim();
+    return (value == null || value.isEmpty) ? null : value;
+  }
+
+  final agent = str('agentId');
+  final provider = str('providerId');
+  final model = str('modelId');
+
+  final modelPart = switch ((provider, model)) {
+    ('on-device', _) => 'On-device',
+    (final p?, final m?) => '$p/$m',
+    (final p?, null) => p,
+    (null, final m?) => m,
+    (null, null) => null,
+  };
+
+  final parts = [?agent, ?modelPart];
+  return parts.isEmpty ? null : parts.join(' · ');
 }
 
 bool _isAnswerBlock(ContentBlock block) => switch (block) {
@@ -859,28 +1056,171 @@ class _RunErrorBubble extends StatelessWidget {
   }
 }
 
-class _RunCancelledBubble extends StatelessWidget {
-  const _RunCancelledBubble({required this.message});
+/// Shown when a run was stopped, in place of the old bare "cancelled" label.
+///
+/// Stopping is how users steer: they see the model heading the wrong way and
+/// interrupt it, expecting the work so far to stay in play. This says so
+/// explicitly — what was kept, and the four things they can do next — because
+/// the previous label left regular users unsure whether their work survived.
+///
+/// The two actions that KEEP the user's work lead (Steer, Resume); the two that
+/// throw it away are subordinate, so the destructive option stops competing for
+/// the tap. Codex and Amp both treat steer and interrupt as separate intents
+/// rather than one undifferentiated "send again", which is the distinction most
+/// users are actually reaching for when they hit stop.
+class _StoppedTurnBar extends StatelessWidget {
+  const _StoppedTurnBar({
+    required this.message,
+    required this.keptBlocks,
+    required this.onSteer,
+    required this.onResume,
+    required this.onRegenerate,
+    required this.onDelete,
+  });
+
   final String message;
+  final int keptBlocks;
+  final VoidCallback onSteer;
+  final Future<void> Function() onResume;
+  final Future<void> Function() onRegenerate;
+  final Future<void> Function() onDelete;
 
   @override
   Widget build(BuildContext context) {
     final colors = shad.Theme.of(context).colorScheme;
+    final kept = keptBlocks == 1 ? '1 block' : '$keptBlocks blocks';
+    // Only claim work was kept when there is some; a stop before the first
+    // block produced nothing, and saying otherwise would be a lie the user can
+    // see through.
+    final summary = keptBlocks > 0
+        ? '$message — kept $kept, still in context'
+        : message;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        // Flat 2.0: regions differ by background colour only — no border.
+        color: colors.secondary,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Semantics(
+            liveRegion: true,
+            child: Row(
+              children: [
+                // Icon plus text: state is never carried by colour alone.
+                const Icon(Icons.stop_circle_outlined),
+                const SizedBox(width: 10),
+                Expanded(child: Text(summary)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Wrap so the actions reflow instead of clipping at large text scales.
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _StoppedAction(
+                icon: Icons.edit_outlined,
+                label: 'Steer',
+                semanticLabel:
+                    'Steer from here — write a new instruction, '
+                    'keeping the work so far',
+                onPressed: onSteer,
+                emphasis: _ActionEmphasis.primary,
+              ),
+              // For the user who stopped and changed their mind. Only offered
+              // when something was actually kept — there is nothing to continue
+              // from otherwise.
+              if (keptBlocks > 0)
+                _StoppedAction(
+                  icon: Icons.play_arrow_outlined,
+                  label: 'Resume',
+                  semanticLabel: 'Resume — continue from where it stopped',
+                  onPressed: () => onResume(),
+                  emphasis: _ActionEmphasis.primary,
+                ),
+              _StoppedAction(
+                icon: Icons.refresh,
+                // Named for what it does to the kept work: `regenerateResponse`
+                // is destructive in place, so it discards the partial answer the
+                // rest of this bar exists to preserve. Saying "replaces" is the
+                // difference between an informed tap and a surprise.
+                label: 'Retry',
+                semanticLabel:
+                    'Retry — replaces this response and discards the '
+                    'work so far',
+                onPressed: () => onRegenerate(),
+                emphasis: _ActionEmphasis.subordinate,
+              ),
+              _StoppedAction(
+                icon: Icons.delete_outline,
+                label: 'Discard',
+                semanticLabel: 'Discard this stopped response',
+                onPressed: () => onDelete(),
+                emphasis: _ActionEmphasis.subordinate,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// How much visual weight an action carries.
+///
+/// Three tiers rather than a bool, because the bar now has to say which actions
+/// keep the user's work (primary) and which throw it away (subordinate) without
+/// relying on colour alone.
+enum _ActionEmphasis { primary, secondary, subordinate }
+
+class _StoppedAction extends StatelessWidget {
+  const _StoppedAction({
+    required this.icon,
+    required this.label,
+    required this.semanticLabel,
+    required this.onPressed,
+    this.emphasis = _ActionEmphasis.secondary,
+  });
+
+  final IconData icon;
+  final String label;
+  final String semanticLabel;
+  final VoidCallback onPressed;
+  final _ActionEmphasis emphasis;
+
+  @override
+  Widget build(BuildContext context) {
+    final child = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [Icon(icon, size: 16), const SizedBox(width: 6), Text(label)],
+    );
     return Semantics(
-      liveRegion: true,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: colors.secondary,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.stop_circle_outlined),
-            const SizedBox(width: 10),
-            Expanded(child: Text(message)),
-          ],
-        ),
+      button: true,
+      label: semanticLabel,
+      // Excluded so each control announces once rather than doubling up its
+      // own visible label with the descriptive one.
+      excludeSemantics: true,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 48),
+        child: switch (emphasis) {
+          _ActionEmphasis.primary => shad.PrimaryButton(
+            onPressed: onPressed,
+            child: child,
+          ),
+          _ActionEmphasis.secondary => shad.SecondaryButton(
+            onPressed: onPressed,
+            child: child,
+          ),
+          _ActionEmphasis.subordinate => shad.GhostButton(
+            onPressed: onPressed,
+            child: child,
+          ),
+        },
       ),
     );
   }
@@ -889,8 +1229,8 @@ class _RunCancelledBubble extends StatelessWidget {
 class _AttachmentStrip extends StatelessWidget {
   const _AttachmentStrip({required this.files, required this.onRemove});
 
-  final List<PlatformFile> files;
-  final ValueChanged<PlatformFile> onRemove;
+  final List<StagedAttachment> files;
+  final ValueChanged<StagedAttachment> onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -903,7 +1243,8 @@ class _AttachmentStrip extends StatelessWidget {
             Padding(
               padding: const EdgeInsetsDirectional.only(end: 8),
               child: Semantics(
-                label: '${file.name}, ${_formatBytes(file.size)} attachment',
+                label:
+                    '${file.fileName}, ${_formatBytes(file.sizeBytes)} attachment',
                 child: Container(
                   constraints: const BoxConstraints(maxWidth: 220),
                   padding: const EdgeInsetsDirectional.fromSTEB(10, 6, 4, 6),
@@ -914,15 +1255,45 @@ class _AttachmentStrip extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        Icons.description_outlined,
-                        size: 18,
-                        color: colors.primary,
-                      ),
+                      // A thumbnail for images, so the composer shows WHICH
+                      // picture is attached rather than a generic document
+                      // glyph. Decorative: the chip's Semantics label already
+                      // names the file, so an image here would repeat it.
+                      if (file.isImage)
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: SizedBox(
+                            width: 24,
+                            height: 24,
+                            child:
+                                localImage(
+                                  file.path,
+                                  semanticLabel: '',
+                                  onError: () => Icon(
+                                    Icons.broken_image_outlined,
+                                    size: 18,
+                                    color: colors.primary,
+                                  ),
+                                ) ??
+                                Icon(
+                                  Icons.image_outlined,
+                                  size: 18,
+                                  color: colors.primary,
+                                ),
+                          ),
+                        )
+                      else
+                        Icon(
+                          file.isVideo
+                              ? Icons.movie_outlined
+                              : Icons.description_outlined,
+                          size: 18,
+                          color: colors.primary,
+                        ),
                       const SizedBox(width: 8),
                       Flexible(
                         child: Text(
-                          file.name,
+                          file.fileName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -932,7 +1303,7 @@ class _AttachmentStrip extends StatelessWidget {
                         ),
                       ),
                       IconButton(
-                        tooltip: 'Remove ${file.name}',
+                        tooltip: 'Remove ${file.fileName}',
                         constraints: const BoxConstraints(
                           minWidth: 48,
                           minHeight: 48,
@@ -963,29 +1334,107 @@ String _formatBytes(int bytes) {
   return '$bytes B';
 }
 
-String _mimeFor(String? extension) => switch (extension?.toLowerCase()) {
-  'png' => 'image/png',
-  'jpg' || 'jpeg' => 'image/jpeg',
-  'gif' => 'image/gif',
-  'webp' => 'image/webp',
-  'svg' => 'image/svg+xml',
-  'pdf' => 'application/pdf',
-  'md' => 'text/markdown',
-  'txt' => 'text/plain',
-  'mp4' => 'video/mp4',
-  'webm' => 'video/webm',
-  _ => 'application/octet-stream',
-};
+// `_mimeFor` lived here and is gone: Rust decides the mime when it stages the
+// file, and a second copy in Dart is how the two surfaces drifted apart.
 
-class _ConversationSheet extends ConsumerWidget {
+class _ConversationSheet extends ConsumerStatefulWidget {
   const _ConversationSheet({required this.close});
 
   final Future<void> Function() close;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ConversationSheet> createState() => _ConversationSheetState();
+}
+
+class _ConversationSheetState extends ConsumerState<_ConversationSheet> {
+  final _searchController = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  /// Rename in place, from a dialog seeded with the current title.
+  ///
+  /// React has had rename since it shipped; here the title was static text, so
+  /// a conversation kept whatever its first message auto-titled it forever.
+  Future<void> _rename(String id, String currentTitle) async {
+    final controller = TextEditingController(text: currentTitle);
+    // A sheet rather than a dialog: it is the overlay primitive this app
+    // already uses everywhere else, so focus, dismissal and theming behave the
+    // way the rest of the surface does.
+    // The overlay completer is not a Future, so the controller is disposed when
+    // the sheet reports closed rather than on a bogus await.
+    final sheet = shad.openSheetOverlay<void>(
+      context: context,
+      position: shad.OverlayPosition.bottom,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text('Rename conversation').semiBold(),
+              const SizedBox(height: 12),
+              shad.TextField(
+                controller: controller,
+                autofocus: true,
+                placeholder: const Text('Conversation title'),
+                onSubmitted: (value) {
+                  shad.closeSheet(sheetContext);
+                  unawaited(_submitRename(id, value));
+                },
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  shad.SecondaryButton(
+                    onPressed: () => shad.closeSheet(sheetContext),
+                    child: const Text('Cancel'),
+                  ),
+                  const SizedBox(width: 8),
+                  shad.PrimaryButton(
+                    onPressed: () {
+                      shad.closeSheet(sheetContext);
+                      unawaited(_submitRename(id, controller.text));
+                    },
+                    child: const Text('Rename'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await sheet.future;
+    controller.dispose();
+  }
+
+  Future<void> _submitRename(String id, String title) async {
+    if (!mounted) return;
+    await ref.read(chatProvider.notifier).renameConversation(id, title);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(chatProvider);
     final colors = shad.Theme.of(context).colorScheme;
+    // Case-insensitive substring on the title, matching React's thread search.
+    // Body text is deliberately not searched on either surface.
+    final query = _query.trim().toLowerCase();
+    final conversations = query.isEmpty
+        ? state.conversations
+        : state.conversations
+              .where(
+                (conversation) =>
+                    conversation.title.toLowerCase().contains(query),
+              )
+              .toList();
     return ColoredBox(
       color: colors.background,
       child: SafeArea(
@@ -1005,58 +1454,105 @@ class _ConversationSheet extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  shad.PrimaryButton(
-                    onPressed: () async {
-                      await ref
-                          .read(chatProvider.notifier)
-                          .createConversation();
-                      await close();
-                    },
-                    density: shad.ButtonDensity.icon,
-                    child: const Icon(Icons.add),
+                  Semantics(
+                    button: true,
+                    label: 'New conversation',
+                    excludeSemantics: true,
+                    child: shad.PrimaryButton(
+                      onPressed: () async {
+                        await ref
+                            .read(chatProvider.notifier)
+                            .createConversation();
+                        await widget.close();
+                      },
+                      density: shad.ButtonDensity.icon,
+                      child: const Icon(Icons.add),
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
-              Expanded(
-                child: ListView.separated(
-                  itemCount: state.conversations.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 8),
-                  itemBuilder: (context, index) {
-                    final conversation = state.conversations[index];
-                    final selected = conversation.id == state.threadId;
-                    return ColoredBox(
-                      color: selected ? colors.accent : colors.card,
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: shad.GhostButton(
-                              alignment: Alignment.centerLeft,
-                              onPressed: () async {
-                                await ref
-                                    .read(chatProvider.notifier)
-                                    .selectConversation(conversation.id);
-                                await close();
-                              },
-                              child: Text(
-                                conversation.title,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ),
-                          shad.GhostButton(
-                            onPressed: () => ref
-                                .read(chatProvider.notifier)
-                                .deleteConversation(conversation.id),
-                            density: shad.ButtonDensity.icon,
-                            child: const Icon(Icons.delete_outline),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
+              const SizedBox(height: 12),
+              // Only offered when there is something to search — a filter over
+              // an empty list is noise.
+              if (state.conversations.isNotEmpty) ...[
+                Semantics(
+                  textField: true,
+                  label: 'Search threads',
+                  child: shad.TextField(
+                    controller: _searchController,
+                    placeholder: const Text('Search threads'),
+                    features: const [
+                      shad.InputFeature.leading(Icon(Icons.search)),
+                    ],
+                    onChanged: (value) => setState(() => _query = value),
+                  ),
                 ),
+                const SizedBox(height: 12),
+              ],
+              Expanded(
+                child: conversations.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No threads found',
+                          style: TextStyle(color: colors.mutedForeground),
+                        ),
+                      )
+                    : ListView.separated(
+                        itemCount: conversations.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 8),
+                        itemBuilder: (context, index) {
+                          final conversation = conversations[index];
+                          final selected = conversation.id == state.threadId;
+                          return ColoredBox(
+                            color: selected ? colors.accent : colors.card,
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: shad.GhostButton(
+                                    alignment: Alignment.centerLeft,
+                                    onPressed: () async {
+                                      await ref
+                                          .read(chatProvider.notifier)
+                                          .selectConversation(conversation.id);
+                                      await widget.close();
+                                    },
+                                    child: Text(
+                                      conversation.title,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ),
+                                Semantics(
+                                  button: true,
+                                  label: 'Rename ${conversation.title}',
+                                  excludeSemantics: true,
+                                  child: shad.GhostButton(
+                                    onPressed: () => _rename(
+                                      conversation.id,
+                                      conversation.title,
+                                    ),
+                                    density: shad.ButtonDensity.icon,
+                                    child: const Icon(Icons.edit_outlined),
+                                  ),
+                                ),
+                                Semantics(
+                                  button: true,
+                                  label: 'Delete ${conversation.title}',
+                                  excludeSemantics: true,
+                                  child: shad.GhostButton(
+                                    onPressed: () => ref
+                                        .read(chatProvider.notifier)
+                                        .deleteConversation(conversation.id),
+                                    density: shad.ButtonDensity.icon,
+                                    child: const Icon(Icons.delete_outline),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
               ),
             ],
           ),

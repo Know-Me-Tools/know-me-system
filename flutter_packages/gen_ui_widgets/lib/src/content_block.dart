@@ -47,6 +47,10 @@ sealed class ContentBlock {
           json['url'] as String?,
           _jsonNullableString(json, 'dataBase64', snakeKey: 'data_base64'),
           json['mime'] as String,
+          path: json['path'] as String?,
+          alt: json['alt'] as String?,
+          width: (json['width'] as num?)?.toInt(),
+          height: (json['height'] as num?)?.toInt(),
         ),
         'divider' => const DividerBlock(),
         final type => throw FormatException('Unknown ContentBlock type: $type'),
@@ -137,7 +141,29 @@ class ImageBlock extends ContentBlock {
   final String? url;
   final String? dataBase64;
   final String mime;
-  const ImageBlock(this.url, this.dataBase64, this.mime);
+
+  /// A file in app-owned storage, for user attachments. Never a picker path —
+  /// those are purgeable on Android and expire on iOS.
+  final String? path;
+
+  /// Accessible description. Falls back to the file name at attach time, so a
+  /// screen reader says "holiday.png" rather than "image/png".
+  final String? alt;
+
+  /// Intrinsic pixel size when known, so the layout does not shift as the
+  /// image decodes.
+  final int? width;
+  final int? height;
+
+  const ImageBlock(
+    this.url,
+    this.dataBase64,
+    this.mime, {
+    this.path,
+    this.alt,
+    this.width,
+    this.height,
+  });
 }
 
 class DividerBlock extends ContentBlock {

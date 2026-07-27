@@ -24,6 +24,9 @@ import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useChatStore } from "@/features/chat/stores/chatStore";
+import { useLane } from "@/features/chat/hooks/useLane";
+import { StoppedTurnActions } from "@/features/chat/components/StoppedTurnActions";
+import { MediaWithActions } from "@/features/chat/components/MediaWithActions";
 import {
   ActionBarMorePrimitive,
   ActionBarPrimitive,
@@ -57,6 +60,8 @@ import {
 import {
   createContext,
   useContext,
+  useEffect,
+  useRef,
   type ComponentType,
   type FC,
   type PropsWithChildren,
@@ -211,24 +216,49 @@ const ThreadSuggestionItem: FC = () => {
 };
 
 const Composer: FC = () => {
+  const pendingSteer = useChatStore((s) => s.pendingSteer);
+  const { modelBusy } = useLane();
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Steering is the point of stopping, so put the caret where the correction
+  // goes rather than making the user find it. Existing text is left alone — a
+  // half-typed thought is theirs to keep.
+  useEffect(() => {
+    if (pendingSteer) inputRef.current?.focus();
+  }, [pendingSteer]);
+
   return (
     <ComposerPrimitive.Root className="aui-composer-root relative flex w-full flex-col">
       <ComposerPrimitive.AttachmentDropzone render={<div data-slot="aui_composer-shell" className="flex w-full flex-col gap-2 rounded-(--composer-radius) bg-(--composer-bg) p-(--composer-padding) text-[color:var(--color-fg)] shadow-none transition-colors focus-within:bg-[color:var(--color-card-hov)] data-[dragging=true]:bg-accent" />}><ComposerAttachments /><ComposerPrimitive.Input
-                      placeholder="Send a message..."
+                      ref={inputRef}
+                      placeholder={pendingSteer ? "Steer the stopped response..." : "Send a message..."}
                       className="aui-composer-input caret-primary placeholder:text-[color:var(--color-fg-faint)] max-h-32 min-h-10 w-full resize-none bg-transparent px-2.5 py-1 text-base text-[color:var(--color-fg)] outline-none"
                       rows={1}
                       autoFocus
                       enterKeyHint="send"
-                      aria-label="Message input"
-                    /><ComposerAction /></ComposerPrimitive.AttachmentDropzone>
+                      // Gated while the local model is downloading, verifying or
+                      // loading: a send here reaches a lane whose weights are
+                      // not resident, and the turn fails for a reason the user
+                      // was given no way to see. Flutter gates the same four
+                      // controls (chat_screen.dart).
+                      disabled={modelBusy}
+                      // The armed-steer mode is otherwise carried only by the
+                      // placeholder, which screen readers do not re-announce —
+                      // so name the mode on the field itself.
+                      aria-label={pendingSteer ? "Steer the stopped response" : "Message input"}
+                    /><ComposerAction modelBusy={modelBusy} /></ComposerPrimitive.AttachmentDropzone>
     </ComposerPrimitive.Root>
   );
 };
 
-const ComposerAction: FC = () => {
+const ComposerAction: FC<{ modelBusy: boolean }> = ({ modelBusy }) => {
   return (
     <div className="aui-composer-action-wrapper relative flex items-center justify-between">
-      <ComposerAddAttachment />
+      {/* Attaching while the model loads would stage files for a turn that
+          cannot be sent yet. */}
+      <span aria-disabled={modelBusy} className={modelBusy ? 'pointer-events-none opacity-50' : undefined}>
+        <ComposerAddAttachment />
+      </span>
       <div className="flex items-center gap-1.5">
         <AuiIf condition={(s) => s.thread.capabilities.dictation}>
           <AuiIf condition={(s) => s.composer.dictation == null}>
@@ -239,7 +269,7 @@ const ComposerAction: FC = () => {
           </AuiIf>
         </AuiIf>
         <AuiIf condition={(s) => !s.thread.isRunning}>
-          <ComposerPrimitive.Send render={<TooltipIconButton tooltip="Send message" side="bottom" type="button" variant="default" size="icon" className="aui-composer-send size-7 rounded-full" aria-label="Send message" />}><ArrowUpIcon className="aui-composer-send-icon size-4.5" /></ComposerPrimitive.Send>
+          <ComposerPrimitive.Send disabled={modelBusy} render={<TooltipIconButton tooltip={modelBusy ? "Waiting for the local model" : "Send message"} side="bottom" type="button" variant="default" size="icon" className="aui-composer-send size-7 rounded-full" aria-label={modelBusy ? "Send message, unavailable while the local model loads" : "Send message"} />}><ArrowUpIcon className="aui-composer-send-icon size-4.5" /></ComposerPrimitive.Send>
         </AuiIf>
         <AuiIf condition={(s) => s.thread.isRunning}>
           <ComposerPrimitive.Cancel render={<Button type="button" variant="default" size="icon" className="aui-composer-cancel size-7 rounded-full" aria-label="Stop generating" />}><SquareIcon className="aui-composer-cancel-icon size-3.5 fill-current" /></ComposerPrimitive.Cancel>
@@ -342,8 +372,41 @@ const AssistantMessage: FC = () => {
                     {"●"}
                   </span>
                 );
-              default:
+              case "image":
+                // Was missing entirely: the adapter emits a well-formed image
+                // part and this switch dropped it through `default: return null`,
+                // so image blocks rendered NOTHING — silent data loss with no
+                // error surface. Sizing mirrors Flutter's ContentBlockImage
+                // (max 420 / min 120) so a tall image cannot swallow the thread.
+                return (
+                  <MediaWithActions
+                    src={part.image}
+                    fileName={part.filename ?? "image"}
+                    alt={part.filename ? `Image from the assistant (${part.filename})` : "Image from the assistant"}
+                  />
+                );
+              case "file":
+              case "source":
+              case "audio":
+              case "generative-ui":
+                // assistant-ui part kinds our ContentBlock union never produces.
+                // Listed explicitly so the `never` guard below stays reachable
+                // rather than being defeated by an unrelated library part.
                 return null;
+              default: {
+                // `GroupPart<`group-${string}`>` is an open template-literal
+                // type, so it can never narrow to `never` — an unmatched group
+                // falls here legitimately and renders its children.
+                if (part.type.startsWith("group-")) return children;
+                // Exhaustiveness guard for the CLOSED part union, per the
+                // ContentBlock contract. The image case above went missing
+                // precisely because a bare `default: return null` made a dropped
+                // variant look like ordinary code. Now a new variant is a
+                // COMPILE error, not a blank screen.
+                const exhaustive: never = part as never;
+                void exhaustive;
+                return null;
+              }
             }
           }}
         </MessagePrimitive.GroupedParts>
@@ -352,12 +415,53 @@ const AssistantMessage: FC = () => {
 
       <div
         data-slot="aui_assistant-message-footer"
-        className={cn("ms-2 flex items-center", ACTION_BAR_HEIGHT)}
+        className={cn("ms-2 flex items-center gap-2", ACTION_BAR_HEIGHT)}
       >
         <BranchPicker />
         <AssistantActionBar />
+        <ProvenanceFooter />
       </div>
     </MessagePrimitive.Root>
+  );
+};
+
+/** Builds "agent · provider/model" from provenance, or null when empty. */
+function provenanceLabel(p: {
+  agentId?: string;
+  providerId?: string;
+  modelId?: string;
+}): string | null {
+  const agent = p.agentId?.trim() || undefined;
+  const provider = p.providerId?.trim() || undefined;
+  const model = p.modelId?.trim() || undefined;
+  const modelPart =
+    provider === "on-device"
+      ? "On-device"
+      : provider && model
+        ? `${provider}/${model}`
+        : (provider ?? model ?? undefined);
+  const parts = [agent, modelPart].filter(
+    (part): part is string => Boolean(part),
+  );
+  return parts.length === 0 ? null : parts.join(" · ");
+}
+
+/** Subtle, text-first chip showing which agent + provider/model produced the
+ *  response. Renders nothing until provenance resolves. */
+const ProvenanceFooter: FC = () => {
+  const messageId = useAuiState((s) => s.message.id);
+  const provenance = useChatStore((s) =>
+    s.messages.find((m) => m.id === messageId)?.provenance,
+  );
+  const label = provenance ? provenanceLabel(provenance) : null;
+  if (!label) return null;
+  return (
+    <span
+      className="text-muted-foreground truncate text-[11px]"
+      title={label}
+    >
+      {label}
+    </span>
   );
 };
 
@@ -365,6 +469,30 @@ const AssistantActionBar: FC = () => {
   const messageId = useAuiState((s) => s.message.id);
   const regenerateResponse = useChatStore((s) => s.regenerateResponse);
   const deleteResponse = useChatStore((s) => s.deleteResponse);
+  // Read the cancelled state from assistant-ui, not the store. That is the point
+  // of reporting `incomplete/cancelled` in convertMessage: the status is legible
+  // to the primitives rather than needing a store side-channel.
+  const isCancelled = useAuiState(
+    (s) => s.message.status?.type === "incomplete" && s.message.status.reason === "cancelled",
+  );
+  const keptBlocks = useChatStore(
+    (s) => s.messages.find((m) => m.id === messageId)?.content.length ?? 0,
+  );
+
+  // A stopped turn asks a different question than a finished one ("what now?"
+  // rather than "copy/regenerate"), so it gets its own row instead of four more
+  // icons crowded next to Copy.
+  if (isCancelled) {
+    return (
+      <ActionBarPrimitive.Root
+        hideWhenRunning
+        className="aui-assistant-action-bar-root animate-in fade-in col-start-3 row-start-2 -ms-1 flex duration-200"
+      >
+        <StoppedTurnActions messageId={messageId} keptBlocks={keptBlocks} />
+      </ActionBarPrimitive.Root>
+    );
+  }
+
   return (
     <ActionBarPrimitive.Root
       hideWhenRunning

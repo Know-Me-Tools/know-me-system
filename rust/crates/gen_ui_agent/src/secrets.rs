@@ -11,7 +11,7 @@
 //! this module only covers the read path C-103's chat call needs.
 use crate::error::AgentError;
 
-const SERVICE: &str = "ai.prometheusags.knowme-poc";
+const SERVICE: &str = "tools.knowme.knowme";
 
 /// Resolve a provider's API key reference to its actual secret value.
 pub fn resolve_api_key(api_key_ref: &str) -> Result<String, AgentError> {

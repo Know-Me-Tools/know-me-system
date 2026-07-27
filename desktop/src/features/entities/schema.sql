@@ -35,8 +35,10 @@ CREATE TABLE IF NOT EXISTS chat_messages (
   run_status text,
   run_phase text,
   status_message text,
+  intent text,
   error jsonb,
   attachments jsonb NOT NULL DEFAULT '[]'::jsonb,
+  provenance jsonb,
   generation_settings jsonb,
   diagnostics jsonb,
   context_plan_version text,
@@ -46,3 +48,22 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 );
 CREATE INDEX IF NOT EXISTS chat_messages_conversation_branch
   ON chat_messages (conversation_id, branch_id, sequence);
+
+-- Migrations. Every CREATE TABLE above is IF NOT EXISTS, so a column added to
+-- one of them never lands on a database that already exists — and the very next
+-- INSERT then fails for EVERY message, not just the new field. Each column added
+-- after the first release therefore needs a matching idempotent ALTER here.
+--
+-- These run through `db.exec(schemaSql)`, which executes the whole file. They are
+-- deliberately NOT picked up by the `registerEntityFromSql` path, which filters to
+-- statements containing "CREATE TABLE" — that path only needs the table shape.
+ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS intent text;
+-- `attachments` has been in the CREATE TABLE above since before release, but it
+-- was only ever written as a hardcoded empty array, so a database created before
+-- the column existed was never caught. Now that real values are persisted, that
+-- latent gap becomes a failing INSERT on every message.
+ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS attachments jsonb NOT NULL DEFAULT '[]'::jsonb;
+-- Which agent + provider + model produced an assistant turn. Captured and
+-- rendered since it shipped, but never stored — so it vanished on reload while
+-- Flutter showed it on every historical turn.
+ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS provenance jsonb;

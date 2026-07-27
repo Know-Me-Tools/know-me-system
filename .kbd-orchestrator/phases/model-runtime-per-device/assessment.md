@@ -74,3 +74,119 @@ mobile, desktop, and web is assessed separately in
 
 This supplemental document does not alter the active LiteRT-LM change or the
 phase implementation counters.
+
+---
+
+# Addendum — 2026-07-27: media rendering + download/share
+
+Assessment of a defect the operator hit in live testing: an attached PNG
+rendered as a document row, not as the image. Scope then widened to
+"images, video, and OpenGraph link thumbnails must display, and media must
+be downloadable/shareable, on all four surfaces."
+
+Surfaces: Flutter (iOS, Android) and React (web, Tauri desktop). Flutter has
+no web target in this repo (`mobile/web/` absent), so the split is clean.
+
+## Defect 1 — attachments never become image blocks
+
+Five hardcoded sites, none of which consult mime:
+
+| Surface | Site | Code |
+|---|---|---|
+| Flutter | `mobile/.../chat_screen.dart:367` | `'attachment',` — kind literal |
+| Flutter | `gen_ui_widgets/.../content_block_view.dart:597` | `'attachment' => ContentBlockDocumentPreview(` |
+| React | `desktop/.../attachmentAdapter.ts:121` | `type: 'document',` |
+| React | `desktop/.../ArtifactKindBody.tsx:53` | `case 'attachment': return 'document'` |
+| React | `desktop/.../chatStore.ts:222` | `kind: 'attachment',` |
+
+`mimeFor()` at `attachmentAdapter.ts:44` already returns `image/png`
+correctly — the value is computed and then discarded.
+
+**Knock-on not visible from the bug report:** because the React adapter
+reports `type: 'document'`, assistant-ui's `useAttachmentSrc`
+(`attachment.tsx:61`) returns `undefined` for a PNG, so the COMPOSER
+thumbnail and its preview dialog are dead too — not only the sent bubble.
+
+### Blocker A — `ContentBlock::Image` is a write-dead variant
+
+Defined at `rust/crates/gen_ui_types/src/content_block.rs:51`, decoded by
+both UIs, and **constructed by nothing in `rust/crates/`**. Rust does read
+image attachments (`chat.rs:261` `read_attachment`) but routes them only to
+`ImageInput` / `ContentPart::ImageUrl` — inference payloads, not transcript
+blocks. Changing a block kind alone therefore cannot work; something must
+construct an image block for the first time.
+
+### Blocker B — no renderer accepts a local path, and the path is not durable
+
+`ContentBlockImage` (`content_block_view.dart:914-958`) decodes only
+`SvgPicture.string` and `Image.memory`, both base64. `ContentBlockVideo`
+(`:1150`) throws on a scheme-less source.
+
+Worse, the path itself is transient: `file_picker` returns a CACHED copy on
+Android, which is why the package ships `clearTemporaryFiles()`
+(file_picker 11.0.1 changelog). Rendering from the picker path would work
+during testing and break after a cache purge — a defect that would look
+like a regression weeks later.
+
+Durable rendering therefore needs either base64 in the block or a copy into
+app-owned storage at attach time. That is a design decision, not a patch.
+
+## Defect 2 — download/share exists nowhere
+
+Confirmed absent on all four surfaces. The nearest existing behaviour:
+
+- `_CopyButton` (`content_block_view.dart:1725`) — clipboard TEXT only; for
+  an image its `copyValue` is `url ?? dataBase64`, i.e. it can dump a
+  multi-megabyte base64 blob into the system pasteboard.
+- `<video controls>` (`ArtifactKindBody.tsx:196`) — the browser's own
+  "Save video as…", incidental rather than designed.
+
+### Researched constraints (not assumed)
+
+- **share_plus 13.3.0** supports FILE sharing on Android, iOS, macOS, Web,
+  Windows — **not Linux** (pub.dev platform-support matrix). Linux gets text
+  via `mailto` only. If Linux desktop matters, share is not uniform and the
+  gap must be stated rather than papered over.
+- **Tauri v2 needs BOTH `tauri-plugin-dialog` and `tauri-plugin-fs`**, and
+  the fs plugin's docs state permissions must be added to `capabilities`.
+  Neither plugin is present today (`src-tauri/Cargo.toml:16-20`,
+  `package.json:37-40`).
+
+### Registration cost of the Tauri save path — FIVE places
+
+`Cargo.toml`, `package.json`, `lib.rs` plugin registration,
+`capabilities/default.json`, and the JS call site. The existing capability
+file lists eleven permissions and has no `dialog`/`fs` entry.
+
+This is the same multi-place trap that broke the release build earlier today
+(`SetPermissionNotFound`, fixed in `12134b6` by adding the missed fourth
+registration). The public failure mode for a missed capability is
+`"dialog.open not allowed. Plugin not found"`.
+
+## Divergence to fold in
+
+React's `LinkBody` (`ArtifactKindBody.tsx:146-181`) does NOT render
+`imageUrl`, while Flutter's `ContentBlockLinkPreview`
+(`content_block_view.dart:1367`) does. OpenGraph thumbnails were explicitly
+requested, so React needs that arm regardless of the attachment work.
+
+## Honest scope
+
+This is substantially larger than the three certification items it
+interrupted. It spans two codebases, four surfaces, a Rust variant that must
+be constructed for the first time, two new Flutter dependencies, two new
+Tauri plugins with five registration points, and an unresolved decision
+about where attachment bytes live.
+
+The Linux share gap and the byte-durability decision are the two items that
+need an explicit call before implementation, not during it.
+
+## Open questions for plan
+
+1. Where do attachment bytes live for durable rendering — base64 inline in
+   the block (simple, bloats the transcript store) or a copy into app
+   storage with the block holding a stable path (more code, no bloat)?
+2. Is Linux desktop in scope? share_plus cannot share files there.
+3. Should Rust construct the image block (one place, both UIs benefit) or
+   should each UI construct it at attach time (no Rust change, two
+   implementations to keep in step)?

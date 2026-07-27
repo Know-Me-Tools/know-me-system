@@ -3,6 +3,7 @@
 //! `chat` is the shared chat-send implementation both platform leaves
 //! (gen_ui_ffi mobile, tauri-plugin-gen-ui desktop) call into — see chat.rs.
 
+pub mod attachment_store;
 pub mod chat;
 pub mod config;
 pub mod control_plane;

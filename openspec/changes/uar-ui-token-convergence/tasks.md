@@ -37,7 +37,7 @@ All paths relative to `rust/vendor/universal-agent-runtime/` unless noted. Work 
 - [ ] 5.3 Playwright e2e passes; regenerate snapshots where the only delta is color/typography, and attach before/after screenshots of the chat page at 1440 dark + light to the change
 - [x] 5.4 Manual AA spot-check of the new pairs: fg on each ladder step, ember on ember-soft, cyan on surface (4.5:1 body / 3:1 large); record values in the change notes
 - [ ] 5.5 Serve the production `static/` bundle through the Axum binary in both browser and Tauri webview and confirm identical rendering (tokens, fonts, logo)
-- [ ] 5.6 Commit in the submodule on the feature branch, open the submodule PR/push per repo policy, then bump the submodule pointer in know-me-system
+- [x] 5.6 Commit in the submodule on the feature branch, open the submodule PR/push per repo policy, then bump the submodule pointer in know-me-system
 
 ## Verification notes (2026-07-21, kimi)
 

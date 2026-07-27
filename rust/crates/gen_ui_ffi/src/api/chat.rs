@@ -49,6 +49,58 @@ pub async fn chat_send(
     .map_err(Into::into)
 }
 
+/// Copy a picked file into durable app storage and describe it as JSON.
+///
+/// Call this at PICK time, before the turn is sent. The path a picker returns
+/// is not safe to keep: on Android it lives in the app cache, which the OS or
+/// the user can clear, so a transcript holding it renders during testing and
+/// shows broken media later.
+///
+/// The JSON is a `StoredAttachment`: durable path, mime, size, image/video/
+/// document classification, and intrinsic pixel dimensions for images. Flutter
+/// renders from this instead of deciding the kind from the file extension
+/// itself — that duplicated decision is why a picked PNG became a grey
+/// document chip.
+///
+/// Returns a JSON string rather than a generated struct to match the existing
+/// FFI convention (`lane_availability`, `chat_control_catalog`).
+pub async fn stage_attachment(
+    conversation_id: String,
+    source_path: String,
+) -> Result<String, CoreError> {
+    let stored = gen_ui_agent::attachment_store::stage_path(&conversation_id, &source_path)
+        .await
+        .map_err(CoreError::from)?;
+    serde_json::to_string(&stored)
+        .map_err(|error| CoreError::Terminal(format!("cannot encode attachment: {error}")))
+}
+
+/// Delete stored attachment files whose conversation no longer exists.
+///
+/// Called by the UI once it has loaded its conversation list, because that
+/// list lives in the entity store the UI owns — Rust cannot enumerate it at
+/// boot. A crash between writing a file and committing the message row leaves
+/// bytes with no owner; without this they accumulate forever.
+///
+/// Returns the number of conversation directories removed.
+pub async fn sweep_orphan_attachments(
+    known_conversation_ids: Vec<String>,
+) -> Result<u32, CoreError> {
+    // A caller that passes an EMPTY list would delete every stored attachment
+    // on the device. That is almost always a load failure rather than a user
+    // with no conversations, so refuse it: the cost of skipping a sweep is
+    // some wasted disk, and the cost of getting it wrong is every image in
+    // every conversation disappearing at once.
+    if known_conversation_ids.is_empty() {
+        tracing::debug!("skipping attachment sweep: no known conversations supplied");
+        return Ok(0);
+    }
+    gen_ui_agent::attachment_store::sweep_orphans(&known_conversation_ids)
+        .await
+        .map(|removed| removed as u32)
+        .map_err(CoreError::from)
+}
+
 /// Submit a typed A2UI/AG-UI user interaction and start the agent's response.
 /// The JSON envelope is preserved verbatim so Rust remains the sole transport
 /// boundary and the agent can correlate surface, component, and context IDs.
@@ -115,6 +167,16 @@ pub async fn set_active_lane(lane: String) -> Result<(), CoreError> {
     gen_ui_agent::chat::set_active_lane(&lane)
         .await
         .map_err(Into::into)
+}
+
+/// Which lanes can be selected right now, and why not when they cannot.
+///
+/// The mode picker calls this to render unavailable modes as disabled with a
+/// reason, instead of offering a control that fails when tapped. Side-effect
+/// free: it probes registration state only and never loads an engine.
+pub async fn lane_availability() -> Result<String, CoreError> {
+    let value = gen_ui_agent::chat::lane_availability().await?;
+    serde_json::to_string(&value).map_err(|error| CoreError::Serde(error.to_string()))
 }
 
 pub async fn uar_service_config() -> Result<String, CoreError> {
@@ -273,6 +335,32 @@ pub async fn conversation_effective_config(conversation_id: String) -> Result<St
 
 fn parse_json(value: &str) -> Result<serde_json::Value, CoreError> {
     serde_json::from_str(value).map_err(|error| CoreError::Serde(error.to_string()))
+}
+
+/// The local lane's system prompt, or the shipped default when unset.
+pub async fn local_system_prompt() -> Result<String, CoreError> {
+    gen_ui_agent::chat::local_system_prompt()
+        .await
+        .map_err(|error| {
+            tracing::error!(%error, "local system prompt read failed");
+            error.into()
+        })
+}
+
+/// Persist the local lane's system prompt; a blank value restores the default.
+pub async fn set_local_system_prompt(prompt: String) -> Result<(), CoreError> {
+    gen_ui_agent::chat::set_local_system_prompt(&prompt)
+        .await
+        .map_err(|error| {
+            tracing::error!(%error, "local system prompt write failed");
+            error.into()
+        })
+}
+
+/// The shipped default, so Settings can offer "reset" without hardcoding copy
+/// that would drift from Rust.
+pub fn default_local_system_prompt() -> String {
+    gen_ui_agent::chat::DEFAULT_LOCAL_SYSTEM_PROMPT.to_string()
 }
 
 pub async fn theme_mode() -> Result<String, CoreError> {

@@ -49,10 +49,7 @@ class _MemoryScreenState extends ConsumerState<MemoryScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Ingest',
-                  style: TextStyle(color: colors.mutedForeground),
-                ),
+                Text('Ingest', style: TextStyle(color: colors.mutedForeground)),
                 const SizedBox(height: 6),
                 Row(
                   children: [
@@ -60,6 +57,8 @@ class _MemoryScreenState extends ConsumerState<MemoryScreen> {
                       child: shad.TextField(
                         controller: _ingestController,
                         placeholder: const Text('Add a memory…'),
+                        contextMenuBuilder:
+                            shad.TextField.nativeContextMenuBuilder(),
                         onSubmitted: _isIngesting ? null : (_) => _ingest(),
                       ),
                     ),
@@ -77,10 +76,7 @@ class _MemoryScreenState extends ConsumerState<MemoryScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                Text(
-                  'Search',
-                  style: TextStyle(color: colors.mutedForeground),
-                ),
+                Text('Search', style: TextStyle(color: colors.mutedForeground)),
                 const SizedBox(height: 6),
                 Row(
                   children: [
@@ -88,6 +84,8 @@ class _MemoryScreenState extends ConsumerState<MemoryScreen> {
                       child: shad.TextField(
                         controller: _searchController,
                         placeholder: const Text('Hybrid graph-RAG search…'),
+                        contextMenuBuilder:
+                            shad.TextField.nativeContextMenuBuilder(),
                         onSubmitted: _isSearching ? null : (_) => _search(),
                       ),
                     ),
@@ -116,8 +114,9 @@ class _MemoryScreenState extends ConsumerState<MemoryScreen> {
                       result.query.isEmpty
                           ? 'No search yet'
                           : 'No hits for "${result.query}"',
-                      style:
-                          TextStyle(color: KnowMePalette.of(context).faintText),
+                      style: TextStyle(
+                        color: KnowMePalette.of(context).faintText,
+                      ),
                     ),
                   )
                 : ListView.separated(

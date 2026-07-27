@@ -382,6 +382,21 @@ impl InferenceProvider for MlxcEngine {
         let _ = self.model_operation.send(ModelOperationState::Cancelling);
     }
 
+    /// Stop an in-flight generation.
+    ///
+    /// Without this override the trait default is a no-op, so a stop tap set the
+    /// cancellation token but never reached the engine and mlx-c generated to
+    /// completion — the macOS twin of the iOS defect fixed in `mlx.rs`. The
+    /// per-token check at the generation loop and the `Cancelled` emit were
+    /// already here; only this wiring was missing, so the flag was reachable
+    /// solely through `cancel_model_operation` (a model *download*).
+    ///
+    /// Deliberately does NOT touch `model_cancelled` or the model-operation
+    /// channel: cancelling a chat turn must not report the model as cancelling.
+    fn cancel_generation(&self) {
+        self.generation_cancelled.store(true, Ordering::Release);
+    }
+
     async fn runtime_diagnostics(&self) -> Option<RuntimeDiagnostics> {
         self.diagnostics().await
     }
@@ -550,7 +565,10 @@ impl MlxcEngine {
 
             if cancel.load(Ordering::Acquire) {
                 let _ = sender.send(StreamEvent::Cancelled {
-                    message: "mlx-c generation cancelled".into(),
+                    // Same phrase as chat.rs:151 and every other engine. The
+                    // user sees a stop, not an engine name, and the device
+                    // certifications assert this exact string.
+                    message: "Cancelled by user".into(),
                 });
             }
             if produced {
@@ -559,5 +577,44 @@ impl MlxcEngine {
             let _ = sender.send(StreamEvent::Done);
         });
         tokio_stream::wrappers::UnboundedReceiverStream::new(receiver).boxed()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A stop must reach the generation flag, not the model-operation one.
+    ///
+    /// The trait default for `cancel_generation` is a no-op, so this engine
+    /// accepted stops and generated to completion: the per-token flag existed and
+    /// was only ever set by `cancel_model_operation` (a model *download*).
+    /// Asserting the flag is what separates "wired" from "silently ignored".
+    #[test]
+    fn cancel_generation_sets_the_generation_flag_only() {
+        let engine = MlxcEngine::new("/tmp/knowme-mlxc-test");
+        assert!(!engine.generation_cancelled.load(Ordering::Acquire));
+        assert!(!engine.model_cancelled.load(Ordering::Acquire));
+
+        engine.cancel_generation();
+
+        assert!(
+            engine.generation_cancelled.load(Ordering::Acquire),
+            "cancel_generation must set the per-token generation flag"
+        );
+        assert!(
+            !engine.model_cancelled.load(Ordering::Acquire),
+            "stopping a chat turn must not report the MODEL as cancelling — \
+             that flag belongs to a download"
+        );
+    }
+
+    /// Cancelling a download still stops generation too (it tears the session
+    /// down), but it must ALSO mark the model — the two are not interchangeable.
+    #[test]
+    fn cancel_model_operation_marks_the_model() {
+        let engine = MlxcEngine::new("/tmp/knowme-mlxc-test");
+        engine.cancel_model_operation();
+        assert!(engine.model_cancelled.load(Ordering::Acquire));
     }
 }

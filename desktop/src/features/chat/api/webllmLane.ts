@@ -90,7 +90,14 @@ export async function* streamWebLlm(
   const stream = await engine.chat.completions.create({ messages, stream: true })
 
   let text = ''
+  let aborted = false
   for await (const chunk of stream) {
+    // WebLLM reports a user interrupt as finish_reason "abort" (not an error and
+    // not "stop"), so this is the only signal that the run was stopped rather
+    // than finished. Whatever streamed before it stays in `text` and is already
+    // in the transcript — that preserved partial is what Steer and Resume build
+    // on.
+    if (chunk.choices[0]?.finish_reason === 'abort') aborted = true
     const delta = chunk.choices[0]?.delta?.content
     if (!delta) continue
     // Accumulate: ContentBlock carries the full text so far, and blockIndex 0
@@ -100,7 +107,33 @@ export async function* streamWebLlm(
     yield { type: 'contentBlock', messageId, blockIndex: 0, block: { type: 'text', text } }
   }
 
+  if (aborted) {
+    // Same phrase every other lane uses. The store turns this into
+    // runStatus 'cancelled', which is what surfaces the stopped-turn actions.
+    // `runId` is the assistant message id on this lane — there is no separate
+    // Rust-issued run id, and the existing error path uses the same convention.
+    yield { type: 'cancelled', messageId, runId: messageId, phase: 'generation', message: 'Cancelled by user' }
+    return
+  }
+
   yield { type: 'messageComplete', messageId }
+}
+
+/**
+ * Stop an in-flight generation.
+ *
+ * WebLLM exposes no AbortSignal — `chat.completions.create` takes no `signal`
+ * and returns a bare async iterable — so an out-of-band interrupt is the only
+ * mechanism. The loop above then sees `finish_reason: "abort"`.
+ *
+ * Deliberately does NOT await `loadWebLlm()`: if no engine is loaded there is
+ * nothing generating, and awaiting a load here would start a ~1GB download in
+ * response to a Stop tap.
+ */
+export async function interruptWebLlm(): Promise<void> {
+  if (!enginePromise) return
+  const engine = await enginePromise.catch(() => null)
+  await engine?.interruptGenerate()
 }
 
 /** Release the engine + its GPU memory. Safe when nothing is loaded. */

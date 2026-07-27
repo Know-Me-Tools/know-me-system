@@ -28,6 +28,8 @@ class ChatMessage {
     this.contextPlanVersion,
     this.attachmentPaths = const [],
     this.contextTelemetry = const {},
+    this.provenance = const {},
+    this.intent,
   }) : createdAt =
            createdAt ?? DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
        updatedAt =
@@ -54,6 +56,23 @@ class ChatMessage {
   final List<String> attachmentPaths;
   final Map<String, Object?> contextTelemetry;
 
+  /// Which agent + provider + model produced this assistant turn, projected from
+  /// the run's `effective_run_policy`. Keys: `agentId`, `providerId`, `modelId`
+  /// (any may be null). Empty for user messages or before the run resolves.
+  final Map<String, Object?> provenance;
+
+  /// Why the user sent this turn: `'steer'` (redirect after a stop, keeping the
+  /// partial work) or `'resume'` (carry on from where the stop landed). Null for
+  /// an ordinary turn.
+  ///
+  /// Display and telemetry only — it is NOT how the intent reaches the model.
+  /// `InferenceMessage.name` is threaded end-to-end but the local prompt builder
+  /// never reads it, so a name-based tag would work on the Orchestrator lane and
+  /// vanish on Local; and a new role string degrades to `user` silently in
+  /// [PemChatRepository]. The intent therefore travels in the message content,
+  /// which every lane sends verbatim.
+  final String? intent;
+
   ChatMessage copyWith({
     List<ContentBlock>? content,
     bool? isStreaming,
@@ -65,7 +84,9 @@ class ChatMessage {
     DateTime? updatedAt,
     List<String>? attachmentPaths,
     Map<String, Object?>? contextTelemetry,
+    Map<String, Object?>? provenance,
     String? contextPlanVersion,
+    Object? intent = _unset,
   }) => ChatMessage(
     id: id,
     role: role,
@@ -87,6 +108,8 @@ class ChatMessage {
     contextPlanVersion: contextPlanVersion ?? this.contextPlanVersion,
     attachmentPaths: attachmentPaths ?? this.attachmentPaths,
     contextTelemetry: contextTelemetry ?? this.contextTelemetry,
+    provenance: provenance ?? this.provenance,
+    intent: identical(intent, _unset) ? this.intent : intent as String?,
   );
 }
 

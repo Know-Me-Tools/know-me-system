@@ -423,6 +423,23 @@ impl InferenceProvider for MlxEngine {
         let _ = self.model_operation.send(ModelOperationState::Cancelling);
     }
 
+    /// Stop an in-flight generation.
+    ///
+    /// Without this override the trait default is a no-op, so a stop tap set the
+    /// cancellation token but never reached the engine and MLX generated to
+    /// completion — the iOS twin of the Android defect. Everything needed was
+    /// already here: `MlxBridge::cancel` is documented as "ask an in-flight
+    /// `generate` to stop", the Swift bridge flips a flag its token loop checks,
+    /// and the resulting `MlxBridgeEvent::Cancelled` is already mapped to
+    /// `StreamEvent::Cancelled`. Only this wiring was missing.
+    ///
+    /// Deliberately does NOT touch `model_cancelled` or the model-operation
+    /// channel: those belong to a model *download*, and cancelling a chat turn
+    /// must not report the model as cancelling.
+    fn cancel_generation(&self) {
+        self.bridge.cancel();
+    }
+
     async fn runtime_diagnostics(&self) -> Option<RuntimeDiagnostics> {
         self.diagnostics().await
     }
@@ -539,8 +556,12 @@ impl MlxEngine {
                     }
                 }
                 MlxBridgeEvent::Cancelled => {
+                    // Same phrase as chat.rs:151 and the LiteRT-LM engine. One
+                    // state must not have a per-engine wording: the user sees a
+                    // stop, not an engine name, and the certification asserts
+                    // this string.
                     let _ = sender.send(StreamEvent::Cancelled {
-                        message: "MLX generation cancelled".into(),
+                        message: "Cancelled by user".into(),
                     });
                 }
                 MlxBridgeEvent::Error { message } => {

@@ -8,6 +8,7 @@ import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
 import com.google.ai.edge.litertlm.Message
+import com.google.ai.edge.litertlm.MessageCallback
 import com.google.ai.edge.litertlm.OpenApiTool
 import com.google.ai.edge.litertlm.SamplerConfig
 import com.google.ai.edge.litertlm.ToolProvider
@@ -34,9 +35,51 @@ object KnowMeLiteRtLmBridge {
     private const val FORCE_TOOL_RESULT_FALLBACK_FILE = "knowme-force-litertlm-tool-result-fallback"
 
     private var engine: Engine? = null
+
+    // Volatile because `cancel` reads this WITHOUT holding the object lock (see
+    // the comment there); every writer still holds it, so publication is safe.
+    @Volatile
     private var conversation: Conversation? = null
+
+    // Streaming buffer. Written on the engine's callback thread, drained on the
+    // Rust polling thread, so every access takes `streamLock` — deliberately a
+    // separate lock from the object monitor, which `sendMessage` holds for a
+    // whole blocking generation.
+    private val streamLock = Any()
+    private val streamChunks = mutableListOf<String>()
+    private var streamDone = false
+    private var streamError: String? = null
+
+    /// Set when a generation is cancelled, cleared once the engine is rebuilt.
+    ///
+    /// `cancelProcess()` cancels state inside the native engine that outlives the
+    /// Kotlin `Conversation` wrapper — closing and recreating the conversation is
+    /// NOT enough, verified on device: the next `nativeSendMessage` still threw
+    /// "CANCELLED: Task cancelled". `Engine` exposes no reset (only
+    /// `initialize`/`close`/`createConversation`), so the only way to clear it is
+    /// a full engine rebuild, done lazily on the next send so the cancel itself
+    /// stays instant.
+    @Volatile
+    private var engineNeedsRebuild = false
     private var modelPath: String? = null
     private var cacheDir: String? = null
+
+    /// Rebuild the engine if a cancel poisoned it.
+    ///
+    /// Callers must hold the object lock. The reload re-reads the same model from
+    /// the same cache dir, so the XNNPack weight cache is warm — measured
+    /// `load_ms` of 243-291ms on a Samsung SM-S936U, which is why this is
+    /// acceptable on the turn after a stop rather than requiring a restart.
+    private fun rebuildEngineIfPoisoned() {
+        if (!engineNeedsRebuild) return
+        val path = modelPath
+        val cache = cacheDir
+        engineNeedsRebuild = false
+        if (path == null || cache == null) return
+        Log.i(TAG, "rebuilding LiteRT-LM engine after cancellation")
+        close()
+        load(path, cache)
+    }
 
     @JvmStatic
     @Synchronized
@@ -65,8 +108,15 @@ object KnowMeLiteRtLmBridge {
     @JvmStatic
     @Synchronized
     fun sendMessage(requestJson: String): String {
+        rebuildEngineIfPoisoned()
         val currentEngine = engine ?: error("LiteRT-LM engine is not loaded")
         val request = JSONObject(requestJson)
+        // Same reason as `startStream`: a cancelled conversation left open makes
+        // the next send fail with "CANCELLED: Task cancelled".
+        conversation?.let { previous ->
+            conversation = null
+            runCatching { previous.close() }
+        }
         val activeConversation = currentEngine.createConversation(
             conversationConfigFromRequest(request),
         )
@@ -78,6 +128,96 @@ object KnowMeLiteRtLmBridge {
             ?: error("request contains no user prompt")
         val response = activeConversation.sendMessage(lastUser)
         return messageToJson(response)
+    }
+
+    /**
+     * Begin a streaming generation.
+     *
+     * The blocking [sendMessage] returns only when generation finishes, so
+     * cancelling it discarded everything the model had produced — the text never
+     * crossed the JNI boundary. `sendMessageAsync` delivers each chunk to a
+     * callback instead, and this buffers those chunks for Rust to drain, so a
+     * stop keeps whatever arrived before it.
+     *
+     * Deliberately NOT `@Synchronized`: it must return immediately so Rust can
+     * poll [drainStream] while generation continues. Holding the object lock for
+     * the whole run is what made the old `cancel()` unable to interrupt.
+     */
+    @JvmStatic
+    fun startStream(requestJson: String) {
+        val currentEngine = synchronized(this) {
+            rebuildEngineIfPoisoned()
+            engine
+        } ?: error("LiteRT-LM engine is not loaded")
+        val request = JSONObject(requestJson)
+        // Close the previous conversation before starting a new one. A cancelled
+        // conversation stays cancelled: leaving it open made the *next*
+        // `nativeSendMessage` fail immediately with "CANCELLED: Task cancelled",
+        // so one stop poisoned every following turn.
+        synchronized(this) {
+            conversation?.let { previous ->
+                conversation = null
+                runCatching { previous.close() }
+            }
+        }
+        val activeConversation = currentEngine.createConversation(
+            conversationConfigFromRequest(request),
+        )
+        synchronized(this) { conversation = activeConversation }
+
+        val messages = request.optJSONArray("messages") ?: JSONArray()
+        val lastUser = lastUserContent(messages)
+            ?: request.optString("prompt").takeIf { it.isNotBlank() }
+            ?: error("request contains no user prompt")
+
+        synchronized(streamLock) {
+            streamChunks.clear()
+            streamDone = false
+            streamError = null
+        }
+
+        activeConversation.sendMessageAsync(
+            Message.user(lastUser),
+            object : MessageCallback {
+                override fun onMessage(message: Message) {
+                    synchronized(streamLock) { streamChunks += messageToJson(message) }
+                }
+
+                override fun onDone() {
+                    synchronized(streamLock) { streamDone = true }
+                }
+
+                override fun onError(error: Throwable) {
+                    // Recorded rather than thrown: the throw would land on the
+                    // engine's callback thread where Rust cannot observe it.
+                    synchronized(streamLock) {
+                        streamError = error.message ?: error.toString()
+                        streamDone = true
+                    }
+                }
+            },
+        )
+    }
+
+    /**
+     * Hand Rust everything buffered since the last drain.
+     *
+     * Returns `{"chunks":[...],"done":bool,"error":string?}`. Chunks are removed
+     * as they are read, so a cancel mid-generation still yields whatever the
+     * model produced up to that point rather than losing the run.
+     */
+    @JvmStatic
+    fun drainStream(): String {
+        val payload = JSONObject()
+        val chunks = JSONArray()
+        synchronized(streamLock) {
+            streamChunks.forEach { chunks.put(JSONObject(it)) }
+            streamChunks.clear()
+            payload.put("done", streamDone)
+            streamError?.let { payload.put("error", it) }
+        }
+        payload.put("chunks", chunks)
+        return payload.toString()
     }
 
     @JvmStatic
@@ -131,9 +271,25 @@ object KnowMeLiteRtLmBridge {
         }
     }
 
+    /**
+     * Interrupt an in-flight generation.
+     *
+     * Deliberately NOT `@Synchronized`. `sendMessage` holds the object lock for
+     * the whole generation — tens of seconds for a long answer — so a
+     * synchronized `cancel` would block until generation finished and then
+     * cancel nothing. Device certification caught exactly that: a run completed
+     * with 1506 characters after the stop tap.
+     *
+     * `conversation` is `@Volatile` and `cancelProcess` is the LiteRT-LM API's
+     * own thread-safe interrupt, so reading the reference without the lock is
+     * safe. Cancelling when nothing is running is a no-op.
+     */
     @JvmStatic
-    @Synchronized
     fun cancel() {
+        // Mark before cancelling: the native state is poisoned the moment
+        // cancelProcess lands, and the next send must rebuild regardless of
+        // whether this call throws.
+        engineNeedsRebuild = true
         conversation?.cancelProcess()
     }
 

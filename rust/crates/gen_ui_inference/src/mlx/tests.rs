@@ -17,6 +17,11 @@ struct MockMlxBridge {
     events: Mutex<Vec<MlxBridgeEvent>>,
     load_calls: Mutex<Vec<(PathBuf, String)>>,
     generate_calls: Mutex<Vec<String>>,
+    /// Counts `cancel` so a test can prove the engine actually reached the
+    /// bridge. Before `cancel_generation` was overridden, the trait default
+    /// swallowed the request and MLX generated to completion — a silent gap that
+    /// only a call-count assertion catches.
+    cancel_calls: Mutex<usize>,
     available: bool,
     fail_load: bool,
 }
@@ -27,6 +32,7 @@ impl MockMlxBridge {
             events: Mutex::new(events),
             load_calls: Mutex::new(Vec::new()),
             generate_calls: Mutex::new(Vec::new()),
+            cancel_calls: Mutex::new(0),
             available: true,
             fail_load: false,
         }
@@ -57,7 +63,9 @@ impl MlxBridge for MockMlxBridge {
         Ok(())
     }
 
-    fn cancel(&self) {}
+    fn cancel(&self) {
+        *self.cancel_calls.lock_ok() += 1;
+    }
     fn close(&self) {}
     fn available(&self) -> bool {
         self.available
@@ -303,8 +311,9 @@ fn parser_text_after_tool_call_is_preserved() {
 
 #[test]
 fn think_block_becomes_thinking_deltas_not_text() {
-    let events =
-        parse_all_reasoning(&["<think>the user wants a greeting</think>Hello there!"]);
+    // Pre-filled shape (device reality): reasoning body, then `</think>`, then
+    // content — the opening `<think>` lives in the prompt, not the stream.
+    let events = parse_all_reasoning(&["the user wants a greeting</think>Hello there!"]);
     assert_eq!(thinking_of(&events), "the user wants a greeting");
     assert_eq!(text_of(&events), "Hello there!");
     // Reasoning must never leak into content.
@@ -320,27 +329,67 @@ fn think_disabled_passes_tags_through_as_text() {
 }
 
 #[test]
-fn think_open_and_close_split_across_deltas() {
-    let events = parse_all_reasoning(&[
-        "prefix <thi",
-        "nk>reason",
-        "ing text</thi",
-        "nk>answer",
-    ]);
+fn think_close_split_across_deltas() {
+    // Pre-filled reasoning whose closing `</think>` splits across deltas.
+    let events = parse_all_reasoning(&["reason", "ing text</thi", "nk>answer"]);
     assert_eq!(thinking_of(&events), "reasoning text");
-    assert_eq!(text_of(&events), "prefix answer");
-    // The split "<thi"/"nk>" must not leak as text.
+    assert_eq!(text_of(&events), "answer");
+    // The split "</thi"/"nk>" must not leak as text.
     assert!(!text_of(&events).contains("think"));
 }
 
 #[test]
-fn think_then_tool_call_interleave() {
+fn prefilled_think_close_only_splits_reasoning_from_content() {
+    // The REAL device shape: Qwen3's chat template pre-fills the opening
+    // `<think>`, so the generated stream starts inside reasoning and emits only
+    // the closing `</think>`. Everything before it is reasoning, not content.
+    // (This is the regression from the on-device screenshot: a bare `</think>`
+    // and reasoning leaking into the answer bubble.)
     let events = parse_all_reasoning(&[
-        "<think>need the weather tool</think>",
+        "The user just wants a greeting.\n</think>\n\nHello! How can I assist you today?",
+    ]);
+    assert_eq!(
+        thinking_of(&events).trim(),
+        "The user just wants a greeting."
+    );
+    assert_eq!(
+        text_of(&events).trim(),
+        "Hello! How can I assist you today?"
+    );
+    // The bare close tag must never appear in content.
+    assert!(!text_of(&events).contains("</think>"));
+    assert!(!text_of(&events).contains("The user just wants"));
+}
+
+#[test]
+fn prefilled_empty_think_yields_pure_content() {
+    // Thinking pre-filled but the model reasons nothing: `</think>` comes first,
+    // then content. No ThinkingDelta of substance; content is clean.
+    let events = parse_all_reasoning(&["</think>Just the answer."]);
+    assert!(thinking_of(&events).trim().is_empty());
+    assert_eq!(text_of(&events).trim(), "Just the answer.");
+}
+
+#[test]
+fn prefilled_close_split_across_deltas() {
+    // The pre-filled `</think>` arrives split across token deltas; the partial
+    // tag must not leak into reasoning or content.
+    let events = parse_all_reasoning(&["weighing options</thi", "nk>final answer"]);
+    assert_eq!(thinking_of(&events), "weighing options");
+    assert_eq!(text_of(&events), "final answer");
+    assert!(!text_of(&events).contains("think"));
+    assert!(!thinking_of(&events).contains("think"));
+}
+
+#[test]
+fn prefilled_then_tool_call_after_reasoning() {
+    // Pre-filled reasoning, then a tool call in the content region.
+    let events = parse_all_reasoning(&[
+        "need the weather</think>",
         "<tool_call>{\"name\":\"weather\",\"arguments\":{\"city\":\"SF\"}}</tool_call>",
         "Here you go.",
     ]);
-    assert_eq!(thinking_of(&events), "need the weather tool");
+    assert_eq!(thinking_of(&events), "need the weather");
     assert_eq!(text_of(&events), "Here you go.");
     assert!(events.iter().any(|e| matches!(
         e,
@@ -349,17 +398,77 @@ fn think_then_tool_call_interleave() {
 }
 
 #[test]
-fn think_no_markup_is_plain_passthrough() {
-    // Reasoning enabled, but the model emits no <think> — content is untouched.
-    let events = parse_all_reasoning(&["just a normal answer with no reasoning"]);
+fn prefilled_tool_call_before_any_close_is_not_reasoning() {
+    // Edge: thinking pre-filled, but the model goes straight to a tool call with
+    // no `</think>`. The call must be parsed as a tool call, not swallowed as
+    // reasoning body.
+    let events = parse_all_reasoning(&[
+        "<tool_call>{\"name\":\"weather\",\"arguments\":{\"city\":\"SF\"}}</tool_call>done",
+    ]);
+    assert!(events.iter().any(|e| matches!(
+        e,
+        StreamEvent::ToolCallStarted { name, .. } if name == "weather"
+    )));
+    assert_eq!(text_of(&events), "done");
     assert!(thinking_of(&events).is_empty());
-    assert_eq!(text_of(&events), "just a normal answer with no reasoning");
 }
 
 #[test]
 fn think_unterminated_flushes_as_thinking_on_finish() {
-    // Stream ends mid-<think>; the remainder must surface as reasoning, not vanish.
-    let events = parse_all_reasoning(&["<think>partial reasoning that never closes"]);
+    // Stream ends still inside the pre-filled reasoning block (no `</think>`);
+    // the remainder must surface as reasoning, not vanish or leak as content.
+    let events = parse_all_reasoning(&["partial reasoning that never closes"]);
     assert_eq!(thinking_of(&events), "partial reasoning that never closes");
     assert!(text_of(&events).is_empty());
+}
+
+#[test]
+fn explicit_think_open_is_still_absorbed() {
+    // A model that emits its own leading `<think>` open (not pre-filled) is
+    // handled identically: the open is stripped, body is reasoning, content
+    // follows the close.
+    let events = parse_all_reasoning(&["<think>explicit open</think>and the answer"]);
+    assert_eq!(thinking_of(&events), "explicit open");
+    assert_eq!(text_of(&events), "and the answer");
+}
+
+#[tokio::test]
+async fn cancel_generation_reaches_the_bridge() {
+    init_runtime();
+    // The trait default for `cancel_generation` is a no-op, so an engine that
+    // forgets to override it accepts a stop and keeps generating. Only the
+    // bridge call count distinguishes "wired" from "silently ignored".
+    let bridge = Arc::new(MockMlxBridge::with_events(vec![MlxBridgeEvent::Final]));
+    let engine = MlxEngine::with_bridge("/tmp/knowme-mlx-test", bridge.clone());
+
+    assert_eq!(*bridge.cancel_calls.lock_ok(), 0);
+    engine.cancel_generation();
+    assert_eq!(
+        *bridge.cancel_calls.lock_ok(),
+        1,
+        "cancel_generation must ask the bridge to stop the in-flight generate"
+    );
+}
+
+#[tokio::test]
+async fn cancelled_generation_uses_the_shared_wording() {
+    init_runtime();
+    // One state, one phrase. The engine name has no place in what the user
+    // reads, and the device certification asserts this exact string.
+    let bridge = Arc::new(MockMlxBridge::with_events(vec![
+        MlxBridgeEvent::Delta {
+            text: "partial".into(),
+        },
+        MlxBridgeEvent::Cancelled,
+    ]));
+    let engine = MlxEngine::with_bridge("/tmp/knowme-mlx-test", bridge.clone());
+    let events = collect(engine.generate_request(&text_request("hi")).await.unwrap()).await;
+
+    let cancelled = events.iter().find_map(|event| match event {
+        StreamEvent::Cancelled { message } => Some(message.clone()),
+        _ => None,
+    });
+    assert_eq!(cancelled.as_deref(), Some("Cancelled by user"));
+    // The partial text must survive the cancel — that is the whole point.
+    assert_eq!(text_of(&events), "partial");
 }

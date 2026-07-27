@@ -151,8 +151,12 @@ export interface MessageRecord extends Record<string, unknown> {
   run_status: string | null
   run_phase: string | null
   status_message: string | null
+  intent: string | null
   error: unknown
   attachments: unknown[]
+  /** Which agent + provider + model produced this assistant turn; null on a
+   *  user turn or when the run reported none. */
+  provenance: unknown
   generation_settings: unknown
   diagnostics: unknown
   context_plan_version: string | null
@@ -231,18 +235,21 @@ export async function saveMessageRecords(rows: MessageRecord[]): Promise<void> {
       `INSERT INTO chat_messages
        (id, tenant_id, conversation_id, parent_message_id, branch_id, sequence, role, blocks,
         run_id, run_status, run_phase, status_message, error, attachments, generation_settings,
-        diagnostics, context_plan_version, context_telemetry, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12,$13::jsonb,$14::jsonb,$15::jsonb,$16::jsonb,$17,$18::jsonb,$19,$20)
+        diagnostics, context_plan_version, context_telemetry, created_at, updated_at, intent)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12,$13::jsonb,$14::jsonb,$15::jsonb,$16::jsonb,$17,$18::jsonb,$19,$20,$21)
        ON CONFLICT (id) DO UPDATE SET blocks=EXCLUDED.blocks, run_id=EXCLUDED.run_id,
        run_status=EXCLUDED.run_status, run_phase=EXCLUDED.run_phase, status_message=EXCLUDED.status_message,
        error=EXCLUDED.error, generation_settings=EXCLUDED.generation_settings, diagnostics=EXCLUDED.diagnostics,
        context_plan_version=EXCLUDED.context_plan_version, context_telemetry=EXCLUDED.context_telemetry,
-       updated_at=EXCLUDED.updated_at`,
+       intent=EXCLUDED.intent, updated_at=EXCLUDED.updated_at`,
+      // `intent` is appended as $21 rather than slotted next to status_message so
+      // every existing placeholder index stays put — renumbering a 20-parameter
+      // list by hand is how the wrong value lands in the wrong column.
       [row.id, row.tenant_id, row.conversation_id, row.parent_message_id, row.branch_id, row.sequence,
        row.role, JSON.stringify(row.blocks), row.run_id, row.run_status, row.run_phase, row.status_message,
        JSON.stringify(row.error), JSON.stringify(row.attachments), JSON.stringify(row.generation_settings),
        JSON.stringify(row.diagnostics), row.context_plan_version, JSON.stringify(row.context_telemetry),
-       row.created_at, row.updated_at],
+       row.created_at, row.updated_at, row.intent],
     )
   }
 }

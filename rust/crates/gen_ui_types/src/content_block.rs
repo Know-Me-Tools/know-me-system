@@ -48,10 +48,35 @@ pub enum ContentBlock {
         kind: String,
         content: String,
     },
+    /// Renderable media. Exactly one of `url`, `data_base64`, or `path` carries
+    /// the bytes; the others are `None`.
+    ///
+    /// `path` points into app-owned storage (see `gen_ui_agent::attachment_store`),
+    /// never at the path a file picker returned — a picked path is purgeable on
+    /// Android and expires on iOS, so a transcript holding one renders during
+    /// testing and breaks later.
+    ///
+    /// `alt` is required for any image a user can see: the a11y gate treats a
+    /// missing accessible name as a failure, and a renderer has nothing to
+    /// invent one from. Producers fall back to the file name.
+    ///
+    /// `width`/`height` are the intrinsic pixel dimensions when known. They
+    /// exist so a renderer can reserve space before the bytes decode; without
+    /// them every image entering a transcript shifts the layout under the
+    /// reader. Optional because remote media reports them only after loading.
+    #[serde(rename_all = "camelCase")]
     Image {
         url: Option<String>,
         data_base64: Option<String>,
         mime: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        path: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        alt: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        width: Option<u32>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        height: Option<u32>,
     },
     Divider,
 }

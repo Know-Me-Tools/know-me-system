@@ -18,6 +18,13 @@ Stream<A2uiEvent> _cannedRun() async* {
   yield const RunFinished('run-1');
 }
 
+/// A run that starts and emits, but never finishes — the live-stream state the
+/// conversation-switch guard exists to protect.
+Stream<A2uiEvent> _neverFinishingRun() async* {
+  yield const RunStarted('run-live');
+  yield const BlockEvent('run-live', TextBlock('partial'));
+}
+
 Stream<A2uiEvent> _semanticRun() async* {
   yield const RunStarted('run-semantic');
   yield const BlockEvent('run-semantic', ThinkingBlock('reason '));
@@ -65,28 +72,25 @@ void main() {
     expect((msg.content.single as TextBlock).text, 'Hello world');
   });
 
-  test(
-    'ChatNotifier folds reasoning, citation, and answer chunks without flattening semantics',
-    () async {
-      final container = ProviderContainer();
-      addTearDown(container.dispose);
+  test('ChatNotifier folds reasoning, citation, and answer chunks without flattening semantics', () async {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
 
-      final notifier = container.read(chatProvider.notifier);
-      await notifier.foldStream('msg-semantic', _semanticRun());
+    final notifier = container.read(chatProvider.notifier);
+    await notifier.foldStream('msg-semantic', _semanticRun());
 
-      final ChatState state = container.read(chatProvider);
-      final msg = state.messages.firstWhere((m) => m.id == 'msg-semantic');
-      expect(msg.isStreaming, isFalse);
-      expect(msg.content, hasLength(3));
-      expect((msg.content[0] as ThinkingBlock).text, 'reason continues');
-      expect((msg.content[1] as CitationBlock).source, 'policy.md');
-      expect(
-        (msg.content[1] as CitationBlock).quote,
-        'Keep reasoning out of answers.',
-      );
-      expect((msg.content[2] as TextBlock).text, 'Final answer');
-    },
-  );
+    final ChatState state = container.read(chatProvider);
+    final msg = state.messages.firstWhere((m) => m.id == 'msg-semantic');
+    expect(msg.isStreaming, isFalse);
+    expect(msg.content, hasLength(3));
+    expect((msg.content[0] as ThinkingBlock).text, 'reason continues');
+    expect((msg.content[1] as CitationBlock).source, 'policy.md');
+    expect(
+      (msg.content[1] as CitationBlock).quote,
+      'Keep reasoning out of answers.',
+    );
+    expect((msg.content[2] as TextBlock).text, 'Final answer');
+  });
 
   test(
     'resubmit creates a new branch with the selected prefix history',
@@ -236,6 +240,252 @@ void main() {
       );
     },
   );
+
+  test(
+    'provenance from a ContextTelemetry event lands on the message',
+    () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(chatProvider.notifier);
+
+      Stream<A2uiEvent> runWithProvenance() async* {
+        yield const RunStarted('run-prov');
+        yield const ContextTelemetry('run-prov', {
+          'kind': 'provenance',
+          'provenance': {
+            'agentId': 'orchestrator-agent',
+            'providerId': 'anthropic',
+            'modelId': 'claude-opus-4-8',
+          },
+        });
+        yield const BlockEvent('run-prov', TextBlock('Answer.'));
+        yield const RunFinished('run-prov');
+      }
+
+      await notifier.foldStream('msg-prov', runWithProvenance());
+
+      final msg = container
+          .read(chatProvider)
+          .messages
+          .firstWhere((m) => m.id == 'msg-prov');
+      expect(msg.provenance['agentId'], 'orchestrator-agent');
+      expect(msg.provenance['providerId'], 'anthropic');
+      expect(msg.provenance['modelId'], 'claude-opus-4-8');
+      // A provenance-only telemetry event must not overwrite context telemetry.
+      expect(msg.contextTelemetry, isEmpty);
+    },
+  );
+
+  test(
+    'sendSteer marks the turn and tells the model to keep the work',
+    () async {
+      final repo = _FakeChatRepository();
+      final container = ProviderContainer(
+        overrides: [chatRepositoryProvider.overrideWithValue(repo)],
+      );
+      final subscription = container.listen(chatProvider, (_, _) {});
+      addTearDown(container.dispose);
+      addTearDown(subscription.close);
+
+      final notifier = container.read(chatProvider.notifier);
+      await notifier.load();
+      await notifier.sendSteer('Focus on the cost side instead.');
+      await _flushAsyncEvents();
+
+      final request = repo.startRequests.single;
+      // The correction has to survive verbatim AND be framed as a correction —
+      // the tag rides in the content because it is the only carrier every lane
+      // forwards unchanged.
+      expect(request.message, contains('Focus on the cost side instead.'));
+      expect(request.message, contains('stopped your previous response'));
+
+      final sent = container
+          .read(chatProvider)
+          .messages
+          .firstWhere((message) => message.id == request.userMessageId);
+      expect(sent.intent, 'steer');
+    },
+  );
+
+  test('sendResume continues after the stopped partial turn', () async {
+    final repo = _FakeChatRepository(
+      messages: [
+        _message('u-1', 'user', 'Write a long guide.', branchId: 'main'),
+        ChatMessage(
+          id: 'a-1',
+          role: 'assistant',
+          content: [const TextBlock('Chapter one, partially wri')],
+          branchId: 'main',
+          runStatus: 'cancelled',
+          statusMessage: 'Cancelled by user',
+        ),
+      ],
+    );
+    final container = ProviderContainer(
+      overrides: [chatRepositoryProvider.overrideWithValue(repo)],
+    );
+    final subscription = container.listen(chatProvider, (_, _) {});
+    addTearDown(container.dispose);
+    addTearDown(subscription.close);
+
+    final notifier = container.read(chatProvider.notifier);
+    await notifier.load();
+    await notifier.sendResume();
+    await _flushAsyncEvents();
+
+    final request = repo.startRequests.single;
+    // This is what makes Resume free of Rust changes: history filters on
+    // branchId and non-empty text only — there is NO runStatus filter — so the
+    // cancelled partial turn is still there for the model to continue from.
+    expect(request.history.map((entry) => '${entry.role}:${entry.content}'), [
+      'user:Write a long guide.',
+      'assistant:Chapter one, partially wri',
+    ]);
+    expect(request.message, contains('Continue your previous response'));
+
+    final sent = container
+        .read(chatProvider)
+        .messages
+        .firstWhere((message) => message.id == request.userMessageId);
+    expect(sent.intent, 'resume');
+  });
+
+  test('an ordinary send carries no intent', () async {
+    final repo = _FakeChatRepository();
+    final container = ProviderContainer(
+      overrides: [chatRepositoryProvider.overrideWithValue(repo)],
+    );
+    final subscription = container.listen(chatProvider, (_, _) {});
+    addTearDown(container.dispose);
+    addTearDown(subscription.close);
+
+    final notifier = container.read(chatProvider.notifier);
+    await notifier.load();
+    await notifier.sendMessage('Just a question.');
+    await _flushAsyncEvents();
+
+    final request = repo.startRequests.single;
+    expect(request.message, 'Just a question.');
+    final sent = container
+        .read(chatProvider)
+        .messages
+        .firstWhere((message) => message.id == request.userMessageId);
+    expect(sent.intent, isNull);
+  });
+
+  test('renameConversation persists the new title', () async {
+    // The Flutter sheet showed the title as static text with only a delete
+    // button beside it, so a conversation kept whatever its first message
+    // auto-titled it forever. React has had rename since it shipped.
+    final repo = _FakeChatRepository();
+    final container = ProviderContainer(
+      overrides: [chatRepositoryProvider.overrideWithValue(repo)],
+    );
+    final subscription = container.listen(chatProvider, (_, _) {});
+    addTearDown(container.dispose);
+    addTearDown(subscription.close);
+
+    final notifier = container.read(chatProvider.notifier);
+    await notifier.load();
+    final id = container.read(chatProvider).threadId;
+
+    await notifier.renameConversation(id, '  Trip planning  ');
+
+    // Trimmed, because a title padded with spaces reads as misaligned in the list.
+    expect(repo.savedConversations.single.title, 'Trip planning');
+    expect(
+      container.read(chatProvider).conversations.first.title,
+      'Trip planning',
+    );
+  });
+
+  test('renameConversation ignores an empty title', () async {
+    // An empty title would leave a blank row the user cannot tell apart from
+    // its neighbours.
+    final repo = _FakeChatRepository();
+    final container = ProviderContainer(
+      overrides: [chatRepositoryProvider.overrideWithValue(repo)],
+    );
+    final subscription = container.listen(chatProvider, (_, _) {});
+    addTearDown(container.dispose);
+    addTearDown(subscription.close);
+
+    final notifier = container.read(chatProvider.notifier);
+    await notifier.load();
+    final before = container.read(chatProvider).conversations.first.title;
+
+    await notifier.renameConversation(
+      container.read(chatProvider).threadId,
+      '   ',
+    );
+
+    expect(repo.savedConversations, isEmpty);
+    expect(container.read(chatProvider).conversations.first.title, before);
+  });
+
+  test('selectConversation refuses to switch while a run is streaming', () async {
+    // Switching swaps state.messages out from under the driver still writing
+    // blocks to a message id no longer in the visible list — the tokens go
+    // nowhere and the turn is lost. React has always guarded this.
+    final repo = _FakeChatRepository();
+    final container = ProviderContainer(
+      overrides: [chatRepositoryProvider.overrideWithValue(repo)],
+    );
+    final subscription = container.listen(chatProvider, (_, _) {});
+    addTearDown(container.dispose);
+    addTearDown(subscription.close);
+
+    final notifier = container.read(chatProvider.notifier);
+    await notifier.load();
+    final original = container.read(chatProvider).threadId;
+    // Drive the streaming state directly. Sending would race the fake's canned
+    // run to completion, and the guard would then be tested against a turn that
+    // had already finished — a test that passes for the wrong reason.
+    await notifier.foldStream('streaming-1', _neverFinishingRun());
+    expect(
+      container
+          .read(chatProvider)
+          .messages
+          .any((message) => message.isStreaming),
+      isTrue,
+      reason: 'the guard is only meaningful against a live run',
+    );
+
+    await notifier.selectConversation('some-other-conversation');
+
+    expect(container.read(chatProvider).threadId, original);
+  });
+
+  test(
+    'a failed submitInteraction ends the turn instead of spinning',
+    () async {
+      // The assistant placeholder is pushed into state BEFORE the call. An
+      // uncaught throw left that bubble streaming forever with no way back —
+      // this was the only action in the notifier without the guard its siblings
+      // have, so the failure had no surface at all.
+      final repo = _FakeChatRepository()..failInteraction = true;
+      final container = ProviderContainer(
+        overrides: [chatRepositoryProvider.overrideWithValue(repo)],
+      );
+      final subscription = container.listen(chatProvider, (_, _) {});
+      addTearDown(container.dispose);
+      addTearDown(subscription.close);
+
+      final notifier = container.read(chatProvider.notifier);
+      await notifier.load();
+      await notifier.submitInteraction({'action': 'submit', 'value': 'yes'});
+      await _flushAsyncEvents();
+
+      final assistant = container
+          .read(chatProvider)
+          .messages
+          .lastWhere((message) => message.role == 'assistant');
+      expect(assistant.isStreaming, isFalse);
+      expect(assistant.runStatus, 'error');
+      expect(assistant.error?.code, 'interaction_submit_failed');
+      expect(assistant.error?.retryable, isTrue);
+    },
+  );
 }
 
 ChatMessage _message(
@@ -288,6 +538,43 @@ class _FakeChatRepository implements ChatRepository {
   final Map<String, ChatMessage> _messages;
   final List<_StartTurnRequest> startRequests = [];
   final List<String> deletedIds = [];
+
+  /// Records what the screen asked to stage, so a test can assert the picker's
+  /// path was handed to Rust rather than kept.
+  final List<String> stagedPaths = [];
+
+  @override
+  Future<StagedAttachment> stageAttachment({
+    required String conversationId,
+    required String sourcePath,
+  }) async {
+    stagedPaths.add(sourcePath);
+    final name = sourcePath.split('/').last;
+    final isImage = name.endsWith('.png') || name.endsWith('.jpg');
+    return StagedAttachment(
+      // A DIFFERENT path from the source: the whole point is that the picker's
+      // path is not what gets persisted.
+      path: '/app-storage/$conversationId/$name',
+      fileName: name,
+      mime: isImage ? 'image/png' : 'application/pdf',
+      sizeBytes: 1024,
+      isImage: isImage,
+      isVideo: false,
+      isDocument: !isImage,
+      width: isImage ? 640 : null,
+      height: isImage ? 480 : null,
+    );
+  }
+
+  /// What the notifier told the sweep was still alive, so a test can assert
+  /// the live conversations are never handed over as orphans.
+  List<String>? sweptAgainst;
+
+  @override
+  Future<int> sweepOrphanAttachments(List<String> conversationIds) async {
+    sweptAgainst = conversationIds;
+    return 0;
+  }
 
   @override
   Future<String> approveToolConfirmation({required String approvalId}) async =>
@@ -343,8 +630,12 @@ class _FakeChatRepository implements ChatRepository {
     RemoteContentKind kind,
   ) async => ResolvedRemoteContent(url: url, mime: 'text/plain');
 
+  final savedConversations = <ChatConversation>[];
+
   @override
-  Future<void> saveConversation(ChatConversation conversation) async {}
+  Future<void> saveConversation(ChatConversation conversation) async {
+    savedConversations.add(conversation);
+  }
 
   @override
   Future<void> saveMessage(String conversationId, ChatMessage message) async {
@@ -374,13 +665,20 @@ class _FakeChatRepository implements ChatRepository {
     return runId;
   }
 
+  /// Set to make the next `submitInteraction` throw, standing in for a dead
+  /// FFI bridge or a rejected run.
+  bool failInteraction = false;
+
   @override
   Future<String> submitInteraction({
     required String threadId,
     required String interactionJson,
     required List<ChatHistoryEntry> history,
     required String branchId,
-  }) async => 'interaction-run';
+  }) async {
+    if (failInteraction) throw StateError('bridge is gone');
+    return 'interaction-run';
+  }
 
   @override
   Stream<Map<String, dynamic>> watchLocalModelStatus() => const Stream.empty();

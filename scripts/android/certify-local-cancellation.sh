@@ -89,6 +89,36 @@ PY
   adb shell input tap $point
 }
 
+# Tap the composer by widget class, not by its placeholder text.
+#
+# The hint changes to "Steer the stopped response…" once a steer is armed, so
+# matching on "Ask KnowMe anything" silently misses the composer in exactly the
+# state this feature introduces.
+tap_composer() {
+  dump_ui
+  local point
+  point="$(python3 - "$UI_XML_PATH" <<'PYX'
+import re
+import sys
+import xml.etree.ElementTree as ET
+
+root = ET.parse(sys.argv[1]).getroot()
+for node in root.iter("node"):
+    if node.attrib.get("class") != "android.widget.EditText":
+        continue
+    match = re.search(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", node.attrib.get("bounds", ""))
+    if not match:
+        continue
+    x1, y1, x2, y2 = map(int, match.groups())
+    print(f"{(x1 + x2) // 2} {(y1 + y2) // 2}")
+    raise SystemExit(0)
+raise SystemExit(1)
+PYX
+)" || return 1
+  [[ -n "$point" ]] || return 1
+  adb shell input tap $point
+}
+
 screen_dimensions() {
   adb shell wm size | tr -d '\r' | python3 -c 'import re,sys
 text=sys.stdin.read()
@@ -148,7 +178,7 @@ PY
 
 adb logcat -c
 
-if ! tap_matching_node "Ask KnowMe anything"; then
+if ! tap_composer; then
   if ! tap_matching_node "Chat"; then
     echo "Chat semantics not found; using bottom-navigation tap fallback" >&2
     tap_chat_fallback
@@ -156,7 +186,7 @@ if ! tap_matching_node "Ask KnowMe anything"; then
   sleep 1
 fi
 
-if ! tap_matching_node "Ask KnowMe anything"; then
+if ! tap_composer; then
   echo "composer placeholder not found; using bottom-screen tap fallback" >&2
   tap_composer_fallback
 fi

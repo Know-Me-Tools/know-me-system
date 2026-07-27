@@ -141,13 +141,96 @@ export function streamAgentA2ui(
   messages: InferenceHistoryMessage[],
   conversationId: string,
   branchId: string,
+  /**
+   * Absolute filesystem paths of user attachments. Rust reads and extracts
+   * these; passing bytes would mean copying multi-megabyte files across the
+   * IPC boundary for no benefit. Requires `userMessageId` — Rust correlates the
+   * extracted content back to that message for memory ingest.
+   */
+  attachmentPaths?: string[],
+  userMessageId?: string,
 ): Promise<string> {
   return invoke<string>(cmd("stream_agent_a2ui"), {
     userMessage,
     messages,
     conversationId,
     branchId,
+    attachmentPaths: attachmentPaths ?? [],
+    userMessageId: userMessageId ?? null,
   });
+}
+/** A file copied into durable app storage, described by Rust. */
+export interface StoredAttachment {
+  /** Durable path in app-owned storage. Safe to persist in a transcript. */
+  path: string;
+  fileName: string;
+  mime: string;
+  sizeBytes: number;
+  isImage: boolean;
+  isVideo: boolean;
+  isDocument: boolean;
+  /** Intrinsic pixel dimensions, present for images with a readable header. */
+  width?: number;
+  height?: number;
+}
+/**
+ * Copy a picked file into durable app storage and describe it.
+ *
+ * Call at PICK time, before sending the turn. A browser `File` holds bytes with
+ * no filesystem path, and Rust's attachment pipeline reads from disk — this
+ * bridges the two once instead of pushing megabytes through IPC every turn.
+ *
+ * Returns metadata, not a bare path. The caller previously got only a string
+ * and had to infer the kind from the file name, which produced `document` for
+ * every attachment — that is why a picked PNG rendered as a grey chip. Mime,
+ * image/video classification and dimensions are decided once in Rust and used
+ * by both UIs.
+ */
+export function stageAttachment(
+  conversationId: string,
+  fileName: string,
+  bytes: Uint8Array,
+): Promise<StoredAttachment> {
+  // Array.from because Tauri's IPC serialises to JSON — a Uint8Array would
+  // arrive as an object of index keys rather than a byte sequence.
+  return invoke<StoredAttachment>(cmd("stage_attachment"), {
+    conversationId,
+    fileName,
+    bytes: Array.from(bytes),
+  });
+}
+/** What a remote URL resolved to, fetched natively by Rust. */
+export interface ResolvedRemoteContent {
+  url: string;
+  mime: string;
+  /** Inline bytes when the content was small enough to embed. */
+  dataBase64?: string;
+  localPath?: string;
+  /** Link-preview metadata, present for the `link` kind. */
+  title?: string;
+  description?: string;
+  siteName?: string;
+  imageUrl?: string;
+}
+/** What sort of remote content to resolve. Rust applies a size cap per kind. */
+export type RemoteContentKind = "image" | "video" | "link" | "document";
+/**
+ * Fetch remote media natively rather than from the webview.
+ *
+ * The webview cannot always reach what the model references — CORS, mixed
+ * content, or an origin it holds no credentials for. Flutter has resolved
+ * through Rust since it shipped, which is why remote images and link previews
+ * rendered on mobile and appeared broken on desktop.
+ */
+export async function resolveRemoteContent(
+  url: string,
+  kind: RemoteContentKind,
+): Promise<ResolvedRemoteContent> {
+  const raw = await invoke<string>(cmd("resolve_remote_content"), { url, kind });
+  return JSON.parse(raw) as ResolvedRemoteContent;
+}
+export function chatApproveToolConfirmation(approvalId: string): Promise<string> {
+  return invoke<string>(cmd("chat_approve_tool_confirmation"), { approvalId });
 }
 /**
  * Continue a chat run from a structured client/A2UI interaction.
@@ -194,6 +277,27 @@ export function getActiveLane(): Promise<ChatLane> {
  */
 export function setActiveLane(lane: ChatLane): Promise<void> {
   return invoke<void>(cmd("set_active_lane"), { lane });
+}
+/** Whether a lane can be selected right now, and the reason when it cannot. */
+export interface LaneAvailability {
+  lane: ChatLane;
+  available: boolean;
+  /** Human-readable reason when `available` is false; null when usable. */
+  reason: string | null;
+}
+/**
+ * Availability for every selectable lane, in one call.
+ *
+ * The mode picker renders an unavailable lane as disabled WITH its reason
+ * rather than offering a control that fails when clicked. Side-effect free —
+ * it probes registration state and never loads an engine, so it is safe to
+ * call on mount and after a failed switch.
+ */
+export async function laneAvailability(): Promise<LaneAvailability[]> {
+  // Rust hands back JSON text (the FFI surface does the same) so the shape
+  // stays serde-owned rather than duplicated across two bindings.
+  const raw = await invoke<string>(cmd("lane_availability"));
+  return JSON.parse(raw) as LaneAvailability[];
 }
 /** Whether this build has a local-inference engine — gate the toggle on this. */
 export function hasLocalEngine(): Promise<boolean> {

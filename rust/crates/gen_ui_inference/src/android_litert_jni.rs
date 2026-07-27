@@ -38,6 +38,24 @@ pub struct NativeLiteRtLmResponse {
     pub tool_result_fallback_applied: bool,
 }
 
+/// One poll of the Kotlin stream buffer.
+///
+/// `chunks` holds whatever arrived since the previous drain — each is a
+/// `messageToJson` payload, so it reuses [`NativeLiteRtLmResponse`]. `done` goes
+/// true on the engine's `onDone` or `onError`; `error` is set only in the latter
+/// case, letting the caller distinguish a completed stream from a failed one
+/// without inspecting the chunks.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NativeLiteRtLmStreamDrain {
+    #[serde(default)]
+    pub chunks: Vec<NativeLiteRtLmResponse>,
+    #[serde(default)]
+    pub done: bool,
+    #[serde(default)]
+    pub error: Option<String>,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct NativeLiteRtLmToolCall {
     pub name: String,
@@ -86,6 +104,37 @@ impl NativeLiteRtLmAdapter {
         })?;
         serde_json::from_str(&response)
             .map_err(|error| CoreError::Serde(format!("LiteRT-LM response JSON: {error}")))
+    }
+
+    /// Start a streaming generation; chunks are collected by [`Self::drain_stream`].
+    ///
+    /// Returns as soon as the engine accepts the request. The blocking
+    /// `generate_text` above only yields text once generation finishes, so
+    /// cancelling it lost everything produced — nothing had crossed this
+    /// boundary yet. Streaming is what makes a stop non-destructive.
+    pub fn start_stream(&self, request: &InferenceRequest) -> CoreResult<()> {
+        let request_json = serde_json::to_string(request)
+            .map_err(|error| CoreError::Serde(format!("LiteRT-LM request JSON: {error}")))?;
+        with_env("LiteRT-LM JavaVM", |env| {
+            let request_json = env
+                .new_string(request_json)
+                .map_err(|error| jni_error(env, "LiteRT-LM request string", error))?;
+            call_static_void(
+                env,
+                "startStream",
+                "(Ljava/lang/String;)V",
+                &[JValue::Object(request_json.as_ref())],
+            )
+        })
+    }
+
+    /// Take everything buffered since the last drain.
+    pub fn drain_stream(&self) -> CoreResult<NativeLiteRtLmStreamDrain> {
+        let payload = with_env("LiteRT-LM JavaVM", |env| {
+            call_static_string(env, "drainStream", "()Ljava/lang/String;", &[])
+        })?;
+        serde_json::from_str(&payload)
+            .map_err(|error| CoreError::Serde(format!("LiteRT-LM stream drain JSON: {error}")))
     }
 
     pub fn continue_with_tool_results(

@@ -12,9 +12,11 @@ import 'package:video_player/video_player.dart';
 
 import 'a2ui_surface_view.dart';
 import 'content_block.dart';
+import 'local_media/local_image.dart';
 
-typedef AgentInteractionCallback =
-    FutureOr<void> Function(Map<String, Object?> interaction);
+typedef AgentInteractionCallback = FutureOr<void> Function(
+  Map<String, Object?> interaction,
+);
 
 enum RemoteContentKind { image, video, audio, opengraph }
 
@@ -53,8 +55,10 @@ class ResolvedRemoteContent {
   final String? imageUrl;
 }
 
-typedef RemoteContentResolver =
-    Future<ResolvedRemoteContent> Function(String url, RemoteContentKind kind);
+typedef RemoteContentResolver = Future<ResolvedRemoteContent> Function(
+  String url,
+  RemoteContentKind kind,
+);
 
 /// Exhaustive dispatcher for KnowMe's 11-variant A2UI projection.
 ///
@@ -67,6 +71,7 @@ class ContentBlockView extends StatelessWidget {
     this.isStreaming = false,
     this.onInteraction,
     this.remoteResolver,
+    this.mediaActionsBuilder,
     super.key,
   });
 
@@ -74,6 +79,10 @@ class ContentBlockView extends StatelessWidget {
   final bool isStreaming;
   final AgentInteractionCallback? onInteraction;
   final RemoteContentResolver? remoteResolver;
+
+  /// Supplies Save/Share controls for media stored on disk. Null renders none,
+  /// which is right for surfaces with no filesystem access.
+  final MediaActionsBuilder? mediaActionsBuilder;
 
   @override
   Widget build(BuildContext context) => switch (block) {
@@ -117,12 +126,24 @@ class ContentBlockView extends StatelessWidget {
         onInteraction: onInteraction,
         remoteResolver: remoteResolver,
       ),
-    ImageBlock(:final url, :final dataBase64, :final mime) => ContentBlockImage(
-      url: url,
-      dataBase64: dataBase64,
-      mime: mime,
-      remoteResolver: remoteResolver,
-    ),
+    ImageBlock(
+      :final url,
+      :final dataBase64,
+      :final mime,
+      :final path,
+      :final alt,
+    ) =>
+      ContentBlockImage(
+        url: url,
+        dataBase64: dataBase64,
+        mime: mime,
+        path: path,
+        // Falls back to the default rather than passing null: every image
+        // needs an accessible name, and older blocks carry no alt.
+        alt: alt ?? 'Generated image',
+        remoteResolver: remoteResolver,
+        mediaActionsBuilder: mediaActionsBuilder,
+      ),
     DividerBlock() => const ContentBlockDivider(),
   };
 }
@@ -869,21 +890,47 @@ String _activityTitle(String kind) {
   return '${name.isEmpty ? 'Agent' : name[0].toUpperCase() + name.substring(1)} activity';
 }
 
+/// Builds the Save/Share controls for a file in app-owned storage.
+///
+/// The app supplies this; the widget package has no plugins of its own.
+typedef MediaActionsBuilder = List<Widget> Function({
+  required String path,
+  required String fileName,
+  required String mime,
+});
+
 class ContentBlockImage extends StatefulWidget {
   const ContentBlockImage({
     required this.url,
     required this.dataBase64,
     required this.mime,
+    this.path,
     this.alt = 'Generated image',
     this.remoteResolver,
+    this.mediaActionsBuilder,
     super.key,
   });
 
   final String? url;
   final String? dataBase64;
   final String mime;
+
+  /// A file in app-owned storage, for user attachments.
+  ///
+  /// Never a path a picker returned: on Android those live in the purgeable
+  /// cache, so a transcript holding one renders during testing and shows a
+  /// broken image weeks later.
+  final String? path;
   final String alt;
   final RemoteContentResolver? remoteResolver;
+
+  /// Builds Save/Share controls for a stored file.
+  ///
+  /// Injected because this package cannot depend on the app's plugins, and
+  /// because what is offerable differs by platform. Null (the default) renders
+  /// no media actions at all, which is correct for remote images that were
+  /// never written to disk.
+  final MediaActionsBuilder? mediaActionsBuilder;
 
   @override
   State<ContentBlockImage> createState() => _ContentBlockImageState();
@@ -931,6 +978,20 @@ class _ContentBlockImageState extends State<ContentBlockImage> {
         semanticLabel: widget.alt,
         errorBuilder: (_, __, ___) => const _MediaError(label: 'Image'),
       );
+    } else if (localImage(
+          widget.path ?? '',
+          semanticLabel: widget.alt,
+          onError: () => const _MediaError(label: 'Image'),
+        )
+        case final Widget local) {
+      // A user attachment stored on disk. Checked before the remote branch so
+      // a local file renders immediately instead of showing a spinner that
+      // waits on a resolver it will never need.
+      //
+      // `localImage` returns null on the web, where a filesystem path cannot
+      // be loaded at all — that falls through to the unavailable state below
+      // rather than pretending to load.
+      image = local;
     } else if (widget.url != null && widget.remoteResolver != null) {
       image = const SizedBox(
         height: 120,
@@ -946,6 +1007,15 @@ class _ContentBlockImageState extends State<ContentBlockImage> {
         icon: Icons.image_outlined,
         label: mime,
         copyValue: widget.url ?? dataBase64 ?? '',
+        // Only for media that actually exists on disk. A remote image was
+        // never written locally, so offering Save would promise something
+        // this block cannot deliver.
+        actions: switch ((widget.path, widget.mediaActionsBuilder)) {
+          (final String path, final MediaActionsBuilder build)
+              when path.isNotEmpty =>
+            build(path: path, fileName: widget.alt, mime: widget.mime),
+          _ => const [],
+        },
       ),
       child: Padding(
         padding: const EdgeInsets.only(top: 8),
@@ -1541,12 +1611,20 @@ class _BlockHeader extends StatelessWidget {
     required this.label,
     required this.copyValue,
     this.status,
+    this.actions = const [],
   });
 
   final IconData icon;
   final String label;
   final String copyValue;
   final String? status;
+
+  /// Extra controls beside Copy — Save and Share for media.
+  ///
+  /// Supplied by the app rather than built here: this package must not depend
+  /// on the app's plugins, and the platform capabilities differ per surface
+  /// (Linux has no file share sheet at all).
+  final List<Widget> actions;
 
   @override
   Widget build(BuildContext context) {
@@ -1567,6 +1645,7 @@ class _BlockHeader extends StatelessWidget {
             ),
           ),
         ),
+        ...actions,
         _CopyButton(value: copyValue, label: 'Copy $label'),
       ],
     );

@@ -267,6 +267,38 @@ pub trait InferenceProvider: Send + Sync {
 
     fn cancel_model_operation(&self) {}
 
+    /// Interrupt an in-flight generation.
+    ///
+    /// Distinct from [`Self::cancel_model_operation`], which aborts model
+    /// *preparation* (download/verify/load). Local engines generate inside a
+    /// single blocking call, so a run-cancellation token polled between phases
+    /// cannot stop them — the host calls this to reach the engine itself.
+    ///
+    /// Best-effort and idempotent: the default is a no-op for engines with no
+    /// interruptible generation, and calling it when nothing is running must be
+    /// harmless. Implementations should leave the provider reusable afterwards.
+    ///
+    /// # The default silently ignores every stop
+    ///
+    /// An engine that forgets to override this **compiles cleanly**, accepts the
+    /// stop, and generates to completion — and `cancel_run` still returns
+    /// `Ok(true)`, so the caller and the UI both report success. Nothing errors.
+    /// This exact gap shipped on four engines before it was caught: iOS/MLX and
+    /// macOS/mlx-c had a working cancel flag and never wired it here, and
+    /// Win-Linux/llama.cpp had no flag at all.
+    ///
+    /// So when adding or touching a local engine:
+    /// - implement this, and
+    /// - assert it with a mock that **counts** cancel calls. A call count is the
+    ///   only thing that distinguishes "wired" from "silently ignored" (see
+    ///   `gen_ui_inference::mlx::tests`).
+    ///
+    /// Every engine must emit `StreamEvent::Cancelled` with the message
+    /// `"Cancelled by user"` — the same phrase `gen_ui_agent::chat` uses. One
+    /// state must not carry a per-engine wording: the user sees a stop, not an
+    /// engine name, and the device certifications assert that exact string.
+    fn cancel_generation(&self) {}
+
     async fn runtime_diagnostics(&self) -> Option<RuntimeDiagnostics> {
         None
     }

@@ -1,0 +1,42 @@
+{
+  "apkBuiltAt": "2026-07-27T10:33 local",
+  "date": "2026-07-27",
+  "device": {
+    "android": "16",
+    "model": "SM-S936U",
+    "serial": "R5GYB4AZD7A",
+    "soc": "SM8750"
+  },
+  "fixture": {
+    "bytes": 73,
+    "name": "knowme-fix-verify.png",
+    "note": "unusual dimensions so a default or guess cannot pass",
+    "pixels": "11x5"
+  },
+  "gates": {
+    "cacheEvicted": {
+      "method": "pm trim-caches 999G",
+      "pass": true
+    },
+    "composerShowsFileNameAndSize": {
+      "evidence": "content-desc='knowme-fix-verify.png, 73 B attachment'",
+      "pass": true
+    },
+    "survivedCachePurgeAndRestart": {
+      "evidence": "same content-desc after force-stop + relaunch; zero 'unavailable' nodes",
+      "pass": true
+    },
+    "transcriptBlockIsMimeAware": {
+      "evidence": "content-desc='knowme-fix-verify.png\\nimage/png' \u2014 image/png, not 'attachment'",
+      "pass": true
+    }
+  },
+  "regressionFoundAndFixed": {
+    "commit": "388f6b2",
+    "summary": "The first device run FAILED here: _encodeBlock dropped path/alt/width/height on save, so an image rendered in-session and returned 'Image unavailable' after restart. Found only on hardware \u2014 157 React, 88 Rust and 50 Flutter tests all passed with the bug present."
+  },
+  "unverified": {
+    "runAsStorageInspection": "run-as refuses a release build ('package not debuggable'), so files/attachments could not be listed directly. Not a failure \u2014 the cache-purge gate carries the proof.",
+    "saveAndShareOnDevice": "NOT exercised in this run. Covered by unit tests only."
+  }
+}

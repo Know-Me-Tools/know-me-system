@@ -63,8 +63,8 @@ class NotesScreen extends ConsumerWidget {
                         onPressed: action.isLoading
                             ? null
                             : () => ref
-                                .read(notesActionsProvider.notifier)
-                                .delete(note.id),
+                                  .read(notesActionsProvider.notifier)
+                                  .delete(note.id),
                         density: shad.ButtonDensity.icon,
                         child: const Icon(Icons.delete_outline),
                       ),

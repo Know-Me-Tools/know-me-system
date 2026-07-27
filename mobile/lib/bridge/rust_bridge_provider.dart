@@ -16,6 +16,7 @@ import 'third_party/gen_ui_types/transport.dart' as transport_wire;
 import 'third_party/gen_ui_types/inference.dart';
 import 'third_party/gen_ui_types/error.dart' as error_wire;
 import 'third_party/gen_ui_types/view.dart' as view_wire;
+
 import 'package:prometheus_entity_management/prometheus_entity_management.dart';
 
 export 'third_party/gen_ui_db_graph.dart' show MemoryHit, RelatedEntity;
@@ -43,6 +44,20 @@ Future<String> chatSend(
   branchId: branchId,
   userMessageId: userMessageId,
 );
+
+/// stage_attachment(conversation_id, source_path) -> StoredAttachment JSON.
+///
+/// Called at PICK time. The picker's own path is not durable — on Android it
+/// lives in the app cache, which the OS or the user can clear — so Rust copies
+/// the bytes into app-owned storage and returns the path that is safe to keep.
+Future<String> stageAttachment(String conversationId, String sourcePath) =>
+    ffi.stageAttachment(conversationId: conversationId, sourcePath: sourcePath);
+
+/// sweep_orphan_attachments(known_ids) -> count removed.
+Future<int> sweepOrphanAttachments(List<String> knownConversationIds) async =>
+    (await ffi.sweepOrphanAttachments(
+      knownConversationIds: knownConversationIds,
+    )).toInt();
 
 Future<String> chatAction(
   String threadId,
@@ -81,6 +96,15 @@ Future<Map<String, dynamic>> uarRuntimeStatus() async =>
 Future<String> activeLane() => ffi.activeLane();
 
 Future<void> setActiveLane(String lane) => ffi.setActiveLane(lane: lane);
+
+/// Which lanes are selectable right now, as `[{lane, available, reason}]`.
+/// Lets the mode picker disable unavailable modes with a reason rather than
+/// offering a control that fails when tapped.
+Future<List<dynamic>> laneAvailability() async {
+  final raw = await ffi.laneAvailability();
+  final decoded = jsonDecode(raw);
+  return decoded is List ? decoded : const [];
+}
 
 /// Resolve FRB's opaque workspace error into the safe Rust `Display` message.
 /// Generated bindings intentionally stay untouched; every feature reaches this
@@ -162,14 +186,9 @@ Future<void> deleteUarAgent(String id) => ffi.uarAgentDelete(id: id);
 Future<Map<String, dynamic>> saveUarMcpServer(
   String name,
   Object server,
-) async =>
-    jsonDecode(
-          await ffi.uarMcpServerSave(
-            name: name,
-            serverJson: jsonEncode(server),
-          ),
-        )
-        as Map<String, dynamic>;
+) async => jsonDecode(
+  await ffi.uarMcpServerSave(name: name, serverJson: jsonEncode(server)),
+) as Map<String, dynamic>;
 
 Future<Map<String, dynamic>> deleteUarMcpServer(String name) async =>
     jsonDecode(await ffi.uarMcpServerDelete(name: name))
@@ -180,9 +199,8 @@ Future<Map<String, dynamic>> deleteUarMemory(String id) async =>
 
 Future<Map<String, dynamic>> createUarKnowledgeBase(Object request) async =>
     jsonDecode(
-          await ffi.uarKnowledgeBaseCreate(requestJson: jsonEncode(request)),
-        )
-        as Map<String, dynamic>;
+      await ffi.uarKnowledgeBaseCreate(requestJson: jsonEncode(request)),
+    ) as Map<String, dynamic>;
 
 Future<void> deleteUarKnowledgeBase(String id) =>
     ffi.uarKnowledgeBaseDelete(id: id);
@@ -197,37 +215,43 @@ Future<Map<String, dynamic>?> conversationPolicy(String conversationId) async {
 Future<Map<String, dynamic>> saveConversationPolicy(
   String conversationId,
   Map<String, dynamic> policy,
-) async =>
-    jsonDecode(
-          await ffi.conversationPolicySave(
-            conversationId: conversationId,
-            policyJson: jsonEncode(policy),
-          ),
-        )
-        as Map<String, dynamic>;
+) async => jsonDecode(
+  await ffi.conversationPolicySave(
+    conversationId: conversationId,
+    policyJson: jsonEncode(policy),
+  ),
+) as Map<String, dynamic>;
 
 Future<void> deleteConversationPolicy(String conversationId) =>
     ffi.conversationPolicyDelete(conversationId: conversationId);
 
 Future<Map<String, dynamic>> conversationEffectiveConfig(
   String conversationId,
-) async =>
-    jsonDecode(
-          await ffi.conversationEffectiveConfig(conversationId: conversationId),
-        )
-        as Map<String, dynamic>;
+) async => jsonDecode(
+  await ffi.conversationEffectiveConfig(conversationId: conversationId),
+) as Map<String, dynamic>;
 
 Future<String> getThemeMode() => ffi.themeMode();
 
 Future<void> setThemeMode(String mode) => ffi.setThemeMode(mode: mode);
 
+/// The local lane's system prompt, already resolved to the shipped default when
+/// the user has not set one.
+Future<String> localSystemPrompt() => ffi.localSystemPrompt();
+
+/// Persist the local lane's system prompt; a blank value restores the default.
+Future<void> setLocalSystemPrompt(String prompt) =>
+    ffi.setLocalSystemPrompt(prompt: prompt);
+
+/// The shipped default, so "reset" does not duplicate Rust's copy in Dart.
+Future<String> defaultLocalSystemPrompt() => ffi.defaultLocalSystemPrompt();
+
 Future<String> resolveRemoteContent(String url, String kind) =>
     ffi.resolveRemoteContent(url: url, kind: kind);
 
 Future<int> deleteConversationContext(String conversationId) async =>
-    (await ffi.memoryDeleteConversationContext(
-      conversationId: conversationId,
-    )).toInt();
+    (await ffi.memoryDeleteConversationContext(conversationId: conversationId))
+        .toInt();
 
 Future<int> deleteMessageContext(List<String> messageIds) async =>
     (await ffi.memoryDeleteMessageContext(messageIds: messageIds)).toInt();

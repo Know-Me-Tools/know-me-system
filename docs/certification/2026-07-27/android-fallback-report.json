@@ -1,0 +1,11 @@
+{
+  "backendObserved": "gemma-4-e2b-it-litertlm",
+  "device": {
+    "model": "SM-S936U",
+    "soc": "SM8750"
+  },
+  "fallbackReasonObserved": "CPU is the certification baseline; GPU/NPU require device proof",
+  "memoryDowngradeCoverage": "unit tests only \u2014 cargo test -p gen_ui_inference --lib --features local-llama (downgrade selection, budget override, preflight rejection). Not drivable on device: the budget lever is a process env var and Android cannot inject one into a monkey/am launch.",
+  "memoryDowngradeExercised": false,
+  "thermalStatus": 0
+}

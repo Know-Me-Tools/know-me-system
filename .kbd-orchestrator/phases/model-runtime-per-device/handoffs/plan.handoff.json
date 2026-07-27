@@ -1,11 +1,9 @@
 {
   "stage": "plan",
-  "completedAt": "2026-07-19T13:07:03Z",
-  "outputs": [
-    ".kbd-orchestrator/phases/model-runtime-per-device/plan.md"
-  ],
-  "nextStage": "execute",
-  "summaryForNext": "Five total phase changes are now recorded: the existing four LiteRT-LM slices are preserved and one independent document-only OpenSpec slice was added. document-uar-karpathy-knowledge-strategy is next because the user explicitly requested the strategy document plan; it may execute independently without advancing runtime work.",
-  "skipped": false,
-  "skipReason": null
+  "phase": "model-runtime-per-device",
+  "timestamp": "2026-07-27T00:00:00Z",
+  "artifact": "plan.md",
+  "summary": "Media plan APPENDED to plan.md (the file is the phase 5-change baseline; overwriting would destroy it). One OpenSpec change, chat-media-rendering, with 8 ordered sub-changes C1-C8. All three assess-stage blocking questions resolved by the operator: bytes copy into app storage, download everywhere with share only where supported (Linux gets no share control), and Rust constructs the image block once for both UIs. C1 (durable storage) and C2 (mime-aware block construction) gate everything else; C3/C4 renderers and C5/C6 export can then run in parallel; C7 (OpenGraph) is independent.",
+  "next": "Apply C1: copy attachment bytes into app-owned storage in read_attachment (rust/crates/gen_ui_agent/src/chat.rs:393) and return the stable content-hashed path.",
+  "open_questions": []
 }

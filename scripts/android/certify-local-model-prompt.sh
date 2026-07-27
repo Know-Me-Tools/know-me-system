@@ -188,6 +188,33 @@ if ! tap_matching_node "Ask KnowMe anything"; then
   sleep 1
 fi
 
+# Start a fresh conversation when asked. A long-running device carries the whole
+# session's prior turns: an observed run reached history_count=108, and the model
+# emitted 4-, 6- and 2-character fragments with tool_calls=0 — the instruction was
+# drowned by context rather than refused. Gates that depend on the model FOLLOWING
+# an instruction need a clean thread; gates that only need a reply do not, so this
+# is opt-in.
+if [[ "${CERT_NEW_CONVERSATION:-0}" == "1" ]]; then
+  if tap_matching_node "Conversations"; then
+    sleep 1
+    if tap_matching_node "New conversation" || tap_matching_node "New Thread"; then
+      echo "started a fresh conversation for this run" >&2
+      sleep 2
+    else
+      echo "CERT FAIL: found the conversations sheet but not its new-conversation control" >&2
+      exit 70
+    fi
+  else
+    # Hard failure, not a warning. A run that silently falls back to existing
+    # history looks like a model failure when it is really an unexercised setup
+    # step — three runs were spent that way before this was caught.
+    echo "CERT FAIL: CERT_NEW_CONVERSATION=1 but the conversations control was not found" >&2
+    echo "  the run would have used existing history, which invalidates any gate" >&2
+    echo "  that depends on the model following an instruction" >&2
+    exit 70
+  fi
+fi
+
 if ! tap_matching_node "Ask KnowMe anything"; then
   echo "composer placeholder not found; using bottom-screen tap fallback" >&2
   tap_composer_fallback
@@ -240,11 +267,33 @@ while (( SECONDS < deadline )); do
     echo "ui xml: $UI_XML_PATH" >&2
     exit 1
   fi
-  if rg -q "LiteRT-LM generation starting" "$LOG_PATH" &&
-     rg -q "LiteRT-LM generation produced text" "$LOG_PATH" &&
-     ui_contains_expected_substrings; then
-    echo "G5 PASS: LiteRT-LM generation started"
-    echo "G6 PASS: LiteRT-LM produced text"
+  # The rendered UI is the authoritative signal: it proves the answer reached
+  # the user regardless of which lane produced it. The LiteRT-LM log markers are
+  # corroboration for local-lane runs and are reported when present, but they
+  # must not gate success — requiring them made an Orchestrator-lane run poll
+  # until timeout while the expected text was already on screen, since those
+  # markers can never appear on that lane.
+  #
+  # Set REQUIRE_LOCAL_ENGINE=1 to insist on the local engine specifically (e.g.
+  # when certifying the on-device path itself rather than a tool flow).
+  if ui_contains_expected_substrings; then
+    local_started=0
+    rg -q "LiteRT-LM generation starting" "$LOG_PATH" && local_started=1
+    local_produced=0
+    rg -q "LiteRT-LM generation produced text" "$LOG_PATH" && local_produced=1
+    if [[ "${REQUIRE_LOCAL_ENGINE:-0}" == "1" ]] &&
+       (( local_started == 0 || local_produced == 0 )); then
+      sleep 2
+      continue
+    fi
+    if (( local_started == 1 )); then
+      echo "G5 PASS: LiteRT-LM generation started"
+    else
+      echo "G5 INFO: no local-engine generation marker (non-local lane)"
+    fi
+    if (( local_produced == 1 )); then
+      echo "G6 PASS: LiteRT-LM produced text"
+    fi
     echo "G6 PASS: expected visible UI text found: $EXPECTED_SUBSTRINGS"
     echo "prompt: $PROMPT"
     echo "logcat: $LOG_PATH"

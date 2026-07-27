@@ -23,6 +23,13 @@ const THINK_CLOSE: &str = "</think>";
 
 #[derive(Debug, PartialEq)]
 enum State {
+    /// Initial state for reasoning models whose chat template pre-fills the
+    /// opening `<think>`. The leading run is treated as reasoning (streamed as
+    /// `ThinkingDelta`) until the closing `</think>`, after which we move to
+    /// `Text`. Absorbs an optional explicit leading `<think>` open and defers to
+    /// the tool path if a `<tool_call>` leads instead. Non-reasoning models skip
+    /// this state and start in `Text`.
+    PreThink,
     /// Passing assistant content through, watching for an open tag.
     Text,
     /// Inside a `<think>` block, emitting its body as `ThinkingDelta` until
@@ -64,7 +71,14 @@ impl ToolCallParser {
     pub(crate) fn with_reasoning(format: ReasoningFormat) -> Self {
         let think_enabled = matches!(format, ReasoningFormat::Qwen3Think);
         Self {
-            state: State::Text,
+            // Reasoning models start in `PreThink` because the chat template
+            // pre-fills the opening `<think>`; non-reasoning models start in
+            // `Text` and never treat `<think>` specially.
+            state: if think_enabled {
+                State::PreThink
+            } else {
+                State::Text
+            },
             buffer: String::new(),
             next_call_index: 0,
             think_enabled,
@@ -77,6 +91,64 @@ impl ToolCallParser {
         let mut out = Vec::new();
         loop {
             match self.state {
+                State::PreThink => {
+                    // The stream starts here for reasoning models. Qwen3's chat
+                    // template pre-fills the opening `<think>` into the prompt, so
+                    // generation begins *inside* the reasoning block and emits only
+                    // the closing `</think>`. We therefore treat the leading run as
+                    // reasoning by default. Two shapes are absorbed:
+                    //   1. pre-filled (the common case): body… `</think>` content…
+                    //   2. explicit pair (a model that emits its own `<think>`):
+                    //      a leading `<think>` open is stripped, then identical.
+                    // A leading `<tool_call>` before any `</think>` (a model that
+                    // skips thinking and goes straight to a call) hands off to the
+                    // tool path without misclassifying it as reasoning.
+                    if let Some(pos) = self.buffer.find(THINK_OPEN).filter(|&p| {
+                        // Only strip a `<think>` open that leads the block (nothing
+                        // but whitespace before it), else it's reasoning body text.
+                        self.buffer[..p].trim().is_empty()
+                    }) {
+                        self.buffer.drain(..pos + THINK_OPEN.len());
+                        continue;
+                    }
+                    let close_at = self.buffer.find(THINK_CLOSE);
+                    let tool_at = self.buffer.find(TOOL_OPEN);
+                    // A tool call before any `</think>` means no reasoning block:
+                    // switch to Text so the normal open-tag scan handles it.
+                    if let (Some(t), close) = (tool_at, close_at) {
+                        if close.map_or(true, |c| t < c) {
+                            self.state = State::Text;
+                            continue;
+                        }
+                    }
+                    if let Some(pos) = close_at {
+                        let body = self.buffer[..pos].to_string();
+                        if !body.is_empty() {
+                            out.push(StreamEvent::ThinkingDelta {
+                                index: 0,
+                                delta: body,
+                            });
+                        }
+                        self.buffer.drain(..pos + THINK_CLOSE.len());
+                        self.state = State::Text;
+                        continue;
+                    }
+                    // No close yet: stream the safe prefix as reasoning, holding
+                    // back only a possible partial `</think>` (and, near the very
+                    // start, a possible partial leading `<think>`/`<tool_call>`).
+                    let safe = safe_emit_len(&self.buffer, THINK_CLOSE)
+                        .min(safe_emit_len(&self.buffer, THINK_OPEN))
+                        .min(safe_emit_len(&self.buffer, TOOL_OPEN));
+                    if safe > 0 {
+                        let body = self.buffer[..safe].to_string();
+                        out.push(StreamEvent::ThinkingDelta {
+                            index: 0,
+                            delta: body,
+                        });
+                        self.buffer.drain(..safe);
+                    }
+                    break;
+                }
                 State::Text => {
                     // Find the earliest of the open tags we recognize.
                     let tool_at = self.buffer.find(TOOL_OPEN);
@@ -95,11 +167,11 @@ impl ToolCallParser {
                             });
                         }
                         self.buffer.drain(..pos + tag.len());
-                        self.state = if tag == THINK_OPEN {
-                            State::InThinking
+                        if tag == THINK_OPEN {
+                            self.state = State::InThinking;
                         } else {
-                            State::InToolCall
-                        };
+                            self.state = State::InToolCall;
+                        }
                         continue;
                     }
                     // No complete open tag. Emit everything except a tail that
@@ -163,6 +235,22 @@ impl ToolCallParser {
     pub(crate) fn finish(&mut self) -> Vec<StreamEvent> {
         let mut out = Vec::new();
         match self.state {
+            State::PreThink => {
+                // Stream ended while still in the pre-filled reasoning block (no
+                // `</think>` ever arrived). Strip a dangling leading `<think>` if
+                // present, then emit the remainder as reasoning rather than
+                // leaking it as content.
+                if let Some(rest) = self.buffer.trim_start().strip_prefix(THINK_OPEN) {
+                    self.buffer = rest.to_string();
+                }
+                if !self.buffer.is_empty() {
+                    out.push(StreamEvent::ThinkingDelta {
+                        index: 0,
+                        delta: std::mem::take(&mut self.buffer),
+                    });
+                }
+                self.state = State::Text;
+            }
             State::Text => {
                 if !self.buffer.is_empty() {
                     out.push(StreamEvent::TextDelta {
@@ -267,10 +355,7 @@ impl ToolCallParser {
 /// Pick the earlier of two optional tag matches, returning its position and the
 /// tag literal. `None` positions lose to `Some`; equal positions can't happen
 /// (the tags differ), but tool wins the tie defensively.
-fn earliest(
-    tool_at: Option<usize>,
-    think_at: Option<usize>,
-) -> Option<(usize, &'static str)> {
+fn earliest(tool_at: Option<usize>, think_at: Option<usize>) -> Option<(usize, &'static str)> {
     match (tool_at, think_at) {
         (Some(t), Some(k)) if k < t => Some((k, THINK_OPEN)),
         (Some(t), _) => Some((t, TOOL_OPEN)),

@@ -21,6 +21,19 @@ class PemChatRepository implements ChatRepository {
   static const _messageType = 'chat_message';
 
   @override
+  Future<StagedAttachment> stageAttachment({
+    required String conversationId,
+    required String sourcePath,
+  }) async {
+    final json = await bridge.stageAttachment(conversationId, sourcePath);
+    return StagedAttachment.fromJson(jsonDecode(json) as Map<String, dynamic>);
+  }
+
+  @override
+  Future<int> sweepOrphanAttachments(List<String> conversationIds) =>
+      bridge.sweepOrphanAttachments(conversationIds);
+
+  @override
   Future<String> startTurn({
     required String threadId,
     required String message,
@@ -173,6 +186,8 @@ class PemChatRepository implements ChatRepository {
           'contextPlanVersion': message.contextPlanVersion,
           'attachmentPaths': message.attachmentPaths,
           'contextTelemetry': message.contextTelemetry,
+          'provenance': message.provenance,
+          'intent': message.intent,
           'content': message.content.map(_encodeBlock).toList(growable: false),
         }),
       ),
@@ -244,6 +259,11 @@ class PemChatRepository implements ChatRepository {
             (data['contextTelemetry'] as Map<String, dynamic>?)
                 ?.cast<String, Object?>() ??
             const {},
+        provenance:
+            (data['provenance'] as Map<String, dynamic>?)
+                ?.cast<String, Object?>() ??
+            const {},
+        intent: data['intent']?.toString(),
         content: (data['content'] as List<dynamic>)
             .cast<Map<String, dynamic>>()
             .map(ContentBlock.fromJson)
@@ -294,12 +314,30 @@ class PemChatRepository implements ChatRepository {
       'kind': kind,
       'content': content,
     },
-    ImageBlock(:final url, :final dataBase64, :final mime) => {
-      'type': 'image',
-      'url': url,
-      'dataBase64': dataBase64,
-      'mime': mime,
-    },
+    // path/alt/width/height MUST be persisted. Dropping them made an attached
+    // image render correctly in-session and come back as "Image unavailable"
+    // after a restart: the durable path was written to disk, then thrown away
+    // on save, so the rehydrated block had no carrier at all. Caught on device
+    // — the transcript survived a cache purge, but the image did not.
+    ImageBlock(
+      :final url,
+      :final dataBase64,
+      :final mime,
+      :final path,
+      :final alt,
+      :final width,
+      :final height,
+    ) =>
+      {
+        'type': 'image',
+        'url': url,
+        'dataBase64': dataBase64,
+        'mime': mime,
+        'path': path,
+        'alt': alt,
+        'width': width,
+        'height': height,
+      },
     DividerBlock() => {'type': 'divider'},
   };
 }

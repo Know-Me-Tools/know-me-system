@@ -5,6 +5,7 @@ import { subscribeWithSelector } from 'zustand/middleware'
 import { isTauri } from '@tauri-apps/api/core'
 import {
   cancelAgentRun,
+  chatApproveToolConfirmation,
   memoryDeleteConversationContext,
   memoryDeleteMessageContext,
   onChatEvent,
@@ -12,9 +13,9 @@ import {
   streamAgentA2ui,
 } from '@prometheus-ags/tauri-plugin-gen-ui'
 import type { InferenceHistoryMessage } from '@prometheus-ags/tauri-plugin-gen-ui'
-import type { ContentBlock, Message, MessageUsage } from '@/bridge/a2ui/types'
+import type { ContentBlock, Message, MessageIntent, MessageUsage } from '@/bridge/a2ui/types'
 import { applyA2uiEvent, createA2uiWireAdapter, type A2uiWireEvent, type RunLifecycleUpdate } from '@/bridge/a2ui/driver'
-import { streamWebLlm } from '../api/webllmLane'
+import { interruptWebLlm, streamWebLlm } from '../api/webllmLane'
 import { cancelHostedChat, streamHostedA2uiAction, streamHostedChat } from '../api/hostedLane'
 import { useLaneStore } from './laneStore'
 import {
@@ -29,6 +30,27 @@ import {
 } from '@/features/entities/stores/entityRuntime'
 
 const CHAT_TENANT_ID = 'knowme-poc-local'
+
+/** Prefixed to a steer so the model treats the stopped turn as work to build on.
+ *
+ *  Worded for the model, but it stays visible in the transcript, so it also has
+ *  to read sensibly to the user who sent it.
+ *
+ *  Kept textually identical to mobile's `_steerPreamble`
+ *  (mobile/lib/features/chat/presentation/providers/chat_notifier.dart). Both
+ *  copies are deliberate: a shared constant would have to travel through the Rust
+ *  bridge, and a duplicated string with a comment naming its twin is easier to
+ *  keep honest than that. If you change one, change the other. */
+const STEER_PREAMBLE =
+  'I stopped your previous response part-way through. Keep the work you had '
+  + 'already done in mind, then follow this correction instead of continuing '
+  + 'the direction you were heading:'
+
+/** Sent verbatim when the user resumes a stopped turn. Mirrors mobile's
+ *  `_resumeInstruction`. */
+const RESUME_INSTRUCTION =
+  'Continue your previous response from where you stopped. Do not start over '
+  + 'or repeat what you already wrote.'
 
 export interface Conversation {
   id: string
@@ -73,8 +95,14 @@ function persistActiveConversation(): void {
       run_status: message.runStatus ?? null,
       run_phase: message.runPhase ?? null,
       status_message: message.statusMessage ?? null,
+      intent: message.intent ?? null,
       error: message.error ?? null,
-      attachments: [],
+      // Was hardcoded `[]`, so the column was write-only and every attachment
+      // vanished on reload while the transcript still showed its chips.
+      attachments: message.attachmentPaths ?? [],
+      // Rendered on every assistant bubble but never stored, so it disappeared
+      // on reload while Flutter kept showing it on historical turns.
+      provenance: message.provenance ?? null,
       generation_settings: message.generationSettings ?? null,
       diagnostics: message.diagnostics ?? null,
       context_plan_version: message.contextPlanVersion ?? null,
@@ -115,10 +143,15 @@ async function streamLocalWeb(text: string, assistantId: string, history: Infere
   const store = useChatStore.getState()
   const startedAt = performance.now()
   let tokens = 0
+  // This lane has no Rust-issued run id, so the assistant message id doubles as
+  // one. Without it `cancelActiveRun` returns early and a Stop tap does nothing.
+  useChatStore.setState({ activeRunId: assistantId })
   try {
     for await (const event of streamWebLlm(text, assistantId, turns)) {
       if (event.type === 'contentBlock') tokens += 1
-      applyA2uiEvent(event, store.streamBlock, store.finalizeMessage)
+      // `updateLifecycle` was omitted here, so the lane could never report a
+      // cancel — the event was accepted and dropped on the floor.
+      applyA2uiEvent(event, store.streamBlock, store.finalizeMessage, store.updateLifecycle)
     }
     useLaneStore.getState().recordThroughput(tokens, (performance.now() - startedAt) / 1000)
   } catch (e: unknown) {
@@ -163,12 +196,82 @@ function inferenceHistory(messages: Message[], branchId: string): InferenceHisto
   return history
 }
 
+/** One file the user attached, as the composer adapter resolved it. */
+export interface AttachmentInput {
+  /** Durable path in app-owned storage. Rust reads the file from here, and the
+   *  transcript can keep it — unlike a picker path, which is purgeable. */
+  path: string
+  name: string
+  /** Size in bytes; formatted for display when the block is rendered. */
+  size: number
+  mime: string
+  /** Classification decided by Rust, not re-derived from the mime string here.
+   *  Optional so the web build, which has no Rust, can omit them. */
+  isImage?: boolean
+  isVideo?: boolean
+  /** Intrinsic pixel dimensions, so the renderer reserves space before decode. */
+  width?: number
+  height?: number
+}
+
+/** Human-readable size, matching Flutter's `_formatBytes` exactly. */
+export function formatBytes(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${bytes} B`
+}
+
+/** The transcript record of an attachment — same shape Flutter emits, so a
+ *  conversation started on either surface renders on both.
+ *
+ *  Images become a real `image` block carrying the durable path. This used to
+ *  hardcode `kind: 'attachment'` for every file regardless of mime, which is
+ *  why a picked PNG rendered as a grey document chip: `ContentBlock.Image` was
+ *  defined in Rust and decoded by both UIs, but nothing ever constructed one.
+ *
+ *  The classification comes from Rust (`isImage`/`isVideo`) and falls back to
+ *  the mime prefix only on the web build, where there is no Rust to ask. */
+export function attachmentBlock(attachment: AttachmentInput): ContentBlock {
+  const isImage = attachment.isImage ?? attachment.mime.startsWith('image/')
+  const isVideo = attachment.isVideo ?? attachment.mime.startsWith('video/')
+
+  if (isImage) {
+    return {
+      type: 'image',
+      url: null,
+      dataBase64: null,
+      mime: attachment.mime,
+      path: attachment.path,
+      // Mandatory: a missing accessible name fails the a11y gate, and the file
+      // name is the only description available at attach time.
+      alt: attachment.name,
+      width: attachment.width,
+      height: attachment.height,
+    }
+  }
+
+  return {
+    type: 'artifact',
+    id: attachment.path,
+    kind: isVideo ? 'video' : 'attachment',
+    content: JSON.stringify({
+      name: attachment.name,
+      size: formatBytes(attachment.size),
+      mime: attachment.mime,
+      path: attachment.path,
+    }),
+  }
+}
+
 async function runInferenceTurn(
   text: string,
   assistantId: string,
   branchId: string,
   history: InferenceHistoryMessage[],
   conversationId: string,
+  /** Files to send with this turn, and the user message they belong to. Rust
+   *  reads the paths and correlates the extracted content to that message. */
+  attachments?: { paths: string[]; userMessageId: string },
 ): Promise<void> {
   const store = useChatStore.getState()
   let lane = useLaneStore.getState().lane
@@ -227,7 +330,14 @@ async function runInferenceTurn(
   }
 
   wireAdapter.bind(assistantId)
-  await streamAgentA2ui(text, history, conversationId, branchId).catch((error: unknown) => {
+  await streamAgentA2ui(
+    text,
+    history,
+    conversationId,
+    branchId,
+    attachments?.paths,
+    attachments?.userMessageId,
+  ).catch((error: unknown) => {
     console.error(error)
     store.updateLifecycle({ type: 'error', messageId: assistantId, runId: assistantId,
       error: { code: 'run_start_failed', phase: 'queued', message: error instanceof Error ? error.message : 'Chat failed to start', retryable: true } })
@@ -242,11 +352,30 @@ interface ChatState {
   isStreaming: boolean
   activeRunId: string | null
   isHydrated: boolean
+  /** Set when the user taps Steer, cleared once that send goes out.
+   *
+   *  Steer only ARMS the composer — it does not send. The intent has to survive
+   *  until the user finishes typing the correction, otherwise it goes out as an
+   *  anonymous new question and the model has no reason to treat the stopped
+   *  turn as work to build on. A Steer that fired immediately would just be a
+   *  Resume with extra words. */
+  pendingSteer: boolean
 }
 
 interface ChatActions {
-  sendMessage: (text: string) => Promise<void>
+  sendMessage: (
+    text: string,
+    options?: { intent?: MessageIntent; attachments?: AttachmentInput[] },
+  ) => Promise<void>
+  /** Course-correct after a stop, keeping the partial work in play. */
+  sendSteer: (text: string) => Promise<void>
+  /** Carry on from where a stop landed. */
+  sendResume: () => Promise<void>
+  armSteer: () => void
+  disarmSteer: () => void
   submitInteraction: (interaction: unknown) => Promise<void>
+  /** Run a tool call the local model proposed and KnowMe refused to auto-run. */
+  approveToolConfirmation: (sourceMessageId: string, approvalId: string) => Promise<void>
   resubmitMessage: (userMessageId: string) => Promise<void>
   deleteResponse: (assistantMessageId: string) => Promise<void>
   regenerateResponse: (assistantMessageId: string) => Promise<void>
@@ -262,6 +391,33 @@ interface ChatActions {
   cancelActiveRun: () => Promise<void>
 }
 
+/**
+ * Decide whether a refused cancel is worth reporting.
+ *
+ * Rust returns `false` when the run is no longer registered — the NORMAL outcome
+ * of a second stop tap, or of the run finishing in the gap before the call
+ * landed. Treating that as an error would overwrite a legitimate stopped turn
+ * with a failure bubble and hide the work the user just chose to keep. So only
+ * surface an error when the turn is somehow STILL streaming; otherwise it has
+ * already reached a terminal state. Mirrors chat_notifier.dart:544-564.
+ */
+function settleCancel(
+  get: () => ChatState & ChatActions,
+  messageId: string | undefined,
+  accepted: boolean,
+): void {
+  if (accepted || !messageId) return
+  const current = get().messages.find((item) => item.id === messageId)
+  if (!current?.isStreaming) return
+  get().updateLifecycle({
+    type: 'error', messageId, runId: current.runId ?? messageId,
+    error: {
+      code: 'run_not_active', phase: 'generation', retryable: false,
+      message: 'This run already ended and could not be cancelled.',
+    },
+  })
+}
+
 export const useChatStore = create<ChatState & ChatActions>()(
   subscribeWithSelector(
     immer((set, get) => ({
@@ -271,6 +427,7 @@ export const useChatStore = create<ChatState & ChatActions>()(
       isStreaming: false,
       activeRunId: null,
       isHydrated: false,
+      pendingSteer: false,
 
       streamBlock: ({ messageId, blockIndex, block }) => {
         set((s) => {
@@ -318,9 +475,25 @@ export const useChatStore = create<ChatState & ChatActions>()(
             msg.runStatus = update.status
             msg.statusMessage = update.message
           } else if (update.type === 'telemetry') {
-            msg.contextTelemetry = update.payload
-            msg.contextPlanVersion = typeof update.payload === 'object' && update.payload !== null && 'planVersion' in update.payload
-              ? String((update.payload as { planVersion?: unknown }).planVersion ?? '') : msg.contextPlanVersion
+            const payload = update.payload
+            const asObject = typeof payload === 'object' && payload !== null
+              ? (payload as Record<string, unknown>) : undefined
+            // Provenance rides the telemetry channel under a `provenance` key.
+            // Capture it; a provenance-only event must not clobber real telemetry.
+            const provenance = asObject?.provenance
+            if (provenance && typeof provenance === 'object') {
+              const p = provenance as Record<string, unknown>
+              msg.provenance = {
+                agentId: typeof p.agentId === 'string' ? p.agentId : undefined,
+                providerId: typeof p.providerId === 'string' ? p.providerId : undefined,
+                modelId: typeof p.modelId === 'string' ? p.modelId : undefined,
+              }
+            }
+            if (asObject?.kind !== 'provenance') {
+              msg.contextTelemetry = payload
+              msg.contextPlanVersion = asObject && 'planVersion' in asObject
+                ? String(asObject.planVersion ?? '') : msg.contextPlanVersion
+            }
           } else if (update.type === 'error') {
             msg.error = update.error
             msg.runPhase = update.error.phase
@@ -342,13 +515,33 @@ export const useChatStore = create<ChatState & ChatActions>()(
         persistActiveConversation()
       },
 
-      sendMessage: async (text: string) => {
+      sendMessage: async (
+        text: string,
+        options?: { intent?: MessageIntent; attachments?: AttachmentInput[] },
+      ) => {
         const branchId = get().messages.at(-1)?.branchId ?? get().activeConversationId
-        const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: [{ type: 'text', text }], timestamp: new Date().toISOString(), branchId }
+        const attachments = options?.attachments ?? []
+        // Attachment blocks lead the content, as on Flutter: they are the
+        // transcript record of what was sent, while the paths below are the
+        // inference payload Rust reads.
+        const userMsg: Message = {
+          id: crypto.randomUUID(),
+          role: 'user',
+          content: [...attachments.map(attachmentBlock), { type: 'text' as const, text }],
+          timestamp: new Date().toISOString(), branchId,
+          ...(attachments.length > 0
+            ? { attachmentPaths: attachments.map((attachment) => attachment.path) }
+            : {}),
+          ...(options?.intent ? { intent: options.intent } : {}),
+        }
         const assistantId = crypto.randomUUID()
         const assistantMsg: Message = {
           id: assistantId, role: 'assistant', content: [], timestamp: new Date().toISOString(),
           isStreaming: true, parentMessageId: userMsg.id, branchId, runStatus: 'queued',
+          // Seeded, not left blank: `statusMessage` is what the pending bubble
+          // renders, so without it React showed a bare dot where Flutter says
+          // "Queued" and then "Preparing response".
+          runPhase: 'queued', statusMessage: 'Queued',
         }
         set((s) => {
           s.messages.push(userMsg, assistantMsg)
@@ -366,7 +559,99 @@ export const useChatStore = create<ChatState & ChatActions>()(
         // including the new user row here would submit the prompt twice.
         const history = inferenceHistory(get().messages.slice(0, -2), branchId)
 
-        await runInferenceTurn(text, assistantId, branchId, history, get().activeConversationId)
+        await runInferenceTurn(
+          text, assistantId, branchId, history, get().activeConversationId,
+          attachments.length > 0
+            ? { paths: attachments.map((attachment) => attachment.path), userMessageId: userMsg.id }
+            : undefined,
+        )
+      },
+
+      /** Course-correct after a stop, keeping the partial work in play.
+       *
+       *  The user stopped *because* they were steering — they read the partial
+       *  answer or a tool call and want a different direction. The preamble says
+       *  that plainly, so the stopped turn reads to the model as work-in-progress
+       *  to build on rather than a failed attempt to ignore.
+       *
+       *  The tag travels in the CONTENT because that is the only carrier every
+       *  lane forwards verbatim — see `Message.intent` for why a typed field and
+       *  a new role string both fail silently. */
+      sendSteer: async (text: string) => {
+        await get().sendMessage(`${STEER_PREAMBLE}\n\n${text}`, { intent: 'steer' })
+      },
+
+      /** Carry on from where a stop landed.
+       *
+       *  For the user who stopped and changed their mind. No backend change is
+       *  needed: `inferenceHistory` filters only on `branchId` and non-empty text
+       *  — there is no `runStatus` filter — and the cancelled branch of
+       *  `updateLifecycle` never clears `content`, so the partial assistant turn
+       *  is already replayed and the model sees
+       *  `[… assistant(partial), user(continue)]`.
+       *
+       *  The instruction stays visible in the transcript rather than hidden, so
+       *  the conversation remains honest about what was actually sent. */
+      sendResume: async () => {
+        await get().sendMessage(RESUME_INSTRUCTION, { intent: 'resume' })
+      },
+
+      armSteer: () => set((s) => { s.pendingSteer = true }),
+      disarmSteer: () => set((s) => { s.pendingSteer = false }),
+
+      approveToolConfirmation: async (sourceMessageId: string, approvalId: string) => {
+        if (!approvalId) return
+        const source = get().messages.find((item) => item.id === sourceMessageId)
+        // Only a settled assistant turn can be approved: approving mid-stream
+        // would race the run that is still producing the card.
+        if (!source || source.role !== 'assistant' || source.isStreaming) return
+
+        const branchId = source.branchId ?? get().activeConversationId
+        const assistantId = crypto.randomUUID()
+        const assistantMsg: Message = {
+          id: assistantId,
+          role: 'assistant',
+          content: [],
+          timestamp: new Date().toISOString(),
+          isStreaming: true,
+          parentMessageId: source.id,
+          branchId,
+          runStatus: 'queued',
+          runPhase: 'tool_execution',
+          statusMessage: 'Approving tool call',
+        }
+        set((s) => {
+          s.messages.push(assistantMsg)
+          s.isStreaming = true
+          const conversation = s.conversations.find((item) => item.id === s.activeConversationId)
+          if (conversation) { conversation.messages = s.messages; conversation.updatedAt = new Date().toISOString() }
+        })
+        persistActiveConversation()
+
+        if (!isTauri()) {
+          // Approvals live in the Rust process registry; the browser lane has
+          // no engine proposing local tool calls in the first place.
+          get().updateLifecycle({ type: 'error', messageId: assistantId, runId: assistantId, error: {
+            code: 'tool_approval_unavailable', phase: 'tool_execution',
+            message: 'Tool approval requires the desktop app.', retryable: false,
+          } })
+          return
+        }
+
+        wireAdapter.bind(assistantId)
+        try {
+          await chatApproveToolConfirmation(approvalId)
+        } catch (error) {
+          get().updateLifecycle({ type: 'error', messageId: assistantId, runId: assistantId, error: {
+            code: 'tool_approval_start_failed', phase: 'tool_execution',
+            // Approvals are process-local: a card restored after a restart has
+            // no pending registration behind it, and this is where the user
+            // finds that out rather than watching a bubble spin.
+            message: error instanceof Error ? error.message : 'The tool approval could not be started.',
+            retryable: false,
+          } })
+        }
+        persistActiveConversation()
       },
 
       submitInteraction: async (interaction: unknown) => {
@@ -376,6 +661,23 @@ export const useChatStore = create<ChatState & ChatActions>()(
           ? (interaction as Record<string, unknown>).sourceRunId as string
           : parent?.runId
         const branchId = parent?.branchId ?? get().activeConversationId
+        // Record what the user actually did. Without this the transcript jumped
+        // straight from the artifact to a spinner — a reply to nothing — and
+        // the interaction never entered history, so the next turn's model could
+        // not see the choice that produced it. Flutter has always recorded it
+        // (chat_notifier.dart submitInteraction).
+        const userMsg: Message = {
+          id: crypto.randomUUID(),
+          role: 'user',
+          content: [{
+            type: 'artifact',
+            id: crypto.randomUUID(),
+            kind: 'client_interaction',
+            content: JSON.stringify(interaction),
+          }],
+          timestamp: new Date().toISOString(),
+          branchId,
+        }
         const assistantId = crypto.randomUUID()
         const assistantMsg: Message = {
           id: assistantId,
@@ -383,13 +685,16 @@ export const useChatStore = create<ChatState & ChatActions>()(
           content: [],
           timestamp: new Date().toISOString(),
           isStreaming: true,
-          parentMessageId: parent?.id,
+          parentMessageId: userMsg.id,
           branchId,
           runStatus: 'queued',
+          runPhase: 'queued',
+          statusMessage: 'Queued',
         }
-        const history = inferenceHistory(get().messages, branchId)
+        // History is taken AFTER the user turn exists, so the interaction is in it.
+        const history = inferenceHistory([...get().messages, userMsg], branchId)
         set((s) => {
-          s.messages.push(assistantMsg)
+          s.messages.push(userMsg, assistantMsg)
           s.isStreaming = true
           const conversation = s.conversations.find((item) => item.id === s.activeConversationId)
           if (conversation) { conversation.messages = s.messages; conversation.updatedAt = new Date().toISOString() }
@@ -582,11 +887,20 @@ export const useChatStore = create<ChatState & ChatActions>()(
             runStatus: message.run_status as Message['runStatus'],
             runPhase: message.run_phase ?? undefined,
             statusMessage: message.status_message ?? undefined,
+            intent: (message.intent ?? undefined) as Message['intent'],
             error: message.error as Message['error'],
             generationSettings: message.generation_settings as Message['generationSettings'],
             diagnostics: message.diagnostics as Message['diagnostics'],
             contextPlanVersion: message.context_plan_version ?? undefined,
             contextTelemetry: message.context_telemetry,
+            // Read back so a resubmit re-sends the same files rather than
+            // silently dropping them.
+            ...(Array.isArray(message.attachments) && message.attachments.length > 0
+              ? { attachmentPaths: message.attachments as string[] }
+              : {}),
+            ...(message.provenance
+              ? { provenance: message.provenance as Message['provenance'] }
+              : {}),
           })) : row.messages as Message[]
           return {
             id: row.id, title: row.title, messages,
@@ -619,6 +933,10 @@ export const useChatStore = create<ChatState & ChatActions>()(
         if (!conversation || s.isStreaming) return
         s.activeConversationId = id
         s.messages = conversation.messages
+        // An armed steer belongs to the turn it was armed from. Carrying it into
+        // another conversation would silently prefix the next message there with
+        // a correction preamble about a stop that never happened.
+        s.pendingSteer = false
       }),
 
       renameConversation: (id, title) => {
@@ -650,8 +968,34 @@ export const useChatStore = create<ChatState & ChatActions>()(
           type: 'phase', messageId: message.id, runId,
           phase: message.runPhase ?? 'generation', status: 'preparing', message: 'Cancelling',
         })
-        if (isTauri()) await cancelAgentRun(runId)
-        else await cancelHostedChat(get().activeConversationId)
+        // Mirror `runInferenceTurn`'s THREE-way lane split. This branched only on
+        // isTauri(), so a Stop during a browser-local WebLLM run POSTed to the
+        // remote UAR service for a run it had never heard of — while tokens kept
+        // streaming and the UI showed "Cancelling", so it looked like it worked.
+        // Every branch's outcome is checked. Previously the return value and any
+        // rejection were both discarded, so a refused or failed cancel left the
+        // turn showing "Cancelling" forever with no way out.
+        try {
+          if (isTauri()) {
+            const accepted = await cancelAgentRun(runId)
+            settleCancel(get, message?.id, accepted)
+            return
+          }
+          if (useLaneStore.getState().lane === 'local') {
+            await interruptWebLlm()
+            return
+          }
+          await cancelHostedChat(get().activeConversationId)
+        } catch (error: unknown) {
+          if (!message) return
+          get().updateLifecycle({
+            type: 'error', messageId: message.id, runId,
+            error: {
+              code: 'run_cancel_failed', phase: 'generation', retryable: true,
+              message: error instanceof Error ? error.message : 'Cancelling this run failed.',
+            },
+          })
+        }
       },
 
       initListeners: () => {

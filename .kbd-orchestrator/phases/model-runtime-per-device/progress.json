@@ -12,22 +12,22 @@
   "implementation_total": 5,
   "implementation_completed": 4,
   "changes_total": 5,
-  "changes_completed": 4,
+  "changes_completed": 5,
   "completion": {
     "primaryCounter": "implementation",
     "implementation": {
-      "completed": 4,
+      "completed": 5,
       "total": 5,
-      "status": "IN_PROGRESS"
+      "status": "COMPLETE"
     },
     "evidence": {
-      "status": "NOT_TRACKED",
-      "summary": null,
+      "status": "COMPLETE",
+      "summary": "Android SM-S936U: backend/throughput/fallback, cancellation, four stopped-turn intents, multi-turn, permitted tool call, and durable media surviving a real cache eviction. iOS iPhone 17 Pro Max: release build installed and launched, media save + share operator-verified. Desktop: release bundle built with the asset protocol and CSP compiled in.",
       "blockers": []
     },
     "certification": {
-      "status": "NOT_TRACKED",
-      "summary": null,
+      "status": "COMPLETE",
+      "summary": "docs/certification/2026-07-27/ — five reports across Android, iOS and desktop.",
       "blockers": []
     },
     "publication": {
@@ -39,14 +39,64 @@
   "completed_changes": [
     "android-litertlm-runtime",
     "litertlm-native-adapter",
-    "litertlm-device-proof",
-    "document-uar-karpathy-knowledge-strategy"
+    "document-uar-karpathy-knowledge-strategy",
+    "litertlm-local-tools"
   ],
-  "active_change": "litertlm-local-tools",
+  "active_change": "litertlm-device-proof",
   "blocked_changes": [],
   "sourceTool": "codex",
-  "last_updated_by": "codex",
-  "last_updated": "2026-07-19T08:17:00-05:00",
+  "last_updated_by": "claude-code",
+  "last_updated": "2026-07-25T19:15:00-05:00",
   "createdBy": "kbd-new-phase",
-  "updatedAt": "2026-07-20T20:09:55Z"
+  "updatedAt": "2026-07-20T20:09:55Z",
+  "status_corrections": [
+    {
+      "change": "android-litertlm-runtime",
+      "was": "completed",
+      "now": "completed",
+      "note": "Kept complete, but it was NOT actually working when first marked: release builds failed at ClassNotFoundException tools.knowme.knowme.KnowMeLiteRtLmBridge because R8 shrank the JNI-only bridge class. Fixed 2026-07-25 (commit 7330389: proguard keep rules + proguardFiles on the release buildType) and certified on Samsung SM-S936U."
+    },
+    {
+      "change": "litertlm-device-proof",
+      "was": "completed",
+      "now": "not_completed",
+      "note": "Reverted to incomplete. It claimed device certification of the Android path, but that path crashed at bridge load in release builds until 2026-07-25, so the claimed evidence could not have been obtained. Needs a genuine re-run: load time, throughput, backend, memory, thermal, cancellation, Markdown/Mermaid, attachment flow, and a permitted tool call."
+    },
+    {
+      "change": "litertlm-local-tools",
+      "was": "active",
+      "now": "completed",
+      "note": "Certified on Samsung SM-S936U 2026-07-25: shortlisted declarations -> model tool call (knowme_diagnostics__local_runtime_status) -> gate validation -> MCP execution -> continuation -> 393-char answer, tool_result_fallback_applied did not fire. Bounded trusted-first shortlist landed in commit e07002b."
+    }
+  ],
+  "assessment_addenda": [
+    {
+      "date": "2026-07-27",
+      "topic": "media rendering + download/share across four surfaces"
+    }
+  ],
+  "plan_addenda": [
+    {
+      "date": "2026-07-27",
+      "change": "chat-media-rendering",
+      "sub_changes": 8,
+      "note": "Media rendering/download/share appended to plan.md; OpenSpec change emitted. Baseline 5-change list untouched."
+    }
+  ],
+  "reconciliation_2026_07_27": {
+    "why": "The counter was a bare integer with no per-change list, and the plan's four LiteRT change IDs were never created as OpenSpec directories — the work shipped under qwen35-* names. Reconciled against task files and certification evidence, not from memory.",
+    "changes": {
+      "qwen35-model-runtime": "ARCHIVED 2026-07-18",
+      "document-uar-karpathy-knowledge-strategy": "ARCHIVED 2026-07-19",
+      "qwen35-local-tools": "6/6 — device-certified 2026-07-27",
+      "qwen35-device-proof": "5/5 — Android + iOS deployed and certified",
+      "chat-media-rendering": "37/37 — the media defect, closed on hardware"
+    },
+    "deferred": {
+      "qwen35-mobile-vision": "Image RECOGNITION deferred to a future phase by operator decision 2026-07-27. Not achievable as written regardless: Android's Gemma 4 E2B lane is text-only by design (chat.rs:292). Image RENDERING — a separate concern — is complete and certified in this phase."
+    },
+    "notInThisPhase": {
+      "embed-uar-mobile-offline": "14 open tasks; belongs to embedded-uar-offline-agents."
+    }
+  }
 }

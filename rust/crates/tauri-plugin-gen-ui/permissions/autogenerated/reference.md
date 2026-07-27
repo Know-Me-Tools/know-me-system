@@ -5,9 +5,13 @@ Default gen-ui permissions: startup/read/chat intents. Mutating ENTITY commands 
 #### This default permission set includes the following:
 
 - `allow-stream-agent-a2ui`
+- `allow-chat-approve-tool-confirmation`
+- `allow-stage-attachment`
+- `allow-resolve-remote-content`
 - `allow-send-agent-interaction-a2ui`
 - `allow-get-active-lane`
 - `allow-set-active-lane`
+- `allow-lane-availability`
 - `allow-has-local-engine`
 - `allow-cancel-agent-run`
 - `allow-prepare-local-model`
@@ -111,6 +115,32 @@ Enables the cancel_model_operation command without any pre-configured scope.
 <td>
 
 Denies the cancel_model_operation command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:allow-chat-approve-tool-confirmation`
+
+</td>
+<td>
+
+Enables the chat_approve_tool_confirmation command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-chat-approve-tool-confirmation`
+
+</td>
+<td>
+
+Denies the chat_approve_tool_confirmation command without any pre-configured scope.
 
 </td>
 </tr>
@@ -560,6 +590,32 @@ Denies the has_local_engine command without any pre-configured scope.
 <tr>
 <td>
 
+`gen-ui:allow-lane-availability`
+
+</td>
+<td>
+
+Enables the lane_availability command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-lane-availability`
+
+</td>
+<td>
+
+Denies the lane_availability command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `gen-ui:allow-load-seeds`
 
 </td>
@@ -950,6 +1006,32 @@ Denies the provider_test command without any pre-configured scope.
 <tr>
 <td>
 
+`gen-ui:allow-resolve-remote-content`
+
+</td>
+<td>
+
+Enables the resolve_remote_content command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-resolve-remote-content`
+
+</td>
+<td>
+
+Denies the resolve_remote_content command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `gen-ui:allow-run-migrations`
 
 </td>
@@ -1073,6 +1155,32 @@ Enables the set_active_lane command without any pre-configured scope.
 <td>
 
 Denies the set_active_lane command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:allow-stage-attachment`
+
+</td>
+<td>
+
+Enables the stage_attachment command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`gen-ui:deny-stage-attachment`
+
+</td>
+<td>
+
+Denies the stage_attachment command without any pre-configured scope.
 
 </td>
 </tr>

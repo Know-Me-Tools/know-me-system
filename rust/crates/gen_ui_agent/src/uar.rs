@@ -15,14 +15,30 @@ use gen_ui_types::events::A2uiEvent;
 use gen_ui_types::events::StreamEvent;
 use gen_ui_types::inference::{InferenceProvider, LocalModelSpec};
 use serde::{Deserialize, Serialize};
-use std::{collections::VecDeque, sync::Arc};
+use std::{
+    collections::{HashMap, VecDeque},
+    sync::Arc,
+};
 pub use universal_agent_runtime::llm::ProviderConfig as UarProviderConfig;
 use universal_agent_runtime::{
-    llm::{registry::ModelConfig, registry::ProtocolSetting, LlmDriver, LlmRequest},
+    config::{build_client_config, LlmConfig},
+    llm::{
+        registry::ModelConfig, registry::ProtocolSetting, LiterLlmDriver, LlmDriver, LlmRequest,
+    },
     normalized::{Citation as UarCitation, NormalizedEvent as UarNormalizedEvent},
 };
 
 use crate::error::AgentError;
+
+/// The well-known provider id under which the on-device local model is presented
+/// in the unified provider picker. Selecting this id routes the embedded UAR run
+/// to the on-device inference bridge instead of a cloud provider.
+pub const LOCAL_PROVIDER_ID: &str = "on-device";
+
+/// Config-store setting holding the id of the provider the embedded UAR should
+/// route to (either [`LOCAL_PROVIDER_ID`] or a configured cloud provider id).
+/// Unset ⇒ the on-device local model (offline-capable first-run default).
+pub const SETTING_UAR_ACTIVE_PROVIDER: &str = "uar_active_provider";
 
 /// How this platform should access UAR.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -79,6 +95,24 @@ pub struct UarRunRequest {
     pub session_id: Option<String>,
     pub agent_id: Option<String>,
     pub run_policy: Option<serde_json::Value>,
+    /// Prior conversation turns from the host's durable store, used to seed an
+    /// empty embedded session after a cold start so the UAR lane presents the
+    /// full thread to the model rather than only the current message.
+    #[serde(default)]
+    pub history: Vec<UarSeedMessage>,
+}
+
+/// A prior conversation turn supplied to seed the embedded session.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct UarSeedMessage {
+    /// `"user"`, `"assistant"`, `"tool"`, or `"system"`.
+    pub role: String,
+    /// The message text.
+    pub content: String,
+    /// The tool-call id when `role == "tool"`.
+    #[serde(default)]
+    pub tool_call_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -280,6 +314,203 @@ impl LlmDriver for UarLocalInferenceDriverBridge {
             },
         )
         .boxed())
+    }
+}
+
+/// The resolved model backend a single embedded-UAR run should execute against.
+///
+/// Produced by an [`ActiveModelSelector`] at `stream()` time and consumed by the
+/// [`UarRoutingDriver`] to dispatch either to the on-device inference bridge or a
+/// cloud `LiterLlmDriver`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ActiveRoute {
+    /// Route to the on-device local model (the wrapped inference bridge).
+    Local,
+    /// Route to a configured cloud provider/model over liter-llm.
+    Cloud {
+        /// Configured provider id (e.g. `"openai"`), used for cache keying and
+        /// the liter-llm `provider/model` address.
+        provider_id: String,
+        /// Model id within the provider (e.g. `"gpt-4o"`).
+        model_id: String,
+        /// Optional base-URL override; `None` uses liter-llm auto-detection.
+        base_url: Option<String>,
+        /// Resolved API key for the provider.
+        api_key: String,
+    },
+}
+
+/// Resolves the currently-selected model backend for the embedded UAR. Kept as a
+/// trait so the [`UarRoutingDriver`] is unit-testable with a scripted selector.
+#[async_trait::async_trait]
+pub trait ActiveModelSelector: Send + Sync {
+    /// The route the next run should execute against.
+    async fn active(&self) -> Result<ActiveRoute, AgentError>;
+}
+
+/// [`ActiveModelSelector`] backed by the KnowMe config store. Reads the selected
+/// provider id from [`SETTING_UAR_ACTIVE_PROVIDER`]; the on-device local id (or an
+/// unset/dangling selection) resolves to [`ActiveRoute::Local`], any other id to
+/// the matching configured cloud provider + its selected model.
+pub struct ConfigActiveSelector;
+
+#[async_trait::async_trait]
+impl ActiveModelSelector for ConfigActiveSelector {
+    async fn active(&self) -> Result<ActiveRoute, AgentError> {
+        // Never fail the run because selection couldn't be read. Any error
+        // (config store not initialized, transient read failure) degrades to the
+        // on-device model, which is always available. `resolve()` holds the real
+        // logic; this wrapper enforces the Local fallback.
+        Ok(self.resolve().await.unwrap_or(ActiveRoute::Local))
+    }
+}
+
+impl ConfigActiveSelector {
+    async fn resolve(&self) -> Result<ActiveRoute, AgentError> {
+        let config = crate::state::config()?;
+        let selected = config
+            .get_setting(SETTING_UAR_ACTIVE_PROVIDER)
+            .await?
+            .and_then(|value| value.as_str().map(str::to_owned));
+
+        // Unset or the local id ⇒ on-device. This keeps first-run offline-capable
+        // with no keys configured.
+        let provider_id = match selected {
+            Some(id) if id != LOCAL_PROVIDER_ID => id,
+            _ => return Ok(ActiveRoute::Local),
+        };
+
+        // A cloud provider is selected: resolve its credentials and model. Any
+        // gap (deleted provider, missing key, no model pref) falls back to Local
+        // rather than failing the run — the picker can never strand the user.
+        let Some(provider) = config.get_provider(&provider_id).await? else {
+            return Ok(ActiveRoute::Local);
+        };
+        if !provider.enabled {
+            return Ok(ActiveRoute::Local);
+        }
+        let Some(api_key) = provider
+            .api_key_ref
+            .as_deref()
+            .map(crate::secrets::resolve_api_key)
+            .transpose()?
+        else {
+            return Ok(ActiveRoute::Local);
+        };
+        let model_id = config
+            .get_model_pref(SURFACE_CHAT, LANE_CLOUD)
+            .await?
+            .map(|pref| pref.model_id)
+            .filter(|model_id| !model_id.is_empty());
+        let Some(model_id) = model_id else {
+            return Ok(ActiveRoute::Local);
+        };
+
+        Ok(ActiveRoute::Cloud {
+            provider_id,
+            model_id,
+            base_url: provider.base_url,
+            api_key,
+        })
+    }
+}
+
+const SURFACE_CHAT: &str = "chat";
+const LANE_CLOUD: &str = "cloud";
+
+/// The single `LlmDriver` the embedded UAR kernel holds for its lifetime, routing
+/// each run to the on-device local model OR a configured cloud provider.
+///
+/// The embedded `RunManager` builds one driver at construction and reuses it for
+/// every run (the per-run `LlmRequest` carries no model string), so backend
+/// selection must happen *inside* the driver: on each `stream()` the selector is
+/// consulted and the call is dispatched to the wrapped local bridge or a cloud
+/// [`LiterLlmDriver`] (built lazily and cached per `(provider_id, model_id)`).
+/// Both emit `UarNormalizedEvent`, so the downstream projection is identical.
+pub struct UarRoutingDriver {
+    local: Arc<UarLocalInferenceDriverBridge>,
+    selector: Arc<dyn ActiveModelSelector>,
+    cloud_cache: tokio::sync::RwLock<HashMap<(String, String), Arc<LiterLlmDriver>>>,
+}
+
+impl UarRoutingDriver {
+    /// Wrap the on-device bridge with a routing layer driven by `selector`.
+    pub fn new(
+        local: Arc<UarLocalInferenceDriverBridge>,
+        selector: Arc<dyn ActiveModelSelector>,
+    ) -> Self {
+        Self {
+            local,
+            selector,
+            cloud_cache: tokio::sync::RwLock::new(HashMap::new()),
+        }
+    }
+
+    /// Drop all cached cloud drivers. Called when provider config changes so a
+    /// re-keyed provider is rebuilt on its next run.
+    pub async fn invalidate_cloud_cache(&self) {
+        self.cloud_cache.write().await.clear();
+    }
+
+    /// Get or build the cloud driver for a `(provider_id, model_id)` selection.
+    /// Reuses UAR's own `LiterLlmDriver` + `build_client_config`, so this is the
+    /// exact cloud path the service UAR uses — with no submodule change.
+    async fn cloud_driver(
+        &self,
+        provider_id: &str,
+        model_id: &str,
+        base_url: Option<String>,
+        api_key: String,
+    ) -> anyhow::Result<Arc<LiterLlmDriver>> {
+        let key = (provider_id.to_owned(), model_id.to_owned());
+        if let Some(driver) = self.cloud_cache.read().await.get(&key) {
+            return Ok(Arc::clone(driver));
+        }
+        let model = format!("{provider_id}/{model_id}");
+        // LlmConfig has no Default derive but every field has a serde default, so
+        // build it from a minimal JSON object and override the three fields we set.
+        let mut llm_config: LlmConfig = serde_json::from_value(serde_json::json!({}))
+            .map_err(|error| anyhow::anyhow!("construct LlmConfig: {error}"))?;
+        llm_config.model = model.clone();
+        llm_config.api_key = Some(api_key);
+        llm_config.base_url = base_url;
+        let client_config = build_client_config(&llm_config);
+        let driver = Arc::new(LiterLlmDriver::new(client_config, model, None)?);
+        self.cloud_cache
+            .write()
+            .await
+            .insert(key, Arc::clone(&driver));
+        Ok(driver)
+    }
+}
+
+#[async_trait::async_trait]
+impl LlmDriver for UarRoutingDriver {
+    async fn stream(
+        &self,
+        request: LlmRequest,
+    ) -> anyhow::Result<
+        std::pin::Pin<Box<dyn futures::Stream<Item = anyhow::Result<UarNormalizedEvent>> + Send>>,
+    > {
+        match self
+            .selector
+            .active()
+            .await
+            .map_err(|error| anyhow::anyhow!("resolve active model: {error}"))?
+        {
+            ActiveRoute::Local => self.local.stream(request).await,
+            ActiveRoute::Cloud {
+                provider_id,
+                model_id,
+                base_url,
+                api_key,
+            } => {
+                let driver = self
+                    .cloud_driver(&provider_id, &model_id, base_url, api_key)
+                    .await?;
+                driver.stream(request).await
+            }
+        }
     }
 }
 
@@ -607,6 +838,10 @@ pub trait UarRuntimeFacade: Send + Sync {
 #[derive(Clone)]
 pub struct UarEmbeddedRuntime {
     runtime: universal_agent_runtime_sdk::Runtime,
+    /// The single routing driver the runtime executes every run through. Retained
+    /// so provider-admin mutations can invalidate its cached cloud drivers when a
+    /// provider is re-keyed or removed (see [`Self::invalidate_routing_cache`]).
+    routing: Arc<UarRoutingDriver>,
 }
 
 impl std::fmt::Debug for UarEmbeddedRuntime {
@@ -628,8 +863,18 @@ impl UarEmbeddedRuntime {
         model_spec: LocalModelSpec,
         provider_config: UarProviderConfig,
     ) -> Result<Self, AgentError> {
-        let driver: Arc<dyn LlmDriver> =
-            Arc::new(UarLocalInferenceDriverBridge::new(provider, model_spec));
+        // Wrap the on-device bridge in the routing driver so a single embedded
+        // run can execute against the local model OR a configured cloud provider,
+        // chosen at stream() time from the persisted active selection. Cloud
+        // providers are additionally registered into the runtime's provider
+        // registry after build (see `register_cloud_providers`) so they list and
+        // resolve for policy/telemetry; execution switching is the driver's job.
+        let local_bridge = Arc::new(UarLocalInferenceDriverBridge::new(provider, model_spec));
+        let routing = Arc::new(UarRoutingDriver::new(
+            local_bridge,
+            Arc::new(ConfigActiveSelector),
+        ));
+        let driver: Arc<dyn LlmDriver> = routing.clone();
         let persistence: Arc<dyn universal_agent_runtime::uar::persistence::PersistenceLayer> =
             Arc::new(
                 universal_agent_runtime::uar::persistence::providers::memory::InMemoryProvider::new(
@@ -642,7 +887,172 @@ impl UarEmbeddedRuntime {
             .build()
             .await
             .map_err(|error| AgentError::Config(format!("embedded UAR: {error}")))?;
-        Ok(Self { runtime })
+        Ok(Self { runtime, routing })
+    }
+
+    /// Register (or replace) a cloud provider in the embedded runtime's provider
+    /// registry so it lists and resolves for policy/telemetry. Execution switching
+    /// between local and cloud remains the routing driver's job; this only keeps
+    /// the registry's view of configured providers in sync with the config store.
+    pub async fn register_cloud_provider(
+        &self,
+        config: UarProviderConfig,
+    ) -> Result<(), AgentError> {
+        self.runtime
+            .provider_registry()
+            .register_custom_provider(config)
+            .await
+            .map_err(|error| AgentError::Config(format!("register cloud provider: {error}")))
+    }
+
+    /// Drop every cached cloud driver held by the routing driver. Call after any
+    /// provider credential/base-URL/selection change so the next run rebuilds the
+    /// driver from the updated config rather than reusing a stale client.
+    pub async fn invalidate_routing_cache(&self) {
+        self.routing.invalidate_cloud_cache().await;
+    }
+
+    // ---- embedded admin surface ----
+    //
+    // Thin JSON facades over the SDK Runtime's in-process settings + agent admin
+    // (added in the embedded-run-policy-and-admin-surface UAR change), so the
+    // KnowMe `control_plane` embedded branch can administer settings and agents
+    // with no HTTP service. Each serializes the typed SDK result to the
+    // `serde_json::Value` shape `control_plane`'s HTTP path already returns.
+
+    /// Read a typed setting (e.g. `run_policy.global`); `None` when unset.
+    pub async fn get_setting(&self, key: &str) -> Result<Option<serde_json::Value>, AgentError> {
+        self.runtime
+            .get_setting(key)
+            .await
+            .map_err(|error| AgentError::Config(format!("get setting {key}: {error}")))
+    }
+
+    /// Write a typed setting value.
+    pub async fn set_setting(&self, key: &str, value: serde_json::Value) -> Result<(), AgentError> {
+        self.runtime
+            .set_setting(key, value)
+            .await
+            .map_err(|error| AgentError::Config(format!("set setting {key}: {error}")))
+    }
+
+    /// Current setting values + registered setting types, as `(values, types)`
+    /// JSON — the shape the admin snapshot exposes.
+    pub async fn settings_snapshot(
+        &self,
+    ) -> Result<(serde_json::Value, serde_json::Value), AgentError> {
+        let snapshot = self
+            .runtime
+            .settings_snapshot()
+            .await
+            .map_err(|error| AgentError::Config(format!("settings snapshot: {error}")))?;
+        let values = serde_json::to_value(&snapshot.values)
+            .map_err(|error| AgentError::Config(format!("serialize settings: {error}")))?;
+        let types = serde_json::to_value(&snapshot.types)
+            .map_err(|error| AgentError::Config(format!("serialize setting types: {error}")))?;
+        Ok((values, types))
+    }
+
+    /// All agent definitions as JSON.
+    pub async fn list_agents(&self) -> Result<serde_json::Value, AgentError> {
+        let agents = self
+            .runtime
+            .list_agents()
+            .await
+            .map_err(|error| AgentError::Config(format!("list agents: {error}")))?;
+        serde_json::to_value(&agents)
+            .map_err(|error| AgentError::Config(format!("serialize agents: {error}")))
+    }
+
+    /// Create or replace an agent from its JSON artifact.
+    pub async fn upsert_agent(&self, agent: &serde_json::Value) -> Result<(), AgentError> {
+        let artifact = serde_json::from_value(agent.clone())
+            .map_err(|error| AgentError::Config(format!("parse agent artifact: {error}")))?;
+        self.runtime
+            .upsert_agent(artifact)
+            .await
+            .map_err(|error| AgentError::Config(format!("upsert agent: {error}")))
+    }
+
+    /// Delete an agent by id.
+    pub async fn delete_agent(&self, id: &str) -> Result<(), AgentError> {
+        self.runtime
+            .delete_agent(id)
+            .await
+            .map_err(|error| AgentError::Config(format!("delete agent {id}: {error}")))
+    }
+
+    /// Load the per-conversation run policy, or `null` when none is saved.
+    ///
+    /// Returns the **bare** `RunPolicy`, not the `ConversationPolicyRecord`
+    /// wrapper that persistence stores it in. The wrapper is a storage detail:
+    /// `save_conversation_policy` below accepts a bare policy, the TypeScript
+    /// binding declares `Promise<RunPolicy | null>`, and Flutter assigns the
+    /// result straight to its policy map. Leaking `{conversation_id, policy,
+    /// updated_at}` here broke all of them — and silently, because every
+    /// `RunPolicy` field is `#[serde(default)]`, so feeding the wrapper back to
+    /// save deserialized to defaults instead of erroring and quietly discarded
+    /// the user's selection.
+    pub async fn conversation_policy(
+        &self,
+        conversation_id: &str,
+    ) -> Result<serde_json::Value, AgentError> {
+        let record = self
+            .runtime
+            .get_conversation_policy(conversation_id)
+            .await
+            .map_err(|error| AgentError::Config(format!("load conversation policy: {error}")))?;
+        match record {
+            Some(record) => serde_json::to_value(&record.policy).map_err(|error| {
+                AgentError::Config(format!("serialize conversation policy: {error}"))
+            }),
+            None => Ok(serde_json::Value::Null),
+        }
+    }
+
+    /// Save or replace the per-conversation run policy; echoes the stored policy
+    /// in the same bare shape [`Self::conversation_policy`] returns, so a client
+    /// can assign the result back over what it sent.
+    pub async fn save_conversation_policy(
+        &self,
+        conversation_id: &str,
+        policy: &serde_json::Value,
+    ) -> Result<serde_json::Value, AgentError> {
+        let run_policy = serde_json::from_value(policy.clone())
+            .map_err(|error| AgentError::Config(format!("parse run policy: {error}")))?;
+        let record = self
+            .runtime
+            .save_conversation_policy(conversation_id, run_policy)
+            .await
+            .map_err(|error| AgentError::Config(format!("save conversation policy: {error}")))?;
+        serde_json::to_value(&record.policy)
+            .map_err(|error| AgentError::Config(format!("serialize conversation policy: {error}")))
+    }
+
+    /// Delete the per-conversation run policy.
+    pub async fn delete_conversation_policy(
+        &self,
+        conversation_id: &str,
+    ) -> Result<(), AgentError> {
+        self.runtime
+            .delete_conversation_policy(conversation_id)
+            .await
+            .map_err(|error| AgentError::Config(format!("delete conversation policy: {error}")))
+    }
+
+    /// Resolve the effective configuration (agent + requested + effective policy)
+    /// for a conversation, mirroring the service path's effective-config shape.
+    pub async fn effective_config(
+        &self,
+        conversation_id: &str,
+    ) -> Result<serde_json::Value, AgentError> {
+        let config = self.runtime.effective_config(conversation_id).await;
+        Ok(serde_json::json!({
+            "sessionId": conversation_id,
+            "agent": config.agent,
+            "requestedPolicy": config.requested_policy,
+            "effectivePolicy": config.effective_policy,
+        }))
     }
 
     fn projected_run(
@@ -691,23 +1101,50 @@ impl UarRuntimeFacade for UarEmbeddedRuntime {
 
     async fn start_run(&self, request: UarRunRequest) -> Result<UarProjectedRun, AgentError> {
         let conversation_id = request.session_id;
+        let seed_history: Vec<universal_agent_runtime_sdk::SeedMessage> = request
+            .history
+            .into_iter()
+            .map(|message| universal_agent_runtime_sdk::SeedMessage {
+                role: message.role,
+                content: message.content,
+                tool_call_id: message.tool_call_id,
+            })
+            .collect();
         let run_id = if let Some(artifact) = request.artifact {
             let artifact = serde_json::from_value(artifact)
                 .map_err(|error| AgentError::Config(format!("UAR agent artifact: {error}")))?;
             self.runtime
-                .start_run(artifact, request.input, conversation_id, None, Vec::new())
-                .await
-        } else {
-            self.runtime
-                .start_agent_run(
-                    request.agent_id.as_deref().unwrap_or("orchestrator-agent"),
+                .start_run_with_history(
+                    artifact,
                     request.input,
                     conversation_id,
                     None,
                     Vec::new(),
+                    seed_history,
                 )
                 .await
+        } else {
+            // Resolve the built-in agent, then start with seeded history so the
+            // agentless (orchestrator) path also repopulates a cold session.
+            let agent_id = request.agent_id.as_deref().unwrap_or("orchestrator-agent");
+            let artifact = self
+                .runtime
+                .get_agent(agent_id)
+                .await
                 .map_err(embedded_sdk_error)?
+                .ok_or_else(|| {
+                    AgentError::Config(format!("UAR agent '{agent_id}' was not found"))
+                })?;
+            self.runtime
+                .start_run_with_history(
+                    artifact,
+                    request.input,
+                    conversation_id,
+                    None,
+                    Vec::new(),
+                    seed_history,
+                )
+                .await
         };
         self.subscribe_projected(run_id).await
     }
@@ -848,163 +1285,37 @@ fn project_embedded_stream(
                         Err(tokio::sync::broadcast::error::RecvError::Closed) => return None,
                     }
                 };
-                let payload = embedded_stream_payload(event);
-                projected.extend(projector.ingest_agui_payload(&payload));
+                if let Some(payload) = embedded_stream_payload(&event) {
+                    projected.extend(projector.ingest_agui_payload(&payload));
+                }
             }
         },
     )
     .boxed()
 }
 
+/// Encode one embedded-runtime stream event as an AG-UI frame.
+///
+/// Delegates to UAR's canonical transport-free encoder (ADR 0012) rather than
+/// maintaining a parallel `NormalizedEvent -> AG-UI` map here: the runtime owns
+/// the wire contract, and a second hand-rolled copy silently drifts from it.
+/// Returns `None` for events that produce no wire frame.
 fn embedded_stream_payload(
-    event: universal_agent_runtime::uar::runtime::manager::StreamEvent,
-) -> serde_json::Value {
-    use universal_agent_runtime::uar::domain::events::NormalizedEvent;
-
-    let event_id = event.id.to_string();
-    let custom = |name: &str, run_id: Option<&str>, value: serde_json::Value| {
-        serde_json::json!({
-            "type": "CUSTOM",
-            "profile": "uar.agui/1",
-            "name": name,
-            "value": value,
-            "runId": run_id,
-            "threadId": run_id,
-            "eventId": event_id,
-        })
+    event: &universal_agent_runtime::uar::runtime::manager::StreamEvent,
+) -> Option<serde_json::Value> {
+    use universal_agent_runtime::uar::api::adapters::{
+        enrich_agui_spec_payload, to_agui_spec_event,
     };
-    match event.event {
-        NormalizedEvent::RunStart { run_id, agent_id } => serde_json::json!({
-            "type": "RUN_STARTED", "profile": "uar.agui/1", "eventId": event_id,
-            "threadId": run_id, "runId": run_id, "input": { "agentId": agent_id }
-        }),
-        NormalizedEvent::ChatDelta { run_id, text_delta } => serde_json::json!({
-            "type": "TEXT_MESSAGE_CONTENT", "profile": "uar.agui/1", "eventId": event_id,
-            "messageId": format!("{run_id}:assistant"), "delta": text_delta,
-            "threadId": run_id, "runId": run_id
-        }),
-        NormalizedEvent::ThinkingDelta { run_id, text_delta }
-        | NormalizedEvent::ReasoningDelta { run_id, text_delta } => serde_json::json!({
-            "type": "REASONING_MESSAGE_CONTENT", "profile": "uar.agui/1", "eventId": event_id,
-            "messageId": format!("{run_id}:reasoning"), "delta": text_delta,
-            "threadId": run_id, "runId": run_id
-        }),
-        NormalizedEvent::Citation { run_id, sources } => serde_json::json!({
-            "type": "agui.citation.added", "eventId": event_id,
-            "request_id": run_id, "citations": sources
-        }),
-        NormalizedEvent::RagCitations { run_id, citations } => serde_json::json!({
-            "type": "agui.rag_citations", "eventId": event_id,
-            "request_id": run_id, "citations": citations
-        }),
-        NormalizedEvent::MemoryRecall { run_id, items } => serde_json::json!({
-            "type": "agui.memory.recall", "eventId": event_id,
-            "request_id": run_id, "items": items
-        }),
-        NormalizedEvent::SkillActivated {
-            run_id,
-            skill_id,
-            title,
-            selection_method,
-        } => serde_json::json!({
-            "type": "agui.skill.activated", "eventId": event_id,
-            "request_id": run_id, "skill": { "id": skill_id, "title": title },
-            "selection_method": selection_method, "phase": "activated"
-        }),
-        NormalizedEvent::ToolDelta {
-            run_id,
-            call_index,
-            tool_call_id,
-            delta,
-        } => serde_json::json!({
-            "type": "agui.tool_call.delta", "eventId": event_id,
-            "request_id": run_id, "call_index": call_index, "id": tool_call_id,
-            "delta": { "arguments": delta.to_string() }
-        }),
-        NormalizedEvent::ToolStart {
-            run_id,
-            call_index,
-            tool_call_id,
-            tool,
-            input,
-        } => serde_json::json!({
-            "type": "agui.tool_call.complete", "eventId": event_id,
-            "request_id": run_id, "call_index": call_index, "id": tool_call_id,
-            "name": tool, "arguments_json": input.to_string()
-        }),
-        NormalizedEvent::ToolEnd {
-            run_id,
-            call_index,
-            tool_call_id,
-            tool,
-            output,
-            ok,
-        } => serde_json::json!({
-            "type": "agui.tool_result", "eventId": event_id,
-            "request_id": run_id, "call_index": call_index, "id": tool_call_id,
-            "name": tool, "content": output.to_string(), "success": ok
-        }),
-        NormalizedEvent::Artifact { run_id, artifact }
-        | NormalizedEvent::ArtifactDisplay { run_id, artifact } => custom(
-            "uar.artifact.available",
-            Some(&run_id),
-            serde_json::json!({
-                "artifactId": artifact.artifact_id,
-                "artifactType": artifact.artifact_type,
-                "title": artifact.title,
-                "content": artifact.content,
-                "language": artifact.language,
-                "metadata": artifact.metadata,
-                "sourceRunId": run_id,
-            }),
-        ),
-        NormalizedEvent::ArtifactInputRequest { run_id, artifact } => custom(
-            "uar.artifact.input_required",
-            Some(&run_id),
-            serde_json::json!({
-                "artifactId": artifact.artifact_id,
-                "artifactType": artifact.artifact_type,
-                "title": artifact.title,
-                "content": artifact.content,
-                "metadata": artifact.metadata,
-                "sourceRunId": run_id,
-            }),
-        ),
-        NormalizedEvent::Error {
-            run_id,
-            code,
-            message,
-        } => serde_json::json!({
-            "type": "RUN_ERROR", "profile": "uar.agui/1", "eventId": event_id,
-            "threadId": run_id, "runId": run_id, "code": code, "message": message
-        }),
-        NormalizedEvent::Cancelled { run_id } => serde_json::json!({
-            "type": "agui.cancelled", "eventId": event_id, "request_id": run_id,
-            "message": "Run cancelled"
-        }),
-        NormalizedEvent::RunDone { run_id } | NormalizedEvent::RunDoneWithUsage { run_id, .. } => {
-            serde_json::json!({
-                "type": "RUN_FINISHED", "profile": "uar.agui/1", "eventId": event_id,
-                "threadId": run_id, "runId": run_id
-            })
-        }
-        NormalizedEvent::StatePatch { run_id, patch } => serde_json::json!({
-            "type": "CUSTOM", "profile": "uar.agui/1", "eventId": event_id,
-            "name": "agui.state.patch", "runId": run_id, "threadId": run_id,
-            "value": { "patch": patch }
-        }),
-        other => {
-            let value = serde_json::to_value(&other).unwrap_or_else(
-                |error| serde_json::json!({ "serializationError": error.to_string() }),
-            );
-            let name = value
-                .get("type")
-                .and_then(serde_json::Value::as_str)
-                .map(|kind| format!("uar.{}", kind.to_ascii_lowercase()))
-                .unwrap_or_else(|| "uar.unknown".into());
-            custom(&name, None, value)
-        }
-    }
+
+    let (event_name, payload) = to_agui_spec_event(&event.event)?;
+    // Ordinal 8 matches the SSE path so live and embedded frames share the same
+    // `eventId`/`sequence` derivation.
+    Some(enrich_agui_spec_payload(
+        event_name,
+        payload,
+        &event.id.to_string(),
+        8,
+    ))
 }
 
 #[derive(Debug, Clone)]
@@ -1266,18 +1577,63 @@ const fn service_artifact_response_available() -> bool {
 /// same `A2uiAdapter` buffer.
 pub struct UarEventProjector {
     adapter: A2uiAdapter,
+    /// Agent id observed on `RUN_STARTED`, used to back-fill provenance when the
+    /// `effective_run_policy` artifact itself omits `agentId`.
+    last_agent_id: Option<String>,
 }
 
 impl UarEventProjector {
     pub fn new(run_id: impl Into<String>) -> Self {
         Self {
             adapter: A2uiAdapter::new(run_id),
+            last_agent_id: None,
         }
     }
 
     pub fn ingest_agui_payload(&mut self, payload: &serde_json::Value) -> Vec<A2uiEvent> {
+        // Remember the RunStart agent id before normalization drops it.
+        if payload.get("type").and_then(serde_json::Value::as_str) == Some("RUN_STARTED") {
+            if let Some(agent_id) = payload
+                .get("input")
+                .and_then(|input| input.get("agentId"))
+                .and_then(serde_json::Value::as_str)
+            {
+                self.last_agent_id = Some(agent_id.to_owned());
+            }
+        }
+
         let event = normalize_uar_agui_event(payload);
-        self.adapter.ingest(&event)
+        let mut events = self.adapter.ingest(&event);
+        for event in &mut events {
+            back_fill_provenance_agent_id(event, self.last_agent_id.as_deref());
+        }
+        events
+    }
+}
+
+/// Fill a null `agentId` in a provenance `ContextTelemetry` payload from the
+/// RunStart-observed agent id. No-op for any other event or a non-null agentId.
+fn back_fill_provenance_agent_id(event: &mut A2uiEvent, fallback_agent_id: Option<&str>) {
+    let Some(fallback) = fallback_agent_id else {
+        return;
+    };
+    let A2uiEvent::ContextTelemetry { payload, .. } = event else {
+        return;
+    };
+    let Some(provenance) = payload.get_mut("provenance") else {
+        return;
+    };
+    let missing = provenance
+        .get("agentId")
+        .map(serde_json::Value::is_null)
+        .unwrap_or(true);
+    if missing {
+        if let Some(object) = provenance.as_object_mut() {
+            object.insert(
+                "agentId".into(),
+                serde_json::Value::String(fallback.to_owned()),
+            );
+        }
     }
 }
 
@@ -1291,6 +1647,7 @@ pub fn runtime_status() -> UarRuntimeStatus {
 mod tests {
     use super::*;
     use futures::StreamExt;
+    use gen_ui_protocol::provenance_from_effective_run_policy;
     use gen_ui_types::content_block::ContentBlock;
     use gen_ui_types::inference::{InferenceRequest, InferenceToolResult};
     use gen_ui_types::{CoreError, CoreResult};
@@ -1487,10 +1844,7 @@ mod tests {
 
         assert_eq!(
             registry.default_model().await,
-            Some((
-                IOS_MLX_PROVIDER_ID.to_string(),
-                PINNED_MODEL_ID.to_string()
-            ))
+            Some((IOS_MLX_PROVIDER_ID.to_string(), PINNED_MODEL_ID.to_string()))
         );
         let resolved = registry
             .resolve_to_llm_config(IOS_MLX_PROVIDER_ID, "")
@@ -1700,6 +2054,7 @@ mod tests {
                 session_id: Some("offline-test-conversation".into()),
                 agent_id: None,
                 run_policy: None,
+                history: Vec::new(),
             })
             .await
             .expect("seeded orchestrator run starts");
@@ -1946,6 +2301,96 @@ mod tests {
                 && content.contains("agui.artifact_input_request")
                 && content.contains("artifact-1")
         ));
+    }
+
+    #[test]
+    fn projector_maps_effective_run_policy_artifact_to_provenance_telemetry() {
+        let mut projector = UarEventProjector::new("run-1");
+        let output = projector.ingest_agui_payload(&serde_json::json!({
+            "type": "CUSTOM",
+            "profile": "uar.agui/1",
+            "name": "uar.artifact.available",
+            "value": {
+                "artifactId": "artifact-1",
+                "artifactType": "effective_run_policy",
+                "content": {
+                    "agent_id": "office-assistant",
+                    "model": { "provider_id": "anthropic", "model_id": "claude-opus-4-8" }
+                },
+                "sourceRunId": "run-1"
+            },
+            "runId": "run-1"
+        }));
+
+        assert_eq!(
+            output.len(),
+            1,
+            "policy artifact must not also emit a block"
+        );
+        let A2uiEvent::ContextTelemetry { payload, .. } = &output[0] else {
+            panic!("expected ContextTelemetry, got {:?}", output[0]);
+        };
+        let provenance = &payload["provenance"];
+        assert_eq!(provenance["agentId"], "office-assistant");
+        assert_eq!(provenance["providerId"], "anthropic");
+        assert_eq!(provenance["modelId"], "claude-opus-4-8");
+    }
+
+    #[test]
+    fn projector_back_fills_provenance_agent_id_from_run_started() {
+        let mut projector = UarEventProjector::new("run-1");
+        // RunStart carries the agent id; the policy artifact omits it.
+        let _ = projector.ingest_agui_payload(&serde_json::json!({
+            "type": "RUN_STARTED",
+            "profile": "uar.agui/1",
+            "runId": "run-1",
+            "threadId": "run-1",
+            "input": { "agentId": "office-assistant" }
+        }));
+        let output = projector.ingest_agui_payload(&serde_json::json!({
+            "type": "CUSTOM",
+            "profile": "uar.agui/1",
+            "name": "uar.artifact.available",
+            "value": {
+                "artifactType": "effective_run_policy",
+                "content": {
+                    "agent_id": null,
+                    "model": { "provider_id": "on-device", "model_id": "gemma-3n" }
+                }
+            },
+            "runId": "run-1"
+        }));
+
+        let telemetry = output
+            .iter()
+            .find_map(|event| match event {
+                A2uiEvent::ContextTelemetry { payload, .. } => Some(payload),
+                _ => None,
+            })
+            .expect("expected a ContextTelemetry event");
+        assert_eq!(telemetry["provenance"]["agentId"], "office-assistant");
+        assert_eq!(telemetry["provenance"]["providerId"], "on-device");
+        assert_eq!(telemetry["provenance"]["modelId"], "gemma-3n");
+    }
+
+    #[test]
+    fn provenance_helper_parses_string_encoded_policy() {
+        let content = serde_json::json!(
+            "{\"agent_id\":\"a\",\"model\":{\"provider_id\":\"p\",\"model_id\":\"m\"}}"
+        );
+        let provenance = provenance_from_effective_run_policy(&content);
+        assert_eq!(provenance["agentId"], "a");
+        assert_eq!(provenance["providerId"], "p");
+        assert_eq!(provenance["modelId"], "m");
+    }
+
+    #[test]
+    fn provenance_helper_nulls_missing_parts() {
+        let content = serde_json::json!({ "agent_id": "a" });
+        let provenance = provenance_from_effective_run_policy(&content);
+        assert_eq!(provenance["agentId"], "a");
+        assert!(provenance["providerId"].is_null());
+        assert!(provenance["modelId"].is_null());
     }
 
     #[test]
@@ -2275,6 +2720,7 @@ mod tests {
                 session_id: Some("session-1".into()),
                 agent_id: None,
                 run_policy: None,
+                history: Vec::new(),
             })
             .await
             .unwrap();
@@ -2321,5 +2767,107 @@ mod tests {
         );
 
         server.abort();
+    }
+
+    // -------- routing driver (local ⊕ cloud selection) --------
+
+    /// A scripted selector so the routing driver is testable without touching the
+    /// config store or a live cloud endpoint.
+    struct ScriptedSelector(ActiveRoute);
+
+    #[async_trait::async_trait]
+    impl ActiveModelSelector for ScriptedSelector {
+        async fn active(&self) -> Result<ActiveRoute, AgentError> {
+            Ok(self.0.clone())
+        }
+    }
+
+    fn empty_llm_request() -> LlmRequest {
+        LlmRequest {
+            messages: vec![serde_json::json!({"role": "user", "content": "hi"})],
+            tools: vec![],
+            cache_strategy: None,
+            thinking_config: None,
+            anthropic_system: None,
+            extra_params: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn routing_driver_local_route_streams_from_the_on_device_bridge() {
+        // Selector says Local ⇒ the request must reach the wrapped inference
+        // provider (proving no cloud dispatch), and the on-device stream projects.
+        let inference = Arc::new(RecordingInferenceProvider::with_events(vec![
+            StreamEvent::MessageStart,
+            StreamEvent::TextDelta {
+                index: 0,
+                delta: "on-device answer".into(),
+            },
+            StreamEvent::Done,
+        ]));
+        let bridge = Arc::new(UarLocalInferenceDriverBridge::new(
+            inference.clone(),
+            LocalModelSpec {
+                model: "test-model".into(),
+                context_len: None,
+            },
+        ));
+        let driver = UarRoutingDriver::new(bridge, Arc::new(ScriptedSelector(ActiveRoute::Local)));
+
+        let events: Vec<_> = driver
+            .stream(empty_llm_request())
+            .await
+            .expect("local route streams")
+            .collect()
+            .await;
+
+        // The on-device provider actually generated (Local was honored, not cloud).
+        assert_eq!(inference.requests.lock().len(), 1);
+        assert!(!events.is_empty());
+        assert!(events.iter().all(|event| event.is_ok()));
+    }
+
+    #[tokio::test]
+    async fn cloud_driver_cache_reuses_one_driver_per_provider_model() {
+        // Two builds for the same (provider, model) return the same Arc; a
+        // different model builds a distinct driver. Proves keyed caching without
+        // needing a live endpoint (LiterLlmDriver::new only constructs a client).
+        let bridge = Arc::new(UarLocalInferenceDriverBridge::new(
+            Arc::new(RecordingInferenceProvider::default()),
+            LocalModelSpec {
+                model: "test-model".into(),
+                context_len: None,
+            },
+        ));
+        let driver = UarRoutingDriver::new(bridge, Arc::new(ScriptedSelector(ActiveRoute::Local)));
+
+        let a = driver
+            .cloud_driver("openai", "gpt-4o", None, "sk-test".into())
+            .await
+            .expect("build cloud driver a");
+        let b = driver
+            .cloud_driver("openai", "gpt-4o", None, "sk-test".into())
+            .await
+            .expect("build cloud driver b");
+        assert!(Arc::ptr_eq(&a, &b), "same (provider,model) ⇒ cached driver");
+
+        let c = driver
+            .cloud_driver("openai", "gpt-4o-mini", None, "sk-test".into())
+            .await
+            .expect("build cloud driver c");
+        assert!(
+            !Arc::ptr_eq(&a, &c),
+            "different model ⇒ distinct cached driver"
+        );
+
+        driver.invalidate_cloud_cache().await;
+        let d = driver
+            .cloud_driver("openai", "gpt-4o", None, "sk-test".into())
+            .await
+            .expect("rebuild after invalidate");
+        assert!(
+            !Arc::ptr_eq(&a, &d),
+            "cache cleared ⇒ fresh driver after invalidate"
+        );
     }
 }
