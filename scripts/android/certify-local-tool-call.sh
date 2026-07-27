@@ -21,8 +21,14 @@ if [[ ! -x "$PROMPT_GATE" ]]; then
   exit 66
 fi
 
+# `EXPECTED_SUBSTRINGS` is `|`-separated but the gate requires EVERY item, so
+# each one must be a string the app genuinely renders. The first entry used to
+# be "Tool use knowme_diagnostics__local_runtime_status", which the UI has never
+# emitted: the tool block renders as "Skill <name>, running" then ", complete".
+# That single wrong literal failed runs where the tool plainly worked and the
+# model had already answered TOOLSTATUSOK on screen.
 PROMPT="$PROMPT" \
-  EXPECTED_SUBSTRINGS="Tool use knowme_diagnostics__local_runtime_status|Tool completed|TOOLSTATUSOK" \
+  EXPECTED_SUBSTRINGS="Skill knowme_diagnostics, complete|Tool completed|TOOLSTATUSOK" \
   TIMEOUT_SECONDS="$TIMEOUT_SECONDS" \
   LOG_PATH="$LOG_PATH" \
   UI_XML_PATH="$UI_XML_PATH" \
