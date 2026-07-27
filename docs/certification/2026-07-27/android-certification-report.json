@@ -1,0 +1,254 @@
+{
+  "apk": {
+    "bytes": 181656359,
+    "nativeLibraries": [
+      "lib/arm64-v8a/libapp.so",
+      "lib/arm64-v8a/libc++_shared.so",
+      "lib/arm64-v8a/libdartjni.so",
+      "lib/arm64-v8a/libdatastore_shared_counter.so",
+      "lib/arm64-v8a/libflutter.so",
+      "lib/arm64-v8a/libgen_ui_ffi.so",
+      "lib/arm64-v8a/liblitertlm_jni.so"
+    ],
+    "path": "mobile/build/app/outputs/flutter-apk/app-release.apk",
+    "sha256": "eba547f46141f2299af9a0a9af21e08ce47ffec2128c83ac421cb8e8fef49388"
+  },
+  "artifacts": [
+    {
+      "bytes": 1293433,
+      "path": "/tmp/knowme-local-cancellation.log",
+      "sha256": "3e1c55fc83140c03fdd170801d899533411ba48bd9f446c95a85590ce0868931"
+    },
+    {
+      "bytes": 16590,
+      "path": "/tmp/knowme-local-cancellation.xml",
+      "sha256": "9559a13ae8c8c4d910ed715ba90dbdd2dadd793754feaa0c25cabbad9d01109c"
+    },
+    {
+      "bytes": 972205,
+      "path": "/tmp/knowme-local-model-certification-code.log",
+      "sha256": "54e35e20a3e8e0ec603a540dd2b8e4b76af6ff476c7ec269b4a67a1ddc9e2990"
+    },
+    {
+      "bytes": 17092,
+      "path": "/tmp/knowme-local-model-certification-code.xml",
+      "sha256": "779a305e413793460695ef358e8f7b8695b6fe046ac4e351ca58a74febfe75cb"
+    },
+    {
+      "bytes": 510198,
+      "path": "/tmp/knowme-local-model-certification-exact.log",
+      "sha256": "707c6086f5b48a2e327ee100661a1e1df435c6645c7a5bbceae52760b0de69e5"
+    },
+    {
+      "bytes": 15996,
+      "path": "/tmp/knowme-local-model-certification-exact.xml",
+      "sha256": "ba3a59083544d5ad61a9a1b46356af147ba67b607a253f46a03cc6d823ba30e5"
+    },
+    {
+      "bytes": 1041137,
+      "path": "/tmp/knowme-local-model-certification-mermaid.log",
+      "sha256": "a31fcac21aad5eafe5e543219e34cad3efa5023bc5d4070844fa420c773a08ad"
+    },
+    {
+      "bytes": 13419,
+      "path": "/tmp/knowme-local-model-certification-mermaid.xml",
+      "sha256": "6054d19ba12ec0f8a94f987b24bd6c692e51223a836db3fbf25809ac549aa336"
+    },
+    {
+      "bytes": 1377081,
+      "path": "/tmp/knowme-local-model-certification.log",
+      "sha256": "8c9cffc73834976ac9031037e4b22acc3082065aaeca505c6ab093f316e6e967"
+    },
+    {
+      "bytes": 15547,
+      "path": "/tmp/knowme-local-model-certification.xml",
+      "sha256": "3156fb1172b4d9bfee0c611c68d45be72482c9beeedd8bae4695f140336ac836"
+    },
+    {
+      "bytes": 654573,
+      "path": "/tmp/knowme-local-multiturn-history.log",
+      "sha256": "868bbc597910c3a96185ec526acabf06ce6ea09f84225af08afe20305743bb2c"
+    },
+    {
+      "bytes": 12827,
+      "path": "/tmp/knowme-local-multiturn-history.xml",
+      "sha256": "d852e83623494d726a67e9f4927f4e3c9440b3ce61d96274091aeed3bdc2bb90"
+    },
+    {
+      "bytes": 493906,
+      "path": "/tmp/knowme-local-multiturn-seed.log",
+      "sha256": "7480d8da98f9ec19a6422608c58d7de49b5dd1268efbb98359f2956e4c05cd54"
+    },
+    {
+      "bytes": 16408,
+      "path": "/tmp/knowme-local-multiturn-seed.xml",
+      "sha256": "c650f7f63ad8d7c1e2e18ed4e42add35a1f2df40b36003eeaad110e4aaf84cd9"
+    },
+    {
+      "bytes": 488576,
+      "path": "/tmp/knowme-local-second-send.log",
+      "sha256": "d754096c490fcb5ac70bb4e237b92a0d6783e3ca91242806062b40a159a40a9e"
+    },
+    {
+      "bytes": 12698,
+      "path": "/tmp/knowme-local-second-send.xml",
+      "sha256": "9fb5dfb7b4fbf50ed515a7f5f2b32d5eb23c9cdbb4d6bbe32ca3d9097b054c72"
+    },
+    {
+      "bytes": 732513,
+      "path": "/tmp/knowme-local-steer-intents.log",
+      "sha256": "e8027468242ad678d34ee88375cb0c622cfb494b792f458903689475e1edfcad"
+    },
+    {
+      "bytes": 15914,
+      "path": "/tmp/knowme-local-steer-intents.xml",
+      "sha256": "7bc12a0a478ec5cf8d5891504d9b32062f5d23cbf463389d090dbe99e745d7bd"
+    },
+    {
+      "bytes": 3479931,
+      "path": "/tmp/knowme-local-tool-call.log",
+      "sha256": "bde6595bcdf1acbe01dc19f87bb0d28c99306fa219dcbca3a26df4ca8d946edd"
+    },
+    {
+      "bytes": 16053,
+      "path": "/tmp/knowme-local-tool-call.xml",
+      "sha256": "03a01532699b3716bc611cfbd788c6f5a4a11a4e0f6ccf58f185c8e8ca4900b9"
+    }
+  ],
+  "device": {
+    "abi": "arm64-v8a",
+    "manufacturer": "samsung",
+    "model": "SM-S936U",
+    "release": "16",
+    "sdk": "36",
+    "serial": "R5GYB4AZD7A",
+    "soc": "SM8750"
+  },
+  "generatedAt": "2026-07-27T10:15:54.127348+00:00",
+  "gitCommit": "72b61abf9e5262212b9f55e8432d7ef52588f9a0",
+  "memory": {
+    "processFound": true,
+    "rawSummary": [
+      "Native Heap  1740508  1740504        0       24  1742184  1790712  1774344    10145",
+      "Dalvik Heap     9113     9092        4       57    10636    27247     2671    24576",
+      "GL mtrack    59240    59240        0        0    59240",
+      "TOTAL  3079083  1938540  1135936      158  3178992  1817959  1777015    34721",
+      "Native Heap:  1740504                        1742184",
+      "Graphics:   139816                         139816",
+      "TOTAL PSS:  3079083            TOTAL RSS:  3178992       TOTAL SWAP PSS:      158"
+    ],
+    "totalPssKb": 3079083
+  },
+  "package": "tools.knowme.knowme",
+  "performance": {
+    "charsPerSecond": 1,
+    "generateMs": 7726,
+    "generatedChars": 12,
+    "generationCount": 1,
+    "modelLoadMs": 228,
+    "observedBackend": "gemma-4-e2b-it-litertlm"
+  },
+  "runtime": {
+    "appPrivateFiles": [],
+    "expectedBackend": "litert-lm-cpu",
+    "expectedRuntimeKind": "litert-lm",
+    "modelArtifacts": [
+      {
+        "bytes": null,
+        "path": "run-as: package not debuggable: tools.knowme.knowme",
+        "sha256": "run-as:"
+      }
+    ],
+    "pid": "14875"
+  },
+  "schemaVersion": 1,
+  "thermal": {
+    "status": 0,
+    "temperatures": [
+      {
+        "name": "SUBBAT",
+        "status": "0",
+        "type": "2",
+        "valueCelsius": 0.0
+      },
+      {
+        "name": "AP",
+        "status": "0",
+        "type": "0",
+        "valueCelsius": 45.6
+      },
+      {
+        "name": "PA",
+        "status": "0",
+        "type": "5",
+        "valueCelsius": 44.6
+      },
+      {
+        "name": "BAT",
+        "status": "0",
+        "type": "2",
+        "valueCelsius": 35.2
+      },
+      {
+        "name": "USB",
+        "status": "0",
+        "type": "4",
+        "valueCelsius": 28.7
+      },
+      {
+        "name": "SKIN",
+        "status": "0",
+        "type": "3",
+        "valueCelsius": 37.6
+      },
+      {
+        "name": "AP",
+        "status": "0",
+        "type": "0",
+        "valueCelsius": 32.9
+      },
+      {
+        "name": "BAT",
+        "status": "0",
+        "type": "2",
+        "valueCelsius": 31.7
+      },
+      {
+        "name": "PA",
+        "status": "0",
+        "type": "5",
+        "valueCelsius": 32.2
+      },
+      {
+        "name": "SKIN",
+        "status": "0",
+        "type": "3",
+        "valueCelsius": 31.7
+      },
+      {
+        "name": "SUBBAT",
+        "status": "0",
+        "type": "2",
+        "valueCelsius": 0.0
+      },
+      {
+        "name": "USB",
+        "status": "0",
+        "type": "4",
+        "valueCelsius": 30.2
+      }
+    ]
+  },
+  "uar": {
+    "bossfangLibreFangMobileSidecar": false,
+    "cloudModeTarget": "http_service",
+    "currentMobileIntegration": "projection_only",
+    "desktopWebModeTarget": "http_service_or_sidecar",
+    "localModelProviderRole": "knowme_local_provider_backend",
+    "mobileModeTarget": "embedded_library",
+    "runtimeAuthority": "universal-agent-runtime",
+    "submoduleCommit": "08a6f4c0bb49c5299d32eb39c5bf4ffc5aac412e",
+    "submodulePath": "rust/vendor/universal-agent-runtime",
+    "submoduleRemote": "git@github.com:Prometheus-AGS/universal-agent-runtime.git"
+  }
+}
