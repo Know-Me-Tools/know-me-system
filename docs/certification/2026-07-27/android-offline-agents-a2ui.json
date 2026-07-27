@@ -1,7 +1,9 @@
 {
   "a2ui": {
     "accessibleName": "Interactive agent interface",
+    "coveredElsewhere": "mobile/test/features/chat/a2ui_surface_test.dart \u2014 2 tests PASS: 'A2UI v0.9 JSONL renders data bindings and dispatches actions' and 'unknown A2UI catalog components fail closed'. Rendering and action dispatch are verified at the widget layer; only the end-to-end device observation is missing.",
     "stillLoading": false,
+    "structuralFinding": "A2UI cannot be device-certified on this build for a STRUCTURAL reason, not a flaky one. An A2UI surface has never appeared in ANY device dump in this suite. The only local tool registered is knowme_diagnostics__local_runtime_status, which emits no artifact, and promote_a2ui_component (chat.rs:613-616) is driven BY an interaction \u2014 so nothing on this build produces an A2UI artifact to interact with. Certifying it needs an artifact producer (an agent or skill that emits one), not a louder prompt or a longer timeout.",
     "surfaceRendered": false,
     "verdict": "UNVERIFIED \u2014 the model did not emit an A2UI artifact this run",
     "whyConditional": "A 4B local model is nondeterministic about emitting an A2UI artifact \u2014 measured in this suite, the same prompt produced 1 tool call on one run and 0 on the next. Demanding one would make this gate flaky, and a flaky gate teaches people to ignore failures."
@@ -9,6 +11,13 @@
   "device": {
     "android": "16",
     "model": "SM-S936U"
+  },
+  "harnessDefectFound": {
+    "defect": "the offline toggle could leave com.android.settings/.SubSettings in the foreground",
+    "fix": "cert_enter_offline detects a settings foreground after the toggle and sends HOME",
+    "intermittent": "yes \u2014 which is why some runs passed and others did not",
+    "symptom": "a gate typed its prompt into Settings instead of the app and reported 'timed out waiting for generation' with ZERO engine lines \u2014 a failure that reads as a broken model but is a stolen window",
+    "verified": "4/4 gates PASS after the fix (cancellation, second-send, agents/a2ui, restart-recovery)"
   },
   "offline": {
     "enforced": true,

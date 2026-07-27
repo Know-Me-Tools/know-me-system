@@ -63,11 +63,15 @@
     Gate proven to FAIL on an empty registry: with the agent-context control
     still rendered but no seeded agents, it exits 1. The control alone is
     deliberately NOT accepted as proof — it renders either way.
-  - A2UI is asserted CONDITIONALLY and is currently UNVERIFIED: a 4B local
-    model is nondeterministic about emitting an artifact (same prompt gave 1
-    tool call on one run, 0 on the next). If a surface renders it must carry
-    its accessible name; if none is emitted that is reported as UNVERIFIED
-    rather than dressed up as a pass. Settling it needs a deterministic A2UI
-    fixture, not a louder prompt.
+  - A2UI: asserted CONDITIONALLY, and BLOCKED on device for a STRUCTURAL
+    reason. An A2UI surface has never appeared in any device dump in this
+    suite: the only registered local tool
+    (knowme_diagnostics__local_runtime_status) emits no artifact, and
+    promote_a2ui_component (chat.rs:613) is driven BY an interaction — so
+    nothing on this build produces an artifact to interact with. Rendering and
+    action dispatch ARE verified at the widget layer
+    (mobile/test/features/chat/a2ui_surface_test.dart, 2 tests PASS incl.
+    "unknown A2UI catalog components fail closed"). Closing the device gap
+    needs an artifact producer, not a louder prompt.
 - [ ] 5.5 Certify iOS device or simulator with networking disabled against the same functional suite
 - [ ] 5.6 Record logs, screenshots, performance, KBD reflection, Prometheus wiki entries, and Karpathy success/failure learning records

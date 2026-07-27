@@ -57,6 +57,22 @@ cert_enter_offline() {
     cert_exit_offline
     return 1
   fi
+
+  # Toggling the radios can raise a One UI connectivity panel
+  # (com.android.settings/.SubSettings) that STEALS FOREGROUND. Measured: a gate
+  # then typed its prompt into Settings instead of the app and reported "timed
+  # out waiting for generation" with zero engine lines — a failure that looks
+  # like a broken model but is really a stolen window. It is intermittent, which
+  # is why some runs passed and others did not.
+  local top
+  top="$(adb shell dumpsys activity activities 2>/dev/null \
+         | rg -m1 -o 'topResumedActivity=[^ ]* [^ ]* ([a-zA-Z0-9_.]+)/' -r '$1' | tr -d '\r')"
+  if [[ "$top" == "com.android.settings" ]]; then
+    echo "  dismissing the settings panel that took foreground after the toggle"
+    adb shell input keyevent KEYCODE_HOME >/dev/null 2>&1 || true
+    sleep 2
+  fi
+
   echo "  OFFLINE ENFORCED: $CERT_OFFLINE_PROBE_HOST unreachable (both radios down)"
 }
 
