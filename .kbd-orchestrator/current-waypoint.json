@@ -10,8 +10,8 @@
   ],
   "childPointer": null,
   "completionMetric": "implementation",
-  "currentTask": "5.4 Android offline certification is DONE except A2UI, which is blocked structurally (nothing on this build emits an artifact; widget layer already covered by a2ui_surface_test.dart). Both harness defects fixed: branch-actions exit 69 (c7d5db2) and the Settings foreground-steal (d504d86). 4/4 gates PASS.",
-  "exactNextCommand": "close 3.3 \u2014 advertise offline-unavailable resources with a reason instead of empty arrays",
+  "currentTask": "3.3 CLOSED (a391dc4): both UIs render why a registry is empty, with a structural-vs-transient distinction; 6 new tests. Now on 1.3: the two auto-discovered bins are gated behind `server`; embedded-mobile check running.",
+  "exactNextCommand": "read the embedded-mobile check result; decide on surreal-memory scope",
   "implementationCompleted": 0,
   "implementationTotal": 1,
   "nextPendingChange": "embed-uar-mobile-offline",
@@ -36,5 +36,5 @@
   "sourceTool": "claude-code",
   "stage": "implementation_ready",
   "status": "implementation_ready",
-  "updatedAt": "2026-07-27T21:16:57Z"
+  "updatedAt": "2026-07-27T23:18:22Z"
 }
