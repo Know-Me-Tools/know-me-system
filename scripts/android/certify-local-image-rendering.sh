@@ -148,8 +148,37 @@ fi
 # GATE 5 — THE DURABILITY PROOF. Clearing the cache is what a real Android
 # device does on its own schedule. A build that kept the picker's path renders
 # correctly until this moment and breaks after it.
-echo "Clearing the app cache to simulate an OS purge..."
-adb shell run-as "$PACKAGE" sh -c 'rm -rf cache/* 2>/dev/null' >/dev/null 2>&1 || true
+#
+# `pm trim-caches` is the platform's OWN cache eviction — what the device does
+# under storage pressure — and it works on a release build.
+#
+# Two rejected alternatives, both verified against this device rather than
+# assumed:
+#   - `run-as ... rm -rf cache/*` REFUSES a release build ("package not
+#     debuggable"), so it would have silently no-opped and this gate would have
+#     passed without purging anything.
+#   - `pm clear --cache-only` HANGS indefinitely on this Samsung (One UI);
+#     measured, not guessed. Kept only as a bounded fallback.
+#
+# Every call is bounded: an unbounded purge stalls the whole run instead of
+# reporting something.
+PURGE_TIMEOUT_SECONDS="${PURGE_TIMEOUT_SECONDS:-45}"
+echo "Evicting the app cache (pm trim-caches — the platform's own path)..."
+purged=0
+if timeout "$PURGE_TIMEOUT_SECONDS" adb shell pm trim-caches 999G >/dev/null 2>&1; then
+  purged=1
+  PURGE_METHOD="pm trim-caches"
+elif timeout "$PURGE_TIMEOUT_SECONDS" adb shell pm clear --cache-only "$PACKAGE" 2>&1 | rg -q "Success"; then
+  purged=1
+  PURGE_METHOD="pm clear --cache-only"
+fi
+if (( purged == 0 )); then
+  echo "IMAGE FAIL: could not evict the app cache, so durability was never tested" >&2
+  echo "  both pm trim-caches and pm clear --cache-only failed or timed out" >&2
+  echo "  a pass here would mean nothing — refusing to report one" >&2
+  exit 1
+fi
+echo "CACHE EVICTED via $PURGE_METHOD"
 adb shell am force-stop "$PACKAGE" >/dev/null 2>&1 || true
 sleep 2
 adb shell monkey -p "$PACKAGE" -c android.intent.category.LAUNCHER 1 >/dev/null
@@ -167,12 +196,12 @@ done
 STORED_AFTER="$(stored_files)"
 STORED_AFTER_COUNT="$(printf '%s' "$STORED_AFTER" | grep -c . || true)"
 
-python3 - "$REPORT" "$STORED_COUNT" "$STORED_AFTER_COUNT" "$survived" <<'PY'
+python3 - "$REPORT" "$STORED_COUNT" "$STORED_AFTER_COUNT" "$survived" "$PURGE_METHOD" <<'PY'
 import json
 import subprocess
 import sys
 
-report_path, before, after, survived = sys.argv[1:5]
+report_path, before, after, survived, purge_method = sys.argv[1:6]
 
 def prop(name: str) -> str:
     try:
@@ -188,11 +217,14 @@ report = {
     "storedFilesAfterPurge": int(after),
     # The claim under test: the bytes live in app storage, not the cache.
     "survivedCachePurge": survived == "1",
+    "cachePurgeMethod": purge_method,
     "pickerPathNotPersisted": int(after) > 0,
     "note": (
-        "storedFiles* are 0 when run-as is unavailable (release build); that "
-        "is unverified, not a failure. survivedCachePurge is the assertion "
-        "that matters and is UI-observed."
+        "storedFiles* are 0 when run-as is unavailable, which is ALWAYS true "
+        "on a release build (package not debuggable) — unverified, not a "
+        "failure. survivedCachePurge is the assertion that matters: it is "
+        "UI-observed after a real platform cache eviction, and the run aborts "
+        "rather than reporting a pass if that eviction did not succeed."
     ),
 }
 open(report_path, "w").write(json.dumps(report, indent=2, sort_keys=True) + "\n")
