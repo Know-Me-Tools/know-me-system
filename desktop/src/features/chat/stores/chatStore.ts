@@ -96,7 +96,9 @@ function persistActiveConversation(): void {
       status_message: message.statusMessage ?? null,
       intent: message.intent ?? null,
       error: message.error ?? null,
-      attachments: [],
+      // Was hardcoded `[]`, so the column was write-only and every attachment
+      // vanished on reload while the transcript still showed its chips.
+      attachments: message.attachmentPaths ?? [],
       generation_settings: message.generationSettings ?? null,
       diagnostics: message.diagnostics ?? null,
       context_plan_version: message.contextPlanVersion ?? null,
@@ -190,12 +192,47 @@ function inferenceHistory(messages: Message[], branchId: string): InferenceHisto
   return history
 }
 
+/** One file the user attached, as the composer adapter resolved it. */
+export interface AttachmentInput {
+  /** Absolute filesystem path. Rust reads the file from here. */
+  path: string
+  name: string
+  /** Size in bytes; formatted for display when the block is rendered. */
+  size: number
+  mime: string
+}
+
+/** Human-readable size, matching Flutter's `_formatBytes` exactly. */
+export function formatBytes(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${bytes} B`
+}
+
+/** The transcript record of an attachment — same artifact shape Flutter emits,
+ *  so a conversation started on either surface renders on both. */
+function attachmentBlock(attachment: AttachmentInput): ContentBlock {
+  return {
+    type: 'artifact',
+    id: attachment.path,
+    kind: 'attachment',
+    content: JSON.stringify({
+      name: attachment.name,
+      size: formatBytes(attachment.size),
+      mime: attachment.mime,
+    }),
+  }
+}
+
 async function runInferenceTurn(
   text: string,
   assistantId: string,
   branchId: string,
   history: InferenceHistoryMessage[],
   conversationId: string,
+  /** Files to send with this turn, and the user message they belong to. Rust
+   *  reads the paths and correlates the extracted content to that message. */
+  attachments?: { paths: string[]; userMessageId: string },
 ): Promise<void> {
   const store = useChatStore.getState()
   let lane = useLaneStore.getState().lane
@@ -254,7 +291,14 @@ async function runInferenceTurn(
   }
 
   wireAdapter.bind(assistantId)
-  await streamAgentA2ui(text, history, conversationId, branchId).catch((error: unknown) => {
+  await streamAgentA2ui(
+    text,
+    history,
+    conversationId,
+    branchId,
+    attachments?.paths,
+    attachments?.userMessageId,
+  ).catch((error: unknown) => {
     console.error(error)
     store.updateLifecycle({ type: 'error', messageId: assistantId, runId: assistantId,
       error: { code: 'run_start_failed', phase: 'queued', message: error instanceof Error ? error.message : 'Chat failed to start', retryable: true } })
@@ -280,7 +324,10 @@ interface ChatState {
 }
 
 interface ChatActions {
-  sendMessage: (text: string, options?: { intent?: MessageIntent }) => Promise<void>
+  sendMessage: (
+    text: string,
+    options?: { intent?: MessageIntent; attachments?: AttachmentInput[] },
+  ) => Promise<void>
   /** Course-correct after a stop, keeping the partial work in play. */
   sendSteer: (text: string) => Promise<void>
   /** Carry on from where a stop landed. */
@@ -427,11 +474,23 @@ export const useChatStore = create<ChatState & ChatActions>()(
         persistActiveConversation()
       },
 
-      sendMessage: async (text: string, options?: { intent?: MessageIntent }) => {
+      sendMessage: async (
+        text: string,
+        options?: { intent?: MessageIntent; attachments?: AttachmentInput[] },
+      ) => {
         const branchId = get().messages.at(-1)?.branchId ?? get().activeConversationId
+        const attachments = options?.attachments ?? []
+        // Attachment blocks lead the content, as on Flutter: they are the
+        // transcript record of what was sent, while the paths below are the
+        // inference payload Rust reads.
         const userMsg: Message = {
-          id: crypto.randomUUID(), role: 'user', content: [{ type: 'text', text }],
+          id: crypto.randomUUID(),
+          role: 'user',
+          content: [...attachments.map(attachmentBlock), { type: 'text' as const, text }],
           timestamp: new Date().toISOString(), branchId,
+          ...(attachments.length > 0
+            ? { attachmentPaths: attachments.map((attachment) => attachment.path) }
+            : {}),
           ...(options?.intent ? { intent: options.intent } : {}),
         }
         const assistantId = crypto.randomUUID()
@@ -455,7 +514,12 @@ export const useChatStore = create<ChatState & ChatActions>()(
         // including the new user row here would submit the prompt twice.
         const history = inferenceHistory(get().messages.slice(0, -2), branchId)
 
-        await runInferenceTurn(text, assistantId, branchId, history, get().activeConversationId)
+        await runInferenceTurn(
+          text, assistantId, branchId, history, get().activeConversationId,
+          attachments.length > 0
+            ? { paths: attachments.map((attachment) => attachment.path), userMessageId: userMsg.id }
+            : undefined,
+        )
       },
 
       /** Course-correct after a stop, keeping the partial work in play.
@@ -709,6 +773,11 @@ export const useChatStore = create<ChatState & ChatActions>()(
             diagnostics: message.diagnostics as Message['diagnostics'],
             contextPlanVersion: message.context_plan_version ?? undefined,
             contextTelemetry: message.context_telemetry,
+            // Read back so a resubmit re-sends the same files rather than
+            // silently dropping them.
+            ...(Array.isArray(message.attachments) && message.attachments.length > 0
+              ? { attachmentPaths: message.attachments as string[] }
+              : {}),
           })) : row.messages as Message[]
           return {
             id: row.id, title: row.title, messages,

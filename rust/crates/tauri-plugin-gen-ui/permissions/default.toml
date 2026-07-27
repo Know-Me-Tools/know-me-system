@@ -5,6 +5,8 @@
 description = "Default gen-ui permissions: startup/read/chat intents. Mutating ENTITY commands require the gen-ui:allow-write set explicitly. set-active-lane writes an app setting (a user preference), not entity data, so it belongs here alongside the other chat intents — same category as memory-ingest."
 permissions = [
     "allow-stream-agent-a2ui",
+    "allow-chat-approve-tool-confirmation",
+    "allow-stage-attachment",
     "allow-send-agent-interaction-a2ui",
     "allow-get-active-lane",
     "allow-set-active-lane",

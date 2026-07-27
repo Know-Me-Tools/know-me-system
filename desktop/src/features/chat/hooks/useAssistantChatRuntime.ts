@@ -2,6 +2,7 @@
 import { useExternalStoreRuntime, type ThreadMessageLike } from '@assistant-ui/react'
 import { useEffect } from 'react'
 import type { ContentBlock, Message } from '@/bridge/a2ui/types'
+import { createAttachmentAdapter, takeStagedAttachments } from '../adapters/attachmentAdapter'
 import { useChatStore } from '../stores/chatStore'
 import { useLaneStore } from '../stores/laneStore'
 
@@ -200,18 +201,29 @@ export function useAssistantChatRuntime() {
     convertMessage,
     onNew: async (message) => {
       const text = textFromComposer(message.content)
-      if (!text) return
+      // Resolve the staged paths for whatever the composer is sending. Doing it
+      // here rather than in the store keeps the adapter's bookkeeping out of the
+      // transport layer.
+      const attachments = takeStagedAttachments((message.attachments ?? []).map((item) => item.id))
+      // An attachment-only turn is legitimate — Flutter substitutes the same
+      // prompt so the model is told what to do with the files.
+      const body = text || (attachments.length > 0 ? 'Please review the attached files.' : '')
+      if (!body) return
       // Steer arms the composer rather than sending, so the correction the user
       // then types is what gets marked — routing happens here, at submit time.
       if (pendingSteer) {
         disarmSteer()
-        await sendSteer(text)
+        await sendSteer(body)
         return
       }
-      await sendMessage(text)
+      await sendMessage(body, attachments.length > 0 ? { attachments } : undefined)
     },
     onCancel: cancelActiveRun,
     adapters: {
+      // Registered at last: the Plus button, the dropzone and the chip row have
+      // always rendered, but with no adapter behind them picking a file did
+      // nothing at all.
+      attachments: createAttachmentAdapter(),
       threadList: {
         threadId: activeConversationId,
         threads: conversations.map((conversation) => ({

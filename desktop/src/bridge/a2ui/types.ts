@@ -23,6 +23,12 @@ export interface Message {
   diagnostics?: Record<string, unknown>
   contextPlanVersion?: string
   contextTelemetry?: unknown
+  /** Absolute filesystem paths of the files the user attached to this turn.
+   *
+   *  Kept alongside the `artifact` blocks that render them: the blocks are the
+   *  transcript, these are the inference payload Rust reads and extracts. Both
+   *  are persisted so a resubmit can re-send the same files. */
+  attachmentPaths?: string[]
   /** Which agent + provider + model produced this assistant turn, projected from
    *  the run's effective_run_policy. Any field may be absent. */
   provenance?: MessageProvenance

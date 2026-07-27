@@ -57,3 +57,8 @@ CREATE INDEX IF NOT EXISTS chat_messages_conversation_branch
 -- deliberately NOT picked up by the `registerEntityFromSql` path, which filters to
 -- statements containing "CREATE TABLE" — that path only needs the table shape.
 ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS intent text;
+-- `attachments` has been in the CREATE TABLE above since before release, but it
+-- was only ever written as a hardcoded empty array, so a database created before
+-- the column existed was never caught. Now that real values are persisted, that
+-- latent gap becomes a failing INSERT on every message.
+ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS attachments jsonb NOT NULL DEFAULT '[]'::jsonb;

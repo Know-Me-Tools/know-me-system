@@ -384,3 +384,81 @@ describe('chatStore cancel failure handling', () => {
     expect(message?.error?.message).toContain('bridge is gone')
   })
 })
+
+describe('attachment persistence round-trip', () => {
+  it('writes the real paths instead of a hardcoded empty array', async () => {
+    // `attachments: []` used to be hardcoded on every persist, so the column was
+    // write-only: the chips rendered in the transcript and the files were gone
+    // on reload, with nothing to resubmit.
+    vi.useFakeTimers()
+    try {
+      // Sending is what triggers a persist; the store debounces it, so the
+      // timers are advanced rather than waiting on wall-clock.
+      await useChatStore.getState().sendMessage('look at these', {
+        attachments: [
+          { path: '/tmp/a.pdf', name: 'a.pdf', size: 2048, mime: 'application/pdf' },
+          { path: '/tmp/b.png', name: 'b.png', size: 4096, mime: 'image/png' },
+        ],
+      })
+      await vi.runAllTimersAsync()
+    } finally {
+      vi.useRealTimers()
+    }
+
+    const rows = mocks.saveMessageRecords.mock.calls.at(-1)?.[0] as
+      { role: string; attachments: unknown; blocks: { type: string; kind?: string }[] }[] | undefined
+    const userRow = rows?.find((row) => row.role === 'user')
+    expect(userRow?.attachments).toEqual(['/tmp/a.pdf', '/tmp/b.png'])
+    // The blocks are the transcript half of the same turn: they lead the
+    // content so the files read as sent alongside the prompt, as on Flutter.
+    expect(userRow?.blocks.filter((block) => block.kind === 'attachment')).toHaveLength(2)
+    expect(userRow?.blocks.at(-1)?.type).toBe('text')
+  })
+
+  it('hydrates the paths back onto the message', async () => {
+    mocks.listConversationRecords.mockResolvedValue([
+      { id: 'conversation-1', tenant_id: 't', title: 'Chat', created_at: '2026-07-19T12:00:00.000Z', updated_at: '2026-07-19T12:00:00.000Z', messages: [] },
+    ])
+    mocks.listMessageRecords.mockResolvedValue([{
+      id: 'user-1', tenant_id: 't', conversation_id: 'conversation-1',
+      parent_message_id: null, branch_id: 'conversation-1', sequence: 0,
+      role: 'user', blocks: [{ type: 'text', text: 'look at these' }],
+      run_id: null, run_status: null, run_phase: null, status_message: null,
+      intent: null, error: null,
+      attachments: ['/tmp/a.pdf'],
+      generation_settings: null, diagnostics: null,
+      context_plan_version: null, context_telemetry: null,
+      created_at: '2026-07-19T12:00:00.000Z', updated_at: '2026-07-19T12:00:00.000Z',
+    }])
+    useChatStore.setState({ isHydrated: false })
+
+    await useChatStore.getState().hydrateConversations()
+
+    const message = useChatStore.getState().messages.find((item) => item.id === 'user-1')
+    expect(message?.attachmentPaths).toEqual(['/tmp/a.pdf'])
+  })
+
+  it('leaves attachmentPaths absent on a message that had none', async () => {
+    // An empty array and "no attachments" must not be conflated — the absent
+    // case is what every ordinary turn looks like.
+    mocks.listConversationRecords.mockResolvedValue([
+      { id: 'conversation-1', tenant_id: 't', title: 'Chat', created_at: '2026-07-19T12:00:00.000Z', updated_at: '2026-07-19T12:00:00.000Z', messages: [] },
+    ])
+    mocks.listMessageRecords.mockResolvedValue([{
+      id: 'user-2', tenant_id: 't', conversation_id: 'conversation-1',
+      parent_message_id: null, branch_id: 'conversation-1', sequence: 0,
+      role: 'user', blocks: [{ type: 'text', text: 'plain question' }],
+      run_id: null, run_status: null, run_phase: null, status_message: null,
+      intent: null, error: null, attachments: [],
+      generation_settings: null, diagnostics: null,
+      context_plan_version: null, context_telemetry: null,
+      created_at: '2026-07-19T12:00:00.000Z', updated_at: '2026-07-19T12:00:00.000Z',
+    }])
+    useChatStore.setState({ isHydrated: false })
+
+    await useChatStore.getState().hydrateConversations()
+
+    const message = useChatStore.getState().messages.find((item) => item.id === 'user-2')
+    expect(message?.attachmentPaths).toBeUndefined()
+  })
+})

@@ -29,20 +29,121 @@ fn app_data_dir<R: Runtime>(app: &tauri::AppHandle<R>) -> Result<std::path::Path
 // frontend — mobile's frb bridge calls the equivalent Rust fn `chat_send`
 // directly by name (no separate invoke-key layer), so the two ecosystems
 // have different but internally consistent naming.
+///
+/// `attachment_paths` and `user_message_id` mirror mobile's `chat_send`. When
+/// there are no attachments this takes the same path it always has; with them
+/// it reaches `send_with_attachments`, which extracts file content and
+/// correlates it to the user message for memory ingest. Desktop previously had
+/// no way to reach that function at all, so the composer's attachment UI was a
+/// dead control.
 #[tauri::command]
 pub async fn stream_agent_a2ui(
     user_message: String,
     messages: Vec<gen_ui_types::inference::InferenceMessage>,
     conversation_id: String,
     branch_id: String,
+    attachment_paths: Option<Vec<String>>,
+    user_message_id: Option<String>,
 ) -> Result<String> {
-    tracing::info!(history_items = messages.len(), "desktop chat turn starting");
-    let run_id = gen_ui_agent::chat::send(user_message, messages, conversation_id, branch_id)
+    let attachment_paths = attachment_paths.unwrap_or_default();
+    tracing::info!(
+        history_items = messages.len(),
+        attachments = attachment_paths.len(),
+        "desktop chat turn starting"
+    );
+    let run_id = if attachment_paths.is_empty() {
+        gen_ui_agent::chat::send(user_message, messages, conversation_id, branch_id).await
+    } else {
+        // `send_with_attachments` correlates extracted content to the user
+        // message, so it needs that id. Every real caller supplies one; require
+        // it rather than inventing a value that would silently mis-correlate
+        // the extracted content against a message that does not exist.
+        let user_message_id = user_message_id.ok_or_else(|| {
+            gen_ui_types::CoreError::Terminal(
+                "user_message_id is required when sending attachments".to_string(),
+            )
+        })?;
+        gen_ui_agent::chat::send_with_attachments(
+            user_message,
+            messages,
+            attachment_paths,
+            conversation_id,
+            branch_id,
+            user_message_id,
+        )
         .await
-        .map_err(gen_ui_types::CoreError::from)
-        .map_err(crate::Error::from)?;
+    }
+    .map_err(gen_ui_types::CoreError::from)
+    .map_err(crate::Error::from)?;
     tracing::info!(run_id = %run_id, "desktop chat run started");
     Ok(run_id)
+}
+
+/// Stage an attachment the user picked in the browser, returning its path.
+///
+/// The web composer hands React a `File` (bytes in memory); Rust's attachment
+/// pipeline reads from the filesystem, because copying multi-megabyte files
+/// through IPC on every turn would be wasteful. This bridges the two once, at
+/// pick time: write the bytes under the app data dir and hand back the path
+/// that `stream_agent_a2ui` will read.
+///
+/// The 25 MB ceiling matches the composer's own limit and is enforced here too
+/// — a client-side check is a courtesy, not a control.
+#[tauri::command]
+pub async fn stage_attachment<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    file_name: String,
+    bytes: Vec<u8>,
+) -> Result<String> {
+    const MAX_BYTES: usize = 25 * 1024 * 1024;
+    if bytes.len() > MAX_BYTES {
+        return Err(gen_ui_types::CoreError::Terminal(format!(
+            "{file_name} is larger than the 25 MB attachment limit"
+        ))
+        .into());
+    }
+    let dir = app_data_dir(&app)?.join("attachments");
+    std::fs::create_dir_all(&dir).map_err(|error| gen_ui_types::CoreError::Io(error.to_string()))?;
+    // Take only the final component: a crafted name like "../../etc/passwd"
+    // must not escape the staging directory.
+    let base = std::path::Path::new(&file_name)
+        .file_name()
+        .map(|name| name.to_string_lossy().to_string())
+        .filter(|name| !name.is_empty())
+        .unwrap_or_else(|| "attachment".to_string());
+    // Prefix with a fresh id so two files of the same name in one turn — or
+    // across turns — cannot overwrite each other.
+    let path = dir.join(format!("{}-{}", nanoid_like(), base));
+    std::fs::write(&path, &bytes)
+        .map_err(|error| gen_ui_types::CoreError::Io(error.to_string()))?;
+    Ok(path.to_string_lossy().to_string())
+}
+
+/// Short unique prefix for staged attachment filenames. Avoids taking a uuid
+/// dependency on this crate for one call site.
+fn nanoid_like() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or_default();
+    format!("{nanos:x}")
+}
+
+/// Approve a tool call the local model proposed but KnowMe refused to run.
+///
+/// Deliberately its own command rather than a variant of the interaction
+/// channel: routing approvals through free-form interaction text would let the
+/// UI spoof tool execution. Mirrors mobile's `chat_approve_tool_confirmation`.
+/// Desktop already had the whole approval CARD built and could set
+/// `tool_approval: 'ask'` from its own toolbar — with no command behind it,
+/// that combination was an unresolvable stall.
+#[tauri::command]
+pub async fn chat_approve_tool_confirmation(approval_id: String) -> Result<String> {
+    gen_ui_agent::chat::approve_tool_confirmation(approval_id)
+        .await
+        .map_err(gen_ui_types::CoreError::from)
+        .map_err(Into::into)
 }
 
 /// Continue a conversation from a structured A2UI/client interaction.

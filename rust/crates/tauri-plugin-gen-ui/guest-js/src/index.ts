@@ -141,13 +141,41 @@ export function streamAgentA2ui(
   messages: InferenceHistoryMessage[],
   conversationId: string,
   branchId: string,
+  /**
+   * Absolute filesystem paths of user attachments. Rust reads and extracts
+   * these; passing bytes would mean copying multi-megabyte files across the
+   * IPC boundary for no benefit. Requires `userMessageId` — Rust correlates the
+   * extracted content back to that message for memory ingest.
+   */
+  attachmentPaths?: string[],
+  userMessageId?: string,
 ): Promise<string> {
   return invoke<string>(cmd("stream_agent_a2ui"), {
     userMessage,
     messages,
     conversationId,
     branchId,
+    attachmentPaths: attachmentPaths ?? [],
+    userMessageId: userMessageId ?? null,
   });
+}
+/**
+ * Approve a tool call the local model proposed but KnowMe refused to run.
+ *
+ * Its own command rather than a variant of the interaction channel: routing
+ * approvals through free-form interaction text would let the UI spoof tool
+ * execution. Returns the run id of the continuation.
+ *
+ * Approvals are process-local — an approval card restored after a restart has
+ * no pending registration behind it, and the call will fail.
+ */
+export function stageAttachment(fileName: string, bytes: Uint8Array): Promise<string> {
+  // Array.from because Tauri's IPC serialises to JSON — a Uint8Array would
+  // arrive as an object of index keys rather than a byte sequence.
+  return invoke<string>(cmd("stage_attachment"), { fileName, bytes: Array.from(bytes) });
+}
+export function chatApproveToolConfirmation(approvalId: string): Promise<string> {
+  return invoke<string>(cmd("chat_approve_tool_confirmation"), { approvalId });
 }
 /**
  * Continue a chat run from a structured client/A2UI interaction.

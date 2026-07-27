@@ -5,6 +5,8 @@ Default gen-ui permissions: startup/read/chat intents. Mutating ENTITY commands 
 #### This default permission set includes the following:
 
 - `allow-stream-agent-a2ui`
+- `allow-chat-approve-tool-confirmation`
+- `allow-stage-attachment`
 - `allow-send-agent-interaction-a2ui`
 - `allow-get-active-lane`
 - `allow-set-active-lane`
