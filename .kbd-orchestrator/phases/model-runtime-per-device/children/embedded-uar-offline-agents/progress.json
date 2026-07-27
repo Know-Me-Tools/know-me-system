@@ -138,6 +138,14 @@
           "pr": "https://github.com/Prometheus-AGS/universal-agent-runtime/pull/174 (stacked on #173)",
           "branch": "uar-ui-verify-gates",
           "notes": "openspec/changes/uar-ui-verify-gates/verification-notes.md + screenshots/ (24 PNG)"
+        },
+        "bdd-ui-convergence-suite": {
+          "status": "merged",
+          "appliedAt": "2026-07-22T13:45:00Z",
+          "by": "kimi",
+          "pr": "https://github.com/Prometheus-AGS/universal-agent-runtime/pull/177",
+          "verified": "8/8 UI convergence BDD scenarios pass locally (playwright-bdd, JWT configured-not-required, vite proxy :8085); per-scenario WebM + named PNG evidence + cucumber-report.json; suite unblocked by drafts quarantine",
+          "notes": "operator direction: BDD over CI/CD for testing; fixture for user-bubble message added (15 entries)"
         }
       }
     }
