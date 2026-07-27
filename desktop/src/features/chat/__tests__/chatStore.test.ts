@@ -520,3 +520,54 @@ describe('approveToolConfirmation', () => {
     expect(placeholder?.error?.code).toBe('tool_approval_start_failed')
   })
 })
+
+describe('provenance persistence round-trip', () => {
+  it('hydrates provenance so it survives a reload', async () => {
+    // Provenance was captured and rendered but never stored, so every assistant
+    // bubble lost its "which agent + provider + model" chip on reload — while
+    // Flutter showed it on every historical turn.
+    mocks.listConversationRecords.mockResolvedValue([
+      { id: 'conversation-1', tenant_id: 't', title: 'Chat', created_at: '2026-07-19T12:00:00.000Z', updated_at: '2026-07-19T12:00:00.000Z', messages: [] },
+    ])
+    mocks.listMessageRecords.mockResolvedValue([{
+      id: 'assistant-9', tenant_id: 't', conversation_id: 'conversation-1',
+      parent_message_id: null, branch_id: 'conversation-1', sequence: 0,
+      role: 'assistant', blocks: [{ type: 'text', text: 'answer' }],
+      run_id: null, run_status: 'complete', run_phase: null, status_message: null,
+      intent: null, error: null, attachments: [],
+      provenance: { agentId: 'writer-agent', providerId: 'on-device', modelId: 'qwen' },
+      generation_settings: null, diagnostics: null,
+      context_plan_version: null, context_telemetry: null,
+      created_at: '2026-07-19T12:00:00.000Z', updated_at: '2026-07-19T12:00:00.000Z',
+    }])
+    useChatStore.setState({ isHydrated: false })
+
+    await useChatStore.getState().hydrateConversations()
+
+    const message = useChatStore.getState().messages.find((item) => item.id === 'assistant-9')
+    expect(message?.provenance?.agentId).toBe('writer-agent')
+    expect(message?.provenance?.modelId).toBe('qwen')
+  })
+
+  it('leaves provenance absent when the run reported none', async () => {
+    mocks.listConversationRecords.mockResolvedValue([
+      { id: 'conversation-1', tenant_id: 't', title: 'Chat', created_at: '2026-07-19T12:00:00.000Z', updated_at: '2026-07-19T12:00:00.000Z', messages: [] },
+    ])
+    mocks.listMessageRecords.mockResolvedValue([{
+      id: 'assistant-10', tenant_id: 't', conversation_id: 'conversation-1',
+      parent_message_id: null, branch_id: 'conversation-1', sequence: 0,
+      role: 'assistant', blocks: [{ type: 'text', text: 'answer' }],
+      run_id: null, run_status: 'complete', run_phase: null, status_message: null,
+      intent: null, error: null, attachments: [], provenance: null,
+      generation_settings: null, diagnostics: null,
+      context_plan_version: null, context_telemetry: null,
+      created_at: '2026-07-19T12:00:00.000Z', updated_at: '2026-07-19T12:00:00.000Z',
+    }])
+    useChatStore.setState({ isHydrated: false })
+
+    await useChatStore.getState().hydrateConversations()
+
+    expect(useChatStore.getState().messages.find((item) => item.id === 'assistant-10')?.provenance)
+      .toBeUndefined()
+  })
+})

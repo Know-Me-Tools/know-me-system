@@ -100,6 +100,9 @@ function persistActiveConversation(): void {
       // Was hardcoded `[]`, so the column was write-only and every attachment
       // vanished on reload while the transcript still showed its chips.
       attachments: message.attachmentPaths ?? [],
+      // Rendered on every assistant bubble but never stored, so it disappeared
+      // on reload while Flutter kept showing it on historical turns.
+      provenance: message.provenance ?? null,
       generation_settings: message.generationSettings ?? null,
       diagnostics: message.diagnostics ?? null,
       context_plan_version: message.contextPlanVersion ?? null,
@@ -835,6 +838,9 @@ export const useChatStore = create<ChatState & ChatActions>()(
             // silently dropping them.
             ...(Array.isArray(message.attachments) && message.attachments.length > 0
               ? { attachmentPaths: message.attachments as string[] }
+              : {}),
+            ...(message.provenance
+              ? { provenance: message.provenance as Message['provenance'] }
               : {}),
           })) : row.messages as Message[]
           return {

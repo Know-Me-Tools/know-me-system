@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS chat_messages (
   intent text,
   error jsonb,
   attachments jsonb NOT NULL DEFAULT '[]'::jsonb,
+  provenance jsonb,
   generation_settings jsonb,
   diagnostics jsonb,
   context_plan_version text,
@@ -62,3 +63,7 @@ ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS intent text;
 -- the column existed was never caught. Now that real values are persisted, that
 -- latent gap becomes a failing INSERT on every message.
 ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS attachments jsonb NOT NULL DEFAULT '[]'::jsonb;
+-- Which agent + provider + model produced an assistant turn. Captured and
+-- rendered since it shipped, but never stored — so it vanished on reload while
+-- Flutter showed it on every historical turn.
+ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS provenance jsonb;

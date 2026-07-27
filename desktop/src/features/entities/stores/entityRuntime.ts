@@ -154,6 +154,9 @@ export interface MessageRecord extends Record<string, unknown> {
   intent: string | null
   error: unknown
   attachments: unknown[]
+  /** Which agent + provider + model produced this assistant turn; null on a
+   *  user turn or when the run reported none. */
+  provenance: unknown
   generation_settings: unknown
   diagnostics: unknown
   context_plan_version: string | null
