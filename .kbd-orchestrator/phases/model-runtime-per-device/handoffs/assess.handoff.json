@@ -1,11 +1,12 @@
 {
   "stage": "assess",
-  "completedAt": "2026-07-20T20:14:12Z",
-  "outputs": [
-    "assessment.md"
-  ],
-  "nextStage": "analyze",
-  "summaryForNext": "Mobile UAR is service-only; the SDK embedded Runtime stores state=None. Analyze a mobile-safe in-process kernel, local driver/provider registration, persistence/profile boundaries, and offline certification without weakening UAR ownership.",
-  "skipped": false,
-  "skipReason": null
+  "phase": "model-runtime-per-device",
+  "recordedAt": "2026-07-27",
+  "artifact": "assessment.md",
+  "summary": "Media rendering + download/share addendum. The PNG-as-document bug has five mime-blind hardcodes across both codebases, and two blockers make it more than a kind swap: ContentBlock::Image is a write-dead variant constructed by nothing in rust/crates, and no renderer accepts a local path — which is moot anyway because file_picker returns a purgeable cached path on Android. Download/share is absent on all four surfaces; share_plus cannot share files on Linux, and the Tauri save path needs two new plugins across five registration points.",
+  "openQuestions": [
+    "Where do attachment bytes live for durable rendering: base64 inline in the block, or a copy into app storage with a stable path?",
+    "Is Linux desktop in scope? share_plus 13.3.0 does not support file sharing there.",
+    "Should Rust construct the image block once for both UIs, or should each UI construct it at attach time?"
+  ]
 }
