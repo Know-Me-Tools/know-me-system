@@ -58,7 +58,12 @@ universal-agent-runtime-sdk = { path = "../../vendor/universal-agent-runtime/sdk
 # The agent layer owns the in-process UAR/local-model seam.  Mobile and desktop
 # inject a platform `InferenceProvider`; this dependency supplies only the
 # transport-free kernel/driver contracts and never starts a listener.
-universal-agent-runtime = { path = "../../vendor/universal-agent-runtime", default-features = false, features = ["embedded-mobile", "in-memory-backend"] }
+# `surreal-backend` gates `uar::persistence::providers::surreal`. Without it
+# SurrealDbProvider does not exist in the build at all, so the embedded runtime
+# can only be handed an InMemoryProvider — every agent, skill, policy and
+# conversation it holds dies with the process. `in-memory-backend` stays for
+# tests, which need a store that requires no filesystem.
+universal-agent-runtime = { path = "../../vendor/universal-agent-runtime", default-features = false, features = ["embedded-mobile", "in-memory-backend", "surreal-backend"] }
 
 [target.'cfg(target_os = "ios")'.dependencies]
 # Cargo feature-unifies this into the same apple-native-keyring-store instance
