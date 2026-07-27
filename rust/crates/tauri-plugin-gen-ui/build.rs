@@ -4,10 +4,14 @@
 //! in src/lib.rs.
 const COMMANDS: &[&str] = &[
     "stream_agent_a2ui",
+    "chat_approve_tool_confirmation",
+    "stage_attachment",
+    "resolve_remote_content",
     "send_agent_interaction_a2ui",
     "promote_a2ui_component",
     "get_active_lane",
     "set_active_lane",
+    "lane_availability",
     "has_local_engine",
     "cancel_agent_run",
     "prepare_local_model",
