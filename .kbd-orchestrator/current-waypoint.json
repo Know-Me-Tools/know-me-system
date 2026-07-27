@@ -1,7 +1,7 @@
 {
   "assessNote": "2026-07-27 assess found the 2026-07-20 assessment largely obsolete: four headline claims verified FALSE against code. The change's 14 open tasks are NOT trustworthy \u2014 re-verify each against code before planning.",
   "blockedOn": "",
-  "certificationStatus": "android persistence: PASS; android offline: 4 PASS / 1 PARTIAL / 1 FAIL (both harness, not runtime); desktop persistence: PASS; ios: not run",
+  "certificationStatus": "android persistence PASS; android offline 4/4 PASS + seeded agents PASS; desktop persistence PASS; a2ui device-blocked (widget tests pass); ios not run",
   "change": "embed-uar-mobile-offline",
   "changesCompleted": 0,
   "changesTotal": 1,
@@ -10,8 +10,8 @@
   ],
   "childPointer": null,
   "completionMetric": "implementation",
-  "currentTask": "Offline certification DONE on Android at HEAD: 4 gates PASS with both radios down and unreachability probed; full local tool loop observed. Two harness defects remain (restart-recovery literal-marker prompt; branch-actions SQLITE_NOTADB), both left failing rather than loosened.",
-  "exactNextCommand": "fix the two Android harness defects so 5.4 runs clean",
+  "currentTask": "5.4 Android offline certification is DONE except A2UI, which is blocked structurally (nothing on this build emits an artifact; widget layer already covered by a2ui_surface_test.dart). Both harness defects fixed: branch-actions exit 69 (c7d5db2) and the Settings foreground-steal (d504d86). 4/4 gates PASS.",
+  "exactNextCommand": "close 3.3 \u2014 advertise offline-unavailable resources with a reason instead of empty arrays",
   "implementationCompleted": 0,
   "implementationTotal": 1,
   "nextPendingChange": "embed-uar-mobile-offline",
@@ -36,5 +36,5 @@
   "sourceTool": "claude-code",
   "stage": "implementation_ready",
   "status": "implementation_ready",
-  "updatedAt": "2026-07-27T20:37:29Z"
+  "updatedAt": "2026-07-27T21:16:57Z"
 }

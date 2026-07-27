@@ -20,7 +20,16 @@
 
 - [x] 3.1 Inject durable sandboxed persistence for agents, skills, policies, settings, memory, knowledge, conversations, run state, and A2UI data
 - [ ] 3.2 Expose direct FFI operations for agent administration, provider/model catalog, settings, skills, MCP/native tools, knowledge, memory, run policy, and A2UI registry/actions
-- [ ] 3.3 Ensure network/process-dependent resources advertise requirements and are visibly unavailable under offline mobile policy
+- [/] 3.3 Ensure network/process-dependent resources advertise requirements and are visibly unavailable under offline mobile policy
+  - RUST DONE: ChatControlPlaneCatalog and UarAdminSnapshot now carry an
+    `unavailable: [{resource, reason, platformLimitation}]` list. Previously a
+    client could not tell "no skills configured" from "skills unavailable
+    here" — both arrived as []. Carried ALONGSIDE the arrays so existing
+    consumers keep working; omitted entirely when nothing is unavailable.
+    2 contract tests; 92/92 gen_ui_agent tests pass.
+  - REMAINING: neither UI consumes it yet. Flutter and React still render the
+    empty arrays without the reason, so the user-visible half of this task is
+    not done.
 - [x] 3.4 Verify built-in default and orchestrator agents are seeded, protected from deletion, and default to the local model without keys
 
 ## 4. Client Integration

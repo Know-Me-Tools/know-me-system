@@ -38,6 +38,43 @@ pub struct ChatControlPlaneCatalog {
     pub skills: serde_json::Value,
     pub tools: serde_json::Value,
     pub knowledge_bases: serde_json::Value,
+    /// Resources this deployment CANNOT provide, each with a reason.
+    ///
+    /// Without this a client cannot tell "no skills are configured" from
+    /// "skills are unavailable on this platform" — both arrive as `[]`. That
+    /// ambiguity is the defect: an offline surface silently omits capabilities
+    /// instead of saying they are missing and why.
+    ///
+    /// Carried ALONGSIDE the arrays rather than replacing them, so existing
+    /// consumers that map `skills`/`tools`/`knowledgeBases` keep working
+    /// unchanged and can adopt this incrementally.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub unavailable: Vec<UnavailableResource>,
+}
+
+/// A capability the current deployment cannot serve, and why.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UnavailableResource {
+    /// Catalog key this refers to: `skills`, `tools`, `knowledgeBases`, …
+    pub resource: String,
+    /// Human-readable cause, safe to surface directly in a UI.
+    pub reason: String,
+    /// True when the cause is structural on this platform rather than a
+    /// transient outage — the UI should present it as "not supported here",
+    /// not "retry later".
+    pub platform_limitation: bool,
+}
+
+impl UnavailableResource {
+    fn embedded(resource: &str) -> Self {
+        Self {
+            resource: resource.to_string(),
+            reason: "not available on the embedded runtime yet (no HTTP service on this platform)"
+                .to_string(),
+            platform_limitation: true,
+        }
+    }
 }
 
 /// UAR-owned configuration and runtime resources displayed by the first-party
@@ -54,6 +91,9 @@ pub struct UarAdminSnapshot {
     pub knowledge_bases: serde_json::Value,
     pub mcp_servers: serde_json::Value,
     pub memories: serde_json::Value,
+    /// See `ChatControlPlaneCatalog::unavailable` — same contract.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub unavailable: Vec<UnavailableResource>,
 }
 
 pub async fn catalog() -> Result<ChatControlPlaneCatalog, AgentError> {
@@ -77,6 +117,14 @@ pub async fn catalog() -> Result<ChatControlPlaneCatalog, AgentError> {
             skills: serde_json::json!([]),
             tools: serde_json::json!([]),
             knowledge_bases: serde_json::json!([]),
+            // The arrays stay empty, but they are no longer SILENTLY empty:
+            // a client can now say "skills are unavailable on this platform"
+            // instead of implying none are configured.
+            unavailable: vec![
+                UnavailableResource::embedded("skills"),
+                UnavailableResource::embedded("tools"),
+                UnavailableResource::embedded("knowledgeBases"),
+            ],
         });
     }
     let client = chat::uar_service_client().await?;
@@ -93,6 +141,9 @@ pub async fn catalog() -> Result<ChatControlPlaneCatalog, AgentError> {
         skills,
         tools,
         knowledge_bases,
+        // The service serves every resource, so nothing is advertised as
+        // unavailable.
+        unavailable: Vec::new(),
     })
 }
 
@@ -113,6 +164,15 @@ pub async fn admin_snapshot() -> Result<UarAdminSnapshot, AgentError> {
             knowledge_bases: serde_json::json!([]),
             mcp_servers: serde_json::json!([]),
             memories: serde_json::json!([]),
+            // Same defect as the catalog: five empty arrays that a client
+            // cannot distinguish from "nothing configured".
+            unavailable: vec![
+                UnavailableResource::embedded("skills"),
+                UnavailableResource::embedded("tools"),
+                UnavailableResource::embedded("knowledgeBases"),
+                UnavailableResource::embedded("mcpServers"),
+                UnavailableResource::embedded("memories"),
+            ],
         });
     }
     let client = chat::uar_service_client().await?;
@@ -137,6 +197,7 @@ pub async fn admin_snapshot() -> Result<UarAdminSnapshot, AgentError> {
         knowledge_bases: snapshot_value(knowledge_bases),
         mcp_servers: snapshot_value(mcp_servers),
         memories: snapshot_value(memories),
+        unavailable: Vec::new(),
     })
 }
 
@@ -329,4 +390,65 @@ fn snapshot_value(
             "error": error.to_string(),
         })
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // The defect this guards: an empty `skills` array is indistinguishable from
+    // "skills are unavailable here" unless something says so. A client that
+    // cannot tell them apart silently omits a capability instead of explaining
+    // it — which is exactly what an offline surface must not do.
+    #[test]
+    fn an_embedded_catalog_says_why_its_registries_are_empty() {
+        let catalog = ChatControlPlaneCatalog {
+            agents: serde_json::json!({ "runtime_agents": [], "federated_agents": [] }),
+            skills: serde_json::json!([]),
+            tools: serde_json::json!([]),
+            knowledge_bases: serde_json::json!([]),
+            unavailable: vec![
+                UnavailableResource::embedded("skills"),
+                UnavailableResource::embedded("tools"),
+                UnavailableResource::embedded("knowledgeBases"),
+            ],
+        };
+        let json = serde_json::to_value(&catalog).expect("serializes");
+
+        let listed = json["unavailable"].as_array().expect("unavailable is an array");
+        assert_eq!(listed.len(), 3, "every empty registry must be accounted for");
+
+        for entry in listed {
+            assert!(
+                !entry["reason"].as_str().unwrap_or_default().is_empty(),
+                "an unavailable resource with no reason is no better than an empty array"
+            );
+            assert_eq!(
+                entry["platformLimitation"], true,
+                "embedded gaps are structural, so a UI must not offer 'retry later'"
+            );
+        }
+
+        // camelCase on the wire: both clients parse that shape.
+        assert!(json.get("unavailable").is_some());
+        assert!(listed[0].get("platformLimitation").is_some());
+    }
+
+    // A deployment that serves everything must NOT advertise phantom gaps, and
+    // the field disappears entirely rather than shipping an empty array.
+    #[test]
+    fn a_service_catalog_advertises_nothing_as_unavailable() {
+        let catalog = ChatControlPlaneCatalog {
+            agents: serde_json::json!({}),
+            skills: serde_json::json!([{ "id": "s1" }]),
+            tools: serde_json::json!([]),
+            knowledge_bases: serde_json::json!([]),
+            unavailable: Vec::new(),
+        };
+        let json = serde_json::to_value(&catalog).expect("serializes");
+        assert!(
+            json.get("unavailable").is_none(),
+            "skip_serializing_if keeps the wire clean for deployments with no gaps"
+        );
+    }
 }
