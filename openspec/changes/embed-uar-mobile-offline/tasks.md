@@ -39,6 +39,17 @@
     /tmp/knowme-desktop-uar-persistence.json). Gate proven in both directions —
     it FAILS when state is wiped between phases. Prompting/tool loop/A2UI/
     cancellation remain uncertified on desktop.
-- [ ] 5.4 Install and certify physical Android with networking disabled, including local default/orchestrator agents, tools, A2UI, cancellation, and restart restoration
+- [/] 5.4 Install and certify physical Android with networking disabled, including local default/orchestrator agents, tools, A2UI, cancellation, and restart restoration
+  - networking IS now disabled and PROVEN (both radios + reachability probe;
+    `svc wifi disable` alone left the device online over mobile data).
+  - APK built at HEAD; report records currentMobileIntegration=embedded_library,
+    replacing the prior projection_only evidence.
+    docs/certification/2026-07-27/android-offline-embedded-runtime.json
+  - offline PASS: cancellation, second-send, multiturn-history, steer-intents;
+    full tool loop (generate -> tool call -> tool result -> 160 chars) observed.
+  - NOT yet clean: restart-recovery FAILS on a literal-marker assertion the
+    model satisfies by calling a tool instead; branch-actions exits 26
+    (SQLITE_NOTADB) in its own tooling. Both are harness defects, not runtime
+    failures — left failing rather than loosened.
 - [ ] 5.5 Certify iOS device or simulator with networking disabled against the same functional suite
 - [ ] 5.6 Record logs, screenshots, performance, KBD reflection, Prometheus wiki entries, and Karpathy success/failure learning records
