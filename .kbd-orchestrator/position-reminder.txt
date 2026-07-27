@@ -1,10 +1,20 @@
 POSITION REMINDER — read this as your FIRST tool call every turn
-Phase: model-runtime-per-device
-Step: 4 of 5
-Stage: executing
-Next command: unknown
+Phase: embedded-uar-offline-agents (child of model-runtime-per-device)
+Step: 0 of 1
+Stage: assessed
+Next command: /kbd-plan embedded-uar-offline-agents
+
+BLOCKED ON OPERATOR — three questions from the 2026-07-27 assess:
+  1. Where does the mobile SurrealDB file live — KnowMe's existing
+     memory/graph-RAG instance, or a second store?
+  2. What happens to in-memory state on upgrade? No RAM->disk migration exists.
+  3. Is desktop in scope for the same swap? It shares the embedded runtime path.
+
+DO NOT run /opsx:apply from here. The assess found the change's 14 open tasks
+untrustworthy — several describe already-shipped, device-certified work.
+Applying would skip planning and redo completed work.
 
 Required signal format (emit BEFORE any tool call):
-  Starting <kbd-skill> — model-runtime-per-device (step 4 of 5)
+  Starting <kbd-skill> — embedded-uar-offline-agents (step 0 of 1)
   [do work]
-  Completed <kbd-skill> — model-runtime-per-device (step 4 of 5)
+  Completed <kbd-skill> — embedded-uar-offline-agents (step 0 of 1)

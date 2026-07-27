@@ -1,12 +1,12 @@
 {
-  "phase": "model-runtime-per-device",
+  "phase": "embedded-uar-offline-agents",
   "previousPhase": "on-device-qwen35",
   "change": "embed-uar-mobile-offline",
-  "status": "implementation_ready",
-  "currentTask": "embed-uar-mobile-offline task 3.1 \u2014 inject durable sandboxed persistence (swap InMemoryProvider for SurrealDbProvider)",
+  "status": "assessed",
+  "currentTask": "Plan embed-uar-mobile-offline. The ONE verified gap is task 3.1: uar.rs:880 builds the embedded runtime with InMemoryProvider, so all embedded-runtime state is lost on process death.",
   "nextPendingChange": "embed-uar-mobile-offline",
   "sourceTool": "claude-code",
-  "exactNextCommand": "/opsx:apply embed-uar-mobile-offline",
+  "exactNextCommand": "/kbd-plan embedded-uar-offline-agents",
   "parentPhase": "model-runtime-per-device",
   "childPhases": [
     "embedded-uar-offline-agents"
@@ -32,5 +32,12 @@
     "closedAt": "2026-07-27",
     "evidence": "docs/certification/2026-07-27/ \u2014 Android, iOS and desktop reports",
     "note": "The counters BELOW describe the NEXT change (embed-uar-mobile-offline task 3.1) per main's retarget, not this closed phase. Recorded separately so a 0/1 reading is not mistaken for the phase reopening."
-  }
+  },
+  "stage": "assess_complete",
+  "blockedOn": [
+    "Where does the mobile SurrealDB file live \u2014 KnowMe's existing instance or a second store?",
+    "What happens to in-memory state on upgrade? No RAM->disk migration exists.",
+    "Is desktop in scope for the same swap? It shares the embedded runtime path."
+  ],
+  "assessNote": "2026-07-27 assess found the 2026-07-20 assessment largely obsolete: four headline claims verified FALSE against code. The change's 14 open tasks are NOT trustworthy \u2014 re-verify each against code before planning."
 }
