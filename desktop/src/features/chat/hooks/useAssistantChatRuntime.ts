@@ -75,14 +75,40 @@ function toAssistantParts(blocks: ContentBlock[]): AssistantPart[] {
   })
 }
 
-function convertMessage(message: Message): ThreadMessageLike {
+/** Map our run status onto assistant-ui's message status.
+ *
+ *  A cancelled turn must report `incomplete/cancelled`, not `complete/stop`.
+ *  Reporting a stop as a normal completion is how the stopped-turn state became
+ *  invisible to assistant-ui: `incomplete` + `reason: 'cancelled'` is first-class
+ *  in @assistant-ui/core, and the stopped-turn action bar keys off it.
+ *
+ *  `error` deliberately still reports `complete/stop`. Giving it
+ *  `incomplete/error` would make `MessagePrimitive.Error` render *in addition to*
+ *  the existing `runError` data part above — duplicate error text on every failed
+ *  run. Collapsing those two is a separate change.
+ */
+export function assistantStatus(message: Message): ThreadMessageLike['status'] {
+  if (message.isStreaming) return { type: 'running' }
+  if (message.runStatus === 'cancelled') return { type: 'incomplete', reason: 'cancelled' }
+  return { type: 'complete', reason: 'stop' }
+}
+
+export function convertMessage(message: Message): ThreadMessageLike {
   const content = toAssistantParts(message.content)
   if (message.role === 'assistant') {
     if (message.runStatus === 'error' && message.error) {
       content.push({ type: 'data', name: 'runError', data: message.error } as AssistantPart)
     } else if (message.runStatus === 'cancelled') {
       content.push({ type: 'data', name: 'runCancelled', data: {
-        phase: message.runPhase ?? 'generation', message: message.statusMessage ?? 'Run cancelled',
+        phase: message.runPhase ?? 'generation',
+        // Matches the phrase every Rust lane emits (gen_ui_agent/src/chat.rs).
+        // One state must not carry two wordings; this fallback said "Run
+        // cancelled", which only ever showed if Rust sent nothing.
+        message: message.statusMessage ?? 'Cancelled by user',
+        // How much survived the stop. The bar uses this to say "kept N blocks,
+        // still in context" — and to stay silent at zero rather than claim work
+        // that does not exist.
+        keptBlocks: message.content.length,
       } } as AssistantPart)
     } else if (message.isStreaming && message.statusMessage) {
       content.push({ type: 'data', name: 'runLifecycle', data: {
@@ -95,11 +121,7 @@ function convertMessage(message: Message): ThreadMessageLike {
     role: message.role,
     createdAt: new Date(message.timestamp),
     content,
-    ...(message.role === 'assistant' ? {
-      status: message.isStreaming
-        ? { type: 'running' as const }
-        : { type: 'complete' as const, reason: 'stop' as const },
-    } : {}),
+    ...(message.role === 'assistant' ? { status: assistantStatus(message) } : {}),
   }
 }
 
@@ -119,6 +141,9 @@ export function useAssistantChatRuntime() {
   const renameConversation = useChatStore((state) => state.renameConversation)
   const deleteConversation = useChatStore((state) => state.deleteConversation)
   const cancelActiveRun = useChatStore((state) => state.cancelActiveRun)
+  const sendSteer = useChatStore((state) => state.sendSteer)
+  const pendingSteer = useChatStore((state) => state.pendingSteer)
+  const disarmSteer = useChatStore((state) => state.disarmSteer)
   const initLane = useLaneStore((state) => state.init)
 
   useEffect(() => {
@@ -140,7 +165,15 @@ export function useAssistantChatRuntime() {
     convertMessage,
     onNew: async (message) => {
       const text = textFromComposer(message.content)
-      if (text) await sendMessage(text)
+      if (!text) return
+      // Steer arms the composer rather than sending, so the correction the user
+      // then types is what gets marked — routing happens here, at submit time.
+      if (pendingSteer) {
+        disarmSteer()
+        await sendSteer(text)
+        return
+      }
+      await sendMessage(text)
     },
     onCancel: cancelActiveRun,
     adapters: {

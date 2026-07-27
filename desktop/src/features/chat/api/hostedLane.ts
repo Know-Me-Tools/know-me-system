@@ -68,7 +68,9 @@ function mapAgui(event: string, payload: JsonObject, fallbackRunId: string): A2u
     case 'RUN_FINISHED': return { type: 'run_finished', run_id: runId }
     case 'RUN_ERROR': {
       const code = string(payload.code) || 'uar_run_error'
-      if (code === 'CANCELLED') return { type: 'run_cancelled', run_id: runId, phase: 'generation', message: string(payload.message) || 'Run cancelled' }
+      // Same phrase as every Rust lane (gen_ui_agent/src/chat.rs) and the other
+      // engines. One state, one wording — the user sees a stop, not a lane name.
+      if (code === 'CANCELLED') return { type: 'run_cancelled', run_id: runId, phase: 'generation', message: string(payload.message) || 'Cancelled by user' }
       return { type: 'run_error', run_id: runId, error: { code, phase: 'generation', message: string(payload.message) || 'UAR run failed', retryable: true } }
     }
     case 'CUSTOM': {

@@ -175,11 +175,32 @@ const RunError: DataMessagePartComponent<RunErrorData> = ({ data }) => (
   </section>
 )
 
-const RunCancelled: DataMessagePartComponent<RunLifecycleData> = ({ data }) => (
-  <section className="my-3 flex items-center gap-3 rounded-xl bg-[color:var(--color-surface)] p-4" role="status">
-    <Ban className="size-4" aria-hidden /><span className="text-sm">{data.message}</span>
-  </section>
-)
+interface RunCancelledData extends RunLifecycleData { keptBlocks?: number }
+
+/** The status line on a stopped turn.
+ *
+ *  This is the reassurance that the work survived — without it the four actions
+ *  beneath are buttons with no stated consequence. The count is suppressed at
+ *  zero rather than reading "kept 0 blocks", which would be a lie the user can
+ *  see through.
+ *
+ *  `aria-live` matters here and was missing: `role="status"` alone left the
+ *  cancel notice unannounced, unlike its `RunLifecycle` sibling above. The live
+ *  region is the status text only — never the action row, or every re-render
+ *  would re-announce four button labels.
+ */
+export const RunCancelled: DataMessagePartComponent<RunCancelledData> = ({ data }) => {
+  const kept = data.keptBlocks ?? 0
+  const summary = kept > 0
+    ? `${data.message} — kept ${kept} ${kept === 1 ? 'block' : 'blocks'}, still in context`
+    : data.message
+  return (
+    <section className="my-3 flex items-center gap-3 rounded-xl bg-[color:var(--color-surface)] p-4" role="status" aria-live="polite">
+      {/* Icon plus text: state is never carried by colour alone. */}
+      <Ban className="size-4" aria-hidden /><span className="text-sm">{summary}</span>
+    </section>
+  )
+}
 
 export function RichDataRenderers() {
   useAssistantDataUI({ name: 'memory', render: MemoryData })

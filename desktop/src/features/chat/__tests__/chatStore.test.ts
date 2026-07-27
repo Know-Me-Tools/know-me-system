@@ -16,6 +16,10 @@ const mocks = vi.hoisted(() => ({
   saveConversationRecord: vi.fn(),
   saveMessageRecords: vi.fn(),
   getSessionByok: vi.fn(),
+  cancelHostedChat: vi.fn(),
+  interruptWebLlm: vi.fn(),
+  streamWebLlm: vi.fn(),
+  getActiveLane: vi.fn(),
 }))
 
 vi.mock('@tauri-apps/api/core', () => ({
@@ -29,6 +33,16 @@ vi.mock('@prometheus-ags/tauri-plugin-gen-ui', () => ({
   onChatEvent: mocks.onChatEvent,
   sendAgentInteractionA2ui: mocks.sendAgentInteractionA2ui,
   streamAgentA2ui: mocks.streamAgentA2ui,
+  // laneStore imports from this same module, and `runInferenceTurn` calls
+  // `laneStore.init()`. Without these the send tests reach real IPC and throw.
+  cancelModelOperation: vi.fn(),
+  getActiveLane: mocks.getActiveLane,
+  hasLocalEngine: vi.fn(async () => true),
+  onLocalModelStatus: vi.fn(async () => () => {}),
+  prepareLocalModel: vi.fn(),
+  setActiveLane: vi.fn(),
+  uarRuntimeStatus: vi.fn(async () => null),
+  uarServiceConfig: vi.fn(async () => null),
 }))
 
 vi.mock('@/features/entities/stores/entityRuntime', () => ({
@@ -45,11 +59,14 @@ vi.mock('@/features/settings/stores/providerStore', () => ({
 }))
 
 vi.mock('../api/webllmLane', () => ({
-  streamWebLlm: vi.fn(),
+  streamWebLlm: mocks.streamWebLlm,
+  interruptWebLlm: mocks.interruptWebLlm,
 }))
 
 vi.mock('../api/hostedLane', () => ({
   streamHostedChat: vi.fn(),
+  streamHostedA2uiAction: vi.fn(),
+  cancelHostedChat: mocks.cancelHostedChat,
 }))
 
 import { useChatStore } from '../stores/chatStore'
@@ -92,6 +109,12 @@ beforeEach(() => {
   mocks.saveConversationRecord.mockResolvedValue(undefined)
   mocks.saveMessageRecords.mockResolvedValue(undefined)
   mocks.sendAgentInteractionA2ui.mockResolvedValue('interaction-run-1')
+  mocks.cancelHostedChat.mockResolvedValue(undefined)
+  mocks.interruptWebLlm.mockResolvedValue(undefined)
+  mocks.streamAgentA2ui.mockResolvedValue('run-2')
+  // Local is the lane these tests certify; leaving it unset would silently
+  // exercise a different one.
+  mocks.getActiveLane.mockResolvedValue('local')
   const message = assistantMessage()
   useChatStore.setState({
     messages: [message],
@@ -197,5 +220,125 @@ describe('chatStore cancellation', () => {
     await useChatStore.getState().cancelActiveRun()
 
     expect(mocks.cancelAgentRun).not.toHaveBeenCalled()
+  })
+})
+
+describe('chatStore stopped-turn intents', () => {
+  it('sendSteer prefixes the course-correction and marks the turn', async () => {
+    useChatStore.setState({ isStreaming: false, activeRunId: null })
+    await useChatStore.getState().sendSteer('Focus on the cost side instead.')
+
+    const sent = useChatStore.getState().messages.find((m) => m.intent === 'steer')
+    expect(sent, 'the steered turn must be marked').toBeDefined()
+
+    const text = sent!.content.map((b) => (b.type === 'text' ? b.text : '')).join('')
+    // The correction survives verbatim AND is framed as a correction. The tag
+    // rides in the content because that is the only carrier every lane forwards.
+    expect(text).toContain('Focus on the cost side instead.')
+    expect(text).toContain('stopped your previous response')
+
+    // The PREFIXED text must be what reaches the lane — not the bare correction.
+    expect(mocks.streamAgentA2ui).toHaveBeenCalled()
+    const [sentText] = mocks.streamAgentA2ui.mock.calls.at(-1) as [string]
+    expect(sentText).toContain('stopped your previous response')
+    expect(sentText).toContain('Focus on the cost side instead.')
+  })
+
+  it('sendResume replays the cancelled partial turn', async () => {
+    // This is the invariant Resume rests on, and it is held by the ABSENCE of a
+    // runStatus filter in inferenceHistory — exactly what a later refactor
+    // deletes without noticing.
+    const user: Message = {
+      id: 'user-1', role: 'user', content: [{ type: 'text', text: 'Write a long guide.' }],
+      timestamp: '2026-07-19T12:00:00.000Z', branchId: 'conversation-1',
+    }
+    const stopped = assistantMessage({
+      id: 'assistant-1', isStreaming: false, runStatus: 'cancelled',
+      statusMessage: 'Cancelled by user',
+      content: [{ type: 'text', text: 'Chapter one, partially wri' }],
+    })
+    useChatStore.setState({
+      messages: [user, stopped], conversations: [conversation([user, stopped])],
+      isStreaming: false, activeRunId: null,
+    })
+
+    await useChatStore.getState().sendResume()
+
+    // streamAgentA2ui(text, history, conversationId, branchId)
+    const [text, history] = mocks.streamAgentA2ui.mock.calls.at(-1) as [string, { role: string; content: string }[]]
+    expect(text).toContain('Continue your previous response')
+    expect(history.map((h) => `${h.role}:${h.content}`)).toEqual([
+      'user:Write a long guide.',
+      'assistant:Chapter one, partially wri',
+    ])
+    expect(useChatStore.getState().messages.some((m) => m.intent === 'resume')).toBe(true)
+  })
+
+  it('an ordinary send carries no intent', async () => {
+    useChatStore.setState({ messages: [], conversations: [conversation([])], isStreaming: false, activeRunId: null })
+    await useChatStore.getState().sendMessage('Just a question.')
+    const user = useChatStore.getState().messages.find((m) => m.role === 'user')
+    expect(user?.intent).toBeUndefined()
+  })
+
+  it('arming a steer survives until the send, and clears on conversation switch', () => {
+    useChatStore.getState().armSteer()
+    expect(useChatStore.getState().pendingSteer).toBe(true)
+    useChatStore.getState().disarmSteer()
+    expect(useChatStore.getState().pendingSteer).toBe(false)
+
+    // An armed steer belongs to the turn it was armed from.
+    useChatStore.setState({ isStreaming: false })
+    useChatStore.getState().armSteer()
+    useChatStore.getState().switchConversation('conversation-1')
+    expect(useChatStore.getState().pendingSteer).toBe(false)
+  })
+})
+
+describe('chatStore terminal cancellation', () => {
+  it('settles the run as cancelled and KEEPS the partial content', () => {
+    // Only the intermediate 'Cancelling' state was covered before. The terminal
+    // state is the one the whole stopped-turn feature depends on.
+    useChatStore.getState().streamBlock({ messageId: 'assistant-1', block: { type: 'text', text: 'Partial answer' } })
+    useChatStore.getState().updateLifecycle({
+      type: 'cancelled', messageId: 'assistant-1', runId: 'run-1',
+      phase: 'generation', message: 'Cancelled by user',
+    })
+
+    const message = useChatStore.getState().messages.find((m) => m.id === 'assistant-1')
+    expect(message?.runStatus).toBe('cancelled')
+    expect(message?.isStreaming).toBe(false)
+    expect(message?.statusMessage).toBe('Cancelled by user')
+    expect(useChatStore.getState().isStreaming).toBe(false)
+    expect(useChatStore.getState().activeRunId).toBeNull()
+    // The load-bearing promise: a stop must not discard the work.
+    expect(message?.content).toHaveLength(1)
+    expect(message?.content[0]).toEqual({ type: 'text', text: 'Partial answer' })
+  })
+})
+
+describe('chatStore cancel lane routing', () => {
+  it('interrupts WebLLM in the browser-local lane instead of POSTing to the hosted service', async () => {
+    mocks.isTauri.mockReturnValue(false)
+    const { useLaneStore } = await import('../stores/laneStore')
+    useLaneStore.setState({ lane: 'local' })
+
+    await useChatStore.getState().cancelActiveRun()
+
+    expect(mocks.interruptWebLlm).toHaveBeenCalledOnce()
+    // The bug this replaces: a Stop here POSTed to a UAR session that had never
+    // heard of the run, while tokens kept streaming.
+    expect(mocks.cancelHostedChat).not.toHaveBeenCalled()
+  })
+
+  it('cancels through the hosted service on the web hosted lane', async () => {
+    mocks.isTauri.mockReturnValue(false)
+    const { useLaneStore } = await import('../stores/laneStore')
+    useLaneStore.setState({ lane: 'uar' })
+
+    await useChatStore.getState().cancelActiveRun()
+
+    expect(mocks.cancelHostedChat).toHaveBeenCalledOnce()
+    expect(mocks.interruptWebLlm).not.toHaveBeenCalled()
   })
 })

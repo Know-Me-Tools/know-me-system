@@ -12,9 +12,9 @@ import {
   streamAgentA2ui,
 } from '@prometheus-ags/tauri-plugin-gen-ui'
 import type { InferenceHistoryMessage } from '@prometheus-ags/tauri-plugin-gen-ui'
-import type { ContentBlock, Message, MessageUsage } from '@/bridge/a2ui/types'
+import type { ContentBlock, Message, MessageIntent, MessageUsage } from '@/bridge/a2ui/types'
 import { applyA2uiEvent, createA2uiWireAdapter, type A2uiWireEvent, type RunLifecycleUpdate } from '@/bridge/a2ui/driver'
-import { streamWebLlm } from '../api/webllmLane'
+import { interruptWebLlm, streamWebLlm } from '../api/webllmLane'
 import { cancelHostedChat, streamHostedA2uiAction, streamHostedChat } from '../api/hostedLane'
 import { useLaneStore } from './laneStore'
 import {
@@ -29,6 +29,27 @@ import {
 } from '@/features/entities/stores/entityRuntime'
 
 const CHAT_TENANT_ID = 'knowme-poc-local'
+
+/** Prefixed to a steer so the model treats the stopped turn as work to build on.
+ *
+ *  Worded for the model, but it stays visible in the transcript, so it also has
+ *  to read sensibly to the user who sent it.
+ *
+ *  Kept textually identical to mobile's `_steerPreamble`
+ *  (mobile/lib/features/chat/presentation/providers/chat_notifier.dart). Both
+ *  copies are deliberate: a shared constant would have to travel through the Rust
+ *  bridge, and a duplicated string with a comment naming its twin is easier to
+ *  keep honest than that. If you change one, change the other. */
+const STEER_PREAMBLE =
+  'I stopped your previous response part-way through. Keep the work you had '
+  + 'already done in mind, then follow this correction instead of continuing '
+  + 'the direction you were heading:'
+
+/** Sent verbatim when the user resumes a stopped turn. Mirrors mobile's
+ *  `_resumeInstruction`. */
+const RESUME_INSTRUCTION =
+  'Continue your previous response from where you stopped. Do not start over '
+  + 'or repeat what you already wrote.'
 
 export interface Conversation {
   id: string
@@ -73,6 +94,7 @@ function persistActiveConversation(): void {
       run_status: message.runStatus ?? null,
       run_phase: message.runPhase ?? null,
       status_message: message.statusMessage ?? null,
+      intent: message.intent ?? null,
       error: message.error ?? null,
       attachments: [],
       generation_settings: message.generationSettings ?? null,
@@ -115,10 +137,15 @@ async function streamLocalWeb(text: string, assistantId: string, history: Infere
   const store = useChatStore.getState()
   const startedAt = performance.now()
   let tokens = 0
+  // This lane has no Rust-issued run id, so the assistant message id doubles as
+  // one. Without it `cancelActiveRun` returns early and a Stop tap does nothing.
+  useChatStore.setState({ activeRunId: assistantId })
   try {
     for await (const event of streamWebLlm(text, assistantId, turns)) {
       if (event.type === 'contentBlock') tokens += 1
-      applyA2uiEvent(event, store.streamBlock, store.finalizeMessage)
+      // `updateLifecycle` was omitted here, so the lane could never report a
+      // cancel — the event was accepted and dropped on the floor.
+      applyA2uiEvent(event, store.streamBlock, store.finalizeMessage, store.updateLifecycle)
     }
     useLaneStore.getState().recordThroughput(tokens, (performance.now() - startedAt) / 1000)
   } catch (e: unknown) {
@@ -242,10 +269,24 @@ interface ChatState {
   isStreaming: boolean
   activeRunId: string | null
   isHydrated: boolean
+  /** Set when the user taps Steer, cleared once that send goes out.
+   *
+   *  Steer only ARMS the composer — it does not send. The intent has to survive
+   *  until the user finishes typing the correction, otherwise it goes out as an
+   *  anonymous new question and the model has no reason to treat the stopped
+   *  turn as work to build on. A Steer that fired immediately would just be a
+   *  Resume with extra words. */
+  pendingSteer: boolean
 }
 
 interface ChatActions {
-  sendMessage: (text: string) => Promise<void>
+  sendMessage: (text: string, options?: { intent?: MessageIntent }) => Promise<void>
+  /** Course-correct after a stop, keeping the partial work in play. */
+  sendSteer: (text: string) => Promise<void>
+  /** Carry on from where a stop landed. */
+  sendResume: () => Promise<void>
+  armSteer: () => void
+  disarmSteer: () => void
   submitInteraction: (interaction: unknown) => Promise<void>
   resubmitMessage: (userMessageId: string) => Promise<void>
   deleteResponse: (assistantMessageId: string) => Promise<void>
@@ -271,6 +312,7 @@ export const useChatStore = create<ChatState & ChatActions>()(
       isStreaming: false,
       activeRunId: null,
       isHydrated: false,
+      pendingSteer: false,
 
       streamBlock: ({ messageId, blockIndex, block }) => {
         set((s) => {
@@ -358,9 +400,13 @@ export const useChatStore = create<ChatState & ChatActions>()(
         persistActiveConversation()
       },
 
-      sendMessage: async (text: string) => {
+      sendMessage: async (text: string, options?: { intent?: MessageIntent }) => {
         const branchId = get().messages.at(-1)?.branchId ?? get().activeConversationId
-        const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: [{ type: 'text', text }], timestamp: new Date().toISOString(), branchId }
+        const userMsg: Message = {
+          id: crypto.randomUUID(), role: 'user', content: [{ type: 'text', text }],
+          timestamp: new Date().toISOString(), branchId,
+          ...(options?.intent ? { intent: options.intent } : {}),
+        }
         const assistantId = crypto.randomUUID()
         const assistantMsg: Message = {
           id: assistantId, role: 'assistant', content: [], timestamp: new Date().toISOString(),
@@ -384,6 +430,38 @@ export const useChatStore = create<ChatState & ChatActions>()(
 
         await runInferenceTurn(text, assistantId, branchId, history, get().activeConversationId)
       },
+
+      /** Course-correct after a stop, keeping the partial work in play.
+       *
+       *  The user stopped *because* they were steering — they read the partial
+       *  answer or a tool call and want a different direction. The preamble says
+       *  that plainly, so the stopped turn reads to the model as work-in-progress
+       *  to build on rather than a failed attempt to ignore.
+       *
+       *  The tag travels in the CONTENT because that is the only carrier every
+       *  lane forwards verbatim — see `Message.intent` for why a typed field and
+       *  a new role string both fail silently. */
+      sendSteer: async (text: string) => {
+        await get().sendMessage(`${STEER_PREAMBLE}\n\n${text}`, { intent: 'steer' })
+      },
+
+      /** Carry on from where a stop landed.
+       *
+       *  For the user who stopped and changed their mind. No backend change is
+       *  needed: `inferenceHistory` filters only on `branchId` and non-empty text
+       *  — there is no `runStatus` filter — and the cancelled branch of
+       *  `updateLifecycle` never clears `content`, so the partial assistant turn
+       *  is already replayed and the model sees
+       *  `[… assistant(partial), user(continue)]`.
+       *
+       *  The instruction stays visible in the transcript rather than hidden, so
+       *  the conversation remains honest about what was actually sent. */
+      sendResume: async () => {
+        await get().sendMessage(RESUME_INSTRUCTION, { intent: 'resume' })
+      },
+
+      armSteer: () => set((s) => { s.pendingSteer = true }),
+      disarmSteer: () => set((s) => { s.pendingSteer = false }),
 
       submitInteraction: async (interaction: unknown) => {
         const parent = get().messages.at(-1)
@@ -598,6 +676,7 @@ export const useChatStore = create<ChatState & ChatActions>()(
             runStatus: message.run_status as Message['runStatus'],
             runPhase: message.run_phase ?? undefined,
             statusMessage: message.status_message ?? undefined,
+            intent: (message.intent ?? undefined) as Message['intent'],
             error: message.error as Message['error'],
             generationSettings: message.generation_settings as Message['generationSettings'],
             diagnostics: message.diagnostics as Message['diagnostics'],
@@ -635,6 +714,10 @@ export const useChatStore = create<ChatState & ChatActions>()(
         if (!conversation || s.isStreaming) return
         s.activeConversationId = id
         s.messages = conversation.messages
+        // An armed steer belongs to the turn it was armed from. Carrying it into
+        // another conversation would silently prefix the next message there with
+        // a correction preamble about a stop that never happened.
+        s.pendingSteer = false
       }),
 
       renameConversation: (id, title) => {
@@ -666,8 +749,19 @@ export const useChatStore = create<ChatState & ChatActions>()(
           type: 'phase', messageId: message.id, runId,
           phase: message.runPhase ?? 'generation', status: 'preparing', message: 'Cancelling',
         })
-        if (isTauri()) await cancelAgentRun(runId)
-        else await cancelHostedChat(get().activeConversationId)
+        // Mirror `runInferenceTurn`'s THREE-way lane split. This branched only on
+        // isTauri(), so a Stop during a browser-local WebLLM run POSTed to the
+        // remote UAR service for a run it had never heard of — while tokens kept
+        // streaming and the UI showed "Cancelling", so it looked like it worked.
+        if (isTauri()) {
+          await cancelAgentRun(runId)
+          return
+        }
+        if (useLaneStore.getState().lane === 'local') {
+          await interruptWebLlm()
+          return
+        }
+        await cancelHostedChat(get().activeConversationId)
       },
 
       initListeners: () => {

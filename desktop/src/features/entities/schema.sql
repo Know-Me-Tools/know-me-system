@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS chat_messages (
   run_status text,
   run_phase text,
   status_message text,
+  intent text,
   error jsonb,
   attachments jsonb NOT NULL DEFAULT '[]'::jsonb,
   generation_settings jsonb,
@@ -46,3 +47,13 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 );
 CREATE INDEX IF NOT EXISTS chat_messages_conversation_branch
   ON chat_messages (conversation_id, branch_id, sequence);
+
+-- Migrations. Every CREATE TABLE above is IF NOT EXISTS, so a column added to
+-- one of them never lands on a database that already exists — and the very next
+-- INSERT then fails for EVERY message, not just the new field. Each column added
+-- after the first release therefore needs a matching idempotent ALTER here.
+--
+-- These run through `db.exec(schemaSql)`, which executes the whole file. They are
+-- deliberately NOT picked up by the `registerEntityFromSql` path, which filters to
+-- statements containing "CREATE TABLE" — that path only needs the table shape.
+ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS intent text;

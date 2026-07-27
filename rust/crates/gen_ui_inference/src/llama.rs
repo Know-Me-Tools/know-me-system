@@ -49,6 +49,18 @@ pub struct LlamaCppEngine {
     diagnostics: RwLock<Option<RuntimeDiagnostics>>,
     model_operation: watch::Sender<ModelOperationState>,
     model_cancelled: AtomicBool,
+    /// Cooperative cancel for an in-flight GENERATION, checked once per token.
+    ///
+    /// Deliberately separate from `model_cancelled`, which aborts a model
+    /// *download* and drives the model-operation channel: conflating them would
+    /// make a stopped chat turn report the model as cancelling.
+    ///
+    /// A per-token check does NOT interrupt a long prefill — `llama_decode` of
+    /// the prompt runs to completion first. Interrupting that needs
+    /// `llama_set_abort_callback`, which exists in llama-cpp-sys-2 but is not
+    /// exposed by the safe llama-cpp-2 wrapper, so it would require raw FFI.
+    /// Stop-mid-answer is the case this feature is about, and this covers it.
+    generation_cancelled: Arc<AtomicBool>,
     #[cfg(feature = "local-llama-mtmd")]
     multimodal: RwLock<Option<Arc<MtmdContext>>>,
 }
@@ -69,6 +81,7 @@ impl LlamaCppEngine {
             diagnostics: RwLock::new(None),
             model_operation,
             model_cancelled: AtomicBool::new(false),
+            generation_cancelled: Arc::new(AtomicBool::new(false)),
             #[cfg(feature = "local-llama-mtmd")]
             multimodal: RwLock::new(None),
         }
@@ -641,6 +654,10 @@ impl InferenceProvider for LlamaCppEngine {
             let params = request.generation_settings.clone();
             let grammar = request.grammar.clone();
             let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
+            // Clear any cancel left over from a previous run before this one
+            // starts, so a stale flag cannot kill a fresh generation.
+            self.generation_cancelled.store(false, Ordering::Release);
+            let cancelled = Arc::clone(&self.generation_cancelled);
             gen_ui_runtime::spawn_blocking(move || {
                 if let Err(error) = generate_blocking(
                     &backend,
@@ -650,6 +667,7 @@ impl InferenceProvider for LlamaCppEngine {
                     &params,
                     grammar.as_ref(),
                     &sender,
+                    &cancelled,
                 ) {
                     let _ = sender.send(StreamEvent::Error {
                         message: error.to_string(),
@@ -762,6 +780,19 @@ impl InferenceProvider for LlamaCppEngine {
         let _ = self.model_operation.send(ModelOperationState::Cancelling);
     }
 
+    /// Stop an in-flight generation.
+    ///
+    /// Before this, the token loop had no cancel check at all — it exited only on
+    /// EOG, `max_tokens`, or a dropped receiver — so a stop tap set the
+    /// cancellation token and llama.cpp generated to completion.
+    ///
+    /// Deliberately does NOT touch `model_cancelled` or the model-operation
+    /// channel: those belong to a model *download*, and stopping a chat turn must
+    /// not report the model as cancelling.
+    fn cancel_generation(&self) {
+        self.generation_cancelled.store(true, Ordering::Release);
+    }
+
     async fn runtime_diagnostics(&self) -> Option<RuntimeDiagnostics> {
         self.diagnostics().await
     }
@@ -775,6 +806,7 @@ fn generate_blocking(
     params: &SampleParams,
     grammar: Option<&GrammarConstraint>,
     sender: &tokio::sync::mpsc::UnboundedSender<StreamEvent>,
+    cancelled: &AtomicBool,
 ) -> CoreResult<()> {
     let context_len = NonZeroU32::new(context_len)
         .ok_or_else(|| terminal("mobile inference", "context length cannot be zero"))?;
@@ -832,6 +864,15 @@ fn generate_blocking(
     let mut sampler = LlamaSampler::chain_simple(sampler_chain);
     let mut decoder = encoding_rs::UTF_8.new_decoder();
     for (position, index) in (batch.n_tokens()..).zip(0..params.max_tokens) {
+        // Checked before sampling the next token so a stop lands promptly;
+        // whatever already streamed stays in the transcript, which is what the
+        // stopped-turn Steer/Resume actions build on.
+        if cancelled.load(Ordering::Acquire) {
+            let _ = sender.send(StreamEvent::Cancelled {
+                message: "Cancelled by user".into(),
+            });
+            return Ok(());
+        }
         let token = sampler.sample(&context, batch.n_tokens() - 1);
         sampler.accept(token);
         if model.is_eog_token(token) {
@@ -952,6 +993,43 @@ fn generate_multimodal_blocking(
 mod tests {
     use super::*;
     use crate::catalog::{ANDROID_QWEN3_4B_ID, IPHONE_QWEN35_9B_ID};
+
+    /// A stop must reach the generation flag, not the model-operation one.
+    ///
+    /// The trait default for `cancel_generation` is a no-op, so an engine that
+    /// forgets to override it accepts the stop and generates to completion with
+    /// nothing reporting a failure. Asserting the flag is what separates "wired"
+    /// from "silently ignored".
+    ///
+    /// This covers the wiring only. That the token loop *observes* the flag needs
+    /// a loaded GGUF and is proven on a real desktop run, not here.
+    #[test]
+    fn cancel_generation_sets_the_generation_flag_only() {
+        let engine = LlamaCppEngine::new("/tmp/knowme-llama-test");
+        assert!(!engine.generation_cancelled.load(Ordering::Acquire));
+        assert!(!engine.model_cancelled.load(Ordering::Acquire));
+
+        engine.cancel_generation();
+
+        assert!(
+            engine.generation_cancelled.load(Ordering::Acquire),
+            "cancel_generation must set the per-token generation flag"
+        );
+        assert!(
+            !engine.model_cancelled.load(Ordering::Acquire),
+            "stopping a chat turn must not report the MODEL as cancelling — \
+             that flag belongs to a download"
+        );
+    }
+
+    /// The inverse: cancelling a download must not look like a stopped turn.
+    #[test]
+    fn cancel_model_operation_leaves_generation_running() {
+        let engine = LlamaCppEngine::new("/tmp/knowme-llama-test");
+        engine.cancel_model_operation();
+        assert!(engine.model_cancelled.load(Ordering::Acquire));
+        assert!(!engine.generation_cancelled.load(Ordering::Acquire));
+    }
 
     #[test]
     fn resolves_each_catalog_model_to_its_pinned_file() {

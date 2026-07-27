@@ -24,6 +24,7 @@ import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useChatStore } from "@/features/chat/stores/chatStore";
+import { StoppedTurnActions } from "@/features/chat/components/StoppedTurnActions";
 import {
   ActionBarMorePrimitive,
   ActionBarPrimitive,
@@ -57,6 +58,8 @@ import {
 import {
   createContext,
   useContext,
+  useEffect,
+  useRef,
   type ComponentType,
   type FC,
   type PropsWithChildren,
@@ -211,15 +214,29 @@ const ThreadSuggestionItem: FC = () => {
 };
 
 const Composer: FC = () => {
+  const pendingSteer = useChatStore((s) => s.pendingSteer);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Steering is the point of stopping, so put the caret where the correction
+  // goes rather than making the user find it. Existing text is left alone — a
+  // half-typed thought is theirs to keep.
+  useEffect(() => {
+    if (pendingSteer) inputRef.current?.focus();
+  }, [pendingSteer]);
+
   return (
     <ComposerPrimitive.Root className="aui-composer-root relative flex w-full flex-col">
       <ComposerPrimitive.AttachmentDropzone render={<div data-slot="aui_composer-shell" className="flex w-full flex-col gap-2 rounded-(--composer-radius) bg-(--composer-bg) p-(--composer-padding) text-[color:var(--color-fg)] shadow-none transition-colors focus-within:bg-[color:var(--color-card-hov)] data-[dragging=true]:bg-accent" />}><ComposerAttachments /><ComposerPrimitive.Input
-                      placeholder="Send a message..."
+                      ref={inputRef}
+                      placeholder={pendingSteer ? "Steer the stopped response..." : "Send a message..."}
                       className="aui-composer-input caret-primary placeholder:text-[color:var(--color-fg-faint)] max-h-32 min-h-10 w-full resize-none bg-transparent px-2.5 py-1 text-base text-[color:var(--color-fg)] outline-none"
                       rows={1}
                       autoFocus
                       enterKeyHint="send"
-                      aria-label="Message input"
+                      // The armed-steer mode is otherwise carried only by the
+                      // placeholder, which screen readers do not re-announce —
+                      // so name the mode on the field itself.
+                      aria-label={pendingSteer ? "Steer the stopped response" : "Message input"}
                     /><ComposerAction /></ComposerPrimitive.AttachmentDropzone>
     </ComposerPrimitive.Root>
   );
@@ -406,6 +423,30 @@ const AssistantActionBar: FC = () => {
   const messageId = useAuiState((s) => s.message.id);
   const regenerateResponse = useChatStore((s) => s.regenerateResponse);
   const deleteResponse = useChatStore((s) => s.deleteResponse);
+  // Read the cancelled state from assistant-ui, not the store. That is the point
+  // of reporting `incomplete/cancelled` in convertMessage: the status is legible
+  // to the primitives rather than needing a store side-channel.
+  const isCancelled = useAuiState(
+    (s) => s.message.status?.type === "incomplete" && s.message.status.reason === "cancelled",
+  );
+  const keptBlocks = useChatStore(
+    (s) => s.messages.find((m) => m.id === messageId)?.content.length ?? 0,
+  );
+
+  // A stopped turn asks a different question than a finished one ("what now?"
+  // rather than "copy/regenerate"), so it gets its own row instead of four more
+  // icons crowded next to Copy.
+  if (isCancelled) {
+    return (
+      <ActionBarPrimitive.Root
+        hideWhenRunning
+        className="aui-assistant-action-bar-root animate-in fade-in col-start-3 row-start-2 -ms-1 flex duration-200"
+      >
+        <StoppedTurnActions messageId={messageId} keptBlocks={keptBlocks} />
+      </ActionBarPrimitive.Root>
+    );
+  }
+
   return (
     <ActionBarPrimitive.Root
       hideWhenRunning

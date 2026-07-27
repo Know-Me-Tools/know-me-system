@@ -26,7 +26,20 @@ export interface Message {
   /** Which agent + provider + model produced this assistant turn, projected from
    *  the run's effective_run_policy. Any field may be absent. */
   provenance?: MessageProvenance
+  /** Why the user sent this turn: 'steer' (redirect after a stop, keeping the
+   *  partial work) or 'resume' (carry on from where the stop landed). Absent on
+   *  an ordinary turn.
+   *
+   *  Display and telemetry only — it is NOT how the intent reaches the model.
+   *  That travels in the message content, the one carrier every lane forwards
+   *  verbatim (see `sendSteer` in chatStore). Unlike `provenance`, this IS
+   *  persisted: provenance is derived and recomputable, whereas this is a record
+   *  of what the user did and is unrecoverable after a reload. */
+  intent?: MessageIntent
 }
+
+/** What the user meant by a turn sent from a stopped run. */
+export type MessageIntent = 'steer' | 'resume'
 
 export interface MessageProvenance {
   agentId?: string
