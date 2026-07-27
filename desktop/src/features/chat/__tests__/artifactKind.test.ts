@@ -6,7 +6,14 @@
 // JSON — including `agui_confirmation`, which on Flutter asks the user a
 // question. The aliases below are Flutter's; a divergence here is invisible
 // until someone compares the two surfaces on the same artifact.
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+// The renderer resolves stored paths through Tauri's asset scheme. Stubbed so
+// these stay pure-function tests rather than needing a Tauri host.
+vi.mock('@tauri-apps/api/core', () => ({
+  isTauri: () => true,
+  convertFileSrc: (path: string) => `asset://localhost/${encodeURIComponent(path)}`,
+}))
 
 import { aguiSummary, aguiTitle, artifactKind, mediaUrl } from '../components/ArtifactKindBody'
 
@@ -73,6 +80,19 @@ describe('mediaUrl', () => {
 
   it('falls back to the content when the envelope has no url', () => {
     expect(mediaUrl('{"poster":"x"}')).toBe('{"poster":"x"}')
+  })
+
+  it('resolves a stored path through the asset scheme', () => {
+    // A user-attached video carries a durable `path`, not a `url`. Without this
+    // the whole JSON envelope was handed to <video src> and the player was
+    // permanently broken.
+    expect(mediaUrl('{"path":"/data/attachments/c/abc.mp4","name":"clip.mp4"}'))
+      .toBe(`asset://localhost/${encodeURIComponent('/data/attachments/c/abc.mp4')}`)
+  })
+
+  it('prefers a url over a path when both are present', () => {
+    expect(mediaUrl('{"url":"https://example.test/a.mp4","path":"/local/a.mp4"}'))
+      .toBe('https://example.test/a.mp4')
   })
 })
 

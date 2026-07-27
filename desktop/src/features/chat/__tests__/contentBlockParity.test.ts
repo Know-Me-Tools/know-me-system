@@ -74,4 +74,45 @@ describe('image blocks reach the renderer', () => {
       .find((p) => p.type === 'image')
     expect(part?.image).toBe('data:image/webp;base64,AAAA')
   })
+
+  it('prefers the block alt text over the mime for the accessible name', () => {
+    // A user attaching "holiday.png" should hear "holiday.png", not
+    // "image/png". The mime remains the fallback for model-produced images
+    // that carry no alt.
+    const converted = convertMessage(assistant([
+      {
+        type: 'image', url: 'https://example.test/a.png', dataBase64: null,
+        mime: 'image/png', alt: 'holiday.png',
+      },
+    ]))
+    const part = (converted.content as unknown as { type: string; filename?: string }[])
+      .find((p) => p.type === 'image')
+    expect(part?.filename).toBe('holiday.png')
+  })
+
+  it('reports an unavailable image when a stored path cannot be resolved', () => {
+    // Caught in the browser, not by the earlier tests: on the web build there
+    // is no asset protocol, so localMediaSrc returns '' and this produced
+    // <img src="">, a broken image with no explanation.
+    const converted = convertMessage(assistant([
+      {
+        type: 'image', url: null, dataBase64: null, mime: 'image/png',
+        path: '/data/attachments/c1/abc.png', alt: 'holiday.png',
+      },
+    ]))
+    const parts = converted.content as { type: string; image?: string; text?: string }[]
+    expect(parts.some((p) => p.type === 'image' && p.image === '')).toBe(false)
+    expect(parts.find((p) => p.type === 'text')?.text).toContain('holiday.png')
+  })
+
+  it('reports an unavailable image instead of an empty data URI', () => {
+    // A block with no carrier used to produce `data:image/png;base64,` — a
+    // broken image with no explanation. Say so in text instead.
+    const converted = convertMessage(assistant([
+      { type: 'image', url: null, dataBase64: null, mime: 'image/png', alt: 'gone.png' },
+    ]))
+    const parts = converted.content as { type: string; image?: string; text?: string }[]
+    expect(parts.some((p) => p.type === 'image')).toBe(false)
+    expect(parts.find((p) => p.type === 'text')?.text).toContain('gone.png')
+  })
 })

@@ -18,6 +18,7 @@ import { FileText } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 
 import { MermaidBlock } from '@/components/assistant-ui/markdown-text'
+import { localMediaSrc } from '../lib/localMedia'
 import { useRemoteContent } from '../hooks/useRemoteContent'
 
 /** What kind of body an artifact resolves to, after alias normalisation. */
@@ -61,8 +62,14 @@ export function mediaUrl(content: string): string {
   try {
     const parsed: unknown = JSON.parse(content)
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      const url = (parsed as Record<string, unknown>).url
+      const record = parsed as Record<string, unknown>
+      const url = record.url
       if (typeof url === 'string') return url
+      // A user-attached video carries a durable filesystem `path` instead of a
+      // url. Without this the payload fell through and the whole JSON string
+      // was handed to <video src>, producing a permanently broken player.
+      const path = record.path
+      if (typeof path === 'string') return localMediaSrc(path)
     }
   } catch {
     // Not JSON — the content IS the url.
@@ -150,12 +157,21 @@ function LinkBody({ content }: { content: string }) {
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
         const record = parsed as Record<string, unknown>
         const read = (key: string) => (typeof record[key] === 'string' ? record[key] as string : null)
-        return { url: read('url'), title: read('title'), description: read('description'), siteName: read('siteName') ?? read('site_name') }
+        return {
+          url: read('url'),
+          title: read('title'),
+          description: read('description'),
+          siteName: read('siteName') ?? read('site_name'),
+          // Flutter has always rendered this (content_block_view.dart's link
+          // preview delegates to ContentBlockImage); React dropped it, so the
+          // same link showed a thumbnail on mobile and a bare title here.
+          imageUrl: read('imageUrl') ?? read('image_url') ?? read('image'),
+        }
       }
     } catch {
       // Bare URL rather than an envelope.
     }
-    return { url: content, title: null, description: null, siteName: null }
+    return { url: content, title: null, description: null, siteName: null, imageUrl: null }
   }, [content])
 
   if (!meta.url) {
@@ -166,8 +182,10 @@ function LinkBody({ content }: { content: string }) {
       href={meta.url}
       target="_blank"
       rel="noreferrer noopener"
-      className="block px-4 py-3 hover:bg-[color:var(--color-card-hov)]"
+      className="block hover:bg-[color:var(--color-card-hov)]"
     >
+      {meta.imageUrl ? <LinkThumbnail url={meta.imageUrl} /> : null}
+      <div className="px-4 py-3">
       <p className="truncate text-sm font-medium text-[color:var(--color-fg)]">{meta.title ?? meta.url}</p>
       {meta.description ? (
         <p className="mt-1 line-clamp-2 text-xs text-[color:var(--color-fg-sub)]">{meta.description}</p>
@@ -176,7 +194,35 @@ function LinkBody({ content }: { content: string }) {
           dark mode, under the 4.5:1 floor for 12px text. This line is the only
           thing identifying where the link goes. */}
       <p className="mt-1 truncate text-xs text-[color:var(--color-fg-sub)]">{meta.siteName ?? meta.url}</p>
+      </div>
     </a>
+  )
+}
+
+/**
+ * The OpenGraph image for a link preview.
+ *
+ * Resolved through `useRemoteContent` because an OG image is remote by
+ * definition and is exactly the CORS/mixed-content case that hook exists for.
+ *
+ * A failed thumbnail renders NOTHING rather than a broken-image placeholder or
+ * an error row: the preview's title, description and host are still useful on
+ * their own, and the picture is decoration. It is marked aria-hidden for the
+ * same reason — the surrounding link already carries the accessible name, so
+ * announcing the image would repeat it.
+ */
+function LinkThumbnail({ url }: { url: string }) {
+  const { src, failed, onError } = useRemoteContent(url, 'image')
+  if (failed) return null
+  return (
+    <img
+      src={src}
+      onError={onError}
+      alt=""
+      aria-hidden="true"
+      loading="lazy"
+      className="max-h-48 w-full object-cover"
+    />
   )
 }
 

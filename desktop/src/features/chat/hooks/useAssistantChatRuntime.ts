@@ -3,6 +3,7 @@ import { useExternalStoreRuntime, type ThreadMessageLike } from '@assistant-ui/r
 import { useEffect } from 'react'
 import type { ContentBlock, Message } from '@/bridge/a2ui/types'
 import { createAttachmentAdapter, takeStagedAttachments } from '../adapters/attachmentAdapter'
+import { localMediaSrc } from '../lib/localMedia'
 import { useChatStore } from '../stores/chatStore'
 import { useLaneStore } from '../stores/laneStore'
 
@@ -36,13 +37,31 @@ function toAssistantPart(block: ContentBlock): AssistantPart {
     }
     case 'skill': return { type: 'data', name: 'skill', data: block }
     case 'artifact': return { type: 'data', name: 'artifact', data: block }
+    // Three carriers, checked in order of directness. `path` points into
+    // app-owned storage and needs converting to something the webview can load
+    // — a bare filesystem path in an <img src> resolves to nothing.
+    //
     // `filename` is assistant-ui's only descriptive field on an image part
-    // (there is no `alt`), so the mime carries through as the accessible name's
-    // basis — matching Flutter's ContentBlockImage, which labels the block with
-    // its mime type.
-    case 'image': return block.url
-      ? { type: 'image', image: block.url, filename: block.mime }
-      : { type: 'image', image: `data:${block.mime};base64,${block.dataBase64 ?? ''}`, filename: block.mime }
+    // (there is no `alt`), so the block's alt text goes there and the mime is
+    // the fallback, as before.
+    case 'image': {
+      const label = block.alt ?? block.mime
+      if (block.url) return { type: 'image', image: block.url, filename: label }
+      if (block.dataBase64) {
+        return { type: 'image', image: `data:${block.mime};base64,${block.dataBase64}`, filename: label }
+      }
+      if (block.path) {
+        // Empty on the web build: there is no asset protocol, so a stored path
+        // cannot be loaded at all. Fall through rather than emitting an <img>
+        // with src="" — a blank src renders a broken image with no hint why,
+        // which is the same silent failure as the no-carrier case below.
+        const src = localMediaSrc(block.path)
+        if (src) return { type: 'image', image: src, filename: label }
+      }
+      // No usable carrier. Previously a missing one produced
+      // `data:image/png;base64,` — an empty data URI, broken and unexplained.
+      return { type: 'text', text: `[image unavailable: ${label}]` }
+    }
     case 'divider': return { type: 'text', text: '\n\n' }
   }
 }
