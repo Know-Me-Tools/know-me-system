@@ -75,6 +75,32 @@ pub async fn stage_attachment(
         .map_err(|error| CoreError::Terminal(format!("cannot encode attachment: {error}")))
 }
 
+/// Delete stored attachment files whose conversation no longer exists.
+///
+/// Called by the UI once it has loaded its conversation list, because that
+/// list lives in the entity store the UI owns — Rust cannot enumerate it at
+/// boot. A crash between writing a file and committing the message row leaves
+/// bytes with no owner; without this they accumulate forever.
+///
+/// Returns the number of conversation directories removed.
+pub async fn sweep_orphan_attachments(
+    known_conversation_ids: Vec<String>,
+) -> Result<u32, CoreError> {
+    // A caller that passes an EMPTY list would delete every stored attachment
+    // on the device. That is almost always a load failure rather than a user
+    // with no conversations, so refuse it: the cost of skipping a sweep is
+    // some wasted disk, and the cost of getting it wrong is every image in
+    // every conversation disappearing at once.
+    if known_conversation_ids.is_empty() {
+        tracing::debug!("skipping attachment sweep: no known conversations supplied");
+        return Ok(0);
+    }
+    gen_ui_agent::attachment_store::sweep_orphans(&known_conversation_ids)
+        .await
+        .map(|removed| removed as u32)
+        .map_err(CoreError::from)
+}
+
 /// Submit a typed A2UI/AG-UI user interaction and start the agent's response.
 /// The JSON envelope is preserved verbatim so Rust remains the sole transport
 /// boundary and the agent can correlate surface, component, and context IDs.

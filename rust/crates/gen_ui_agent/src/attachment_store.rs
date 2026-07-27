@@ -599,6 +599,22 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn sweeping_against_an_empty_known_list_would_remove_everything() {
+        // Documents WHY the FFI wrapper refuses an empty list rather than
+        // passing it through: at this layer "nothing is known" genuinely means
+        // "everything is an orphan", which is correct here and catastrophic if
+        // the caller merely failed to load its conversations.
+        let temp = tempfile::tempdir().expect("tempdir");
+        store_in(temp.path(), "conv", "png", b"bytes")
+            .await
+            .expect("store");
+
+        let removed = sweep_orphans_in(temp.path(), &[]).await.expect("sweep");
+
+        assert_eq!(removed, 1, "an empty known-list orphans every conversation");
+    }
+
+    #[tokio::test]
     async fn staging_a_png_reads_its_real_dimensions() {
         shared_root();
 
