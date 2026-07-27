@@ -153,6 +153,15 @@ pub async fn stage_bytes(
     file_name: &str,
     bytes: &[u8],
 ) -> Result<StoredAttachment, AgentError> {
+    stage_bytes_in(root()?, conversation_id, file_name, bytes).await
+}
+
+async fn stage_bytes_in(
+    root: &Path,
+    conversation_id: &str,
+    file_name: &str,
+    bytes: &[u8],
+) -> Result<StoredAttachment, AgentError> {
     if bytes.len() as u64 > gen_ui_document::MAX_INPUT_BYTES {
         return Err(AgentError::Attachment(format!(
             "{file_name} exceeds the 25 MB attachment limit"
@@ -171,7 +180,7 @@ pub async fn stage_bytes(
         .unwrap_or_default()
         .to_ascii_lowercase();
 
-    let path = store(conversation_id, &extension, bytes).await?;
+    let path = store_in(root, conversation_id, &extension, bytes).await?;
     let (mime, is_image, is_document, is_video) = crate::chat::attachment_kind(&extension);
     let (width, height) = if is_image {
         image_dimensions(bytes).map_or((None, None), |(w, h)| (Some(w), Some(h)))
@@ -587,16 +596,10 @@ mod tests {
         }
     }
 
-    /// `stage_*` reads the process-wide root, and these tests share a process,
-    /// so the FIRST test to set it wins. Each of these seeds a tempdir and then
-    /// asserts against whichever root actually took effect — asserting against
-    /// its own tempdir would fail purely on test ordering.
-    fn shared_root() -> &'static Path {
-        static SHARED: OnceCell<tempfile::TempDir> = OnceCell::new();
-        let dir = SHARED.get_or_init(|| tempfile::tempdir().expect("tempdir"));
-        let _ = ATTACHMENT_ROOT.set(dir.path().to_path_buf());
-        root().expect("a root is configured by now")
-    }
+    // A `shared_root()` helper lived here to work around the process-wide
+    // OnceCell — every staging test had to assert against whichever root won
+    // the race. `stage_bytes_in` takes the root explicitly, so each test now
+    // owns its own tempdir and the ordering hazard is gone entirely.
 
     #[tokio::test]
     async fn sweeping_against_an_empty_known_list_would_remove_everything() {
@@ -616,9 +619,9 @@ mod tests {
 
     #[tokio::test]
     async fn staging_a_png_reads_its_real_dimensions() {
-        shared_root();
+        let temp = tempfile::tempdir().expect("tempdir");
 
-        let stored = stage_bytes("dims-conv", "tiny.png", TINY_PNG)
+        let stored = stage_bytes_in(temp.path(), "dims-conv", "tiny.png", TINY_PNG)
             .await
             .expect("stage");
 
@@ -642,9 +645,10 @@ mod tests {
 
     #[tokio::test]
     async fn staging_rejects_a_traversal_filename_without_escaping() {
-        let active_root = shared_root();
+        let temp = tempfile::tempdir().expect("tempdir");
+        let active_root = temp.path();
 
-        let stored = stage_bytes("trav-conv", "../../../etc/passwd", b"x")
+        let stored = stage_bytes_in(active_root, "trav-conv", "../../../etc/passwd", b"x")
             .await
             .expect("stage");
 
@@ -689,5 +693,126 @@ mod tests {
             message.contains("set_root"),
             "the error must name the missing call: {message}"
         );
+    }
+}
+
+#[cfg(test)]
+mod fixture_tests {
+    /// Byte-for-byte the PNG that scripts/android/certify-local-image-rendering.sh
+    /// pushes to the device: 7x3, chosen so a default or a guess cannot pass.
+    ///
+    /// Built here rather than read from disk so the test is self-contained —
+    /// a fixture file under /tmp would make this pass only on the machine that
+    /// happened to run the device script.
+    fn device_certification_png() -> Vec<u8> {
+        fn chunk(tag: &[u8], payload: &[u8]) -> Vec<u8> {
+            let mut out = (payload.len() as u32).to_be_bytes().to_vec();
+            out.extend_from_slice(tag);
+            out.extend_from_slice(payload);
+            let mut crc_input = tag.to_vec();
+            crc_input.extend_from_slice(payload);
+            out.extend_from_slice(&crc32(&crc_input).to_be_bytes());
+            out
+        }
+
+        const WIDTH: u32 = 7;
+        const HEIGHT: u32 = 3;
+
+        let mut ihdr = WIDTH.to_be_bytes().to_vec();
+        ihdr.extend_from_slice(&HEIGHT.to_be_bytes());
+        ihdr.extend_from_slice(&[8, 2, 0, 0, 0]); // 8-bit truecolour
+
+        let mut png = b"\x89PNG\r\n\x1a\n".to_vec();
+        png.extend_from_slice(&chunk(b"IHDR", &ihdr));
+        // imagesize reads the header only, so IDAT contents do not matter —
+        // but the chunk must be present and well-formed.
+        png.extend_from_slice(&chunk(
+            b"IDAT",
+            &[0x78, 0x9c, 0x63, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01],
+        ));
+        png.extend_from_slice(&chunk(b"IEND", &[]));
+        png
+    }
+
+    fn crc32(data: &[u8]) -> u32 {
+        let mut crc = 0xFFFF_FFFFu32;
+        for byte in data {
+            crc ^= u32::from(*byte);
+            for _ in 0..8 {
+                crc = if crc & 1 != 0 {
+                    (crc >> 1) ^ 0xEDB8_8320
+                } else {
+                    crc >> 1
+                };
+            }
+        }
+        !crc
+    }
+
+    /// Pins the device gate's premise: if Rust cannot read 7x3 from this exact
+    /// image, the on-device dimensions assertion means nothing.
+    #[test]
+    fn reads_the_device_certification_fixture_dimensions() {
+        assert_eq!(
+            super::image_dimensions(&device_certification_png()),
+            Some((7, 3))
+        );
+    }
+
+    /// The whole reported defect, end to end: a picked PNG becomes a durable
+    /// file AND an image block that renders — not a grey document chip.
+    ///
+    /// Covers the seam the device gate exercises manually, so a regression is
+    /// caught by `cargo test` rather than only by someone holding a phone.
+    #[tokio::test]
+    async fn a_picked_png_becomes_a_durable_image_block() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let png = device_certification_png();
+
+        // Stand in for the picker's cache directory — the path the OS may
+        // delete at any time.
+        let picked = temp.path().join("picker-cache").join("holiday.png");
+        std::fs::create_dir_all(picked.parent().expect("parent")).expect("cache dir");
+        std::fs::write(&picked, &png).expect("write picked");
+
+        let root = temp.path().join("app-storage");
+        let stored = super::stage_bytes_in(&root, "conv-e2e", "holiday.png", &png)
+            .await
+            .expect("stage");
+
+        // Classified as an image, with dimensions read from the header.
+        assert!(stored.is_image, "a PNG must be classified as an image");
+        assert_eq!(stored.mime, "image/png");
+        assert_eq!((stored.width, stored.height), (Some(7), Some(3)));
+
+        // The stored path is NOT the picked path. This is the entire point:
+        // keeping the picker's path is what made transcripts rot.
+        assert_ne!(
+            std::path::Path::new(&stored.path),
+            picked.as_path(),
+            "the block must not carry the purgeable picker path"
+        );
+
+        // Deleting the picker's cache — what Android does on its own schedule
+        // — must leave the stored bytes intact.
+        std::fs::remove_dir_all(picked.parent().expect("parent")).expect("purge cache");
+        let survived = std::fs::read(&stored.path).expect("stored file survives a cache purge");
+        assert_eq!(survived, png);
+
+        // And the block is a real Image carrying that durable path.
+        match stored.to_content_block() {
+            gen_ui_types::ContentBlock::Image {
+                path,
+                alt,
+                width,
+                height,
+                ..
+            } => {
+                assert_eq!(path.as_deref(), Some(stored.path.as_str()));
+                assert_eq!(alt.as_deref(), Some("holiday.png"));
+                assert_eq!((width, height), (Some(7), Some(3)));
+            }
+            other => panic!("a PNG must render as an image block, got {other:?}"),
+        }
     }
 }
