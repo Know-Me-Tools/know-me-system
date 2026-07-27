@@ -66,3 +66,72 @@ Cross-tool progress: none in this new child phase; four parent model-runtime cha
 - One low-severity S-07 length advisory was reported; no correction was mandatory because each section supplies downstream assessment evidence.
 
 ## ASSESSMENT COMPLETE
+
+---
+
+# ADDENDUM (2026-07-27): re-assessment against current code
+
+The July 20 baseline above is preserved, not rewritten. Most of it is now
+**obsolete** — the mobile embedded-UAR work landed between then and now
+(tasks M5a–M7, M5b.1–M5b.3, FIX.1–FIX.2, MS1–MS3). Every claim below was
+re-checked against the code today rather than inherited.
+
+## Claims from 2026-07-20 that are NO LONGER TRUE
+
+| Claim (07-20) | Verified today |
+|---|---|
+| "`chat` routes every `uar` lane request to `send_uar_service`" | **FALSE.** `send_uar_service` no longer appears in `chat.rs`. `state::embedded_uar()` is wired at three call sites (`chat.rs:1085`, `:1225`, `:1419`). |
+| "`ensure_uar_lane_supported` only accepts a configured UAR service URL" | **FALSE.** It is now a one-line delegate to `selected_uar_runtime()` (`chat.rs:1361`); no URL requirement. |
+| "SDK `RuntimeBuilder::build` sets `state` to `None`, so `orchestrator()`, `run_manager()`, `persistence()` return `None`" | **FALSE.** Those accessors return `Arc<T>` directly (`runtime.rs:77`, `:83`, `:95`). The stub was replaced by a real in-process runtime. |
+| "Local provider/model registration: MISSING" | **FALSE.** `uar.rs` builds the runtime with `.local_provider(driver, provider_config)` behind a `UarRoutingDriver`, and cloud providers are registered post-build. |
+
+Anyone planning from the 07-20 text alone would have re-done work that is
+already shipped and device-certified.
+
+## The ONE gap that remains — and it is exactly task 3.1
+
+`rust/crates/gen_ui_agent/src/uar.rs:880` constructs the embedded runtime with:
+
+```rust
+let persistence: Arc<dyn PersistenceLayer> =
+    Arc::new(providers::memory::InMemoryProvider::new());
+```
+
+Everything the embedded runtime persists — agents, skills, policies, settings,
+memory, knowledge, conversations, run state, A2UI — lives in RAM and is lost on
+process death. That is the whole of task 3.1, and its premise is **current and
+correct**, unlike the rest of the 07-20 assessment.
+
+UAR ships three persistence providers: `memory.rs`, `postgres.rs`,
+`surreal.rs`. `SurrealDbProvider::new` is **async**, which matters: the swap is
+not a one-line constructor change, because the surrounding builder call is
+already async but the provider needs a storage path and connection.
+
+## What this changes about scope
+
+The phase's remaining work is far smaller than `tasks.md` suggests. Of its 14
+open items, several describe work now visibly done (embedded runtime, FFI
+operations, local provider registration, Flutter repository wiring). The file
+was never updated — the same drift that left `qwen35-local-tools` fully
+unticked while device-certified.
+
+**Recommendation for plan:** re-verify each of the 14 tasks against code before
+planning any of them. Do not plan from `tasks.md` as written.
+
+## Open questions for plan
+
+1. **Where does the mobile SurrealDB file live**, and is it the KnowMe instance
+   already embedded for memory/graph-RAG, or a second store? Two SurrealDB
+   instances in one mobile process is a resource decision, not a detail.
+2. **What happens to existing in-memory state on upgrade?** There is no
+   migration path from RAM to disk; first launch after the swap starts empty.
+   That needs to be stated, not discovered.
+3. **Is desktop in scope for the same swap?** Desktop shares the embedded
+   runtime path, so leaving it on `InMemoryProvider` would split behaviour
+   across surfaces.
+
+## Not re-verified in this pass
+
+The airplane-mode certification items (5.4, 5.5) and the dependency-profile /
+licensing risks from 07-20 were **not** re-checked. They are not contradicted
+by anything found today, but they carry the 07-20 date, not this one.

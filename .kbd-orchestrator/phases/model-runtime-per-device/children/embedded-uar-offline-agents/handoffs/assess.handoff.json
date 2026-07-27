@@ -1,0 +1,14 @@
+{
+  "stage": "assess",
+  "phase": "embedded-uar-offline-agents",
+  "timestamp": "2026-07-27T00:00:00Z",
+  "artifact": "assessment.md",
+  "summary": "Re-assessment APPENDED to the 2026-07-20 baseline, which is largely obsolete: four of its headline claims were re-checked against code today and are FALSE \u2014 send_uar_service is gone from chat.rs, ensure_uar_lane_supported no longer requires a URL, the SDK runtime accessors return Arc<T> not Option, and the local provider IS registered. Planning from the 07-20 text would have re-done shipped, device-certified work. ONE real gap remains and it is exactly task 3.1: uar.rs:880 still builds the embedded runtime with InMemoryProvider, so agents, skills, policies, settings, memory, knowledge, conversations, run state and A2UI are lost on process death.",
+  "next": "Re-verify all 14 tasks in openspec/changes/embed-uar-mobile-offline/tasks.md against code BEFORE planning \u2014 several describe work now visibly done, the same drift that left qwen35-local-tools unticked while device-certified. Then plan the InMemoryProvider -> SurrealDbProvider swap; note SurrealDbProvider::new is async and needs a storage path.",
+  "open_questions": [
+    "Where does the mobile SurrealDB file live \u2014 the KnowMe instance already embedded for memory/graph-RAG, or a second store? Two instances in one mobile process is a resource decision.",
+    "What happens to existing in-memory state on upgrade? There is no RAM->disk migration; first launch after the swap starts empty.",
+    "Is desktop in scope for the same swap? It shares the embedded runtime path, so leaving it on InMemoryProvider splits behaviour across surfaces."
+  ],
+  "notReVerified": "Airplane-mode certification (5.4, 5.5) and the dependency-profile/licensing risks still carry the 07-20 date."
+}
