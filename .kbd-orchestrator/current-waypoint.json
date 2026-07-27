@@ -1,7 +1,7 @@
 {
   "assessNote": "2026-07-27 assess found the 2026-07-20 assessment largely obsolete: four headline claims verified FALSE against code. The change's 14 open tasks are NOT trustworthy \u2014 re-verify each against code before planning.",
   "blockedOn": "",
-  "certificationStatus": "android: PASS (/tmp/knowme-uar-persistence.json); desktop: PASS (/tmp/knowme-desktop-uar-persistence.json, WAL 47079->53642B monotonic, negative control FAILs correctly); ios: not run",
+  "certificationStatus": "android persistence: PASS; android offline: 4 PASS / 1 PARTIAL / 1 FAIL (both harness, not runtime); desktop persistence: PASS; ios: not run",
   "change": "embed-uar-mobile-offline",
   "changesCompleted": 0,
   "changesTotal": 1,
@@ -10,8 +10,8 @@
   ],
   "childPointer": null,
   "completionMetric": "implementation",
-  "currentTask": "D1-D4 complete. Durable persistence CERTIFIED on both Android SM-S936U and macOS desktop (separate boot paths, certified separately). Desktop gate proven in both directions via an injected-wipe negative control.",
-  "exactNextCommand": "review the 13-task adversarial re-audit of embed-uar-mobile-offline/tasks.md",
+  "currentTask": "Offline certification DONE on Android at HEAD: 4 gates PASS with both radios down and unreachability probed; full local tool loop observed. Two harness defects remain (restart-recovery literal-marker prompt; branch-actions SQLITE_NOTADB), both left failing rather than loosened.",
+  "exactNextCommand": "fix the two Android harness defects so 5.4 runs clean",
   "implementationCompleted": 0,
   "implementationTotal": 1,
   "nextPendingChange": "embed-uar-mobile-offline",
@@ -36,5 +36,5 @@
   "sourceTool": "claude-code",
   "stage": "implementation_ready",
   "status": "implementation_ready",
-  "updatedAt": "2026-07-27T19:19:26Z"
+  "updatedAt": "2026-07-27T20:37:29Z"
 }

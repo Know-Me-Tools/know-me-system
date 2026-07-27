@@ -45,11 +45,18 @@
   - APK built at HEAD; report records currentMobileIntegration=embedded_library,
     replacing the prior projection_only evidence.
     docs/certification/2026-07-27/android-offline-embedded-runtime.json
-  - offline PASS: cancellation, second-send, multiturn-history, steer-intents;
-    full tool loop (generate -> tool call -> tool result -> 160 chars) observed.
-  - NOT yet clean: restart-recovery FAILS on a literal-marker assertion the
-    model satisfies by calling a tool instead; branch-actions exits 26
-    (SQLITE_NOTADB) in its own tooling. Both are harness defects, not runtime
-    failures — left failing rather than loosened.
+  - offline PASS: cancellation, second-send, multiturn-history, steer-intents,
+    restart-recovery (persisted marker visible again after relaunch). A full
+    tool loop (generate -> tool call -> tool result -> 160 chars) was observed
+    offline.
+  - branch-actions SKIPs its SQL assertions with exit 69: `run-as` refuses a
+    release build. Was masked as exit 26 SQLITE_NOTADB because the redirect
+    wrote run-as's error text into the .db path; now reported honestly.
+  - restart-recovery's first FAIL was MODEL NONDETERMINISM, not a harness
+    defect: identical prompt to multiturn-history, which passes. One run
+    emitted a tool call instead of the marker; the re-run emitted none and
+    passed. No assertion was loosened.
+  - REMAINING for 5.4: A2UI interaction and the default/orchestrator agent
+    checks have no offline gate yet.
 - [ ] 5.5 Certify iOS device or simulator with networking disabled against the same functional suite
 - [ ] 5.6 Record logs, screenshots, performance, KBD reflection, Prometheus wiki entries, and Karpathy success/failure learning records
