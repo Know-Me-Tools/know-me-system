@@ -143,6 +143,17 @@ seeded_visible = sorted({d for d in all_desc if d in SEEDED_AGENT_LABELS})
 orchestrator_visible = "Orchestrator" in seeded_visible
 agent_controls_visible = any("Conversation agent" in d for d in all_desc)
 
+# CLAIM 1b — the RESOURCE CONTROLS are present offline.
+#
+# Added after S6: `tools` used to be a hardcoded [] on the embedded branch and
+# was advertised as unavailable. It is now served from both registries (native
+# + MCP), so the toolbar controls must be reachable with no network. Asserting
+# this is what makes THIS run prove something the previous one could not.
+RESOURCE_CONTROLS = ("Skills", "Tools", "Knowledge")
+resource_controls_visible = sorted(
+    {d for d in all_desc if d in RESOURCE_CONTROLS}
+)
+
 # CLAIM 2 — A2UI, asserted CONDITIONALLY (see the header: the model is
 # nondeterministic about emitting one).
 A2UI_LABELS = ("Interactive agent interface",)
@@ -167,6 +178,12 @@ report = {
         "notAcceptedAsProof": ("the agent-context control alone — it renders whether or "
                                "not any agent was seeded, so passing on it would certify "
                                "nothing"),
+    },
+    "resourceControls": {
+        "visible": resource_controls_visible,
+        "claim": ("Skills/Tools/Knowledge are reachable with no network. `tools` "
+                  "in particular was a hardcoded [] before S6 and is now served "
+                  "from the native + MCP registries in-process."),
     },
     "a2ui": {
         "surfaceRendered": a2ui_present,
