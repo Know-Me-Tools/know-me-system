@@ -1017,6 +1017,26 @@ impl UarEmbeddedRuntime {
             .map_err(|error| AgentError::Config(format!("serialize agents: {error}")))
     }
 
+    /// Every tool the embedded runtime can dispatch, native and MCP.
+    ///
+    /// Each entry keeps its `source`, so a client can show that native tools
+    /// still work with no network while MCP tools do not.
+    pub async fn list_tools(&self) -> Result<serde_json::Value, AgentError> {
+        let tools = self.runtime.list_tools().await;
+        serde_json::to_value(&tools)
+            .map_err(|error| AgentError::Config(format!("serialize tools: {error}")))
+    }
+
+    /// A2UI artifact schemas this runtime can render.
+    ///
+    /// Lets a caller distinguish "the renderer supports nothing" from "nothing
+    /// emitted an artifact this run" — two failures that otherwise look alike.
+    pub async fn list_a2ui_schemas(&self) -> Result<serde_json::Value, AgentError> {
+        let schemas = self.runtime.list_a2ui_schemas().await;
+        serde_json::to_value(&schemas)
+            .map_err(|error| AgentError::Config(format!("serialize a2ui schemas: {error}")))
+    }
+
     /// List every skill the embedded runtime holds.
     ///
     /// Previously the embedded control plane returned a hardcoded `[]` here,

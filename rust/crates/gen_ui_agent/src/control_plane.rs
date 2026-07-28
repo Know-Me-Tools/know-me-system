@@ -114,19 +114,19 @@ pub async fn catalog() -> Result<ChatControlPlaneCatalog, AgentError> {
         // these are REAL rather than the hardcoded `[]` they used to be.
         let skills = runtime.list_skills().await?;
         let knowledge_bases = runtime.list_knowledge_bases().await?;
+        // Tools are now served in-process from both registries, so the marker
+        // that used to sit here would be FALSE — leaving it would make the UI
+        // claim a capability is missing when it works.
+        let tools = runtime.list_tools().await?;
         return Ok(ChatControlPlaneCatalog {
             agents: serde_json::json!({
                 "runtime_agents": agents,
                 "federated_agents": [],
             }),
             skills,
-            // `tools` has no embedded admin surface yet, so it stays empty AND
-            // stays advertised as unavailable — omitting the marker while the
-            // array is empty would make the UI claim "none configured", which is
-            // the exact defect the `unavailable` contract exists to prevent.
-            tools: serde_json::json!([]),
+            tools,
             knowledge_bases,
-            unavailable: vec![UnavailableResource::embedded("tools")],
+            unavailable: Vec::new(),
         });
     }
     let client = chat::uar_service_client().await?;
@@ -160,21 +160,21 @@ pub async fn admin_snapshot() -> Result<UarAdminSnapshot, AgentError> {
         let skills = runtime.list_skills().await?;
         let knowledge_bases = runtime.list_knowledge_bases().await?;
         let mcp_servers = runtime.list_mcp_servers().await?;
+        let tools = runtime.list_tools().await?;
         return Ok(UarAdminSnapshot {
             settings,
             setting_types,
             agents,
             skills,
-            // See the catalog: `tools` and `memories` have no embedded admin
-            // surface yet, so they remain advertised rather than silently empty.
-            tools: serde_json::json!([]),
+            tools,
             knowledge_bases,
             mcp_servers,
+            // `memories` stays empty AND stays advertised. This is a real
+            // storage-layer limit, not an unfinished wire-up: PersistenceLayer
+            // exposes only search_memory(query_vec, ..), so memories cannot be
+            // enumerated without inventing an embedding to search with.
             memories: serde_json::json!([]),
-            unavailable: vec![
-                UnavailableResource::embedded("tools"),
-                UnavailableResource::embedded("memories"),
-            ],
+            unavailable: vec![UnavailableResource::embedded("memories")],
         });
     }
     let client = chat::uar_service_client().await?;

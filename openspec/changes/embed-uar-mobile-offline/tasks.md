@@ -46,10 +46,18 @@
   - Capability gate (skill_exec, 9b894ef): iOS never degrades to local execution
     (asserted), and permanent vs transient unavailability is distinguished so a UI
     never offers a retry that cannot work.
-  - REMAINING: `tools` and `memories` still have no embedded admin surface, so
-    they stay advertised as unavailable rather than silently empty. A2UI
-    registry/actions FFI is still absent. Memory DELETION is deliberately not
-    exposed — writes belong to the memory service that owns scoping/embedding.
+  - tools: DONE. admin::tools merges native + MCP and keeps `source`, because
+    native tools work with no network while MCP tools need a reachable server —
+    a flattened list cannot explain why some survive going offline.
+  - A2UI: schema LISTING done (admin::a2ui, read-only — registering a schema
+    changes how every future artifact renders, so that belongs to composition).
+    A2UI *actions* FFI is still absent.
+  - memories: NOT done, and blocked at the storage layer rather than unfinished.
+    PersistenceLayer exposes only search_memory(query_vec, ..) — there is no way
+    to enumerate memories without inventing an embedding to search with. Its
+    unavailable marker stays until the storage layer grows a listing.
+  - Memory DELETION is deliberately not exposed: writes belong to the memory
+    service that owns scoping, embedding and auto-capture.
   - Verified: 92/92 gen_ui_agent, 9/9 UAR admin::. Two uar::eval failures are
     PRE-EXISTING (proven by stashing) and untouched by this work.
 - [x] 3.3 Ensure network/process-dependent resources advertise requirements and are visibly unavailable under offline mobile policy
