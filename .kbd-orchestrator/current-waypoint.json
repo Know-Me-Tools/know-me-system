@@ -1,6 +1,6 @@
 {
   "assessNote": "2026-07-27 assess found the 2026-07-20 assessment largely obsolete: four headline claims verified FALSE against code. The change's 14 open tasks are NOT trustworthy \u2014 re-verify each against code before planning.",
-  "blockedOn": "shared ~/.cargo package-cache lock held by another Claude Code session",
+  "blockedOn": "",
   "certificationStatus": "android persistence PASS; android offline 4/4 PASS + seeded agents PASS; desktop persistence PASS; a2ui device-blocked (widget tests pass); ios not run",
   "change": "embed-uar-mobile-offline",
   "changesCompleted": 0,
@@ -10,8 +10,8 @@
   ],
   "childPointer": null,
   "completionMetric": "implementation",
-  "currentTask": "S1+S2+S3 done and committed (UAR 1cd130b); pack_sync verified 4/4 against the real 140-skill tree. S4 (skill_exec gate) and S5 (KnowMe control_plane wiring) are WRITTEN BUT UNVERIFIED \u2014 cargo is queued behind another Claude session holding the shared ~/.cargo lock (sansaba workspace, fdb-gateway). S6 (native fetch tool) researched and added to the plan.",
-  "exactNextCommand": "verify S4+S5 once the cargo lock frees, then implement S6",
+  "currentTask": "S1-S6 all complete and verified. UAR: 1cd130b (admin services + SDK + pack_sync), 9b894ef (skill_exec gate), 884b338/31bae45/765ec21 (web_fetch hardening + toggle + extraction). KnowMe: b2aae10 (control_plane serves real skills/knowledge/MCP). 3.2 remains PARTIAL: tools and memories have no embedded admin surface, and A2UI registry/actions FFI is absent.",
+  "exactNextCommand": "close 3.2's remaining gaps (tools/memories admin, A2UI registry FFI) or re-certify on device",
   "implementationCompleted": 0,
   "implementationTotal": 1,
   "nextPendingChange": "embed-uar-mobile-offline",
@@ -36,5 +36,5 @@
   "sourceTool": "claude-code",
   "stage": "implementation_ready",
   "status": "implementation_ready",
-  "updatedAt": "2026-07-28T03:11:28Z"
+  "updatedAt": "2026-07-28T04:46:24Z"
 }
