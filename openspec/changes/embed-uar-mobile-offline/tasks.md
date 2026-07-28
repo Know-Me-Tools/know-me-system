@@ -51,7 +51,15 @@
     a flattened list cannot explain why some survive going offline.
   - A2UI: schema LISTING done (admin::a2ui, read-only — registering a schema
     changes how every future artifact renders, so that belongs to composition).
-    A2UI *actions* FFI is still absent.
+  - A2UI ACTIONS: already wired end to end; my earlier "still absent" note was
+    WRONG. Verified chain — ChatNotifier.submitInteraction (chat_notifier.dart:738)
+    -> PemChatRepository.submitInteraction (:74) -> bridge.chatAction ->
+    gen_ui_ffi chat_action -> gen_ui_agent::chat::send_interaction ->
+    uar_a2ui_action_from_interaction -> submit_a2ui_action, implemented on BOTH
+    the embedded (uar.rs:1320) and service (:1579) facades.
+    promote_a2ui_component is handled on the same path, and a malformed payload
+    raises a typed `uar_interaction_not_a2ui_response` error rather than being
+    silently dropped. Nothing to build.
   - memories: NOT done, and blocked at the storage layer rather than unfinished.
     PersistenceLayer exposes only search_memory(query_vec, ..) — there is no way
     to enumerate memories without inventing an embedding to search with. Its
