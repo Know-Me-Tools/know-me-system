@@ -108,23 +108,25 @@ pub async fn catalog() -> Result<ChatControlPlaneCatalog, AgentError> {
         // so wrap the array to match the service contract — otherwise every
         // embedded surface (iOS/Android/macOS) silently sees an empty agent list
         // while the agents exist and are seeded.
-        let agents = crate::state::embedded_uar()?.list_agents().await?;
+        let runtime = crate::state::embedded_uar()?;
+        let agents = runtime.list_agents().await?;
+        // Skills and knowledge bases are served in-process by the SDK now, so
+        // these are REAL rather than the hardcoded `[]` they used to be.
+        let skills = runtime.list_skills().await?;
+        let knowledge_bases = runtime.list_knowledge_bases().await?;
         return Ok(ChatControlPlaneCatalog {
             agents: serde_json::json!({
                 "runtime_agents": agents,
                 "federated_agents": [],
             }),
-            skills: serde_json::json!([]),
+            skills,
+            // `tools` has no embedded admin surface yet, so it stays empty AND
+            // stays advertised as unavailable — omitting the marker while the
+            // array is empty would make the UI claim "none configured", which is
+            // the exact defect the `unavailable` contract exists to prevent.
             tools: serde_json::json!([]),
-            knowledge_bases: serde_json::json!([]),
-            // The arrays stay empty, but they are no longer SILENTLY empty:
-            // a client can now say "skills are unavailable on this platform"
-            // instead of implying none are configured.
-            unavailable: vec![
-                UnavailableResource::embedded("skills"),
-                UnavailableResource::embedded("tools"),
-                UnavailableResource::embedded("knowledgeBases"),
-            ],
+            knowledge_bases,
+            unavailable: vec![UnavailableResource::embedded("tools")],
         });
     }
     let client = chat::uar_service_client().await?;
@@ -155,22 +157,22 @@ pub async fn admin_snapshot() -> Result<UarAdminSnapshot, AgentError> {
         let runtime = crate::state::embedded_uar()?;
         let (settings, setting_types) = runtime.settings_snapshot().await?;
         let agents = runtime.list_agents().await?;
+        let skills = runtime.list_skills().await?;
+        let knowledge_bases = runtime.list_knowledge_bases().await?;
+        let mcp_servers = runtime.list_mcp_servers().await?;
         return Ok(UarAdminSnapshot {
             settings,
             setting_types,
             agents,
-            skills: serde_json::json!([]),
+            skills,
+            // See the catalog: `tools` and `memories` have no embedded admin
+            // surface yet, so they remain advertised rather than silently empty.
             tools: serde_json::json!([]),
-            knowledge_bases: serde_json::json!([]),
-            mcp_servers: serde_json::json!([]),
+            knowledge_bases,
+            mcp_servers,
             memories: serde_json::json!([]),
-            // Same defect as the catalog: five empty arrays that a client
-            // cannot distinguish from "nothing configured".
             unavailable: vec![
-                UnavailableResource::embedded("skills"),
                 UnavailableResource::embedded("tools"),
-                UnavailableResource::embedded("knowledgeBases"),
-                UnavailableResource::embedded("mcpServers"),
                 UnavailableResource::embedded("memories"),
             ],
         });
@@ -258,7 +260,12 @@ pub async fn save_mcp_server(
     server: &serde_json::Value,
 ) -> Result<serde_json::Value, AgentError> {
     if let Backend::Embedded = backend().await? {
-        return Err(not_on_embedded("MCP server administration"));
+        // The result may report `Deferred`: an edit to an already-connected
+        // server is stored durably but not applied live, so a healthy
+        // connection is not torn down mid-session.
+        return crate::state::embedded_uar()?
+            .save_mcp_server(name, server)
+            .await;
     }
     chat::uar_service_client()
         .await?
@@ -270,7 +277,7 @@ pub async fn save_mcp_server(
 
 pub async fn delete_mcp_server(name: &str) -> Result<serde_json::Value, AgentError> {
     if let Backend::Embedded = backend().await? {
-        return Err(not_on_embedded("MCP server administration"));
+        return crate::state::embedded_uar()?.delete_mcp_server(name).await;
     }
     chat::uar_service_client()
         .await?
@@ -282,7 +289,10 @@ pub async fn delete_mcp_server(name: &str) -> Result<serde_json::Value, AgentErr
 
 pub async fn delete_memory(id: &str) -> Result<serde_json::Value, AgentError> {
     if let Backend::Embedded = backend().await? {
-        return Err(not_on_embedded("memory administration"));
+        // Deliberate, not a gap: memory WRITES go through the memory service,
+        // which owns scoping, embedding and auto-capture. An admin surface that
+        // deleted rows directly would bypass those invariants.
+        return Err(not_on_embedded("memory deletion"));
     }
     chat::uar_service_client()
         .await?

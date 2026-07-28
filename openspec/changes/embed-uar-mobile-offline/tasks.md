@@ -31,7 +31,27 @@
 ## 3. Offline Data and Control Plane
 
 - [x] 3.1 Inject durable sandboxed persistence for agents, skills, policies, settings, memory, knowledge, conversations, run state, and A2UI data
-- [ ] 3.2 Expose direct FFI operations for agent administration, provider/model catalog, settings, skills, MCP/native tools, knowledge, memory, run policy, and A2UI registry/actions
+- [/] 3.2 Expose direct FFI operations for agent administration, provider/model catalog, settings, skills, MCP/native tools, knowledge, memory, run policy, and A2UI registry/actions
+  - DONE: skills, knowledge bases and MCP servers are served in-process by the
+    embedded runtime instead of hardcoded []. UAR gained transport-free
+    uar::admin::{mcp,skills,knowledge,memory} (1cd130b) that the HTTP layer now
+    DELEGATES to, so both containers run one implementation. 11 SDK Runtime
+    methods; KnowMe control_plane calls them; MCP writes work embedded.
+  - MCP edit policy (operator-chosen B): adds/removals apply live, an edit to an
+    already-CONNECTED server returns Deferred rather than dropping a healthy
+    connection mid-session. save_mcp_server returns SaveResult so a UI can say so.
+  - Skill pack loader (pack_sync): metadata to the DB, bodies on disk, config
+    seeds the DB once and the DB is authoritative after. Verified against the
+    real tree — 140 canonical skills, 37 with scripts/, 0 dups, 0 parse failures.
+  - Capability gate (skill_exec, 9b894ef): iOS never degrades to local execution
+    (asserted), and permanent vs transient unavailability is distinguished so a UI
+    never offers a retry that cannot work.
+  - REMAINING: `tools` and `memories` still have no embedded admin surface, so
+    they stay advertised as unavailable rather than silently empty. A2UI
+    registry/actions FFI is still absent. Memory DELETION is deliberately not
+    exposed — writes belong to the memory service that owns scoping/embedding.
+  - Verified: 92/92 gen_ui_agent, 9/9 UAR admin::. Two uar::eval failures are
+    PRE-EXISTING (proven by stashing) and untouched by this work.
 - [x] 3.3 Ensure network/process-dependent resources advertise requirements and are visibly unavailable under offline mobile policy
   - RUST DONE: ChatControlPlaneCatalog and UarAdminSnapshot now carry an
     `unavailable: [{resource, reason, platformLimitation}]` list. Previously a

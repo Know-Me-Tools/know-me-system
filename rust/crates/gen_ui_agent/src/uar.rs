@@ -1017,6 +1017,78 @@ impl UarEmbeddedRuntime {
             .map_err(|error| AgentError::Config(format!("serialize agents: {error}")))
     }
 
+    /// List every skill the embedded runtime holds.
+    ///
+    /// Previously the embedded control plane returned a hardcoded `[]` here,
+    /// which a client could not distinguish from "no skills configured". The
+    /// SDK now serves this in-process, so the real catalog is available with no
+    /// network and no service URL.
+    pub async fn list_skills(&self) -> Result<serde_json::Value, AgentError> {
+        let skills = self
+            .runtime
+            .list_skills()
+            .await
+            .map_err(|error| AgentError::Config(format!("list skills: {error}")))?;
+        serde_json::to_value(&skills)
+            .map_err(|error| AgentError::Config(format!("serialize skills: {error}")))
+    }
+
+    /// List every knowledge base.
+    pub async fn list_knowledge_bases(&self) -> Result<serde_json::Value, AgentError> {
+        let bases = self
+            .runtime
+            .list_knowledge_bases()
+            .await
+            .map_err(|error| AgentError::Config(format!("list knowledge bases: {error}")))?;
+        serde_json::to_value(&bases)
+            .map_err(|error| AgentError::Config(format!("serialize knowledge bases: {error}")))
+    }
+
+    /// List configured MCP servers, read from the database.
+    ///
+    /// Config files seed the store once at boot; the store is authoritative
+    /// afterwards, so a change made through this surface takes effect without a
+    /// restart or a file-polling loop.
+    pub async fn list_mcp_servers(&self) -> Result<serde_json::Value, AgentError> {
+        let servers = self.runtime.list_mcp_servers().await;
+        serde_json::to_value(&servers)
+            .map_err(|error| AgentError::Config(format!("serialize mcp servers: {error}")))
+    }
+
+    /// Save an MCP server.
+    ///
+    /// Returns the runtime's `SaveResult` verbatim rather than `()`, because the
+    /// outcome is not always "applied": an edit to an ALREADY-CONNECTED server is
+    /// stored durably but deferred to the next session so in-flight tool calls
+    /// are not interrupted. Callers must surface that instead of implying the
+    /// change took effect.
+    pub async fn save_mcp_server(
+        &self,
+        name: &str,
+        server: &serde_json::Value,
+    ) -> Result<serde_json::Value, AgentError> {
+        let parsed = serde_json::from_value(server.clone())
+            .map_err(|error| AgentError::Config(format!("parse mcp server: {error}")))?;
+        let result = self
+            .runtime
+            .save_mcp_server(name.to_string(), parsed)
+            .await
+            .map_err(|error| AgentError::Config(format!("save mcp server: {error}")))?;
+        serde_json::to_value(&result)
+            .map_err(|error| AgentError::Config(format!("serialize save result: {error}")))
+    }
+
+    /// Remove an MCP server from the store and the live registry.
+    pub async fn delete_mcp_server(&self, name: &str) -> Result<serde_json::Value, AgentError> {
+        let result = self
+            .runtime
+            .delete_mcp_server(name)
+            .await
+            .map_err(|error| AgentError::Config(format!("delete mcp server: {error}")))?;
+        serde_json::to_value(&result)
+            .map_err(|error| AgentError::Config(format!("serialize delete result: {error}")))
+    }
+
     /// Create or replace an agent from its JSON artifact.
     pub async fn upsert_agent(&self, agent: &serde_json::Value) -> Result<(), AgentError> {
         let artifact = serde_json::from_value(agent.clone())
