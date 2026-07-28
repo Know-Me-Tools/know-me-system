@@ -149,9 +149,18 @@ agent_controls_visible = any("Conversation agent" in d for d in all_desc)
 # was advertised as unavailable. It is now served from both registries (native
 # + MCP), so the toolbar controls must be reachable with no network. Asserting
 # this is what makes THIS run prove something the previous one could not.
-RESOURCE_CONTROLS = ("Skills", "Tools", "Knowledge")
+# The controls render their RESOLVED SELECTION in the accessible name, so the
+# label reads "Tools inherit" / "Skills auto", not a bare "Tools". An exact
+# match finds nothing and looks like a missing capability — measured, after an
+# exact-match version of this check returned [] against a working build.
+RESOURCE_CONTROLS = ("Skills", "Tools", "Knowledge", "MCP")
 resource_controls_visible = sorted(
-    {d for d in all_desc if d in RESOURCE_CONTROLS}
+    {
+        prefix
+        for prefix in RESOURCE_CONTROLS
+        for d in all_desc
+        if d == prefix or d.startswith(f"{prefix} ")
+    }
 )
 
 # CLAIM 2 — A2UI, asserted CONDITIONALLY (see the header: the model is
