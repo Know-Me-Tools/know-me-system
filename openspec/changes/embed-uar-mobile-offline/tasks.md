@@ -120,6 +120,10 @@
     defect: identical prompt to multiturn-history, which passes. One run
     emitted a tool call instead of the marker; the re-run emitted none and
     passed. No assertion was loosened.
+  - RE-CERTIFIED 2026-07-28 against a build carrying S1-S6 (APK 06:47): the
+    four functional gates all PASS offline — cancellation, second-send,
+    multiturn-history, restart-recovery — plus seeded agents and the Skills/
+    Tools resource controls. docs/certification/2026-07-28-android-offline-s1-s6.json
   - offline agents PASS: both UAR-seeded agents ("Default Assistant",
     "Orchestrator") are listed in the mode picker with both radios down.
     scripts/android/certify-offline-agents-and-a2ui.sh

@@ -17,9 +17,21 @@
     ],
     "webFetchAbsentOnMobile": "web_fetch and its SSRF guard are NOT in the mobile .so, and that is correct: the tool registers only when web_fetch_enabled is set, which mobile never does. Shipping the guard to a phone that cannot reach the tool would be dead weight."
   },
+  "coverage": "5.4 functional claims now measured against a build carrying every change this session: generation, cancellation, the turn after a cancel, history recall across turns, and restart recovery \u2014 all with no network.",
   "device": {
     "android": "16",
     "model": "SM-S936U"
+  },
+  "functionalSuite": {
+    "allRunWith": "CERT_REQUIRE_OFFLINE=1 \u2014 both radios down, unreachability probed",
+    "build": "app-release.apk 2026-07-28 06:47 (carries S1-S6)",
+    "note": "cancellation FAILED on the first attempt and PASSED with CERT_NEW_CONVERSATION=1. Cause was accumulated chat state from the earlier certification runs in this session (the UI dump showed markers KMA2UI064923/065139 and a 'Latest' control from prior turns), not a regression from S1-S6. Diagnosed rather than assumed: only 2 generation lines appeared, so the run barely started, and no KnowMe-side error was logged.",
+    "results": {
+      "certify-local-cancellation": "PASS",
+      "certify-local-multiturn-history": "PASS",
+      "certify-local-restart-recovery": "PASS",
+      "certify-local-second-send": "PASS"
+    }
   },
   "harnessBugFixedThisRun": "The first version of the resource-control assertion matched labels exactly and returned [] against a WORKING build: the controls render their resolved selection, so the accessible name is 'Tools inherit', not 'Tools'. Now prefix-matched. An exact-match check would have reported a missing capability that was present.",
   "offline": {
