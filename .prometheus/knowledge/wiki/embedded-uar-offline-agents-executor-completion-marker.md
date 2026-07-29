@@ -11,13 +11,13 @@ tags:
 - uar
 links:
 - embedded-uar-offline-agents-executor-session-complete-change-unknown
-- embedded-uar-offline-agents-executor-completion-change-unknown
 - embedded-uar-offline-agents-completion-marker-with-unknown-change
+- embedded-uar-offline-agents-executor-completion-unknown-change
 sources:
 - stdin
-timestamp: 2026-07-29T13:02:36.043102+00:00
-created_at: 2026-07-29T13:02:36.043057+00:00
-updated_at: 2026-07-29T13:02:36.043102+00:00
+timestamp: 2026-07-29T14:30:34.953616+00:00
+created_at: 2026-07-29T14:30:34.953160+00:00
+updated_at: 2026-07-29T14:30:34.953616+00:00
 revision: 1
 ---
 
@@ -35,7 +35,7 @@ revision: 1
 ## Follow-up
 
 - Correlate this marker with build logs, installation logs, runtime traces, offline-agent execution logs, or later knowledge records before treating `embedded-uar-offline-agents` as implemented or verified.
-- Keep executor completion markers distinct from runtime proof, consistent with [embedded-uar-offline-agents executor session complete, change unknown](/embedded-uar-offline-agents-executor-session-complete-change-unknown.md), [embedded-uar-offline-agents executor completion, change unknown](/embedded-uar-offline-agents-executor-completion-change-unknown.md), and [embedded-uar-offline-agents completion marker with unknown change](/embedded-uar-offline-agents-completion-marker-with-unknown-change.md).
+- Keep executor completion markers distinct from runtime proof, consistent with [embedded-uar-offline-agents executor session complete, change unknown](/embedded-uar-offline-agents-executor-session-complete-change-unknown.md), [embedded-uar-offline-agents completion marker with unknown change](/embedded-uar-offline-agents-completion-marker-with-unknown-change.md), and [embedded-uar-offline-agents executor completion, unknown change](/embedded-uar-offline-agents-executor-completion-unknown-change.md).
 
 # Citations
 
