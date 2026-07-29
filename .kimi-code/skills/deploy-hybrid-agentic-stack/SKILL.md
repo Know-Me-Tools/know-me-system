@@ -1,6 +1,6 @@
 ---
 name: deploy-hybrid-agentic-stack
-description: Plan, scaffold, configure, and verify a KnowMe-style hybrid agentic application spanning React web, Tauri desktop, Flutter mobile, a shared Rust host, Axum, Flint Forge/Fabric/Gate, optional Ory Kratos, and local or BYOK LLMs. Use when adding web deployment, realtime sync, cloud inference, authentication, Docker Compose, Kubernetes, or full-stack deployment options to a TJ-ARCH-MOB-001 project.
+description: Plan, scaffold, configure, and verify a full hybrid agentic application spanning React web, Tauri desktop, Flutter mobile, a shared Rust host, Axum, Flint Forge/Fabric/Gate, optional Ory Kratos, and local or BYOK LLMs. Use when adding web deployment, realtime sync, cloud inference, authentication, Docker Compose, Kubernetes, or full-stack deployment options to a TJ-ARCH-MOB-001 project.
 ---
 
 # Deploy Hybrid Agentic Stack
@@ -41,11 +41,18 @@ Read [architecture.md](references/architecture.md) before implementing service o
 changes. Read [deployment.md](references/deployment.md) before emitting containers or
 Kubernetes resources.
 
+When a Prometheus deployment catalog is available, consume its pinned sources,
+immutable image digests, Compose profiles, PostgreSQL distribution, and GitOps
+components. Do not invent a second build path inside a generated application.
+
 ## Asset modes for Axum
 
-- **Embedded:** `build.rs` consumes `KNOWME_WEB_DIST_DIR` or invokes the tracked package
+Both modes read a env-var prefix derived from the application name (`<APP>_`,
+SCREAMING_SNAKE_CASE) — never a hardcoded product prefix.
+
+- **Embedded:** `build.rs` consumes `<APP>_WEB_DIST_DIR` or invokes the tracked package
   build into `OUT_DIR`. It must never install dependencies or modify the source tree.
-- **External:** runtime `KNOWME_WEB_ROOT` points to an existing compiled bundle. Reject an
+- **External:** runtime `<APP>_WEB_ROOT` points to an existing compiled bundle. Reject an
   invalid directory at readiness time. If unset, use embedded assets.
 - Serve hashed assets with immutable caching, `index.html` with no-cache, client routes
   through an SPA fallback, and unknown API routes as 404.

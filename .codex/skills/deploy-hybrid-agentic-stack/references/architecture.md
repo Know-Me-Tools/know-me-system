@@ -6,7 +6,7 @@
   dependency.
 - `gen_ui_server_axum`: reusable router, request validation, AG-UI SSE, OpenAPI,
   readiness, and metrics adapters.
-- `knowme-web-server`: thin binary that selects configuration, assets, and deployment
+- `<app>-web-server`: thin binary that selects configuration, assets, and deployment
   adapters.
 
 All three surfaces consume the same `AppServices`: Tauri through commands/events,

@@ -4,10 +4,9 @@ description: ALWAYS invoke before writing any color, spacing, typography, radius
 ---
 <!-- TJ-ARCH-MOB-001 compliant -->
 
-> **Binding:** this skill operates under the 40 Prometheus Base Rules
-> ([AGENT_BASE_RULES.md](../../AGENT_BASE_RULES.md) at the project root). Simplicity
-> first, surgical changes, strict layering, strong typing, verified versions — the
-> rules apply to every line this skill helps generate.
+> **Binding:** Prefer simple, surgical, strongly typed changes; preserve strict
+> layering and verify dependency versions. When installed in a project, also
+> obey that project's `AGENT_BASE_RULES.md`; this skill remains self-contained.
 
 # Hybrid Design Tokens
 
@@ -18,15 +17,45 @@ Flutter theme and the Tailwind theme drift.
 ## Token source → outputs
 
 ```
-tokens (single source: design/tokens.json)
-   ├── web/desktop  → Tailwind 4 @theme + shadcn CSS custom properties (:root / .dark)
-   └── mobile       → shadcn_flutter ThemeData (light + dark ColorScheme)
+assets/templates/design-tokens/tokens.toml          ← THE source. Edit only this.
+   │  bash scripts/gen-design-tokens.sh <root>
+   ├── desktop/src/theme.css                        Tailwind 4 @theme (+ light override)
+   └── mobile/lib/core/theme/tokens.dart            Dart token class
 ```
 
-Use the project token compiler (`pnpm tokens:build`) to regenerate BOTH the Tailwind/shadcn
-CSS token block and Flutter theme from `design/tokens.json`. Regenerate—do not hand-edit—the
-derived theme files. `theme-factory` may help explore a palette, but it is not a cross-platform
-token compiler and must never be cited as parity proof.
+Both outputs carry a `GENERATED … DO NOT EDIT` banner. Edit `tokens.toml` and re-run
+the script; never hand-edit a generated file.
+
+### Why this is generated and not "kept in sync"
+
+"One token source" used to be aspiration rather than mechanism: the two files were
+hand-mirrored, and they had **already drifted** — `#0D0D18` on Flutter against
+`#0B0F14` on React for the same app-background role, with nothing in the build to
+notice. Two palettes that agree on intent and disagree on values is worse than one
+ugly palette, because every screenshot comparison becomes unreliable.
+
+Generation makes the drift impossible instead of merely discouraged.
+`theme-factory` may help explore a palette, but it is not a cross-platform token
+compiler and must never be cited as parity proof.
+
+## Naming: role, never colour
+
+A token is named for the **job it does**, never the colour it currently holds.
+`accent` survives a rebrand; `ember` becomes a lie the first time the brand changes,
+and renaming it then touches every call site. The generator emits deprecated
+colour-word aliases (`red` → `danger`) only so older code keeps compiling — new code
+uses the semantic name.
+
+Group prefixes keep roles legible and prevent collisions: `bgSurface` is a
+background, `textPrimary` is a text role. A flat namespace fights over the obvious
+words.
+
+## Light and dark are the same names
+
+Both themes define the **same token names** with different values, so no component
+ever branches on theme — it reads a role and gets the right colour. Both must satisfy
+WCAG 2.2 AA against their own background; changing a value is a contrast change, so
+re-check it (`a11y-gate`).
 
 ## Token categories (define once, reference everywhere)
 
@@ -36,7 +65,7 @@ token compiler and must never be cited as parity proof.
   `clamp()` for section-level rhythm on web.
 - **Typography** — at most two families with a deliberate pairing; fluid `clamp()` sizes
   (`text-base`, `text-hero`); `font-display: swap`; preload only the critical weight.
-- **Radius / motion** — `radius`, `duration-*`, `ease-*`. KnowMe is strict Flat 2.0: no
+- **Radius / motion** — `radius`, `duration-*`, `ease-*`. This project is strict Flat 2.0: no
   visible borders/divider lines and no layout shadows. Adjacent areas differ by background.
 
 ## Rules

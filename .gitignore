@@ -105,3 +105,5 @@ flutter_packages/*/build/
 
 # Local disposal area
 _to_delete/
+.knowme-builder/backups/
+.knowme-builder/conflicts/

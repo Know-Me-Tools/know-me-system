@@ -1,70 +1,59 @@
 // TJ-ARCH-MOB-001 compliant
-//! Tauri 2 plugin build script: generates permission schemas + the guest-side
-//! command allowlist from COMMANDS. Keep COMMANDS in sync with the invoke_handler
-//! in src/lib.rs.
-const COMMANDS: &[&str] = &[
-    "stream_agent_a2ui",
-    "chat_approve_tool_confirmation",
-    "stage_attachment",
-    "resolve_remote_content",
-    "send_agent_interaction_a2ui",
-    "promote_a2ui_component",
-    "get_active_lane",
-    "set_active_lane",
-    "lane_availability",
-    "has_local_engine",
-    "cancel_agent_run",
-    "prepare_local_model",
-    "local_model_status",
-    "cancel_model_operation",
-    "local_runtime_diagnostics",
-    "run_migrations",
-    "load_seeds",
-    "attach_sync_shapes",
-    "memory_ingest",
-    "entity_runtime_start",
-    "entity_runtime_stop",
-    "entity_list",
-    "entity_get",
-    "entity_create",
-    "entity_update",
-    "entity_delete",
-    "memory_search",
-    "graph_expand",
-    "scribe_start",
-    "scribe_stop",
-    "uar_service_config",
-    "uar_service_save",
-    "uar_service_probe",
-    "uar_runtime_status",
-    "provider_catalog",
-    "provider_list",
-    "provider_save",
-    "provider_delete",
-    "provider_test",
-    "cloud_model_get",
-    "cloud_model_save",
-    "chat_control_catalog",
-    "conversation_policy_get",
-    "conversation_policy_save",
-    "conversation_policy_delete",
-    "conversation_effective_config",
-    "uar_admin_snapshot",
-    "uar_setting_save",
-    "uar_agent_save",
-    "uar_agent_delete",
-    "uar_mcp_server_save",
-    "uar_mcp_server_delete",
-    "uar_memory_delete",
-    "uar_knowledge_base_create",
-    "uar_knowledge_base_delete",
-    "memory_delete_conversation_context",
-    "memory_delete_message_context",
-    "memory_promote_context",
-];
+//! Tauri 2 plugin build script. The versioned command manifest is the sole
+//! source for the Rust handler registration and Tauri permission allowlist.
+use serde::Deserialize;
+use std::{env, fs, path::PathBuf};
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CommandManifest {
+    schema_version: u32,
+    commands: Vec<String>,
+}
 
 fn main() {
-    tauri_plugin::Builder::new(COMMANDS)
+    let manifest_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("command-manifest.json");
+    println!("cargo:rerun-if-changed={}", manifest_path.display());
+    let manifest: CommandManifest =
+        serde_json::from_slice(&fs::read(&manifest_path).expect("read command-manifest.json"))
+            .expect("parse command-manifest.json");
+    assert_eq!(manifest.schema_version, 1, "unsupported command manifest");
+    assert!(!manifest.commands.is_empty(), "command manifest is empty");
+
+    let mut unique = manifest.commands.clone();
+    unique.sort();
+    unique.dedup();
+    assert_eq!(
+        unique.len(),
+        manifest.commands.len(),
+        "command manifest contains duplicates"
+    );
+
+    let registrations = manifest
+        .commands
+        .iter()
+        .map(|name| format!("commands::{name}"))
+        .collect::<Vec<_>>()
+        .join(",\n");
+    let output = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR"));
+    fs::write(
+        output.join("command_handler.rs"),
+        format!("tauri::generate_handler![\n{registrations}\n]\n"),
+    )
+    .expect("write generated command handler");
+
+    // tauri_plugin::Builder retains this allowlist for the build process and
+    // therefore requires a static slice. The build script is short-lived, so
+    // promoting the manifest-owned names here is bounded to this process.
+    let command_refs: &'static [&'static str] = Box::leak(
+        manifest
+            .commands
+            .into_iter()
+            .map(|name| Box::leak(name.into_boxed_str()) as &'static str)
+            .collect::<Vec<_>>()
+            .into_boxed_slice(),
+    );
+    tauri_plugin::Builder::new(command_refs)
         .android_path("android")
         .ios_path("ios")
         .build();

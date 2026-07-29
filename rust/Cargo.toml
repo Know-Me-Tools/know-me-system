@@ -105,8 +105,8 @@ regex             = "=1.12.4" # transitive ceiling: mistralrs-core/serde-saphyr 
 # frf-sdk-rust      = { git = "ssh://git@github.com/Prometheus-AGS/flint-realtime-fabric", rev = "9ba04ae6ce41be796ae149609414b17a0d0d376b", default-features = false }
 # frf-crdt          = { git = "ssh://git@github.com/Prometheus-AGS/flint-realtime-fabric", rev = "9ba04ae6ce41be796ae149609414b17a0d0d376b", default-features = false }
 # frf-store-redb    = { git = "ssh://git@github.com/Prometheus-AGS/flint-realtime-fabric", rev = "9ba04ae6ce41be796ae149609414b17a0d0d376b", default-features = false }
-# JWT decode (inspect exp/role/tenant_id from gate-minted tokens; no local verify —
-# gate/forge own verification via JWKS). validation disabled for pure claim reads.
+# JWT payload parsing is display-only (`UntrustedTokenHints`). Authorization and
+# trusted tenant/role state come from server-created `VerifiedSession`.
 jsonwebtoken      = { version = "10.4.0", default-features = false }
 surrealdb         = { version = "3.2.1",  default-features = false }
 sqlx              = { version = "0.9",  default-features = false, features = ["runtime-tokio", "tls-rustls", "macros", "migrate"] }

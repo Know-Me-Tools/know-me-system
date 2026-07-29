@@ -15,7 +15,7 @@ gen_ui_document = { path = "../gen_ui_document" }
 # desktop, never gen_ui_wasm), so native-http is unconditional here.
 gen_ui_client   = { path = "../gen_ui_client", default-features = false, features = ["native-http"] }
 gen_ui_db_graph = { path = "../gen_ui_db_graph", features = ["embed-native"] }
-gen_ui_mcp      = { path = "../gen_ui_mcp" }
+gen_ui_mcp      = { path = "../gen_ui_mcp", features = ["runtime-internal"] }
 # The library NEVER names a concrete engine: it drives local inference purely
 # through the `gen_ui_types::inference::InferenceProvider` trait object handed to
 # `state::init_with_inference`, and the platform leaf picks the engine

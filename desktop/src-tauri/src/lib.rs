@@ -57,7 +57,6 @@ pub fn run() {
                 let _ = window.unminimize();
             }
         }))
-        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_gen_ui::init())

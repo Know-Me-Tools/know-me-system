@@ -19,5 +19,9 @@ reqwest-eventsource.workspace = true
 
 [features]
 default = []
+# Exposes the raw transport execution seam only to the UAR/agent runtime crate.
+# Application-facing crates depend on gen_ui_mcp without this feature and can
+# inspect inventories, but cannot issue tools/call directly.
+runtime-internal = []
 # stdio transport spawns a child process — native-only, opt-in (Claude Desktop etc.).
 stdio = []

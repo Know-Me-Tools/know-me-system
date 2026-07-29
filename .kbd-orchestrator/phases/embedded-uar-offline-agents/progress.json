@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "2",
+  "generatedBy": "kbd-runtime",
+  "sourceRevision": 2,
+  "phase": "embedded-uar-offline-agents",
+  "phaseId": "embedded-uar-offline-agents",
+  "parentPhase": null,
+  "last_updated": "2026-07-29T01:05:45.593758Z",
+  "last_updated_by": "kbd-runtime",
+  "changes_total": 0,
+  "changes_completed": 0,
+  "implementation_total": 0,
+  "implementation_completed": 0,
+  "completion": {
+    "primaryCounter": "implementation",
+    "implementation": {
+      "completed": 0,
+      "total": 0,
+      "status": "PENDING"
+    },
+    "evidence": {
+      "status": "PENDING",
+      "summary": null,
+      "blockers": []
+    },
+    "certification": {
+      "status": "PENDING",
+      "summary": null,
+      "blockers": []
+    },
+    "publication": {
+      "status": "PENDING",
+      "summary": null,
+      "blockers": []
+    }
+  },
+  "changes": [],
+  "children": {},
+  "migrationStatus": "legacy-read-only"
+}

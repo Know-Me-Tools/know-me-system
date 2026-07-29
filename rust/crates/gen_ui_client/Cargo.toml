@@ -54,5 +54,5 @@ peer-crdt = ["frf"]
 # frf-store-redb = { workspace = true, optional = true }
 
 [dev-dependencies]
-jsonwebtoken.workspace = true
+jsonwebtoken = { workspace = true, features = ["rust_crypto"] }
 serde_json.workspace   = true

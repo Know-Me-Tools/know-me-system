@@ -1,0 +1,193 @@
+{
+  "builder": {
+    "digest": "bfa516b47e3d7aede9b32f60a9e3b3bdd91e4999c0c13e9f7ee8516e65378d25",
+    "id": "hybrid-mobile-architecture",
+    "version": "2.0.0-alpha.1"
+  },
+  "openSpec": {
+    "source": "external",
+    "version": "1.6.0"
+  },
+  "prometheus": {
+    "contractDigest": "745c83fd96c609ada1c166fd16ddbd6a36ed8335657b5abb12be88b27167b234",
+    "contractVersion": "2.0.0",
+    "source": "external:prometheus-skill-pack"
+  },
+  "schemaVersion": 1,
+  "skills": [
+    {
+      "digest": "1cc71602fc7ddeac78144d59e1430d2f2794dbea07941c713f0d166f250d70e0",
+      "id": "a11y-gate",
+      "source": "builder:templates/project-skills/a11y-gate",
+      "version": "2.0.0-alpha.1"
+    },
+    {
+      "digest": "e4c7266b2ca53273bad40da8f537d62b319a264c545071bc133e89b0254f2056",
+      "id": "build-branded-docusaurus",
+      "source": "builder:templates/project-skills/build-branded-docusaurus",
+      "version": "2.0.0-alpha.1"
+    },
+    {
+      "digest": "12e45a29652f97fc50155e619b856af44845c00bc791ecd987aaad5ffd507cad",
+      "id": "client-rag",
+      "source": "builder:templates/project-skills/client-rag",
+      "version": "2.0.0-alpha.1"
+    },
+    {
+      "digest": "e7c7712fa3f0714172072dcee5067f47bdd368a1a94bd47a10b428ce80b35ae8",
+      "id": "content-block-ui",
+      "source": "builder:templates/project-skills/content-block-ui",
+      "version": "2.0.0-alpha.1"
+    },
+    {
+      "digest": "2d692b360f3688d767e90be33127ed1df616b4f0a28bc16d407d6c10d6b99f02",
+      "id": "dependency-pin-discipline",
+      "source": "builder:templates/project-skills/dependency-pin-discipline",
+      "version": "2.0.0-alpha.1"
+    },
+    {
+      "digest": "27eb734bfd223775067ea07bca1701dbaaa45c37ff551f2eb76e2d0ba809d15e",
+      "id": "deploy-hybrid-agentic-stack",
+      "source": "builder:templates/project-skills/deploy-hybrid-agentic-stack",
+      "version": "2.0.0-alpha.1"
+    },
+    {
+      "digest": "1769e51211c5900b4cc33dfbdd7e58509e9a9fec9062c1e89bca9a3dfcb49d7b",
+      "id": "flutter-golden-ui",
+      "source": "builder:templates/project-skills/flutter-golden-ui",
+      "version": "2.0.0-alpha.1"
+    },
+    {
+      "digest": "f922730112b1618c04e8b43d6e988b37899c2145cb963ed00e016066daf4ee83",
+      "id": "hybrid-design-tokens",
+      "source": "builder:templates/project-skills/hybrid-design-tokens",
+      "version": "2.0.0-alpha.1"
+    },
+    {
+      "digest": "da3b501817b063ed274457faff33ff4a4aeadf847295642edcc7e96cc334e99c",
+      "id": "hybrid-runtime-verification",
+      "source": "builder:templates/project-skills/hybrid-runtime-verification",
+      "version": "2.0.0-alpha.1"
+    },
+    {
+      "digest": "b6c6936aaf791c83fe2c788d4162f518a95eb69eab5abaced60c86e33266dd06",
+      "id": "karpathy-progress-memory",
+      "source": "builder:templates/project-skills/karpathy-progress-memory",
+      "version": "2.0.0-alpha.1"
+    },
+    {
+      "digest": "5957ff309c99c6ce67b2d268eac9e0373c3c87a36c0f7fc87e351c2db4023626",
+      "id": "local-inference-lanes",
+      "source": "builder:templates/project-skills/local-inference-lanes",
+      "version": "2.0.0-alpha.1"
+    },
+    {
+      "digest": "9e57bfcd5b51a1abdadb6c700f22e2fa7dfc7d169307b935e1e978cf239b253e",
+      "id": "mobile-navigation",
+      "source": "builder:templates/project-skills/mobile-navigation",
+      "version": "2.0.0-alpha.1"
+    },
+    {
+      "digest": "0e414fb362150af8f19909d388d2033af9cf6007d0f7476197287e02e37715e1",
+      "id": "orchestrate-prometheus-application",
+      "source": "builder:templates/project-skills/orchestrate-prometheus-application",
+      "version": "2.0.0-alpha.1"
+    },
+    {
+      "digest": "1156971bb0403b2a239a8bcc3e7e5d60c224c0b7aa768468d78e57d6f8f05433",
+      "id": "peer-profile-sync",
+      "source": "builder:templates/project-skills/peer-profile-sync",
+      "version": "2.0.0-alpha.1"
+    },
+    {
+      "digest": "1bea15f28389466de211c40c4b8e2262d5f6a8618b3bbb03f6683a4913c20fde",
+      "id": "pem-local-first",
+      "source": "builder:templates/project-skills/pem-local-first",
+      "version": "2.0.0-alpha.1"
+    },
+    {
+      "digest": "af0e8ea8a1f925f81398b506c40d559390950f2f01dfbe60ac37ab582fe99713",
+      "id": "reference-ui-fidelity",
+      "source": "builder:templates/project-skills/reference-ui-fidelity",
+      "version": "2.0.0-alpha.1"
+    },
+    {
+      "digest": "581b53501462cdc35b0e2676cbb7106216972fe825ca93e32d3a3d48eafde98e",
+      "id": "sync-doctrine",
+      "source": "builder:templates/project-skills/sync-doctrine",
+      "version": "2.0.0-alpha.1"
+    },
+    {
+      "digest": "69c09f63b4e053e2c6230af72740dddd0d829a50c3451947fca07ab33640c556",
+      "id": "tauri-custom-titlebar",
+      "source": "builder:templates/project-skills/tauri-custom-titlebar",
+      "version": "2.0.0-alpha.1"
+    },
+    {
+      "digest": "5ac31f7fca8bcdbff0dbfae718d76b875baf014368634554fac536b65347baf0",
+      "id": "tauri-ui-review",
+      "source": "builder:templates/project-skills/tauri-ui-review",
+      "version": "2.0.0-alpha.1"
+    },
+    {
+      "digest": "4ff9eddc206557e27cb2c464dea048b194d4d5671dbd73548293e48523ef6531",
+      "id": "entity-graph-web-shell",
+      "source": "builder:templates/project-skills/entity-graph-web-shell",
+      "version": "2.0.0-alpha.1"
+    },
+    {
+      "digest": "5c99c1fdd1745e402762757dcb998cbf956b9eb5ea87ba31c5d00235ad01905d",
+      "id": "mini-app-module",
+      "source": "builder:templates/project-skills/mini-app-module",
+      "version": "2.0.0-alpha.1"
+    },
+    {
+      "digest": "6a58c81056cb5a8b753c9b6b66dfde6b0e20e730e4274f534a4cf94746550f5f",
+      "id": "axum-agent-gateway",
+      "source": "builder:templates/project-skills/axum-agent-gateway",
+      "version": "2.0.0-alpha.1"
+    },
+    {
+      "digest": "c66f2ce1c1d06c919a3b61af8fb6e08c38625a045ad79815c259902be42ab5f6",
+      "id": "legacy-app-embed",
+      "source": "builder:templates/project-skills/legacy-app-embed",
+      "version": "2.0.0-alpha.1"
+    },
+    {
+      "digest": "63d264776d5566e786a90ddbaed5d2aff318671452ff64581b8b3bc0058aa335",
+      "id": "a2ui-surface-contract",
+      "source": "builder:templates/project-skills/a2ui-surface-contract",
+      "version": "2.0.0-alpha.1"
+    },
+    {
+      "digest": "c026070a2b0ccd8ad857293010ffb378bc846578cb7193bc13751fb77f30795b",
+      "id": "agui-event-contract",
+      "source": "builder:templates/project-skills/agui-event-contract",
+      "version": "2.0.0-alpha.1"
+    },
+    {
+      "digest": "62cb90e5821d11e1a8adb928b4604b0723c43de8f52910cdaca7a703e091e181",
+      "id": "agent-runtime-security",
+      "source": "builder:templates/project-skills/agent-runtime-security",
+      "version": "2.0.0-alpha.1"
+    },
+    {
+      "digest": "7b295a100d3690aa62f0c5a64cc8b9129b5b054de863f5809ea786fa5657dd4e",
+      "id": "anonymized-replica",
+      "source": "builder:templates/project-skills/anonymized-replica",
+      "version": "2.0.0-alpha.1"
+    },
+    {
+      "digest": "72f092b4892297be287c722be7f4cafa957bb61dd56502787813e67ccd536174",
+      "id": "persona-scoped-agent",
+      "source": "builder:templates/project-skills/persona-scoped-agent",
+      "version": "2.0.0-alpha.1"
+    },
+    {
+      "digest": "2fe7ee96e9409ea4d3f50d38cb5084258feade61401633c43def27276d500c56",
+      "id": "domain-glossary-service",
+      "source": "builder:templates/project-skills/domain-glossary-service",
+      "version": "2.0.0-alpha.1"
+    }
+  ]
+}

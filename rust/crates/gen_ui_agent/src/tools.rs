@@ -69,7 +69,7 @@ fn to_definition(server: &str, tool: &McpTool) -> ChatCompletionTool {
 /// `arguments` arrives as a JSON *string* (the OpenAI wire format), so it is parsed here
 /// rather than at the call site — a malformed one is the model's error, and it comes back
 /// as a tool result the model can see and retry, not as a failed run.
-pub async fn call_tool(
+pub(crate) async fn call_tool(
     registry: &McpRegistry,
     qualified_name: &str,
     arguments: &str,

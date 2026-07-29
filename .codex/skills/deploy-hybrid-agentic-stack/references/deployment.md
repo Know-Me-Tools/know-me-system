@@ -20,6 +20,18 @@ charts only where they remain the component's maintained interface. Provide star
 readiness, and liveness probes; NetworkPolicies; Pod security settings; persistent volume
 claims where required; and Secret references rather than inline values.
 
+Offer mutually exclusive edge examples for F5 NGINX Ingress Controller, NGINX
+Gateway Fabric, Traefik Ingress, Traefik Gateway API, and Envoy Gateway. Do not
+recommend the retired community `kubernetes/ingress-nginx` controller for new
+production deployments. Include cert-manager HTTP-01 for individual hosts,
+cert-manager DNS-01 for wildcard certificates on GKE/AKS/EKS with workload identity,
+and an external Certbot DNS-01 workflow that writes certificates to the cloud secret
+manager. Wildcards never use HTTP-01, and keys or DNS credentials never enter Git.
+
+Consume pinned source/image catalogs and emit the TJ-CICD-001 base/cloud/overlay
+Kustomize shape. ArgoCD owns live state; application CI builds, attests, mirrors, and
+promotes digests but never runs direct deployment commands.
+
 ## Required proof
 
 Render every selected profile, start it from a clean checkout, wait for readiness, run a

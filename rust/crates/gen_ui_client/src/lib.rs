@@ -3,7 +3,9 @@
 //!
 //! Owns ALL outbound connections (TJ-ARCH-MOB-001: networking lives only here, never
 //! in Dart/TS). Three planes, one façade [`flint::FlintClient`]:
-//!   * gate   — Kratos/JWT auth, token lifecycle, Cedar `@require_approval` polling.
+//!   * gate   — Kratos session bootstrap and display-only token hints. Trusted
+//!              identity, Cedar authorization, and approval administration stay
+//!              behind the server-created `VerifiedSession` boundary.
 //!   * forge  — Quarry REST (`EntityTransport`), A2UI-registry MCP server, AG-UI runs.
 //!   * frf    — realtime spine (Spine subscribe/ack, EntityService watch) [feature = "frf"].
 //!

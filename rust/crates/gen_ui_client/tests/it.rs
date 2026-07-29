@@ -1,6 +1,6 @@
 // TJ-ARCH-MOB-001 compliant
 //! Boundary tests for the flint client. No network, no mocks — the observable
-//! behavior is: (1) a gate JWT decodes to the right role/tenant and expiry drives the
+//! behavior is: (1) untrusted token hints never become authorization and expiry drives the
 //! AuthState machine; (2) forge AG-UI SSE frames fold into the ContentBlock contract.
 #![cfg(not(target_arch = "wasm32"))]
 
@@ -10,7 +10,7 @@ use gen_ui_types::content_block::ContentBlock;
 use gen_ui_types::events::A2uiEvent;
 
 /// Mint an unsigned-payload HS256 JWT for the given claims (test-only; the client
-/// decodes WITHOUT verification, mirroring the real "gate/forge own verification").
+/// parses display-only hints without verification.
 fn mint(claims: serde_json::Value) -> String {
     use jsonwebtoken::{encode, EncodingKey, Header};
     encode(
@@ -22,7 +22,7 @@ fn mint(claims: serde_json::Value) -> String {
 }
 
 #[test]
-fn token_decodes_role_and_tenant_from_gate_claims() {
+fn token_parses_display_only_role_and_tenant_hints() {
     // Mirrors forge-identity::Claims: typed sub/role/tenant_id + untyped extra.
     let jwt = mint(serde_json::json!({
         "sub": "user-42", "role": "agent", "tenant_id": "acme",
@@ -30,10 +30,19 @@ fn token_decodes_role_and_tenant_from_gate_claims() {
     }));
     let token = Token::parse(&jwt).expect("parse");
     assert_eq!(token.role(), Role::Agent);
-    assert_eq!(token.claims.tenant_id.as_deref(), Some("acme"));
+    assert_eq!(token.hints.tenant_id.as_deref(), Some("acme"));
     // `act`/`agent_id` are untyped per the platform contract — read from `extra`.
-    assert_eq!(token.claims.extra_str("agent_id"), Some("planner"));
-    assert_eq!(token.claims.extra_str("act"), Some("user-42"));
+    assert_eq!(token.hints.extra_str("agent_id"), Some("planner"));
+    assert_eq!(token.hints.extra_str("act"), Some("user-42"));
+}
+
+#[test]
+fn service_role_is_never_client_visible() {
+    let jwt = mint(serde_json::json!({
+        "sub": "server", "role": "service_role", "exp": 9_999_999_999i64
+    }));
+    let token = Token::parse(&jwt).expect("parse");
+    assert_eq!(token.role(), Role::Anon);
 }
 
 #[test]

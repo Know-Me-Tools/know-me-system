@@ -4,10 +4,9 @@ description: ALWAYS invoke when building, styling, or debugging a Tauri desktop 
 ---
 <!-- TJ-ARCH-MOB-001 compliant -->
 
-> **Binding:** this skill operates under the 40 Prometheus Base Rules
-> ([AGENT_BASE_RULES.md](../../AGENT_BASE_RULES.md) at the project root). Simplicity
-> first, surgical changes, strict layering, strong typing, verified versions — the
-> rules apply to every line this skill helps generate.
+> **Binding:** Prefer simple, surgical, strongly typed changes; preserve strict
+> layering and verify dependency versions. When installed in a project, also
+> obey that project's `AGENT_BASE_RULES.md`; this skill remains self-contained.
 
 # Tauri Custom Title Bar
 
@@ -121,11 +120,11 @@ Run the `a11y-gate` skill over the result like any other UI.
 
 ## Reference implementation
 
-`apps/knowme-poc/desktop/src/shared/components/Titlebar.tsx` is the worked example in
-this repository: `isTauri()`-gated window resolution, macOS/Windows control variants,
-explicit `startDragging()`, aria-labeled controls, brand lockup centered via flex
-spacers that are draggable because of the explicit call. Read it before writing a new
-one — and prefer adapting it over starting from scratch (Rule 2, Rule 3).
+The scaffolded `desktop/src/shared/components/Titlebar.tsx` is the worked example:
+`isTauri()`-gated window resolution, macOS/Windows control variants, explicit
+`startDragging()`, aria-labeled controls, brand lockup centered via flex spacers
+that are draggable because of the explicit call. Read it before writing a new one —
+and prefer adapting it over starting from scratch (Rule 2, Rule 3).
 
 ## Checklist
 

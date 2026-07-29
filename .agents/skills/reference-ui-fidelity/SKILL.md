@@ -4,8 +4,9 @@ description: ALWAYS invoke before implementing or materially changing a product 
 ---
 <!-- TJ-ARCH-MOB-001 compliant -->
 
-> **Binding:** this skill operates under the 40 Prometheus Base Rules
-> ([AGENT_BASE_RULES.md](../../AGENT_BASE_RULES.md) at the project root).
+> **Binding:** Treat the supplied reference as the acceptance oracle while
+> preserving strict layering and accessibility. Project-local rules supplement,
+> but do not replace, the self-contained verification contract below.
 
 # Reference UI Fidelity Gate
 
@@ -28,13 +29,9 @@ Before editing UI, locate and inspect all applicable sources:
 Record precedence when they conflict. A direct, newer user instruction wins over an older
 mockup mechanic. Preserve the reference's product intent while applying the newer rule.
 
-For the KnowMe reference application, the required sources are:
-
-- `docs/knowme-ui-ux-standard.md`;
-- `docs/reference-app/KnowMe Standalone.html`;
-- `docs/reference-app/knowme-moodboard-user-journeys.html`;
-- `docs/reference-app/knowme-functional-specification-architecture.html`; and
-- the approved desktop/phone light/dark screenshot set.
+Locate this project's actual artifacts before starting — do not assume a given file
+exists. If a project has none of them, say so and stop: there is no acceptance oracle
+to build against, and inventing one produces confident, unreviewable output.
 
 ## 2. Build a coverage matrix before code
 
@@ -69,7 +66,7 @@ Assistant UI for chat/thread behavior, and `shadcn_flutter` or token-driven equi
 Flutter. Do not reproduce a reference as one monolithic component or a pile of inline
 styles.
 
-KnowMe is strict Flat 2.0: **no visible lines or borders anywhere; adjacent regions are
+This project is strict Flat 2.0: **no visible lines or borders anywhere; adjacent regions are
 distinguished only through background-color changes.** Remove border/shadow defaults from
 component libraries before judging fidelity.
 
@@ -113,7 +110,7 @@ Do not call the UI complete unless all are true:
 - [ ] All controls perform the real product action or expose an honest unavailable state.
 - [ ] The complete screenshot matrix exists and has been inspected.
 - [ ] No stock scaffold/template styling remains.
-- [ ] No visible borders/dividers/layout shadows violate the KnowMe Flat 2.0 standard.
+- [ ] No visible borders/dividers/layout shadows violate the Flat 2.0 standard.
 - [ ] Light/dark and phone/desktop maintain the same information architecture.
 - [ ] Keyboard, screen-reader, contrast, text-scaling, and reduced-motion checks pass.
 - [ ] Refresh/relaunch proves durable state where the reference implies persistence.

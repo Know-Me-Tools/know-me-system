@@ -6,22 +6,20 @@
 //! session). We model the ladder as a state enum so the caller cannot, e.g., call an
 //! agent-scoped endpoint while still on the anon boot token.
 //!
-//! Claims mirror flint-forge `forge-identity::Claims` EXACTLY: only `sub`/`role`/
-//! `tenant_id` are first-class; everything else (`act`, `agent_id`, `workflow_id`,
-//! `principal_type`, `scope`) rides the untyped `extra` map — the platform itself
-//! keeps them untyped, so typing them here would be a fiction that drifts.
+//! Payload parsing in this module is display-only. Authorization and trusted
+//! tenant/role state come from a server-created `VerifiedSession` after JWKS or
+//! authoritative session validation.
 use gen_ui_types::{CoreError, CoreResult};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-/// The role ladder. `service_role` bypasses Postgres RLS and never rides a client.
+/// Display-only role hint. Never use this value for authorization.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Role {
     Anon,
     Authenticated,
     Agent,
-    ServiceRole,
 }
 
 impl Role {
@@ -29,17 +27,15 @@ impl Role {
         match s {
             Some("authenticated") => Role::Authenticated,
             Some("agent") => Role::Agent,
-            Some("service_role") => Role::ServiceRole,
-            // forge-identity coerces an absent/unknown role to "anon".
+            // Service and unknown roles are deliberately not client-visible.
             _ => Role::Anon,
         }
     }
 }
 
-/// Decoded gate/forge JWT claims. Only the three typed fields are guaranteed; the
-/// rest are read out of `extra` by key when a caller needs them (e.g. `agent_id`).
+/// Unverified JWT payload hints for display and refresh timing only.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Claims {
+pub struct UntrustedTokenHints {
     pub sub: String,
     #[serde(default)]
     pub role: Option<String>,
@@ -51,7 +47,7 @@ pub struct Claims {
     pub extra: BTreeMap<String, serde_json::Value>,
 }
 
-impl Claims {
+impl UntrustedTokenHints {
     pub fn role(&self) -> Role {
         Role::from_claim(self.role.as_deref())
     }
@@ -59,20 +55,19 @@ impl Claims {
     pub fn extra_str(&self, key: &str) -> Option<&str> {
         self.extra.get(key).and_then(|v| v.as_str())
     }
-    /// Decode WITHOUT signature verification — gate/forge own verification (JWKS).
-    /// We only need to read `exp`/`role`/`tenant_id` to drive the client state.
-    pub fn decode_unverified(jwt: &str) -> CoreResult<Self> {
-        jsonwebtoken::dangerous::insecure_decode::<Claims>(jwt)
+    /// Parse display-only hints without signature verification.
+    pub fn parse_display_only(jwt: &str) -> CoreResult<Self> {
+        jsonwebtoken::dangerous::insecure_decode::<UntrustedTokenHints>(jwt)
             .map(|d| d.claims)
             .map_err(|e| CoreError::Terminal(format!("jwt decode: {e}")))
     }
 }
 
-/// A token plus its decoded claims. `is_expired` uses `exp` with a small skew.
+/// A bearer token plus untrusted display hints.
 #[derive(Debug, Clone)]
 pub struct Token {
     pub raw: String,
-    pub claims: Claims,
+    pub hints: UntrustedTokenHints,
 }
 
 impl Token {
@@ -80,21 +75,21 @@ impl Token {
 
     pub fn parse(raw: impl Into<String>) -> CoreResult<Self> {
         let raw = raw.into();
-        let claims = Claims::decode_unverified(&raw)?;
-        Ok(Self { raw, claims })
+        let hints = UntrustedTokenHints::parse_display_only(&raw)?;
+        Ok(Self { raw, hints })
     }
 
     /// Expired relative to `now_unix` (caller supplies time — this crate does no IO
     /// and stays wasm-safe; the runtime layer provides the clock).
     pub fn is_expired(&self, now_unix: i64) -> bool {
-        match self.claims.exp {
+        match self.hints.exp {
             Some(exp) => now_unix + Self::SKEW_SECS >= exp,
             None => false,
         }
     }
 
     pub fn role(&self) -> Role {
-        self.claims.role()
+        self.hints.role()
     }
 }
 
@@ -120,6 +115,7 @@ impl AuthState {
         }
     }
 
+    /// Display-only role hint. Backend policy must use `VerifiedSession`.
     pub fn role(&self) -> Role {
         match self {
             AuthState::Unauthenticated | AuthState::Anon { .. } => Role::Anon,

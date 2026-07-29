@@ -4,10 +4,9 @@ description: ALWAYS invoke after building or changing any React/Tauri UI surface
 ---
 <!-- TJ-ARCH-MOB-001 compliant -->
 
-> **Binding:** this skill operates under the 40 Prometheus Base Rules
-> ([AGENT_BASE_RULES.md](../../AGENT_BASE_RULES.md) at the project root). Simplicity
-> first, surgical changes, strict layering, strong typing, verified versions — the
-> rules apply to every line this skill helps generate.
+> **Binding:** Prefer simple, surgical, strongly typed changes; preserve strict
+> layering and verify dependency versions. When installed in a project, also
+> obey that project's `AGENT_BASE_RULES.md`; this skill remains self-contained.
 
 # Tauri / React UI Review Loop
 
@@ -45,7 +44,7 @@ catches missing product surfaces—not only overflow, layout jumps, and contrast
 - [ ] **Not a default template.** Fails if it reads as stock shadcn/Tailwind with no point
       of view (centered hero + gradient blob + generic CTA; uniform card grid; gray-on-white
       with one accent). See the design-quality bar below.
-- [ ] **KnowMe Flat 2.0:** no visible borders, divider lines, or layout shadows; adjacent
+- [ ] **Flat 2.0:** no visible borders, divider lines, or layout shadows; adjacent
       regions are distinguished through background-color changes.
 - [ ] **Shadcn/Assistant UI are mounted at the real boundary**, not merely installed.
 - [ ] **Motion is compositor-friendly** (opacity/transform/clip-path only).

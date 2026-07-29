@@ -1,5 +1,5 @@
 // TJ-ARCH-MOB-001 compliant
-//! flint-gate client — auth boot, Kratos session exchange, Cedar approval polling.
+//! flint-gate public client — auth boot and Kratos session exchange.
 //!
 //! VERIFIED contract (gate HEAD 2026-07-15):
 //!  * There is NO anon-token issuance endpoint. `FLINT_ANON_KEY` is a static,
@@ -7,19 +7,14 @@
 //!  * Kratos is proxied: gate resolves a session via `GET /sessions/whoami` with the
 //!    `ory_kratos_session` cookie; the authenticated/agent JWT is then minted by gate
 //!    per-request. No mint endpoint, no refresh endpoint (refresh = re-auth).
-//!  * `@require_approval` (human-in-the-loop) surfaces via the ADMIN approvals API
-//!    (`/approvals/:id` → `decision` field, null = pending). No `isApprovalRequired`
-//!    boolean and no per-request status/header at this HEAD.
 use crate::flint::token::{AuthState, Token};
 use gen_ui_types::{CoreError, CoreResult};
 use serde::Deserialize;
 
-/// Gate endpoints. Proxy (:4456) carries app traffic; admin (:4457) is private and
-/// only reachable from trusted backends — the approvals poll is an admin call.
+/// Public Gate endpoints. Administration remains backend-only.
 #[derive(Debug, Clone)]
 pub struct GateConfig {
     pub proxy_base: String,
-    pub admin_base: Option<String>,
     /// Static publishable anon key (FLINT_ANON_KEY).
     pub anon_key: Option<String>,
 }
@@ -27,27 +22,6 @@ pub struct GateConfig {
 pub struct GateClient {
     http: reqwest::Client,
     config: GateConfig,
-}
-
-/// A pending Cedar approval as surfaced by the admin API. `decision` is `None` while
-/// pending; a caller polls until it flips to approved/rejected.
-#[derive(Debug, Clone, Deserialize)]
-pub struct ApprovalStatus {
-    pub id: String,
-    /// "approved" | "rejected" | null(pending).
-    #[serde(default)]
-    pub decision: Option<String>,
-    #[serde(default)]
-    pub reason: Option<String>,
-}
-
-impl ApprovalStatus {
-    pub fn is_pending(&self) -> bool {
-        self.decision.is_none()
-    }
-    pub fn is_approved(&self) -> bool {
-        self.decision.as_deref() == Some("approved")
-    }
 }
 
 impl GateClient {
@@ -127,31 +101,4 @@ impl GateClient {
         })
     }
 
-    /// Poll a Cedar approval by id (admin API). One shot — the caller drives the wait
-    /// loop with the runtime's timer so this stays IO-only and testable.
-    pub async fn approval_status(&self, approval_id: &str) -> CoreResult<ApprovalStatus> {
-        let admin =
-            self.config.admin_base.as_deref().ok_or_else(|| {
-                CoreError::Terminal("flint: no gate admin_base for approvals".into())
-            })?;
-        let url = format!("{}/approvals/{approval_id}", admin.trim_end_matches('/'));
-        let resp = self
-            .http
-            .get(&url)
-            .send()
-            .await
-            .map_err(|e| CoreError::Transient(e.to_string()))?;
-        if resp.status() == reqwest::StatusCode::NOT_FOUND {
-            return Err(CoreError::NotFound(format!("approval {approval_id}")));
-        }
-        if !resp.status().is_success() {
-            return Err(CoreError::Transient(format!(
-                "flint approval http {}",
-                resp.status()
-            )));
-        }
-        resp.json()
-            .await
-            .map_err(|e| CoreError::Serde(e.to_string()))
-    }
 }
