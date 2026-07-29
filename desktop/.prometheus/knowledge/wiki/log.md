@@ -1,5 +1,8 @@
 # Update Log
 
+## 2026-07-29
+* **Creation**: [Embedded UAR Offline Agents Executor Session Complete](/embedded-uar-offline-agents-executor-session-complete.md)
+
 ## 2026-07-16
 * **Creation**: [Codegen and CI Verification Phase Executor Marker](/codegen-and-ci-verification-phase-executor-marker.md)
 * **Creation**: [kbd-apply os_mark_done Top-Level Checkbox Ordinal Fix](/kbd-apply-os-mark-done-top-level-checkbox-ordinal-fix.md)

@@ -9,8 +9,18 @@ import 'package:knowme_poc/features/chat/presentation/screens/chat_screen.dart';
 import 'package:knowme_poc/features/chat/domain/entities/chat_message.dart';
 import 'package:knowme_poc/main.dart' as app;
 
+import 'offline_guard.dart';
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+
+  // See stopped_turn_intents_test.dart — opt-in so online development runs
+  // still work, mandatory when the iOS 5.5 gate sets REQUIRE_OFFLINE=true.
+  setUpAll(() async {
+    if (const bool.fromEnvironment('REQUIRE_OFFLINE')) {
+      await assertDeviceIsOffline();
+    }
+  });
 
   testWidgets(
     'first-run local chat produces a finalized assistant bubble',

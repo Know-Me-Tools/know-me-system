@@ -38,12 +38,13 @@ if ! command -v python3 >/dev/null 2>&1; then
 fi
 
 source "$SCRIPT_DIR/lib-chat-state.sh"
-trap 'cert_restore_clean_chat_state "$PACKAGE"' EXIT
+trap 'cert_restore_clean_chat_state "$PACKAGE"; cert_exit_offline' EXIT
 
 "$SCRIPT_DIR/verify-device-runtime-gates.sh" "$APK" "$PACKAGE"
 
 if [[ "$CERT_CLEAN_CHAT_STATE" == "1" ]]; then
-  cert_prepare_clean_chat_state "$PACKAGE"
+  cert_enter_offline || exit 1
+cert_prepare_clean_chat_state "$PACKAGE"
   adb shell monkey -p "$PACKAGE" -c android.intent.category.LAUNCHER 1 >/dev/null
   sleep "${CERT_CLEAN_CHAT_RELAUNCH_WAIT_SECONDS:-8}"
   if [[ -z "$(adb shell pidof "$PACKAGE" | tr -d '\r' || true)" ]]; then

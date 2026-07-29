@@ -61,7 +61,7 @@ know-me-system/
 │                          verification-notes per change; archive/ holds completed)
 ├── .kbd-orchestrator/   ← KBD phase tracker — current waypoint, constraints, position
 ├── infra/ · deploy/     ← docker-compose, k8s, flint-gate, keto, postgres
-├── scripts/             ← ios/build-xcframework.sh, android/build.sh,
+├── scripts/             ← android/build.sh, ios/certify-media-save-share.sh,
 │                          android/certify-local-*.sh, android/verify-*-gates.sh,
 │                          android/write-local-certification-report.sh, generate-mobile-app-icons.sh
 └── versions.toml        ← single source of truth for tool/dependency versions and engine lanes
@@ -84,8 +84,10 @@ git submodule update --init --recursive
 # Desktop (Tauri 2 + React 19)
 cd desktop && pnpm install && pnpm tauri dev
 
-# Mobile (Flutter) — build the shared core first
-bash scripts/ios/build-xcframework.sh release   # or scripts/android/build.sh
+# Mobile (Flutter) — CargoKit compiles and links the Rust core during
+# `flutter run`/`flutter build` on BOTH platforms, so there is no separate
+# shared-core build step. `scripts/android/build.sh` only VALIDATES the Android
+# cross-compile; it deliberately does not package.
 (cd rust && flutter_rust_bridge_codegen generate --config-file flutter_rust_bridge.yaml)
 cd mobile && flutter run
 ```

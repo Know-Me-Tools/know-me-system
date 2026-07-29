@@ -350,6 +350,8 @@ class _ChatPolicyToolbarState extends ConsumerState<ChatPolicyToolbar> {
                 Expanded(
                   child: ListView(
                     children: [
+                      if (options.isEmpty)
+                        _unavailableNotice(context, _unavailableFor(state, key)),
                       for (final option in options)
                         CheckboxListTile(
                           value: mode == 'selected' && ids.contains(option.id),
@@ -764,3 +766,67 @@ List<_Option> _skills(Map<String, dynamic> catalog) =>
         )
         .where((value) => value.id.isNotEmpty)
         .toList();
+
+/// The reason a resource registry is unavailable, if the runtime advertised one.
+///
+/// Mirrors Rust's `UnavailableResource`. The policy key the sheet uses
+/// (`skills`, `mcp_servers`, …) is snake_case, while the catalog reports
+/// camelCase — both spellings are matched so a rename on either side degrades
+/// to "no reason shown" rather than a wrong one.
+@visibleForTesting
+Map<String, dynamic>? unavailableEntryFor(Object? listed, String key) {
+  if (listed is! List) return null;
+  final camel = key.replaceAllMapped(
+    RegExp(r'_([a-z])'),
+    (match) => match.group(1)!.toUpperCase(),
+  );
+  for (final entry in listed) {
+    if (entry is! Map) continue;
+    final resource = entry['resource']?.toString();
+    if (resource == key || resource == camel) {
+      return entry.cast<String, dynamic>();
+    }
+  }
+  return null;
+}
+
+Map<String, dynamic>? _unavailableFor(ChatControlState state, String key) =>
+    unavailableEntryFor(state.catalog['unavailable'], key);
+
+/// Empty-state copy for a resource sheet.
+///
+/// An empty list with NO explanation is the defect this closes: the user cannot
+/// tell "nothing is configured" from "this device cannot provide it". When the
+/// runtime gives a reason it is shown; `platformLimitation` decides whether
+/// retrying could ever help, so the UI never suggests a pointless retry.
+Widget _unavailableNotice(BuildContext context, Map<String, dynamic>? reason) {
+  final theme = shad.Theme.of(context);
+  if (reason == null) {
+    return const Padding(
+      padding: EdgeInsets.all(16),
+      child: Text('No enabled resources are advertised by UAR.'),
+    );
+  }
+  final structural = reason['platformLimitation'] == true;
+  return Semantics(
+    label: 'Not available on this device. ${reason['reason']}',
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Not available on this device',
+            style: theme.typography.small.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${reason['reason']}'
+            '${structural ? '' : ' Try again once the service is reachable.'}',
+            style: theme.typography.small,
+          ),
+        ],
+      ),
+    ),
+  );
+}

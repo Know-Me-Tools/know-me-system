@@ -24,6 +24,8 @@ import 'package:knowme_poc/features/chat/presentation/providers/chat_notifier.da
 import 'package:knowme_poc/features/chat/presentation/screens/chat_screen.dart';
 import 'package:knowme_poc/main.dart' as app;
 
+import 'offline_guard.dart';
+
 /// Text characters that must have streamed before the stop is worth taking.
 ///
 /// More than a token or two, so "kept work" means something a user would
@@ -38,6 +40,16 @@ const _longPrompt =
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+
+  // Opt-in rather than always-on: these suites also run online during
+  // development, and on Android the shell gate already proves offline before
+  // launching. Set REQUIRE_OFFLINE=true (as scripts/ios/
+  // certify-offline-functional-suite.sh does) to make a live radio a failure.
+  setUpAll(() async {
+    if (const bool.fromEnvironment('REQUIRE_OFFLINE')) {
+      await assertDeviceIsOffline();
+    }
+  });
 
   testWidgets('a stopped turn keeps its work and offers four intents', (
     tester,

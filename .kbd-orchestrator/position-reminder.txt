@@ -1,23 +1,45 @@
 POSITION REMINDER — read this as your FIRST tool call every turn
 Phase: embedded-uar-offline-agents (child of model-runtime-per-device)
 Step: 0 of 1
-Stage: plan_complete
+Stage: implementation_ready
 Next command: /kbd-apply embedded-uar-offline-agents
 
-CURRENT TASK — D1: enable `surreal-backend` on the UAR dependency in
-gen_ui_agent/Cargo.toml, then verify it cross-compiles for host,
-aarch64-linux-android and aarch64-apple-ios.
+DONE — D1 through D4 are complete and Android is certified:
+  D1  surreal-backend enabled on the UAR dep; cross-compiles for host,
+      aarch64-linux-android, aarch64-apple-ios.
+  D2  uar.rs open_persistence swaps InMemoryProvider for SurrealDbProvider.
+      NO fallback to memory on failure — an unopenable store is a boot failure.
+  D3  storage_dir threaded from BOTH boot paths: gen_ui_host::bootstrap_inner
+      (desktop) and gen_ui_ffi::api::boot (mobile). They share no code.
+  D4  Android SM-S936U PASS — cold start AND fast relaunch both opened the
+      SurrealKV store; no lock error, no permissions error.
+      report: /tmp/knowme-uar-persistence.json
+      gate:   scripts/android/certify-durable-uar-persistence.sh
 
-WHY D1 FIRST: providers::surreal is behind #[cfg(feature = "surreal-backend")]
-and gen_ui_agent currently depends on UAR with only
-[embedded-mobile, in-memory-backend]. SurrealDbProvider does NOT exist in this
-build — swapping the constructor first will not compile.
+  Task 3.1 in openspec/changes/embed-uar-mobile-offline/tasks.md is ticked,
+  verified by confirming all 19 default-bodied PersistenceLayer methods are
+  overridden by SurrealDbProvider (a default no-op body is the
+  cancel_generation-class silent failure; none survive on the durable path).
 
-THEN D2 (uar.rs:880 swap), D3 (thread the path from BOTH gen_ui_host AND
-gen_ui_ffi::api::boot — mobile never touches gen_ui_host), D4 (durability proof).
+CURRENT TASK — desktop (macOS) durable-persistence certification.
+  Desktop boots through gen_ui_host::bootstrap_inner, a SEPARATE call site from
+  mobile's. The Android pass is NOT evidence for it.
+  Gate: scripts/desktop/certify-durable-uar-persistence.sh
+  Blocked on: `pnpm tauri build` — the shipped bundle is from 09:15 and
+  predates the persistence change, so certifying it would prove nothing.
+  Starting state is favourable: ~/Library/Application Support/
+  tools.knowme.knowme/uar-db does NOT yet exist, so if it appears after boot
+  that is direct proof the new code path ran.
 
-DO NOT plan the other 13 tasks from tasks.md — the assess found several
-describe already-shipped, device-certified work.
+ALSO IN FLIGHT — an adversarial re-audit of the other 13 tasks in
+tasks.md. The 07-20 assessment had four headline claims that proved FALSE, so
+no remaining checkbox is trusted until checked against code.
+
+ARCHITECTURE DECISION (settled by the D4 measurement): a dedicated
+connection-owning thread is NOT warranted. The SurrealKV lock race is real in
+one process (the unit test needed retry-with-backoff) but hardware does not
+expose it — force-stop plus a 0s relaunch opened cleanly. Revisit only if the
+gate ever fails.
 
 Required signal format (emit BEFORE any tool call):
   Starting <kbd-skill> — embedded-uar-offline-agents (step 0 of 1)

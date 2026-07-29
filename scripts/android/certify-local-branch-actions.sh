@@ -37,9 +37,10 @@ if [[ ! -x "$PROMPT_GATE" ]]; then
 fi
 
 source "$SCRIPT_DIR/lib-chat-state.sh"
-trap 'cert_restore_clean_chat_state "$PACKAGE"' EXIT
+trap 'cert_restore_clean_chat_state "$PACKAGE"; cert_exit_offline' EXIT
 
 adb install -r "$APK" >/dev/null
+cert_enter_offline || exit 1
 cert_prepare_clean_chat_state "$PACKAGE"
 
 PROMPT="Reply exactly ${TOKEN}." \
@@ -122,12 +123,26 @@ PY
 }
 
 dump_db() {
-  adb exec-out run-as "$PACKAGE" cat app_flutter/entity-records.sqlite3 > "$DB_PATH"
+  # `run-as` REFUSES a release build ("package not debuggable"), and the
+  # redirect happily writes that 52-byte error message to $DB_PATH. sqlite3
+  # then reports "file is not a database" (exit 26) — an error that points at
+  # the database rather than at the real cause, which cost a full debugging
+  # pass to trace. Verify the magic header and say what actually went wrong.
+  adb exec-out run-as "$PACKAGE" cat app_flutter/entity-records.sqlite3 > "$DB_PATH" 2>/dev/null
+  if ! head -c 15 "$DB_PATH" | rg -q "SQLite format"; then
+    echo "BRANCH SKIP: cannot read the app database on this build" >&2
+    echo "  run-as refuses a release build, so the branch assertions that need" >&2
+    echo "  SQL cannot run. Reinstall a debuggable build to exercise them." >&2
+    echo "  got instead: $(head -c 60 "$DB_PATH" | tr -d '\0')" >&2
+    return 69   # EX_UNAVAILABLE — unavailable, NOT a failed assertion
+  fi
 }
 
 sql_value() {
   local query="$1"
-  dump_db
+  # Propagate: without this, an unreadable database falls through to sqlite3
+  # and surfaces as "file is not a database" instead of the real cause.
+  dump_db || return $?
   sqlite3 "$DB_PATH" "$query"
 }
 

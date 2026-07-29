@@ -468,11 +468,17 @@ export interface RunPolicy {
   context_strategy: unknown | null;
   tool_approval: "inherit" | "auto" | "ask" | "deny";
 }
+export interface UnavailableResource {
+  resource: string;
+  reason: string;
+  platformLimitation: boolean;
+}
 export interface ChatControlPlaneCatalog {
   agents: unknown;
   skills: unknown;
   tools: unknown;
   knowledgeBases: unknown;
+  unavailable?: UnavailableResource[];
 }
 export interface UarAdminSnapshot {
   settings: unknown;
@@ -483,6 +489,7 @@ export interface UarAdminSnapshot {
   knowledgeBases: unknown;
   mcpServers: unknown;
   memories: unknown;
+  unavailable?: UnavailableResource[];
 }
 export function chatControlCatalog(): Promise<ChatControlPlaneCatalog> {
   return invoke<ChatControlPlaneCatalog>(cmd("chat_control_catalog"));
@@ -504,6 +511,12 @@ export function uarMcpServerSave(name: string, server: unknown): Promise<unknown
 }
 export function uarMcpServerDelete(name: string): Promise<unknown> {
   return invoke<unknown>(cmd("uar_mcp_server_delete"), { name });
+}
+export function uarMemoryAdd(content: string): Promise<unknown> {
+  return invoke<unknown>(cmd("uar_memory_add"), { content });
+}
+export function uarMemoryUpdate(id: string, content: string): Promise<unknown> {
+  return invoke<unknown>(cmd("uar_memory_update"), { id, content });
 }
 export function uarMemoryDelete(id: string): Promise<unknown> {
   return invoke<unknown>(cmd("uar_memory_delete"), { id });

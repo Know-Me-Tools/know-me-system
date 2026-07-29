@@ -14,12 +14,25 @@ import { useLaneStore } from './laneStore'
 export interface ResourceOption { id: string; label: string; description?: string }
 export interface AgentOption extends ResourceOption { protected: boolean }
 
+/** A capability this deployment cannot serve, and why.
+ *
+ *  Mirrors Rust's `UnavailableResource`. Without it an empty `skills` array is
+ *  indistinguishable from "skills are unavailable on this platform", so the UI
+ *  silently omits a capability instead of explaining it. */
+export interface UnavailableResource {
+  resource: string
+  reason: string
+  /** Structural gap rather than a transient outage — never offer "retry". */
+  platformLimitation: boolean
+}
+
 interface NormalizedCatalog {
   agents: AgentOption[]
   skills: ResourceOption[]
   mcpServers: ResourceOption[]
   tools: ResourceOption[]
   knowledgeBases: ResourceOption[]
+  unavailable: UnavailableResource[]
 }
 
 /** How this conversation runs.
@@ -94,6 +107,15 @@ function normalize(raw: ChatControlPlaneCatalog): NormalizedCatalog {
     mcpServers: Array.isArray(toolsRoot.mcp_servers) ? toolsRoot.mcp_servers.map((id) => ({ id: String(id), label: String(id) })) : [],
     tools: objects(toolsRoot.tools).map((tool) => ({ id: String(tool.namespaced_name ?? tool.name ?? ''), label: String(tool.name ?? tool.namespaced_name ?? ''), description: typeof tool.description === 'string' ? tool.description : undefined })).filter((tool) => tool.id),
     knowledgeBases: objects(raw.knowledgeBases).map((kb) => ({ id: String(kb.id ?? ''), label: String(kb.name ?? kb.id ?? ''), description: typeof kb.description === 'string' ? kb.description : undefined })).filter((kb) => kb.id),
+    // Absent on service deployments (Rust omits the field when nothing is
+    // unavailable), so an empty list here means "no gaps", not "unknown".
+    unavailable: objects(raw.unavailable)
+      .map((entry) => ({
+        resource: String(entry.resource ?? ''),
+        reason: String(entry.reason ?? ''),
+        platformLimitation: entry.platformLimitation === true,
+      }))
+      .filter((entry) => entry.resource && entry.reason),
   }
 }
 
@@ -106,7 +128,7 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 function message(error: unknown): string { return error instanceof Error ? error.message : String(error) }
 
 export const useChatControlStore = create<ChatControlState>((set, get) => ({
-  agents: [], skills: [], mcpServers: [], tools: [], knowledgeBases: [],
+  agents: [], skills: [], mcpServers: [], tools: [], knowledgeBases: [], unavailable: [],
   conversationId: null,
   policy: defaultPolicy(),
   effective: null,
@@ -126,7 +148,7 @@ export const useChatControlStore = create<ChatControlState>((set, get) => ({
               api<unknown>('/api/uar/discovery/skills'),
               api<unknown>('/api/uar/discovery/tools'),
               api<unknown>('/api/uar/knowledge-bases'),
-            ]).then(([agents, skills, tools, knowledgeBases]) => ({ agents, skills, tools, knowledgeBases })),
+            ]).then(([agents, skills, tools, knowledgeBases]) => ({ agents, skills, tools, knowledgeBases, unavailable: [] })),
             api<RunPolicy | null>(`/api/uar/conversations/${encodeURIComponent(conversationId)}/policy`).catch((error: unknown) => {
               if (error instanceof Error && error.message.includes('(404)')) return null
               throw error

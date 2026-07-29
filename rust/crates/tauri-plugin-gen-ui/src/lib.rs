@@ -55,6 +55,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::uar_agent_delete,
             commands::uar_mcp_server_save,
             commands::uar_mcp_server_delete,
+            commands::uar_memory_add,
+            commands::uar_memory_update,
             commands::uar_memory_delete,
             commands::uar_knowledge_base_create,
             commands::uar_knowledge_base_delete,

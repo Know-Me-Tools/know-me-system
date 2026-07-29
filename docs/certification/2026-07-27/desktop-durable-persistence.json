@@ -1,0 +1,18 @@
+{
+  "bootPath": "gen_ui_host::bootstrap_inner (NOT the mobile gen_ui_ffi path)",
+  "coldStart": {
+    "fileCount": 3
+  },
+  "engine": "SurrealKV (surrealdb kv-surrealkv); NOT RocksDB",
+  "fastRelaunch": {
+    "fileCount": 3,
+    "storeSurvived": false,
+    "why": "SurrealKV releases its directory lock on a background task, not synchronously with the handle drop. A relaunch faster than the OS reaps the old process is the case that fails on hardware while the unit test passes."
+  },
+  "host": {
+    "machine": "arm64",
+    "os": "macOS-26.6-arm64-arm-64bit"
+  },
+  "note": "Unlike the Android gate, the store directory is directly readable here, so this asserts the store's real contents rather than relying on a boot marker as a proxy.",
+  "storeDir": "/Users/gqadonis/Library/Application Support/tools.knowme.knowme/uar-db"
+}

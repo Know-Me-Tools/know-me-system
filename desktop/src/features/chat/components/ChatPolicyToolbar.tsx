@@ -9,7 +9,7 @@ import { ModelRoutePicker, type ModelRoute } from '@/features/settings/component
 import { useChat } from '../hooks/useChat'
 import { useChatControl } from '../hooks/useChatControl'
 import { ChatModePicker } from './ChatModePicker'
-import type { ResourceOption } from '../stores/chatControlStore'
+import type { ResourceOption, UnavailableResource } from '../stores/chatControlStore'
 
 function conversationModelRoute(value: unknown): ModelRoute | null {
   if (value && typeof value === 'object') {
@@ -27,7 +27,7 @@ function modelSummary(route: ModelRoute | null): string {
   return route.model_id || route.provider_id
 }
 
-function ResourceControl({ label, icon: Icon, options, value, onChange }: { label: string; icon: typeof Sparkles; options: ResourceOption[]; value: ResourceSelection; onChange: (selection: ResourceSelection) => void }) {
+function ResourceControl({ label, icon: Icon, options, value, onChange, unavailable }: { label: string; icon: typeof Sparkles; options: ResourceOption[]; value: ResourceSelection; onChange: (selection: ResourceSelection) => void; unavailable?: UnavailableResource }) {
   const summary = value.mode === 'selected' ? `${value.ids.length} selected` : value.mode
   function choose(id: string, checked: boolean) {
     const ids = checked ? [...new Set([...value.ids, id])].sort() : value.ids.filter((item) => item !== id)
@@ -43,7 +43,7 @@ function ResourceControl({ label, icon: Icon, options, value, onChange }: { labe
         <div className="grid grid-cols-4 gap-1 rounded-xl bg-[color:var(--color-surface)] p-1">
           {(['auto', 'all', 'none', 'selected'] as const).map((mode) => <button key={mode} type="button" onClick={() => onChange({ ...value, mode, ids: mode === 'selected' ? value.ids : [] })} className={value.mode === mode ? 'min-h-9 rounded-lg bg-[color:var(--color-ember)] px-2 text-[11px] font-bold text-white' : 'min-h-9 rounded-lg px-2 text-[11px] text-[color:var(--color-fg-sub)] hover:bg-[color:var(--color-card-hov)]'}>{mode}</button>)}
         </div>
-        {options.length ? <div className="mt-1 space-y-1">{options.map((option) => <label key={option.id} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-2 hover:bg-[color:var(--color-card-hov)]"><Checkbox className="border-0 bg-[color:var(--color-muted)]" checked={value.mode === 'selected' && value.ids.includes(option.id)} onCheckedChange={(checked) => choose(option.id, checked === true)} /><span className="min-w-0"><span className="block truncate text-sm font-medium">{option.label}</span>{option.description ? <span className="block truncate text-xs text-[color:var(--color-fg-faint)]">{option.description}</span> : null}</span></label>)}</div> : <p className="p-3 text-xs text-[color:var(--color-fg-faint)]">No enabled resources are advertised by UAR.</p>}
+        {options.length ? <div className="mt-1 space-y-1">{options.map((option) => <label key={option.id} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-2 hover:bg-[color:var(--color-card-hov)]"><Checkbox className="border-0 bg-[color:var(--color-muted)]" checked={value.mode === 'selected' && value.ids.includes(option.id)} onCheckedChange={(checked) => choose(option.id, checked === true)} /><span className="min-w-0"><span className="block truncate text-sm font-medium">{option.label}</span>{option.description ? <span className="block truncate text-xs text-[color:var(--color-fg-faint)]">{option.description}</span> : null}</span></label>)}</div> : unavailable ? <p role="note" className="p-3 text-xs text-[color:var(--color-fg-sub)]"><span className="block font-medium text-[color:var(--color-fg)]">Not available on this device</span>{unavailable.reason}{unavailable.platformLimitation ? '' : ' Try again once the service is reachable.'}</p> : <p className="p-3 text-xs text-[color:var(--color-fg-faint)]">No enabled resources are advertised by UAR.</p>}
       </PopoverContent>
     </Popover>
   )
@@ -79,10 +79,10 @@ export function ChatPolicyToolbar() {
           <div className="mt-2"><ModelRoutePicker value={conversationModelRoute(control.policy.model)} onChange={(route) => void control.patchPolicy({ model: route })} inheritLabel="Agent / global default" /></div>
         </PopoverContent>
       </Popover>
-      <ResourceControl label="Skills" icon={Sparkles} options={control.skills} value={control.policy.skills} onChange={(value) => void control.setSelection('skills', value)} />
-      <ResourceControl label="Tools" icon={Wrench} options={control.tools} value={control.policy.tools} onChange={(value) => void control.setSelection('tools', value)} />
-      <ResourceControl label="MCP" icon={Plug} options={control.mcpServers} value={control.policy.mcp_servers} onChange={(value) => void control.setSelection('mcp_servers', value)} />
-      <ResourceControl label="Knowledge" icon={Database} options={control.knowledgeBases} value={control.policy.knowledge_bases} onChange={(value) => void control.setSelection('knowledge_bases', value)} />
+      <ResourceControl unavailable={control.unavailable.find((entry) => entry.resource === 'skills')} label="Skills" icon={Sparkles} options={control.skills} value={control.policy.skills} onChange={(value) => void control.setSelection('skills', value)} />
+      <ResourceControl unavailable={control.unavailable.find((entry) => entry.resource === 'tools')} label="Tools" icon={Wrench} options={control.tools} value={control.policy.tools} onChange={(value) => void control.setSelection('tools', value)} />
+      <ResourceControl unavailable={control.unavailable.find((entry) => entry.resource === 'mcpServers')} label="MCP" icon={Plug} options={control.mcpServers} value={control.policy.mcp_servers} onChange={(value) => void control.setSelection('mcp_servers', value)} />
+      <ResourceControl unavailable={control.unavailable.find((entry) => entry.resource === 'knowledgeBases')} label="Knowledge" icon={Database} options={control.knowledgeBases} value={control.policy.knowledge_bases} onChange={(value) => void control.setSelection('knowledge_bases', value)} />
       <Button variant="ghost" className="min-h-11 rounded-xl px-3 text-xs text-[color:var(--color-fg-sub)]" onClick={() => void control.patchPolicy({ memory_enabled: control.policy.memory_enabled === false ? true : false })}><BrainCircuit aria-hidden className="size-4" />Memory {control.policy.memory_enabled === false ? 'off' : 'on'}{control.policy.memory_enabled !== null ? <Check aria-hidden className="size-3" /> : null}</Button>
       <Select value={contextStrategy} onValueChange={(value) => void control.patchPolicy({ context_strategy: contextValue(value ?? 'inherit') })}>
         <SelectTrigger aria-label="Conversation context strategy" className="h-11 w-44 border-0 bg-[color:var(--color-surface)] text-xs shadow-none"><Layers3 aria-hidden className="size-4" /><SelectValue /></SelectTrigger>

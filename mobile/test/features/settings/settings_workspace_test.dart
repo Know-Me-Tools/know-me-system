@@ -89,11 +89,27 @@ void main() {
     await tester.pumpWidget(_settings(KnowMeTheme.dark));
     await tester.pumpAndSettle();
     expect(find.text('Model providers'), findsWidgets);
-    await tester.tap(find.text('Universal Agent Runtime').first);
+    // 'Runtime & policy', not 'Universal Agent Runtime'. The section was
+    // renamed when the UAR service-URL form was dropped from mobile — the
+    // runtime is always embedded there, so the section is about policy now
+    // rather than about connecting to a runtime. The old label survives only
+    // as prose inside a card, so `.first` on an empty match threw
+    // `Bad state: No element` and this test failed on a rename, not a defect.
+    await tester.tap(find.text('Runtime & policy').first);
     await tester.pumpAndSettle();
-    expect(find.text('Chat runtime'), findsOneWidget);
-    expect(find.text('UAR'), findsWidgets);
-    expect(find.text('Local'), findsWidgets);
+    // The panel headings moved with the same rework: mobile no longer offers a
+    // 'Chat runtime' choice, because the runtime is ALWAYS embedded there.
+    // What it does show is the on-device model and the embedded badge, which
+    // is the fact this test actually cares about — that the section is
+    // reachable and renders its content on a narrow screen.
+    // 'Runtime & policy' appears twice once the section opens — as the nav
+    // label and as the panel heading — which is itself the evidence that the
+    // tap navigated rather than silently doing nothing.
+    expect(find.text('Runtime & policy'), findsNWidgets(2));
+    // Mobile is always the embedded in-process runtime, so the badge stating
+    // that must be present. This is the assertion the old 'UAR'/'Local' text
+    // checks were reaching for before the UAR service-URL form was dropped.
+    expect(find.textContaining('Embedded'), findsWidgets);
   });
 
   testWidgets('conversation toolbar exposes UAR, agent and context controls', (

@@ -43,11 +43,12 @@ if ! command -v python3 >/dev/null 2>&1; then
 fi
 
 source "$SCRIPT_DIR/lib-chat-state.sh"
-trap 'cert_restore_clean_chat_state "$PACKAGE"' EXIT
+trap 'cert_restore_clean_chat_state "$PACKAGE"; cert_exit_offline' EXIT
 
 if [[ "$CERT_CLEAN_CHAT_STATE" == "1" ]]; then
   adb install -r "$APK" >/dev/null
 fi
+cert_enter_offline || exit 1
 cert_prepare_clean_chat_state "$PACKAGE"
 
 dump_ui() {

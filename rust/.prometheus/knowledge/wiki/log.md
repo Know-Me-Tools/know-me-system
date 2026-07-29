@@ -1,5 +1,12 @@
 # Update Log
 
+## 2026-07-29
+* **Creation**: [Embedded UAR Offline Agents Executor Session Complete](/embedded-uar-offline-agents-executor-session-complete.md)
+* **Creation**: [Embedded UAR offline agents implementation-ready status marker](/embedded-uar-offline-agents-implementation-ready-status-marker.md)
+
+## 2026-07-27
+* **Creation**: [Embedded UAR Offline Agents Executor Session Complete](/embedded-uar-offline-agents-executor-session-complete.md)
+
 ## 2026-07-26
 * **Creation**: [Model Runtime Per-Device Executor Session Complete](/model-runtime-per-device-executor-session-complete.md)
 * **Creation**: [Model Runtime Per-Device Executor Completion Marker](/model-runtime-per-device-executor-completion-marker.md)
