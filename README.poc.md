@@ -23,8 +23,8 @@ bash scripts/check-env.sh --install
 # Build shared Rust core (Android)
 bash scripts/android/build.sh release
 
-# Build shared Rust core (iOS/macOS)
-bash scripts/ios/build-xcframework.sh release
+# iOS needs no equivalent step: CargoKit builds and links the Rust core during
+# `flutter run`/`flutter build ios`.
 
 # Generate Flutter FFI bindings from the multi-crate contract
 (cd rust && flutter_rust_bridge_codegen generate --config-file flutter_rust_bridge.yaml)
