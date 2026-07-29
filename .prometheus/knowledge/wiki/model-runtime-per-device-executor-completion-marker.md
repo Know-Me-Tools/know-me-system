@@ -11,15 +11,15 @@ tags:
 - uar
 links:
 - model-runtime-per-device-executor-completion-with-unknown-change
-- model-runtime-per-device-executor-session-completed-change-unknown
-- model-runtime-per-device-executor-completion-change-unknown
 - model-runtime-per-device-executor-session-complete-change-unknown
-- model-runtime-per-device-executor-session-completion-change-unknown
+- model-runtime-per-device-completion-marker-change-unknown
+- model-runtime-per-device-executor-session-complete-unknown-change
+- model-runtime-per-device-executor-completion-change-unknown
 sources:
 - stdin
-timestamp: 2026-07-25T21:49:38.304578+00:00
-created_at: 2026-07-25T21:49:38.304517+00:00
-updated_at: 2026-07-25T21:49:38.304578+00:00
+timestamp: 2026-07-27T17:34:09.019184+00:00
+created_at: 2026-07-27T17:34:09.019053+00:00
+updated_at: 2026-07-27T17:34:09.019184+00:00
 revision: 1
 ---
 
@@ -31,15 +31,15 @@ revision: 1
 ## Interpretation
 
 - This is a completion marker only.
-- It does not identify code, configuration, build, installation, or runtime behavior changes.
-- It does not provide runtime verification evidence for per-device model execution.
+- No code, configuration, build, installation, or runtime behavior change is identified.
+- No runtime verification evidence is provided for per-device model execution.
 
 ## Follow-up
 
 - Correlate this marker with build logs, installation logs, runtime traces, or later knowledge records before treating `model-runtime-per-device` as verified.
-- Keep executor completion markers distinct from runtime proof.
-- For deduplication, compare against related records such as [model-runtime-per-device executor completion with unknown change](/model-runtime-per-device-executor-completion-with-unknown-change.md), [model-runtime-per-device executor session completed, change unknown](/model-runtime-per-device-executor-session-completed-change-unknown.md), [model-runtime-per-device executor completion, change unknown](/model-runtime-per-device-executor-completion-change-unknown.md), [model-runtime-per-device executor session complete, change unknown](/model-runtime-per-device-executor-session-complete-change-unknown.md), and [model-runtime-per-device executor session completion, change unknown](/model-runtime-per-device-executor-session-completion-change-unknown.md).
+- Keep executor completion markers distinct from runtime proof, consistent with [model-runtime-per-device executor completion with unknown change](/model-runtime-per-device-executor-completion-with-unknown-change.md).
+- For deduplication, compare with related completion-marker records such as [model-runtime-per-device executor session complete, change unknown](/model-runtime-per-device-executor-session-complete-change-unknown.md), [model-runtime-per-device completion marker, change unknown](/model-runtime-per-device-completion-marker-change-unknown.md), [model-runtime-per-device executor session complete, unknown change](/model-runtime-per-device-executor-session-complete-unknown-change.md), and [model-runtime-per-device executor completion, change unknown](/model-runtime-per-device-executor-completion-change-unknown.md).
 
 # Citations
 
-1. stdin
+1. [1] stdin

@@ -3,6 +3,7 @@
 ## Reference
 
 * [<think> reasoning split into ThinkingDelta (multi-tag segmenter)](/ios-think-split-segmenter.md)
+* [Android LiteRT-LM cancel pass and non-streaming partial-output limit](/android-litert-lm-cancel-pass-and-non-streaming-partial-output-limit.md)
 * [Android LiteRT-LM Local tab fix and remaining device proof gap](/android-litert-lm-local-tab-fix-and-remaining-device-proof-gap.md)
 * [Android Rust cross-compile progress for Hybrid Mobile PoC](/android-rust-cross-compile-progress-for-hybrid-mobile-poc.md)
 * [Android Rust target install during Hybrid Mobile PoC verification](/android-rust-target-install-during-hybrid-mobile-poc-verification.md)
@@ -10,6 +11,7 @@
 * [Codegen and CI Verification Executor Session Completion](/codegen-and-ci-verification-executor-session-completion.md)
 * [Desktop macOS MLX floor raise + iOS thinking-split](/desktop-macos-mlx-floor-raise-and-ios-thinking-split.md)
 * [Embedded session memory — seeding history and isolating conversations](/uar-embedded-session-memory-fix.md)
+* [Embedded UAR Offline Agents Executor Session Complete](/embedded-uar-offline-agents-executor-session-complete.md)
 * [Embedded UAR session memory seeding and conversation isolation](/embedded-uar-session-memory-seeding-and-conversation-isolation.md)
 * [Executor Completion for Hybrid Mobile Codegen and CI Phase](/executor-completion-for-hybrid-mobile-codegen-and-ci-phase.md)
 * [Executor Completion Marker for Codegen and CI Phase](/executor-completion-marker-for-codegen-and-ci-phase.md)
@@ -22,6 +24,7 @@
 * [Hybrid Mobile Codegen and CI Phase Executor Completion](/hybrid-mobile-codegen-and-ci-phase-executor-completion.md)
 * [Hybrid Mobile Codegen and CI Verification Completion Marker](/hybrid-mobile-codegen-and-ci-verification-completion-marker.md)
 * [Hybrid Mobile Codegen and CI Verification Session Complete](/hybrid-mobile-codegen-and-ci-verification-session-complete.md)
+* [Hybrid Mobile PEM Sync Bridge Phase and CI Fixes](/hybrid-mobile-pem-sync-bridge-phase-and-ci-fixes.md)
 * [Hybrid Mobile PoC Android build monitor status at assembleDebug](/hybrid-mobile-poc-android-build-monitor-status-at-assembledebug.md)
 * [Hybrid Mobile PoC Android build reached Gradle assembleDebug](/hybrid-mobile-poc-android-build-reached-gradle-assembledebug.md)
 * [Hybrid Mobile PoC Codegen and CI Verification Session](/hybrid-mobile-poc-codegen-and-ci-verification-session.md)
@@ -52,6 +55,8 @@
 * [Model Runtime Per Device Executor Session Completion](/model-runtime-per-device-executor-session-completion.md)
 * [Model runtime per-device execution marker with no completed changes](/model-runtime-per-device-execution-marker-with-no-completed-changes.md)
 * [Model Runtime Per-Device Executor Completion Marker](/model-runtime-per-device-executor-completion-marker.md)
+* [Model Runtime Per-Device Executor Completion Record](/model-runtime-per-device-executor-completion-record.md)
+* [Model Runtime Per-Device Executor Completion Status](/model-runtime-per-device-executor-completion-status.md)
 * [Model Runtime Per-Device Executor Session Complete](/model-runtime-per-device-executor-session-complete.md)
 * [Prometheus Entity Management universal platform evolution status](/prometheus-entity-management-universal-platform-evolution-status.md)
 * [Qwen3 PreThink segmenter for reasoning stream splitting](/qwen3-prethink-segmenter-for-reasoning-stream-splitting.md)
