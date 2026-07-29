@@ -10,13 +10,13 @@ tags:
 - completion-marker
 links:
 - model-runtime-per-device-executor-session-complete
-- executor-session-completion-for-codegen-and-ci-verification
+- hybrid-mobile-codegen-and-ci-verification-session-complete
 sources:
 - stdin
-timestamp: 2026-07-27T17:52:47.365399+00:00
-created_at: 2026-07-27T17:52:47.365399+00:00
-updated_at: 2026-07-27T17:52:47.365399+00:00
-revision: 0
+timestamp: 2026-07-29T12:14:52.550345+00:00
+created_at: 2026-07-29T12:14:52.550278+00:00
+updated_at: 2026-07-29T12:14:52.550345+00:00
+revision: 1
 ---
 
 ## Session Metadata
@@ -38,7 +38,7 @@ The marker does **not** include:
 - Test or verification logs
 - Code-change summary
 
-Use this entry only as lightweight phase-completion tracking. It is distinct from model-runtime completion records such as [Model Runtime Per-Device Executor Session Complete](/model-runtime-per-device-executor-session-complete.md) and codegen/CI phase completion records such as [Executor Session Completion for Codegen and CI Verification](/executor-session-completion-for-codegen-and-ci-verification.md).
+Use this entry only as lightweight phase-completion tracking. It is distinct from model-runtime completion records such as [Model Runtime Per-Device Executor Session Complete](/model-runtime-per-device-executor-session-complete.md) and codegen/CI phase completion records such as [Hybrid Mobile Codegen and CI Verification Session Complete](/hybrid-mobile-codegen-and-ci-verification-session-complete.md).
 
 # Citations
 

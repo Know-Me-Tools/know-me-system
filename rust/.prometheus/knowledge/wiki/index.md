@@ -12,6 +12,7 @@
 * [Desktop macOS MLX floor raise + iOS thinking-split](/desktop-macos-mlx-floor-raise-and-ios-thinking-split.md)
 * [Embedded session memory — seeding history and isolating conversations](/uar-embedded-session-memory-fix.md)
 * [Embedded UAR Offline Agents Executor Session Complete](/embedded-uar-offline-agents-executor-session-complete.md)
+* [Embedded UAR offline agents implementation-ready status marker](/embedded-uar-offline-agents-implementation-ready-status-marker.md)
 * [Embedded UAR session memory seeding and conversation isolation](/embedded-uar-session-memory-seeding-and-conversation-isolation.md)
 * [Executor Completion for Hybrid Mobile Codegen and CI Phase](/executor-completion-for-hybrid-mobile-codegen-and-ci-phase.md)
 * [Executor Completion Marker for Codegen and CI Phase](/executor-completion-marker-for-codegen-and-ci-phase.md)
