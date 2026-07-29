@@ -22,14 +22,10 @@ async fn backend() -> Result<Backend, AgentError> {
     }
 }
 
-/// Uniform "not yet on embedded" error for control-plane operations whose SDK
-/// admin surface is not exposed in-process yet (kept explicit rather than falling
-/// through to the URL-demanding HTTP client).
-fn not_on_embedded(op: &str) -> AgentError {
-    AgentError::Config(format!(
-        "{op} is not available on the embedded runtime yet (no HTTP service on this platform)"
-    ))
-}
+// `not_on_embedded` used to live here — a uniform "not yet on embedded" error
+// for control-plane operations the SDK could not serve in-process. Every one of
+// them now can, so the helper is gone rather than left as a tempting shortcut
+// for the next operation that looks hard to wire up.
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -118,9 +114,8 @@ pub struct UarAdminSnapshot {
 
 pub async fn catalog() -> Result<ChatControlPlaneCatalog, AgentError> {
     if let Backend::Embedded = backend().await? {
-        // On embedded, agent definitions come from the in-process runtime; skills/
-        // tools/knowledge-bases have no embedded admin surface yet, so they list
-        // empty rather than demanding a service URL.
+        // Everything here comes from the in-process runtime — agents, skills,
+        // tools and knowledge bases alike. None of it demands a service URL.
         //
         // Shape parity matters here: the service path returns the agents as
         // `{ runtime_agents, federated_agents }` (see `api/discovery.rs`), while
@@ -171,9 +166,9 @@ pub async fn catalog() -> Result<ChatControlPlaneCatalog, AgentError> {
 
 pub async fn admin_snapshot() -> Result<UarAdminSnapshot, AgentError> {
     if let Backend::Embedded = backend().await? {
-        // Settings + agents come from the in-process runtime (enough for the
-        // global run-policy panel and the agent editor). The remaining registries
-        // have no embedded admin surface yet and list empty.
+        // Every registry the admin UI shows is served in-process: settings,
+        // agents, skills, knowledge bases, MCP servers, tools and memories. An
+        // embedded host administers exactly what a served one does.
         let runtime = crate::state::embedded_uar()?;
         let (settings, setting_types) = runtime.settings_snapshot().await?;
         let agents = runtime.list_agents().await?;
@@ -381,7 +376,12 @@ pub async fn create_knowledge_base(
     request: &serde_json::Value,
 ) -> Result<serde_json::Value, AgentError> {
     if let Backend::Embedded = backend().await? {
-        return Err(not_on_embedded("knowledge-base administration"));
+        // Listing knowledge bases already worked embedded, so a device could
+        // SEE them but never add one — the surface read as broken rather than
+        // limited. This was the last embedded refusal in the catalog surface.
+        return crate::state::embedded_uar()?
+            .save_knowledge_base(request)
+            .await;
     }
     chat::uar_service_client()
         .await?
@@ -393,7 +393,7 @@ pub async fn create_knowledge_base(
 
 pub async fn delete_knowledge_base(id: &str) -> Result<(), AgentError> {
     if let Backend::Embedded = backend().await? {
-        return Err(not_on_embedded("knowledge-base administration"));
+        return crate::state::embedded_uar()?.delete_knowledge_base(id).await;
     }
     chat::uar_service_client()
         .await?

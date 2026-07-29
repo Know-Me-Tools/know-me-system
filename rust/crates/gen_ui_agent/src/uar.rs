@@ -1114,6 +1114,31 @@ impl UarEmbeddedRuntime {
             .map_err(|error| AgentError::Config(format!("serialize knowledge bases: {error}")))
     }
 
+    /// Create or replace a knowledge base.
+    pub async fn save_knowledge_base(
+        &self,
+        request: &serde_json::Value,
+    ) -> Result<serde_json::Value, AgentError> {
+        let kb: universal_agent_runtime::uar::domain::knowledge::KnowledgeBase =
+            serde_json::from_value(request.clone()).map_err(|error| {
+                AgentError::Config(format!("knowledge base request is not valid: {error}"))
+            })?;
+        self.runtime
+            .save_knowledge_base(&kb)
+            .await
+            .map_err(|error| AgentError::Config(format!("save knowledge base: {error}")))?;
+        serde_json::to_value(&kb)
+            .map_err(|error| AgentError::Config(format!("serialize knowledge base: {error}")))
+    }
+
+    /// Delete a knowledge base by id.
+    pub async fn delete_knowledge_base(&self, id: &str) -> Result<(), AgentError> {
+        self.runtime
+            .delete_knowledge_base(id)
+            .await
+            .map_err(|error| AgentError::Config(format!("delete knowledge base: {error}")))
+    }
+
     /// List the memories the runtime holds for a user.
     ///
     /// The embedded control plane previously returned `[]` here with an
