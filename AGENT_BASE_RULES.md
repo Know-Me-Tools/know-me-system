@@ -512,21 +512,42 @@ Use strong types wherever the project language supports them.
 * Prefer generated types from schemas where available.
 * Keep API contracts typed and versioned.
 
-## 30. Tests Are Part of Completion
+## 30. Test at Phase Completion, Not Continuously
 
-Implementation is not complete until it has been verified.
+Verification belongs at the END of a phase, immediately before reflection —
+not sprinkled through implementation.
 
-Where available:
+Testing code that is not yet certified to provide any value is waste. A phase
+half-built will change before it is done, so every expensive run against it is
+paid twice: once now, once again after the code settles. Device builds,
+physical-device certification, full release cross-compiles, and end-to-end
+suites are the expensive ones.
 
-* Run unit tests.
-* Run integration tests.
-* Run type checks.
-* Run linters.
-* Run build checks.
-* Add tests for new behavior.
-* Update tests when behavior intentionally changes.
+**During implementation**, run only what is cheap and catches defects that
+would otherwise propagate:
 
-If tests cannot be run, state why.
+* Compiler and type checks (`cargo check`, `tsc`, `dart analyze`).
+* Linters.
+* Unit tests for the specific unit just written.
+
+These cost seconds and stop a wrong contract from spreading through every
+caller. They are not "testing the phase" — they are the edit's own feedback.
+
+**At phase completion, before reflection**, run the full battery:
+
+* Unit and integration tests.
+* Build checks and release cross-compiles.
+* Device and end-to-end certification.
+* Add tests for new behavior; update tests when behavior intentionally changes.
+
+**Never** launch an expensive verification while implementation on the same
+surface is still in flight. Serialize it: one build at a time, and wait for it.
+Parallel builds contend for the same toolchain locks and take longer than
+running them in sequence.
+
+If a phase completes and tests cannot be run, state why, and say plainly which
+claims are therefore unverified. An unverified claim reported as verified is
+worse than no test at all.
 
 ## 31. Prefer Small, Reviewable Changes
 
