@@ -883,14 +883,64 @@ impl UarEmbeddedRuntime {
         ));
         let driver: Arc<dyn LlmDriver> = routing.clone();
         let persistence = Self::open_persistence(storage_dir).await?;
-        let runtime = universal_agent_runtime_sdk::Runtime::builder()
+        let mut builder = universal_agent_runtime_sdk::Runtime::builder()
             .local_provider(driver, provider_config)
             .persistence(persistence)
-            .seed_defaults(true)
+            .seed_defaults(true);
+        if let Some(memory) = Self::open_memory(storage_dir).await {
+            builder = builder.memory_service(memory);
+        }
+        let runtime = builder
             .build()
             .await
             .map_err(|error| AgentError::Config(format!("embedded UAR: {error}")))?;
         Ok(Self { runtime, routing })
+    }
+
+    /// Open the agent memory store.
+    ///
+    /// Returns `None` rather than failing the boot, and this asymmetry with
+    /// `open_persistence` is deliberate. The persistence layer holds the user's
+    /// agents, policies and conversations, so losing it silently is the defect
+    /// that motivated the no-fallback rule there. Memory is recalled context: a
+    /// device that cannot open it should still start and chat, and the admin
+    /// surface already reports `E_MEMORY_SERVICE_UNAVAILABLE` with a reason a
+    /// UI can show — which is strictly more useful than refusing to launch.
+    async fn open_memory(
+        storage_dir: Option<&std::path::Path>,
+    ) -> Option<Arc<universal_agent_runtime::uar::memory::service::MemoryService>> {
+        // A SEPARATE directory from the persistence store. Both take an
+        // exclusive SurrealKV directory lock, so sharing one path would make the
+        // second open fail — on a fast relaunch that surfaces as an intermittent
+        // boot failure, which is the worst kind to diagnose.
+        let dir = storage_dir?.join("memory-db");
+
+        let config = universal_agent_runtime::config::MemoryConfig {
+            enabled: true,
+            db_path: dir.display().to_string(),
+            // NOT the crate default ("openai"). An embedded device must embed
+            // locally: the openai provider requires an API key and a network,
+            // so defaulting to it would make memory silently unavailable on
+            // exactly the offline-first surface this change exists to serve.
+            embedding_provider: "local".to_string(),
+            ..Default::default()
+        };
+
+        match universal_agent_runtime::uar::memory::service::MemoryService::new(config).await {
+            Ok(service) => {
+                tracing::info!(path = %dir.display(), "embedded UAR memory opened");
+                Some(Arc::new(service))
+            }
+            Err(error) => {
+                tracing::warn!(
+                    path = %dir.display(),
+                    %error,
+                    "embedded UAR memory unavailable; the runtime will report a reason rather than \
+                     showing an empty memory list"
+                );
+                None
+            }
+        }
     }
 
     /// Open the runtime's persistence layer.
@@ -1062,6 +1112,82 @@ impl UarEmbeddedRuntime {
             .map_err(|error| AgentError::Config(format!("list knowledge bases: {error}")))?;
         serde_json::to_value(&bases)
             .map_err(|error| AgentError::Config(format!("serialize knowledge bases: {error}")))
+    }
+
+    /// List the memories the runtime holds for a user.
+    ///
+    /// The embedded control plane previously returned `[]` here with an
+    /// `unavailable` marker claiming a storage-layer limit. That diagnosis was
+    /// wrong: the limit was that no host ever constructed a `MemoryService`.
+    /// One is now opened at boot (see `open_memory`), so this serves real rows.
+    pub async fn list_memories(
+        &self,
+        user_ctx: &universal_agent_runtime_sdk::runtime::UserContext,
+        agent_id: Option<&str>,
+        session_id: Option<&str>,
+    ) -> Result<serde_json::Value, AgentError> {
+        let memories = self
+            .runtime
+            .list_memories(user_ctx, agent_id, session_id)
+            .await
+            .map_err(|error| AgentError::Config(format!("list memories: {error}")))?;
+        let items = serde_json::to_value(&memories)
+            .map_err(|error| AgentError::Config(format!("serialize memories: {error}")))?;
+        // `{total, items}`, NOT a bare array: this is the shape the HTTP handler
+        // returns, and both UIs read `memories['items']`. Returning `[...]` here
+        // would compile, deserialize, and render an empty list forever — the
+        // embedded and remote containers must agree on the wire shape, not just
+        // on the data.
+        Ok(serde_json::json!({ "total": memories.len(), "items": items }))
+    }
+
+    /// Add a memory.
+    pub async fn add_memory(
+        &self,
+        content: String,
+        user_ctx: &universal_agent_runtime_sdk::runtime::UserContext,
+        agent_id: Option<&str>,
+        session_id: Option<&str>,
+    ) -> Result<serde_json::Value, AgentError> {
+        use universal_agent_runtime::uar::domain::memory::{MemoryScope, MemoryType};
+        let memory = self
+            .runtime
+            .add_memory(
+                content,
+                MemoryScope::default(),
+                MemoryType::default(),
+                user_ctx,
+                agent_id,
+                session_id,
+            )
+            .await
+            .map_err(|error| AgentError::Config(format!("add memory: {error}")))?;
+        serde_json::to_value(&memory)
+            .map_err(|error| AgentError::Config(format!("serialize memory: {error}")))
+    }
+
+    /// Replace a memory's content. The service records history, so the previous
+    /// text remains recoverable rather than being overwritten destructively.
+    pub async fn update_memory(
+        &self,
+        id: &str,
+        content: String,
+    ) -> Result<serde_json::Value, AgentError> {
+        let memory = self
+            .runtime
+            .update_memory(id, content)
+            .await
+            .map_err(|error| AgentError::Config(format!("update memory: {error}")))?;
+        serde_json::to_value(&memory)
+            .map_err(|error| AgentError::Config(format!("serialize memory: {error}")))
+    }
+
+    /// Delete a memory by id.
+    pub async fn delete_memory(&self, id: &str) -> Result<(), AgentError> {
+        self.runtime
+            .delete_memory(id)
+            .await
+            .map_err(|error| AgentError::Config(format!("delete memory: {error}")))
     }
 
     /// List configured MCP servers, read from the database.

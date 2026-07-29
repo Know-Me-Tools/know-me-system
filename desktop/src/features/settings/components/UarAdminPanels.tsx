@@ -1,6 +1,6 @@
 // TJ-ARCH-MOB-001 compliant — view-only components over the UAR admin hook.
 import { useEffect, useMemo, useState } from 'react'
-import { Bot, Database, Plug, Plus, Save, SlidersHorizontal, Sparkles, Trash2 } from 'lucide-react'
+import { Bot, Database, Pencil, Plug, Plus, Save, SlidersHorizontal, Sparkles, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -215,9 +215,20 @@ export function KnowledgePanel() {
 
 export function MemoryPanel() {
   const admin = useUarAdmin(); const memories = array(admin.snapshot?.memories, 'items'); const settings = array(admin.snapshot?.settings); const setting = settings.find((item) => item.key === 'memory.enabled'); const enabled = setting?.data !== false
+  // A memory the runtime got wrong should be correctable in place, not only
+  // deletable — deleting loses the true part along with the false part.
+  const [draft, setDraft] = useState(''); const [editingId, setEditingId] = useState<string | null>(null); const [editText, setEditText] = useState('')
+  const commitAdd = async () => { const content = draft.trim(); if (!content) return; if (await admin.addMemory(content)) setDraft('') }
+  const commitEdit = async (id: string) => { const content = editText.trim(); if (!content) return; if (await admin.updateMemory(id, content)) setEditingId(null) }
   return <div><PanelHeader icon={Database} title="Memories" caption="Governed user and conversation memories remain in UAR storage. Reasoning is never promoted into future context by default." />
     <div className="mt-6 flex min-h-20 items-center justify-between rounded-xl bg-[color:var(--color-bg-2)] p-4"><div><p className="font-semibold">Memory retrieval</p><p className="text-sm text-[color:var(--color-fg-sub)]">Apply governed memories during context assembly.</p></div><Switch checked={enabled} onCheckedChange={(checked) => void admin.saveSetting('memory.enabled', checked)} aria-label="Enable memory retrieval" /></div>
-    <div className="mt-4 space-y-2">{memories.map((memory) => <div key={text(memory.id)} className="flex items-start justify-between gap-4 rounded-xl bg-[color:var(--color-surface)] p-4"><div><p className="line-clamp-3 text-sm">{text(memory.content) || text(memory.text)}</p><p className="mt-1 text-xs text-[color:var(--color-fg-faint)]">{text(memory.scope)}</p></div><Button variant="ghost" size="icon" aria-label="Delete memory" onClick={() => void admin.deleteMemory(text(memory.id))}><Trash2 aria-hidden /></Button></div>)}</div><ErrorLine value={admin.error || resourceError(admin.snapshot?.memories)} /></div>
+    <div className="mt-4 flex gap-2"><Input aria-label="New memory" placeholder="Remember something about me…" value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void commitAdd() }} /><Button disabled={!draft.trim()} onClick={() => void commitAdd()}>Add</Button></div>
+    <div className="mt-4 space-y-2">{memories.map((memory) => { const id = text(memory.id); const isEditing = editingId === id
+      return <div key={id} className="flex items-start justify-between gap-4 rounded-xl bg-[color:var(--color-surface)] p-4">
+        {isEditing
+          ? <><Input aria-label="Edit memory" value={editText} onChange={(event) => setEditText(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void commitEdit(id); if (event.key === 'Escape') setEditingId(null) }} /><div className="flex gap-1"><Button size="sm" disabled={!editText.trim()} onClick={() => void commitEdit(id)}>Save</Button><Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>Cancel</Button></div></>
+          : <><div><p className="line-clamp-3 text-sm">{text(memory.content) || text(memory.text)}</p><p className="mt-1 text-xs text-[color:var(--color-fg-faint)]">{text(memory.scope)}</p></div><div className="flex gap-1"><Button variant="ghost" size="icon" aria-label="Edit memory" onClick={() => { setEditingId(id); setEditText(text(memory.content) || text(memory.text)) }}><Pencil aria-hidden /></Button><Button variant="ghost" size="icon" aria-label="Delete memory" onClick={() => void admin.deleteMemory(id)}><Trash2 aria-hidden /></Button></div></>}
+      </div> })}</div><ErrorLine value={admin.error || resourceError(admin.snapshot?.memories)} /></div>
 }
 
 export function ConnectionsPanel() {

@@ -512,6 +512,12 @@ export function uarMcpServerSave(name: string, server: unknown): Promise<unknown
 export function uarMcpServerDelete(name: string): Promise<unknown> {
   return invoke<unknown>(cmd("uar_mcp_server_delete"), { name });
 }
+export function uarMemoryAdd(content: string): Promise<unknown> {
+  return invoke<unknown>(cmd("uar_memory_add"), { content });
+}
+export function uarMemoryUpdate(id: string, content: string): Promise<unknown> {
+  return invoke<unknown>(cmd("uar_memory_update"), { id, content });
+}
 export function uarMemoryDelete(id: string): Promise<unknown> {
   return invoke<unknown>(cmd("uar_memory_delete"), { id });
 }

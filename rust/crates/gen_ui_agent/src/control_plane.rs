@@ -66,7 +66,27 @@ pub struct UnavailableResource {
     pub platform_limitation: bool,
 }
 
+/// The identity an embedded runtime acts as.
+///
+/// An embedded host is single-user by construction — the device owner. There is
+/// no auth service to issue claims, so this is a fixed local identity rather
+/// than an authenticated one. It is still explicit rather than defaulted:
+/// memories are scoped per user, and silently passing an empty or anonymous
+/// context would file every memory under a scope the UI cannot then read back.
+fn local_user_context() -> universal_agent_runtime_sdk::runtime::UserContext {
+    universal_agent_runtime_sdk::runtime::UserContext {
+        user_id: "local".to_string(),
+        claims: universal_agent_runtime_sdk::runtime::UserClaims {
+            sub: "local".to_string(),
+            name: None,
+            roles: None,
+            exp: 0,
+        },
+    }
+}
+
 impl UnavailableResource {
+    #[allow(dead_code, reason = "retained for resources that are still embedded-unavailable")]
     fn embedded(resource: &str) -> Self {
         Self {
             resource: resource.to_string(),
@@ -161,6 +181,31 @@ pub async fn admin_snapshot() -> Result<UarAdminSnapshot, AgentError> {
         let knowledge_bases = runtime.list_knowledge_bases().await?;
         let mcp_servers = runtime.list_mcp_servers().await?;
         let tools = runtime.list_tools().await?;
+        // Memories are served for real now. An earlier note here claimed a
+        // PersistenceLayer limit; that was a misdiagnosis. `PersistenceLayer`'s
+        // memory methods are no-op stubs, but the actual blocker was that no
+        // host constructed a `MemoryService` — one is opened at boot, and this
+        // reads through it.
+        //
+        // A failure to open memory is NOT a failure to list the catalog: the
+        // rest of the snapshot is still valid and useful, so the error becomes
+        // an `unavailable` entry carrying its reason rather than sinking the
+        // whole call. An empty list with no explanation is the exact ambiguity
+        // the contract exists to remove.
+        let (memories, unavailable) = match runtime
+            .list_memories(&local_user_context(), None, None)
+            .await
+        {
+            Ok(value) => (value, Vec::new()),
+            Err(error) => (
+                serde_json::json!([]),
+                vec![UnavailableResource {
+                    resource: "memories".to_string(),
+                    reason: error.to_string(),
+                    platform_limitation: false,
+                }],
+            ),
+        };
         return Ok(UarAdminSnapshot {
             settings,
             setting_types,
@@ -169,12 +214,8 @@ pub async fn admin_snapshot() -> Result<UarAdminSnapshot, AgentError> {
             tools,
             knowledge_bases,
             mcp_servers,
-            // `memories` stays empty AND stays advertised. This is a real
-            // storage-layer limit, not an unfinished wire-up: PersistenceLayer
-            // exposes only search_memory(query_vec, ..), so memories cannot be
-            // enumerated without inventing an embedding to search with.
-            memories: serde_json::json!([]),
-            unavailable: vec![UnavailableResource::embedded("memories")],
+            memories,
+            unavailable,
         });
     }
     let client = chat::uar_service_client().await?;
@@ -289,15 +330,49 @@ pub async fn delete_mcp_server(name: &str) -> Result<serde_json::Value, AgentErr
 
 pub async fn delete_memory(id: &str) -> Result<serde_json::Value, AgentError> {
     if let Backend::Embedded = backend().await? {
-        // Deliberate, not a gap: memory WRITES go through the memory service,
-        // which owns scoping, embedding and auto-capture. An admin surface that
-        // deleted rows directly would bypass those invariants.
-        return Err(not_on_embedded("memory deletion"));
+        // This used to refuse, on the reasoning that a direct admin delete would
+        // bypass the memory service's scoping/embedding invariants. That reason
+        // no longer applies: the call goes THROUGH `MemoryService`, so those
+        // invariants are upheld — and refusing left a device user unable to
+        // remove something the runtime remembered about them, which is worse
+        // than the risk it was guarding against.
+        crate::state::embedded_uar()?.delete_memory(id).await?;
+        return Ok(serde_json::json!({ "id": id, "deleted": true }));
     }
     chat::uar_service_client()
         .await?
         .admin()
         .delete_memory(id)
+        .await
+        .map_err(uar_error)
+}
+
+/// Add a memory.
+pub async fn add_memory(content: &str) -> Result<serde_json::Value, AgentError> {
+    if let Backend::Embedded = backend().await? {
+        return crate::state::embedded_uar()?
+            .add_memory(content.to_string(), &local_user_context(), None, None)
+            .await;
+    }
+    chat::uar_service_client()
+        .await?
+        .admin()
+        .add_memory(content)
+        .await
+        .map_err(uar_error)
+}
+
+/// Replace a memory's content.
+pub async fn update_memory(id: &str, content: &str) -> Result<serde_json::Value, AgentError> {
+    if let Backend::Embedded = backend().await? {
+        return crate::state::embedded_uar()?
+            .update_memory(id, content.to_string())
+            .await;
+    }
+    chat::uar_service_client()
+        .await?
+        .admin()
+        .update_memory(id, content)
         .await
         .map_err(uar_error)
 }

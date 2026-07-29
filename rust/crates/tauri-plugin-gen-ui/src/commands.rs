@@ -364,6 +364,22 @@ pub async fn uar_mcp_server_delete(name: String) -> Result<serde_json::Value> {
 }
 
 #[tauri::command]
+pub async fn uar_memory_add(content: String) -> Result<serde_json::Value> {
+    gen_ui_agent::control_plane::add_memory(&content)
+        .await
+        .map_err(gen_ui_types::CoreError::from)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+pub async fn uar_memory_update(id: String, content: String) -> Result<serde_json::Value> {
+    gen_ui_agent::control_plane::update_memory(&id, &content)
+        .await
+        .map_err(gen_ui_types::CoreError::from)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
 pub async fn uar_memory_delete(id: String) -> Result<serde_json::Value> {
     gen_ui_agent::control_plane::delete_memory(&id)
         .await

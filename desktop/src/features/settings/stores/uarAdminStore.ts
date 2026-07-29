@@ -7,6 +7,8 @@ import {
   uarAgentSave,
   uarMcpServerDelete,
   uarMcpServerSave,
+  uarMemoryAdd,
+  uarMemoryUpdate,
   uarMemoryDelete,
   uarKnowledgeBaseCreate,
   uarKnowledgeBaseDelete,
@@ -63,6 +65,8 @@ interface UarAdminState {
   deleteAgent: (id: string) => Promise<boolean>
   saveMcpServer: (name: string, server: unknown) => Promise<boolean>
   deleteMcpServer: (name: string) => Promise<boolean>
+  addMemory: (content: string) => Promise<boolean>
+  updateMemory: (id: string, content: string) => Promise<boolean>
   deleteMemory: (id: string) => Promise<boolean>
   createKnowledgeBase: (request: unknown) => Promise<boolean>
   deleteKnowledgeBase: (id: string) => Promise<boolean>
@@ -119,6 +123,12 @@ export const useUarAdminStore = create<UarAdminState>((set, get) => {
     deleteMcpServer: (name) => mutate(() => isTauri()
       ? uarMcpServerDelete(name)
       : request(`/api/uar/mcp/servers/${encodeURIComponent(name)}`, { method: 'DELETE' })),
+    addMemory: (content) => mutate(() => isTauri()
+      ? uarMemoryAdd(content)
+      : request('/api/admin/memories', { method: 'POST', body: JSON.stringify({ content }) })),
+    updateMemory: (id, content) => mutate(() => isTauri()
+      ? uarMemoryUpdate(id, content)
+      : request(`/api/admin/memories/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ content }) })),
     deleteMemory: (id) => mutate(() => isTauri()
       ? uarMemoryDelete(id)
       : request(`/api/admin/memories/${encodeURIComponent(id)}`, { method: 'DELETE' })),
