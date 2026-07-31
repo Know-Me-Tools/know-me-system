@@ -18,8 +18,8 @@ use futures::{StreamExt, TryStreamExt};
 use gen_ui_types::error::{CoreError, CoreResult};
 use gen_ui_types::events::StreamEvent;
 use gen_ui_types::inference::{
-    GrammarConstraint, InferenceMessage, InferenceProvider, InferenceRequest, LocalModelSpec,
-    SampleParams,
+    GrammarConstraint, InferenceMessage, InferenceProvider, InferenceRequest, InferenceRole,
+    InferenceToolResult, LocalModelSpec, SampleParams,
 };
 use gen_ui_types::lifecycle::{ModelOperationState, RunError, RunPhase, RuntimeDiagnostics};
 use llama_cpp_2::context::params::LlamaContextParams;
@@ -61,8 +61,20 @@ pub struct LlamaCppEngine {
     /// exposed by the safe llama-cpp-2 wrapper, so it would require raw FFI.
     /// Stop-mid-answer is the case this feature is about, and this covers it.
     generation_cancelled: Arc<AtomicBool>,
+    /// Transcript and sampling of the most recent text turn. llama.cpp has no
+    /// stateful conversation API, so a tool-result continuation replays this
+    /// history with the tool outputs appended — the same prompt-injection
+    /// pattern MLX and mlx-c use (the tool schema itself is already folded into
+    /// the system message by `messages_with_tool_context`).
+    last_turn: RwLock<Option<ContinuationState>>,
     #[cfg(feature = "local-llama-mtmd")]
     multimodal: RwLock<Option<Arc<MtmdContext>>>,
+}
+
+#[derive(Clone)]
+struct ContinuationState {
+    messages: Vec<InferenceMessage>,
+    params: SampleParams,
 }
 
 struct LoadedModel {
@@ -82,6 +94,7 @@ impl LlamaCppEngine {
             model_operation,
             model_cancelled: AtomicBool::new(false),
             generation_cancelled: Arc::new(AtomicBool::new(false)),
+            last_turn: RwLock::new(None),
             #[cfg(feature = "local-llama-mtmd")]
             multimodal: RwLock::new(None),
         }
@@ -652,6 +665,10 @@ impl InferenceProvider for LlamaCppEngine {
             };
             let messages = messages_with_tool_context(request)?;
             let params = request.generation_settings.clone();
+            *self.last_turn.write().await = Some(ContinuationState {
+                messages: messages.clone(),
+                params: params.clone(),
+            });
             let grammar = request.grammar.clone();
             let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
             // Clear any cancel left over from a previous run before this one
@@ -750,6 +767,70 @@ impl InferenceProvider for LlamaCppEngine {
         }
     }
 
+    /// Continue after the host executed one or more tool calls.
+    ///
+    /// The trait default is a Terminal "does not support tool-result
+    /// continuation", so before this override every local-lane tool call on a
+    /// llama.cpp build failed with `tool_result_continuation_failed` AFTER the
+    /// tool had already executed. Mirrors MLX: replay the stored transcript
+    /// with each result appended as a `tool` message and generate again.
+    async fn continue_with_tool_results(
+        &self,
+        results: &[InferenceToolResult],
+    ) -> CoreResult<futures::stream::BoxStream<'static, StreamEvent>> {
+        // History before mutation: a continuation with no prior turn is a
+        // caller bug and must be reported, not sent to the model as a
+        // tool-results-only prompt.
+        let previous = self.last_turn.read().await.clone().ok_or_else(|| {
+            terminal(
+                "tool continuation",
+                "no prior generation to continue — call generate before tool results",
+            )
+        })?;
+        let (backend, model, context_len) = {
+            let state = self.state.read().await;
+            let loaded = state
+                .as_ref()
+                .ok_or_else(|| terminal("tool continuation", "call load before generate"))?;
+            (
+                Arc::clone(&loaded.backend),
+                Arc::clone(&loaded.model),
+                loaded.spec.context_len.unwrap_or(DEFAULT_CONTEXT),
+            )
+        };
+        let messages = messages_with_tool_results(previous.messages, results);
+        let params = previous.params;
+        *self.last_turn.write().await = Some(ContinuationState {
+            messages: messages.clone(),
+            params: params.clone(),
+        });
+        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
+        // `generation_cancelled` is deliberately NOT cleared here, unlike the
+        // initial generation: a stop tapped between the tool call and this
+        // continuation must land as a prompt Cancelled from the token loop,
+        // not be erased by the follow-up turn.
+        let cancelled = Arc::clone(&self.generation_cancelled);
+        gen_ui_runtime::spawn_blocking(move || {
+            if let Err(error) = generate_blocking(
+                &backend,
+                &model,
+                &messages,
+                context_len,
+                &params,
+                // The original grammar constrained the tool call, not the
+                // natural-language answer that follows the tool results.
+                None,
+                &sender,
+                &cancelled,
+            ) {
+                let _ = sender.send(StreamEvent::Error {
+                    message: error.to_string(),
+                });
+            }
+        });
+        Ok(tokio_stream::wrappers::UnboundedReceiverStream::new(receiver).boxed())
+    }
+
     async fn unload(&self) -> CoreResult<()> {
         *self.state.write().await = None;
         #[cfg(feature = "local-llama-mtmd")]
@@ -796,6 +877,24 @@ impl InferenceProvider for LlamaCppEngine {
     async fn runtime_diagnostics(&self) -> Option<RuntimeDiagnostics> {
         self.diagnostics().await
     }
+}
+
+/// The prior transcript with each tool result appended as a `tool` message —
+/// raw output JSON as content, tool name as the message name, exactly how MLX
+/// and mlx-c feed results back so the chat template renders them uniformly.
+fn messages_with_tool_results(
+    mut messages: Vec<InferenceMessage>,
+    results: &[InferenceToolResult],
+) -> Vec<InferenceMessage> {
+    for result in results {
+        messages.push(InferenceMessage {
+            role: InferenceRole::Tool,
+            content: result.output_json.clone(),
+            name: Some(result.tool_name.clone()),
+            tool_call_id: None,
+        });
+    }
+    messages
 }
 
 fn generate_blocking(
@@ -1029,6 +1128,105 @@ mod tests {
         engine.cancel_model_operation();
         assert!(engine.model_cancelled.load(Ordering::Acquire));
         assert!(!engine.generation_cancelled.load(Ordering::Acquire));
+    }
+
+    fn tool_result(name: &str, output: &str) -> InferenceToolResult {
+        InferenceToolResult {
+            tool_name: name.to_string(),
+            output_json: output.to_string(),
+            is_error: false,
+        }
+    }
+
+    fn user_turn(content: &str) -> ContinuationState {
+        ContinuationState {
+            messages: vec![InferenceMessage {
+                role: InferenceRole::User,
+                content: content.to_string(),
+                name: None,
+                tool_call_id: None,
+            }],
+            params: SampleParams::default(),
+        }
+    }
+
+    /// The trait default for `continue_with_tool_results` is a Terminal "does
+    /// not support tool-result continuation", which failed every local-lane
+    /// tool call on llama.cpp builds after the tool had already executed. The
+    /// engine must answer with its own protocol errors, never the default.
+    #[tokio::test]
+    async fn continuation_without_prior_generation_is_a_visible_error() {
+        let engine = LlamaCppEngine::new("/tmp/knowme-llama-test");
+        let Err(error) = engine
+            .continue_with_tool_results(&[tool_result("knowme_fetch", "{}")])
+            .await
+        else {
+            panic!("no prior turn exists to continue");
+        };
+        let message = error.to_string();
+        assert!(
+            message.contains("no prior generation"),
+            "expected the missing-history protocol error, got: {message}"
+        );
+        assert!(
+            !message.contains("does not support tool-result continuation"),
+            "must not fall through to the trait default: {message}"
+        );
+    }
+
+    #[tokio::test]
+    async fn continuation_with_history_but_no_model_asks_for_load() {
+        let engine = LlamaCppEngine::new("/tmp/knowme-llama-test");
+        *engine.last_turn.write().await = Some(user_turn("fetch my profile"));
+        let Err(error) = engine
+            .continue_with_tool_results(&[tool_result("knowme_fetch", "{\"ok\":true}")])
+            .await
+        else {
+            panic!("no model is loaded");
+        };
+        assert!(
+            error.to_string().contains("call load"),
+            "expected the unloaded-model error, got: {error}"
+        );
+    }
+
+    /// A failed continuation must not mutate the stored transcript — the host
+    /// retries after load, and a mutated transcript would double-append the
+    /// same tool results.
+    #[tokio::test]
+    async fn failed_continuation_leaves_the_transcript_untouched() {
+        let engine = LlamaCppEngine::new("/tmp/knowme-llama-test");
+        *engine.last_turn.write().await = Some(user_turn("fetch my profile"));
+        assert!(
+            engine
+                .continue_with_tool_results(&[tool_result("knowme_fetch", "{}")])
+                .await
+                .is_err(),
+            "no model is loaded"
+        );
+        let stored = engine.last_turn.read().await.clone().expect("history kept");
+        assert_eq!(stored.messages.len(), 1, "no tool message may be appended");
+        assert_eq!(stored.messages[0].content, "fetch my profile");
+    }
+
+    #[test]
+    fn tool_results_append_as_tool_messages_in_order() {
+        let history = user_turn("fetch my profile").messages;
+        let results = [
+            tool_result("knowme_fetch", "{\"profile\":\"tj\"}"),
+            tool_result("knowme_search", "{\"hits\":2}"),
+        ];
+
+        let messages = messages_with_tool_results(history, &results);
+
+        assert_eq!(messages.len(), 3);
+        assert_eq!(messages[0].role, InferenceRole::User);
+        assert_eq!(messages[1].role, InferenceRole::Tool);
+        assert_eq!(messages[1].name.as_deref(), Some("knowme_fetch"));
+        assert_eq!(messages[1].content, "{\"profile\":\"tj\"}");
+        assert_eq!(messages[2].role, InferenceRole::Tool);
+        assert_eq!(messages[2].name.as_deref(), Some("knowme_search"));
+        assert_eq!(messages[2].content, "{\"hits\":2}");
     }
 
     #[test]
