@@ -145,7 +145,7 @@ pub async fn resolve(url: &str, kind: &str) -> Result<ResolvedRemoteContent, Age
     }
 }
 
-async fn fetch_bounded(
+pub(crate) async fn fetch_bounded(
     source: &str,
     max_bytes: usize,
 ) -> Result<(reqwest::Url, String, Vec<u8>), AgentError> {

@@ -4929,6 +4929,7 @@ dependencies = [
  "apple-native-keyring-store",
  "async-trait",
  "base64 0.22.1",
+ "ego-tree 0.11.0",
  "futures",
  "gen_ui_client",
  "gen_ui_context",

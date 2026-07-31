@@ -349,6 +349,9 @@ pub async fn run_migrations(data_dir: String) -> Result<(), CoreError> {
     register_mobile_diagnostics_mcp()
         .await
         .map_err(|e| boot_fail("mobile diagnostics MCP registration", e))?;
+    gen_ui_agent::web_fetch::register_fetch_mcp()
+        .await
+        .map_err(|e| boot_fail("web fetch MCP registration", e))?;
     tracing::info!("mobile migrations ready");
     Ok(())
 }

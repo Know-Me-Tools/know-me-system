@@ -61,23 +61,18 @@ pub struct McpToolExecution {
     pub task_support: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum McpServerTrust {
     /// Default for externally registered MCP servers. Tool annotations from
     /// these servers are still preserved, but they are not enough to permit
     /// local automatic execution.
+    #[default]
     Untrusted,
     /// The host registered this server as part of KnowMe's own trusted runtime
     /// boundary. Individual tools still need read-only/non-destructive/
     /// closed-world annotations before local automatic execution is allowed.
     TrustedLocal,
-}
-
-impl Default for McpServerTrust {
-    fn default() -> Self {
-        Self::Untrusted
-    }
 }
 
 /// A connected MCP server: the transport plus its last-known tool inventory.

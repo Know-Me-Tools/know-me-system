@@ -54,6 +54,7 @@ sha2.workspace = true
 # size would cost hundreds of ms on the attach path; already in the lockfile.
 imagesize = "0.14"
 scraper.workspace = true
+ego-tree.workspace = true
 universal-agent-runtime-sdk = { path = "../../vendor/universal-agent-runtime/sdks/rust", default-features = false, features = ["http-client", "embedded-mobile"] }
 # The agent layer owns the in-process UAR/local-model seam.  Mobile and desktop
 # inject a platform `InferenceProvider`; this dependency supplies only the

@@ -18,6 +18,7 @@ pub mod tools;
 // the client is gen_ui_client's — L2 siblings that must not depend on each other.
 pub mod sync_sink;
 pub mod uar;
+pub mod web_fetch;
 
 pub use config::ConfigBackend;
 pub use error::AgentError;
