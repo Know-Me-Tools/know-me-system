@@ -3,11 +3,11 @@
 //! (forge Quarry API) with idempotent keys, exponential backoff, and a poison
 //! handler. Read-path is Electric; this is the write-path half of local-first.
 //!
-//! The in-memory queue here is the replay engine; durability (survive restart) is
-//! delegated to the same [`LocalStore`]-backed action-log table C-003 owns — this
-//! module keeps the seam so persistence wires in without changing the replay logic.
+//! Product constructors use the local store's transaction log. The explicit
+//! transient constructor is retained for isolated replay-engine callers.
 use super::config::SyncConfig;
-use super::seam::{PendingWrite, WriteOutcome, WriteSink};
+use super::seam::{LocalStore, PendingWrite, WriteOutcome, WriteSink};
+use gen_ui_types::{CoreResult, sync::SyncStatus};
 use super::status::SyncStatusHandle;
 use std::collections::VecDeque;
 use std::sync::Arc;
@@ -35,6 +35,8 @@ pub(crate) struct WriteQueue {
     // mutex would be !Send here. Contention is low (one drain task + enqueues).
     pending: Mutex<VecDeque<PendingWrite>>,
     poison: Mutex<Vec<PendingWrite>>,
+    durable: Option<Arc<dyn LocalStore>>,
+    drain_lock: Mutex<()>,
 }
 
 impl WriteQueue {
@@ -50,31 +52,64 @@ impl WriteQueue {
             batch: cfg.write_batch,
             pending: Mutex::new(VecDeque::new()),
             poison: Mutex::new(Vec::new()),
+            durable: None,
+            drain_lock: Mutex::new(()),
         }
+    }
+
+    pub(crate) fn durable(cfg: &SyncConfig, sink: Arc<dyn WriteSink>, status: SyncStatusHandle, store: Arc<dyn LocalStore>) -> Self {
+        let mut queue = Self::new(cfg, sink, status);
+        queue.durable = Some(store);
+        queue
+    }
+
+    pub(crate) async fn initialize(&self) -> CoreResult<()> {
+        if let Some(store) = &self.durable {
+            store.initialize_outbox().await?;
+            self.status.set_pending(store.queued_writes(false).await?.len() as u32);
+        }
+        Ok(())
     }
 
     /// Enqueue a local mutation for replay. Idempotency-keyed so retries dedupe
     /// server-side. Updates the pending-writes count that drives the UI chip.
-    pub(crate) async fn enqueue(&self, write: PendingWrite) {
+    pub(crate) async fn enqueue(&self, write: PendingWrite) -> CoreResult<()> {
+        if let Some(store) = &self.durable {
+            store.enqueue_pending(&write).await?;
+            self.status.set_pending(store.queued_writes(false).await?.len() as u32);
+            return Ok(());
+        }
         let len = {
             let mut q = self.pending.lock().await;
             q.push_back(write);
             q.len() as u32
         };
         self.status.set_pending(len);
+        Ok(())
     }
 
     /// Drain up to `batch` writes, replaying each through the sink. Transient
     /// failures are re-queued (front) after a backoff sleep; poison writes are moved
     /// to the poison list and surfaced. Returns how many writes remain pending.
     pub(crate) async fn drain(&self) -> u32 {
+        let _drain = self.drain_lock.lock().await;
+        if let Some(store) = &self.durable {
+            return match self.drain_durable(store).await {
+                Ok(remaining) => remaining,
+                Err(error) => {
+                    self.status.set(SyncStatus::Error { message: error.to_string() });
+                    tokio::time::sleep(BACKOFF_MAX).await;
+                    self.status.pending()
+                }
+            };
+        }
         for _ in 0..self.batch {
             let Some(mut write) = ({ self.pending.lock().await.pop_front() }) else {
                 break; // queue empty
             };
 
             match self.sink.send(&write).await {
-                WriteOutcome::Applied => {
+                WriteOutcome::Applied | WriteOutcome::Committed { .. } => {
                     // dropped — the write succeeded (or idempotently deduped).
                 }
                 WriteOutcome::Retry => {
@@ -102,6 +137,27 @@ impl WriteQueue {
         remaining
     }
 
+    async fn drain_durable(&self, store: &Arc<dyn LocalStore>) -> CoreResult<u32> {
+        for _ in 0..self.batch {
+            let Some(mut write) = store.queued_writes(false).await?.into_iter().next() else { break };
+            let outcome = self.sink.send(&write).await;
+            if outcome == WriteOutcome::Retry {
+                write.attempts = write.attempts.saturating_add(1);
+                // Offline duration does not turn a valid command into poison.
+                // Only an authoritative terminal refusal quarantines durable work.
+            }
+            // A crash after Forge commit replays its same durable receipt.
+            store.settle_write(&write, &outcome).await?;
+            if outcome == WriteOutcome::Retry {
+                tokio::time::sleep(backoff_for(write.attempts)).await;
+                break;
+            }
+        }
+        let remaining = store.queued_writes(false).await?.len() as u32;
+        self.status.set_pending(remaining);
+        Ok(remaining)
+    }
+
     async fn quarantine(&self, write: PendingWrite, reason: &str) {
         tracing::error!(
             key = %write.idempotency_key,
@@ -114,6 +170,12 @@ impl WriteQueue {
 
     /// Snapshot of quarantined writes for UI surfacing / manual retry tooling.
     pub(crate) async fn poison_writes(&self) -> Vec<PendingWrite> {
+        if let Some(store) = &self.durable {
+            match store.queued_writes(true).await {
+                Ok(writes) => return writes,
+                Err(error) => self.status.set(SyncStatus::Error { message: error.to_string() }),
+            }
+        }
         self.poison.lock().await.clone()
     }
 }

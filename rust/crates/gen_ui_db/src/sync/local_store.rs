@@ -11,9 +11,9 @@
 //! protocol), so one impl serves both and the tests can run against either.
 use async_trait::async_trait;
 use gen_ui_types::error::{CoreError, CoreResult};
-use sqlx::{AssertSqlSafe, PgPool};
+use sqlx::{AssertSqlSafe, PgPool, Postgres, Transaction};
 
-use super::seam::{LocalStore, RowChange, RowOp};
+use super::seam::{LocalStore, PendingWrite, RowChange, RowOp, WriteOutcome};
 
 /// Tables this store is allowed to write.
 ///
@@ -24,7 +24,7 @@ use super::seam::{LocalStore, RowChange, RowOp};
 /// cannot make it known, and silently skipping would strand the row forever.
 const SYNCED_TABLES: &[&str] = &["notes", "memories"];
 
-fn check_table(table: &str) -> CoreResult<&'static str> {
+pub(super) fn check_table(table: &str) -> CoreResult<&'static str> {
     SYNCED_TABLES
         .iter()
         .find(|t| **t == table)
@@ -34,13 +34,17 @@ fn check_table(table: &str) -> CoreResult<&'static str> {
 
 /// Applies decoded row changes to a local Postgres-protocol database.
 pub struct PgLocalStore {
-    pool: PgPool,
+    pub(super) pool: PgPool,
+    pub(super) scope: String,
 }
 
 impl PgLocalStore {
     #[must_use]
     pub fn new(pool: PgPool) -> Self {
-        Self { pool }
+        Self::scoped(pool, "local")
+    }
+    pub fn scoped(pool: PgPool, scope: impl Into<String>) -> Self {
+        Self { pool, scope: scope.into() }
     }
 }
 
@@ -62,39 +66,9 @@ impl LocalStore for PgLocalStore {
             .await
             .map_err(|e| CoreError::Transient(format!("begin: {e}")))?;
 
-        for change in changes {
-            let table = check_table(&change.table)?;
-            match change.op {
-                // Insert and Update are the same statement on purpose. A sync stream is
-                // not a reliable narrator of which one a row "is": a re-materialised
-                // shape replays existing rows as inserts, and an update can arrive for a
-                // row we never saw. Upsert is the only convergent choice.
-                RowOp::Insert | RowOp::Update => {
-                    let sql = format!(
-                        "INSERT INTO {table} SELECT * FROM jsonb_populate_record(NULL::{table}, $1::jsonb) \
-                         ON CONFLICT (id) DO UPDATE SET {assignments}",
-                        assignments = excluded_assignments(table),
-                    );
-                    sqlx::query(AssertSqlSafe(sql))
-                        .bind(&change.value_json)
-                        .execute(&mut *tx)
-                        .await
-                        .map_err(|e| CoreError::Transient(format!("upsert {table}: {e}")))?;
-                }
-                // Soft delete: the server marks `deleted = true` and ships that as a row
-                // change, so a hard DELETE here would diverge from what the next
-                // re-materialisation replays. `value_json` is empty for deletes, so key
-                // off `key` instead.
-                RowOp::Delete => {
-                    let sql = format!("UPDATE {table} SET deleted = true WHERE id = $1");
-                    sqlx::query(AssertSqlSafe(sql))
-                        .bind(&change.key)
-                        .execute(&mut *tx)
-                        .await
-                        .map_err(|e| CoreError::Transient(format!("delete {table}: {e}")))?;
-                }
-            }
-        }
+        self.lock_projection(&mut tx).await?;
+        apply_changes(&mut tx, changes).await?;
+        self.overlay_pending(&mut tx).await?;
 
         tx.commit()
             .await
@@ -103,16 +77,24 @@ impl LocalStore for PgLocalStore {
 
     /// Wipe a table's synced rows so the consumer can re-materialise from scratch.
     ///
-    /// TRUNCATE, not DELETE: this runs on shape rotation / `must-refetch`, where every
-    /// row is about to be replayed anyway, and TRUNCATE skips the per-row WAL churn.
+    /// Remove committed live rows on shape rotation, retaining tombstones and
+    /// reapplying pending local intent atomically before resnapshot starts.
     async fn truncate_shape(&self, table: &str) -> CoreResult<()> {
         let table = check_table(table)?;
-        sqlx::query(AssertSqlSafe(format!("TRUNCATE TABLE {table}")))
-            .execute(&self.pool)
-            .await
-            .map(|_| ())
-            .map_err(|e| CoreError::Transient(format!("truncate {table}: {e}")))
+        let mut tx = self.pool.begin().await.map_err(storage_error)?;
+        self.lock_projection(&mut tx).await?;
+        sqlx::query(AssertSqlSafe(format!("DELETE FROM {table} WHERE NOT deleted")))
+            .execute(&mut *tx).await.map_err(storage_error)?;
+        sqlx::query("DELETE FROM entity_records WHERE entity_type = $1 AND data_json->'deleted' IS DISTINCT FROM 'true'::jsonb")
+            .bind(table).execute(&mut *tx).await.map_err(storage_error)?;
+        self.overlay_pending(&mut tx).await?;
+        tx.commit().await.map_err(storage_error)
     }
+    async fn initialize_outbox(&self) -> CoreResult<()> { self.open_outbox().await }
+    async fn enqueue_pending(&self, write: &PendingWrite) -> CoreResult<()> { self.commit_intent(write).await }
+    async fn queued_writes(&self, poison: bool) -> CoreResult<Vec<PendingWrite>> { self.read_intents(poison).await }
+    async fn settle_write(&self, write: &PendingWrite, outcome: &WriteOutcome) -> CoreResult<()> { self.commit_outcome(write, outcome).await }
+
 }
 
 /// `SET col = EXCLUDED.col` for every column except the PK.
@@ -165,4 +147,54 @@ mod tests {
             assert!(a.contains("updated_at ="), "{t} must carry updated_at: {a}");
         }
     }
+}
+
+pub(super) fn storage_error(e: sqlx::Error) -> CoreError { CoreError::Transient(format!("local sync storage: {e}")) }
+pub(super) async fn apply_changes(tx: &mut Transaction<'_, Postgres>, changes: &[RowChange]) -> CoreResult<()> {
+        for change in changes {
+            check_table(&change.table)?;
+            let mut value = if change.op == RowOp::Delete { serde_json::json!({"id": change.key, "deleted": true}) }
+                else { serde_json::from_str::<serde_json::Value>(&change.value_json).map_err(|e| CoreError::Serde(e.to_string()))? };
+            value.as_object_mut().ok_or_else(|| CoreError::Terminal("sync row must be an object".into()))?
+                .insert("id".into(), serde_json::json!(change.key));
+            sqlx::query("INSERT INTO entity_records (entity_type, id, data_json, updated_at) VALUES ($1, $2, $3::jsonb, CURRENT_TIMESTAMP) ON CONFLICT (entity_type, id) DO UPDATE SET data_json = EXCLUDED.data_json, updated_at = EXCLUDED.updated_at")
+                .bind(&change.table).bind(&change.key).bind(value.to_string()).execute(&mut **tx).await.map_err(storage_error)?;
+            let table = check_table(&change.table)?;
+            match change.op {
+                // Insert and Update are the same statement on purpose. A sync stream is
+                // not a reliable narrator of which one a row "is": a re-materialised
+                // shape replays existing rows as inserts, and an update can arrive for a
+                // row we never saw. Upsert is the only convergent choice.
+                RowOp::Insert | RowOp::Update => {
+                    let sql = format!(
+                        "INSERT INTO {table} SELECT * FROM jsonb_populate_record(NULL::{table}, jsonb_build_object('title', '', 'body', '', 'text', '', 'kind', 'note', 'deleted', false, 'updated_at', CURRENT_TIMESTAMP) || $1::jsonb) \
+                         ON CONFLICT (id) DO UPDATE SET {assignments}",
+                        assignments = excluded_assignments(table),
+                    );
+                    sqlx::query(AssertSqlSafe(sql))
+                        .bind(value.to_string())
+                        .execute(&mut **tx)
+                        .await
+                        .map_err(|e| CoreError::Transient(format!("upsert {table}: {e}")))?;
+                }
+                // Soft delete: the server marks `deleted = true` and ships that as a row
+                // change, so a hard DELETE here would diverge from what the next
+                // re-materialisation replays. `value_json` is empty for deletes, so key
+                // off `key` instead.
+                RowOp::Delete => {
+                    let sql = if table == "memories" {
+                        "INSERT INTO memories (id, text, deleted) VALUES ($1, '', true) ON CONFLICT (id) DO UPDATE SET deleted = true".to_owned()
+                    } else {
+                        "INSERT INTO notes (id, deleted) VALUES ($1, true) ON CONFLICT (id) DO UPDATE SET deleted = true".to_owned()
+                    };
+                    sqlx::query(AssertSqlSafe(sql))
+                        .bind(&change.key)
+                        .execute(&mut **tx)
+                        .await
+                        .map_err(|e| CoreError::Transient(format!("delete {table}: {e}")))?;
+                }
+            }
+        }
+
+    Ok(())
 }

@@ -43,6 +43,8 @@ mod write_queue;
 // (gen_ui_db_graph), matching how `relational` is gated.
 #[cfg(all(not(target_arch = "wasm32"), feature = "pg"))]
 mod local_store;
+#[cfg(all(not(target_arch = "wasm32"), feature = "pg"))]
+mod outbox;
 
 pub use status::{SyncStatusHandle, SyncStatusStream};
 // Re-export the frozen seam types so callers use one import path.

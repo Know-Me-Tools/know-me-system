@@ -50,7 +50,7 @@ mod imp {
 
         pub(crate) fn set_pending(&self, n: u32) {
             self.pending.store(n, Ordering::Relaxed);
-            if n > 0 {
+            if n > 0 || matches!(self.current(), SyncStatus::Syncing { .. }) {
                 self.set(SyncStatus::Syncing { pending_writes: n });
             }
         }

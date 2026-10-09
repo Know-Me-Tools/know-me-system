@@ -140,7 +140,7 @@ impl FrfSyncTransport {
             write_batch: cfg.write_batch,
             max_write_attempts: cfg.max_write_attempts,
         };
-        let queue = Arc::new(WriteQueue::new(&queue_cfg, sink, status.clone()));
+        let queue = Arc::new(WriteQueue::durable(&queue_cfg, sink, status.clone(), Arc::clone(&store)));
         Self {
             cfg,
             store,
@@ -181,6 +181,7 @@ impl FrfSyncTransport {
 #[async_trait]
 impl SyncTransport for FrfSyncTransport {
     async fn start(&self) -> CoreResult<()> {
+        self.queue.initialize().await?;
         self.status.set(SyncStatus::Syncing {
             pending_writes: self.status.pending(),
         });
@@ -200,8 +201,8 @@ impl SyncTransport for FrfSyncTransport {
     }
 
     /// Same contract as the Electric engine's: `change_json` carries the mutation and
-    /// the idempotency key is caller-supplied or derived from the payload, so a replayed
-    /// write dedupes server-side.
+    /// the idempotency key is caller-supplied or allocated in the durable local
+    /// transaction, so a replayed write dedupes server-side.
     async fn enqueue_write(&self, change_json: &str) -> CoreResult<()> {
         let parsed: serde_json::Value =
             serde_json::from_str(change_json).map_err(|e| CoreError::Serde(e.to_string()))?;
@@ -214,7 +215,7 @@ impl SyncTransport for FrfSyncTransport {
             .get("idempotency_key")
             .and_then(|v| v.as_str())
             .map(str::to_string)
-            .unwrap_or_else(|| super::engine::derive_key(change_json));
+            .unwrap_or_default();
 
         self.queue
             .enqueue(super::seam::PendingWrite {
@@ -223,7 +224,7 @@ impl SyncTransport for FrfSyncTransport {
                 change_json: change_json.to_string(),
                 attempts: 0,
             })
-            .await;
+            .await?;
         Ok(())
     }
 

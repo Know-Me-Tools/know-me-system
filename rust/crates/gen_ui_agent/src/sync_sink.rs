@@ -20,7 +20,7 @@
 //! up from the WAL and fans them back out. That is what closes the loop.
 use std::sync::Arc;
 
-use gen_ui_db::sync::{PendingWrite, WriteOutcome, WriteSink};
+use gen_ui_db::sync::{PendingWrite, RowChange, RowOp, WriteOutcome, WriteSink};
 use gen_ui_types::error::CoreError;
 use gen_ui_types::transport::{EntityRecord, EntityTransport};
 
@@ -72,10 +72,7 @@ fn classify(err: &CoreError) -> WriteOutcome {
         CoreError::Serde(e) => WriteOutcome::Poison {
             reason: format!("serde: {e}"),
         },
-        // NotFound on update/delete: the row is already gone server-side. Treat as
-        // poison, not retry — but see `send`, which converts delete-NotFound to Applied
-        // before we ever get here, because a delete whose target is absent has already
-        // achieved what it wanted.
+        // A 404 cannot prove a transaction committed: it may name a missing route.
         CoreError::NotFound(e) => WriteOutcome::Poison {
             reason: format!("not found: {e}"),
         },
@@ -110,29 +107,16 @@ impl<T: EntityTransport + Send + Sync> WriteSink for ForgeWriteSink<T> {
             data_json: body.data.to_string(),
         };
 
-        let result = match body.op.as_str() {
-            // Insert and update are both upserts server-side for the same reason they are
-            // locally (see PgLocalStore): a replayed insert must not fail just because a
-            // previous attempt already landed. `create` carries the client-generated id,
-            // so Quarry's ON CONFLICT does the dedup — which is also why replay is safe
-            // even before the idempotency key is consulted.
-            "insert" | "upsert" => self.forge.create(&record).await.map(|_| ()),
-            "update" => self.forge.update(&record).await.map(|_| ()),
-            "delete" => match self.forge.delete(&write.table, &body.id).await {
-                // Already deleted server-side: the write's intent is satisfied. Reporting
-                // this as a failure would quarantine a write that actually succeeded.
-                Err(CoreError::NotFound(_)) => Ok(()),
-                other => other,
-            },
-            other => {
-                return WriteOutcome::Poison {
-                    reason: format!("unknown write op: {other}"),
-                };
-            }
-        };
-
+        let result = self.forge.mutate_idempotent(&body.op, &record, &write.idempotency_key).await;
         match result {
-            Ok(()) => WriteOutcome::Applied,
+            Ok(row) => WriteOutcome::Committed {
+                change: RowChange {
+                    table: write.table.clone(),
+                    key: body.id,
+                    op: if body.op == "delete" { RowOp::Delete } else { RowOp::Update },
+                    value_json: row.map(|record| record.data_json).unwrap_or_else(|| "{}".into()),
+                },
+            },
             Err(e) => classify(&e),
         }
     }
@@ -174,6 +158,16 @@ pub fn forge_write_sink(
         Arc::new(parking_lot::RwLock::new(auth)),
     );
     Ok(Arc::new(ForgeWriteSink::new(Arc::new(client))))
+}
+
+/// Local cache partition only. Forge still verifies the token and authorizes each
+/// mutation; decoding this subject grants no authority. Token refresh preserves
+/// the partition, while signing in as a different principal cannot replay it.
+pub fn forge_write_subject(bearer: Option<&str>) -> Result<String, CoreError> {
+    match bearer {
+        Some(raw) => Ok(gen_ui_client::flint::Token::parse(raw.to_owned())?.claims.sub),
+        None => Ok("anonymous".to_owned()),
+    }
 }
 
 #[cfg(test)]
@@ -219,6 +213,15 @@ mod tests {
 
     #[async_trait::async_trait]
     impl EntityTransport for FakeForge {
+        async fn mutate_idempotent(&self, operation: &str, record: &EntityRecord, key: &str) -> CoreResult<Option<EntityRecord>> {
+            assert_eq!(key, "k1");
+            match operation {
+                "insert" | "upsert" => self.create(record).await.map(Some),
+                "update" => self.update(record).await.map(Some),
+                "delete" => self.delete(&record.entity_type, &record.id).await.map(|()| None),
+                _ => Err(CoreError::Terminal("unknown operation".into())),
+            }
+        }
         async fn list(&self, _v: &ViewDescriptor) -> CoreResult<ListResult> {
             Ok(ListResult {
                 items: vec![],
@@ -257,7 +260,7 @@ mod tests {
     async fn insert_creates_and_reports_applied() {
         let forge = Arc::new(FakeForge::default());
         let sink = ForgeWriteSink::new(Arc::clone(&forge));
-        assert_eq!(sink.send(&write("insert")).await, WriteOutcome::Applied);
+        assert!(matches!(sink.send(&write("insert")).await, WriteOutcome::Committed { .. }));
         assert_eq!(forge.calls.lock().unwrap().as_slice(), ["create:n1"]);
     }
 
@@ -284,12 +287,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn deleting_an_already_deleted_row_is_success_not_failure() {
-        // The intent ("this row should be gone") is satisfied. Quarantining would flag a
-        // write that actually achieved its goal.
+    async fn missing_receipt_route_does_not_claim_committed_delete() {
+        // A 404 alone cannot prove this command committed at the configured authority.
         let forge = Arc::new(FakeForge::failing(CoreError::NotFound("gone".into())));
         let sink = ForgeWriteSink::new(forge);
-        assert_eq!(sink.send(&write("delete")).await, WriteOutcome::Applied);
+        assert!(matches!(sink.send(&write("delete")).await, WriteOutcome::Poison { .. }));
     }
 
     #[tokio::test]

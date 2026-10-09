@@ -61,4 +61,17 @@ pub trait EntityTransport: Send + Sync {
     async fn create(&self, record: &EntityRecord) -> CoreResult<EntityRecord>;
     async fn update(&self, record: &EntityRecord) -> CoreResult<EntityRecord>;
     async fn delete(&self, entity_type: &str, id: &str) -> CoreResult<()>;
+
+    /// Execute a mutation with a durable server receipt. Unsupported transports
+    /// refuse rather than discarding the command's idempotency key.
+    async fn mutate_idempotent(
+        &self,
+        _operation: &str,
+        _record: &EntityRecord,
+        _key: &str,
+    ) -> CoreResult<Option<EntityRecord>> {
+        Err(crate::error::CoreError::Terminal(
+            "transport does not support receipt-backed mutations".into(),
+        ))
+    }
 }

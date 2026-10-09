@@ -25,7 +25,7 @@ pub struct SyncEngine {
 impl SyncEngine {
     pub fn new(cfg: SyncConfig, store: Arc<dyn LocalStore>, sink: Arc<dyn WriteSink>) -> Self {
         let status = SyncStatusHandle::new();
-        let queue = Arc::new(WriteQueue::new(&cfg, sink, status.clone()));
+        let queue = Arc::new(WriteQueue::durable(&cfg, sink, status.clone(), Arc::clone(&store)));
         Self {
             cfg,
             client: reqwest::Client::new(),
@@ -52,6 +52,7 @@ impl SyncTransport for SyncEngine {
     /// write-queue drain loop. Tasks run on the global runtime; they stop when the
     /// engine (and thus the `Arc`s they hold) is dropped.
     async fn start(&self) -> CoreResult<()> {
+        self.queue.initialize().await?;
         if self.cfg.shapes.is_empty() {
             return Err(CoreError::Terminal("sync: no shapes configured".into()));
         }
@@ -89,9 +90,8 @@ impl SyncTransport for SyncEngine {
     }
 
     /// Enqueue a local write for durable replay through the forge Quarry API.
-    /// `change_json` carries the mutation; the idempotency key is derived from it so
-    /// server-side dedup makes replay safe. The action-log persistence seam (C-003)
-    /// makes this survive restarts.
+    /// Caller identities survive IPC retries; without one the store allocates a new
+    /// command UUID atomically with the local edit. Replays read that saved identity.
     async fn enqueue_write(&self, change_json: &str) -> CoreResult<()> {
         let parsed: serde_json::Value =
             serde_json::from_str(change_json).map_err(|e| CoreError::Serde(e.to_string()))?;
@@ -100,12 +100,12 @@ impl SyncTransport for SyncEngine {
             .and_then(|v| v.as_str())
             .ok_or_else(|| CoreError::Terminal("write: missing \"table\"".into()))?
             .to_string();
-        // Prefer a caller-supplied key; else derive a stable one from the payload.
+        // Empty requests a database-generated command identity, never a payload hash.
         let idempotency_key = parsed
             .get("idempotency_key")
             .and_then(|v| v.as_str())
             .map(str::to_string)
-            .unwrap_or_else(|| derive_key(change_json));
+            .unwrap_or_default();
 
         self.queue
             .enqueue(PendingWrite {
@@ -114,7 +114,7 @@ impl SyncTransport for SyncEngine {
                 change_json: change_json.to_string(),
                 attempts: 0,
             })
-            .await;
+            .await?;
         Ok(())
     }
 
@@ -123,6 +123,8 @@ impl SyncTransport for SyncEngine {
     }
 }
 
+/// Legacy transient replay test helper. Durable submissions get database UUIDs.
+#[cfg(test)]
 /// Derive a stable idempotency key from a write payload (FNV-1a over the bytes).
 /// Deterministic so an identical retried write dedupes server-side.
 ///

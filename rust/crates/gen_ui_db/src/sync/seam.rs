@@ -37,6 +37,26 @@ pub trait LocalStore: Send + Sync {
     /// Wipe a table's synced rows — used on `must-refetch` (shape rotation) so the
     /// consumer can re-materialise the shape from offset `-1` without duplicates.
     async fn truncate_shape(&self, table: &str) -> CoreResult<()>;
+
+    /// Open the durable command log before starting replay. Stores without this
+    /// capability must not silently advertise durable offline writes.
+    async fn initialize_outbox(&self) -> CoreResult<()> {
+        Err(gen_ui_types::CoreError::Terminal("local store has no durable outbox".into()))
+    }
+
+    /// Commit the local projection and command intent in the same transaction.
+    async fn enqueue_pending(&self, _write: &PendingWrite) -> CoreResult<()> {
+        Err(gen_ui_types::CoreError::Terminal("local store has no durable outbox".into()))
+    }
+
+    async fn queued_writes(&self, _poison: bool) -> CoreResult<Vec<PendingWrite>> {
+        Err(gen_ui_types::CoreError::Terminal("local store has no durable outbox".into()))
+    }
+
+    /// Retain the committed result or refusal before removing work from replay.
+    async fn settle_write(&self, _write: &PendingWrite, _outcome: &WriteOutcome) -> CoreResult<()> {
+        Err(gen_ui_types::CoreError::Terminal("local store has no durable outbox".into()))
+    }
 }
 
 /// One durable, idempotent local mutation awaiting replay to the server.
@@ -57,6 +77,8 @@ pub struct PendingWrite {
 pub enum WriteOutcome {
     /// Server accepted (or idempotently deduped) the write — drop it from the queue.
     Applied,
+    /// Authoritative row returned by Forge's transaction receipt (including replay).
+    Committed { change: RowChange },
     /// Transient failure (network / 5xx / conflict-retryable) — keep and back off.
     Retry,
     /// Terminal rejection (4xx validation) — quarantine as poison, stop retrying.
