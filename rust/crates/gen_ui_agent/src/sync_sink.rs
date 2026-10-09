@@ -307,3 +307,8 @@ mod tests {
         assert!(matches!(sink.send(&bad).await, WriteOutcome::Poison { .. }));
     }
 }
+
+/// Selected catalog shapes are authorized by Gate, never by client predicates.
+pub fn fabric_shape_source(gateway: String, token: String, shape: String, table: String) -> Result<Arc<dyn gen_ui_types::sync::AuthorizedReadSource>, CoreError> {
+    Ok(Arc::new(gen_ui_client::flint::authorized_shapes::FabricShapeSource::new(gateway, token, shape, table)?))
+}

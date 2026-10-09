@@ -14,6 +14,8 @@ pub use token::{AuthState as FlintAuthState, Claims, Role, Token};
 pub mod forge;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod frf;
+#[cfg(all(not(target_arch = "wasm32"), feature = "frf"))]
+pub mod authorized_shapes;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod gate;
 

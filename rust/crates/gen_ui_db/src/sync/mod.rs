@@ -45,6 +45,10 @@ mod write_queue;
 mod local_store;
 #[cfg(all(not(target_arch = "wasm32"), feature = "pg"))]
 mod outbox;
+#[cfg(all(not(target_arch = "wasm32"), feature = "pg"))]
+mod read_store;
+#[cfg(not(target_arch = "wasm32"))]
+mod read_lane;
 
 pub use status::{SyncStatusHandle, SyncStatusStream};
 // Re-export the frozen seam types so callers use one import path.
@@ -61,7 +65,7 @@ pub use frf_transport::{row_change_from_payload, FrfSyncConfig, FrfSyncTransport
 #[cfg(all(not(target_arch = "wasm32"), feature = "pg"))]
 pub use local_store::PgLocalStore;
 #[cfg(not(target_arch = "wasm32"))]
-pub use seam::{LocalStore, PendingWrite, RowChange, RowOp, WriteOutcome, WriteSink};
+pub use seam::{CommandView, LocalStore, PendingWrite, RowChange, RowOp, WriteOutcome, WriteSink};
 
 /// wasm32 stub. No Rust engine runs in-browser (tonic/HTTP-2 does not build for
 /// wasm32); FRF's browser story is frf-wasm / Connect-web from the JS side. Kept so

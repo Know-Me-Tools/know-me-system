@@ -38,6 +38,9 @@ impl PgLocalStore {
         let change = local_change(write)?;
         let mut tx = self.pool.begin().await.map_err(storage_error)?;
         self.lock_projection(&mut tx).await?;
+        if self.read_revoked(&mut tx, &write.table).await? {
+            return Err(CoreError::Terminal("selected read grant is revoked; authenticate before submitting".into()));
+        }
         // Each new submission gets a fresh identity. Retries use the identity saved
         // in this transaction; identical edits separated in time are not collapsed.
         let key = if write.idempotency_key.is_empty() {
@@ -63,7 +66,7 @@ impl PgLocalStore {
     pub(super) async fn read_intents(&self, poison: bool) -> CoreResult<Vec<PendingWrite>> {
         let mut tx = self.pool.begin().await.map_err(storage_error)?;
         self.lock_projection(&mut tx).await?;
-        let rows = sqlx::query("SELECT command_id, table_name, change_json, attempts FROM sync_outbox WHERE scope = $1 AND status = $2 ORDER BY sequence")
+        let rows = sqlx::query("SELECT command_id, table_name, change_json, attempts FROM sync_outbox o WHERE scope = $1 AND status = $2 AND NOT EXISTS (SELECT 1 FROM sync_read_cursors c WHERE c.scope = o.scope AND c.table_name = o.table_name AND c.status = 'revoked') ORDER BY sequence")
             .bind(&self.scope).bind(if poison { "poison" } else { "pending" })
             .fetch_all(&mut *tx).await.map_err(storage_error)?;
         let writes = rows.into_iter().map(|row| Ok(PendingWrite {
@@ -78,7 +81,7 @@ impl PgLocalStore {
     }
 
     pub(super) async fn overlay_pending(&self, tx: &mut Transaction<'_, Postgres>) -> CoreResult<()> {
-        let rows = sqlx::query("SELECT command_id, table_name, change_json FROM sync_outbox WHERE scope = $1 AND status = 'pending' ORDER BY sequence")
+        let rows = sqlx::query("SELECT command_id, table_name, change_json FROM sync_outbox o WHERE scope = $1 AND status = 'pending' AND NOT EXISTS (SELECT 1 FROM sync_read_cursors c WHERE c.scope = o.scope AND c.table_name = o.table_name AND c.status = 'revoked') ORDER BY sequence")
             .bind(&self.scope).fetch_all(&mut **tx).await.map_err(storage_error)?;
         for row in rows {
             let write = PendingWrite {
@@ -91,13 +94,20 @@ impl PgLocalStore {
         Ok(())
     }
 
+    async fn read_revoked(&self, tx: &mut Transaction<'_, Postgres>, table: &str) -> CoreResult<bool> {
+        sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM sync_read_cursors WHERE scope = $1 AND table_name = $2 AND status = 'revoked')")
+            .bind(&self.scope).bind(table).fetch_one(&mut **tx).await.map_err(storage_error)
+    }
+
     pub(super) async fn commit_outcome(&self, write: &PendingWrite, outcome: &WriteOutcome) -> CoreResult<()> {
         let mut tx = self.pool.begin().await.map_err(storage_error)?;
         self.lock_projection(&mut tx).await?;
         let (status, result, reason) = match outcome {
             WriteOutcome::Applied => ("committed", None, None),
             WriteOutcome::Committed { change } => {
-                apply_changes(&mut tx, std::slice::from_ref(change)).await?;
+                if !self.read_revoked(&mut tx, &write.table).await? {
+                    apply_changes(&mut tx, std::slice::from_ref(change)).await?;
+                }
                 ("committed", Some(serde_json::json!({"table": change.table, "id": change.key, "op": if change.op == RowOp::Delete { "delete" } else { "upsert" }, "data": serde_json::from_str::<serde_json::Value>(&change.value_json).map_err(|e| CoreError::Serde(e.to_string()))?}).to_string()), None)
             }
             WriteOutcome::Retry => ("pending", None, None),

@@ -1,27 +1,8 @@
 // TJ-ARCH-MOB-001 compliant
-//! FRF-backed [`SyncTransport`] (C-106 T5b) — the read path the PoC actually runs.
-//!
-//! **Why this exists next to `engine.rs` rather than replacing it:** `SyncEngine` is
-//! Electric-shaped (reqwest long-poll against `/v1/shape`, `(handle, offset)` cursor,
-//! `must-refetch` rotation). The 2026-07-16 pivot moved the substrate to
-//! flint-realtime-fabric, where the read path is:
-//!
-//! ```text
-//!   Postgres WAL ─pgoutput→ frf-postgres-cdc ─EntityChange→ Iggy spine channel
-//!                                                              │
-//!                            FrfClient::subscribe(channel, consumer, from)
-//!                                                              ▼
-//!                                          EventEnvelope → RowChange → LocalStore
-//! ```
-//!
-//! The write path and the queue machinery are **unchanged** — [`WriteQueue`] already
-//! does idempotency keys, backoff, and poison quarantine, and re-implementing that here
-//! would be a second copy to keep correct. Only the read lane differs, so only the read
-//! lane is rewritten.
-//!
-//! NOT `EntityService::WatchEntity`: that RPC takes a single `entity_id` and streams one
-//! entity's changes. It is not a table feed, and using it would silently sync exactly one
-//! row. The spine channel is the table-level lane.
+//! Fabric-backed local-first transport. Production business reads use selected
+//! server-catalog shapes through Gate's authorized Fabric facade. Each source
+//! persists its opaque cursor with the projection transaction; Forge owns writes.
+//! The legacy spine payload decoder remains available to existing callers.
 use async_trait::async_trait;
 use gen_ui_types::error::{CoreError, CoreResult};
 use gen_ui_types::sync::{SyncStatus, SyncTransport};
@@ -123,6 +104,9 @@ pub struct FrfSyncTransport {
     store: Arc<dyn LocalStore>,
     queue: Arc<WriteQueue>,
     status: SyncStatusHandle,
+    read_sources: Vec<Arc<dyn gen_ui_types::sync::AuthorizedReadSource>>,
+    stop: tokio::sync::watch::Sender<bool>,
+    started: std::sync::atomic::AtomicBool,
 }
 
 impl FrfSyncTransport {
@@ -146,8 +130,27 @@ impl FrfSyncTransport {
             store,
             queue,
             status,
+            read_sources: Vec::new(),
+            stop: tokio::sync::watch::channel(false).0,
+            started: std::sync::atomic::AtomicBool::new(false),
         }
     }
+
+    pub fn with_read_sources(mut self, sources: Vec<Arc<dyn gen_ui_types::sync::AuthorizedReadSource>>) -> CoreResult<Self> {
+        let mut tables = std::collections::HashSet::new();
+        for source in &sources {
+            if !tables.insert(source.table().to_owned()) {
+                return Err(CoreError::Terminal("only one selected shape may own each local business table".into()));
+            }
+        }
+        self.read_sources = sources;
+        Ok(self)
+    }
+
+    pub fn stop(&self) { self.stop.send_replace(true); }
+
+    pub async fn command_history(&self) -> CoreResult<Vec<super::CommandView>> { self.store.command_history().await }
+    pub async fn retry_command(&self, id: &str) -> CoreResult<()> { self.store.retry_command(id).await }
 
     /// Subscribe to [`SyncStatus`] transitions for the UI sync chip.
     pub fn status_stream(&self) -> super::status::SyncStatusStream {
@@ -181,6 +184,9 @@ impl FrfSyncTransport {
 #[async_trait]
 impl SyncTransport for FrfSyncTransport {
     async fn start(&self) -> CoreResult<()> {
+        if self.started.swap(true, std::sync::atomic::Ordering::SeqCst) {
+            return Err(CoreError::Terminal("sync transport already started".into()));
+        }
         self.queue.initialize().await?;
         self.status.set(SyncStatus::Syncing {
             pending_writes: self.status.pending(),
@@ -189,10 +195,17 @@ impl SyncTransport for FrfSyncTransport {
         // Write-queue drain loop — identical to the Electric engine's, because the write
         // path did not change with the substrate.
         let queue = Arc::clone(&self.queue);
+        let mut stop = self.stop.subscribe();
         gen_ui_runtime::spawn(async move {
             loop {
-                if queue.drain().await == 0 {
-                    tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+                if *stop.borrow() { return; }
+                tokio::select! {
+                    _ = stop.changed() => return,
+                    _ = async {
+                        if queue.drain().await == 0 {
+                            tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+                        }
+                    } => {}
                 }
             }
         });
@@ -233,43 +246,26 @@ impl SyncTransport for FrfSyncTransport {
     }
 }
 
-#[cfg(feature = "frf")]
 impl FrfSyncTransport {
-    /// Spawn the spine consumer. Only compiled with the `frf` feature, which pulls the
-    /// (native-only, private) FRF SDK — see the workspace Cargo.toml for why it is
-    /// off by default.
     fn start_read_lane(&self) -> CoreResult<()> {
-        // Deliberately left as the wiring point for the SDK call:
-        //   let mut client = FrfClient::connect(endpoint, token).await?;
-        //   let stream = client.subscribe(channel_id, consumer_id, from).await?;
-        //   while let Some(env) = stream.next().await {
-        //       if let Some(rc) = row_change_from_payload(&env?.payload, &tenant)? {
-        //           store.apply_batch(&[rc]).await?;
-        //       }
-        //   }
-        // It cannot be written and *verified* here: enabling `frf` requires a cross-org
-        // deploy key that CI does not have (FRF is in Prometheus-AGS, this repo is in
-        // Know-Me-Tools), so this arm cannot be compile-checked in CI today. Shipping
-        // unverifiable code behind a feature nobody can build is how rot starts — the
-        // decode + apply logic that CAN be tested lives above and is tested below.
-        Err(CoreError::Terminal(
-            "frf read lane not yet wired — see C-106 T5b".into(),
-        ))
+        if self.read_sources.is_empty() {
+            self.status.set(SyncStatus::Offline);
+            return Ok(());
+        }
+        for source in &self.read_sources {
+            self.status.set_read(source.shape_id(), SyncStatus::Syncing { pending_writes: self.status.pending() });
+        }
+        for source in &self.read_sources {
+            gen_ui_runtime::spawn(super::read_lane::run(
+                Arc::clone(source), Arc::clone(&self.store), self.status.clone(), self.stop.subscribe(),
+            ));
+        }
+        Ok(())
     }
 }
 
-#[cfg(not(feature = "frf"))]
-impl FrfSyncTransport {
-    /// Offline build: no spine. The write queue still runs and still persists, so an
-    /// offline-first client keeps accepting local writes and replays them once a build
-    /// with the spine is running. That is the honest degrade, not a silent no-op.
-    fn start_read_lane(&self) -> CoreResult<()> {
-        tracing::warn!(
-            endpoint = %self.cfg.endpoint,
-            "sync: built without the `frf` feature — read lane disabled, writes still queue"
-        );
-        Ok(())
-    }
+impl Drop for FrfSyncTransport {
+    fn drop(&mut self) { self.stop.send_replace(true); }
 }
 
 #[cfg(test)]

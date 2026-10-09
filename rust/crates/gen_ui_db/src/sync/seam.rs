@@ -57,6 +57,31 @@ pub trait LocalStore: Send + Sync {
     async fn settle_write(&self, _write: &PendingWrite, _outcome: &WriteOutcome) -> CoreResult<()> {
         Err(gen_ui_types::CoreError::Terminal("local store has no durable outbox".into()))
     }
+
+    async fn read_cursor(&self, _shape: &str) -> CoreResult<Option<gen_ui_types::sync::ReadCursor>> {
+        Err(gen_ui_types::CoreError::Terminal("local store has no durable read cursor".into()))
+    }
+
+    async fn commit_read(&self, _shape: &str, _table: &str, _previous: Option<&gen_ui_types::sync::ReadCursor>, _poll: &gen_ui_types::sync::ReadPoll) -> CoreResult<bool> {
+        Err(gen_ui_types::CoreError::Terminal("local store has no durable read cursor".into()))
+    }
+
+    async fn command_history(&self) -> CoreResult<Vec<CommandView>> {
+        Err(gen_ui_types::CoreError::Terminal("local store has no command history".into()))
+    }
+
+    async fn retry_command(&self, _id: &str) -> CoreResult<()> {
+        Err(gen_ui_types::CoreError::Terminal("local store has no command recovery".into()))
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommandView {
+    pub command_id: String,
+    pub table: String,
+    pub status: String,
+    pub attempts: u32,
+    pub reason: Option<String>,
 }
 
 /// One durable, idempotent local mutation awaiting replay to the server.

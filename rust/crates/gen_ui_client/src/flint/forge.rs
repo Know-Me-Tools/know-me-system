@@ -54,6 +54,13 @@ impl ForgeClient {
         Self { http, config, auth }
     }
 
+    /// Native consumers share the authenticated mutation client without owning its lock.
+    pub fn authenticated(config: ForgeConfig, bearer: String) -> CoreResult<Self> {
+        let token = crate::flint::Token::parse(bearer)?;
+        Ok(Self::new(reqwest::Client::new(), config,
+            Arc::new(parking_lot::RwLock::new(AuthState::Authenticated { token }))))
+    }
+
     fn bearer(&self) -> Option<String> {
         self.auth.read().bearer().map(str::to_owned)
     }

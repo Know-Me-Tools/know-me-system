@@ -35,14 +35,15 @@ committed live rows while preserving tombstones and pending intent.
 - An authenticated Forge subject is required by that provider's receipt contract.
   Anonymous demo configuration does not establish business mutation authority.
 
-## Remaining C11 delivery work
+## Authenticated read lane
 
-The Fabric spine subscription is still an explicit unimplemented read-lane path.
-This slice does not establish durable CDC cursor/version ordering, retention-gap
-transport signaling, or remote revocation delivery. The legacy shape consumer and
-mobile Surreal adapter are not advertised as complete alternatives. UI presentation
-of pending/committed/quarantined state and manual poison recovery remain separate
-consumer work. Existing application callers do not yet supply stable IPC retry IDs.
+Fabric SDK source `8966d6b1fef002a663d98f762955b2d273f8c07d` is declared on the native client. Its real ShapeClient reads Gate-selected catalog shape IDs with the bearer; caller predicates cannot widen selection. Configure `sync.frf.shape_gateway` and `shapes: [{shape_id, table}]` for notes and/or memories. Missing selection remains explicit write-only/offline status.
+
+Additive migration `0005_sync_read_cursors.sql` stores opaque handle/offset pairs. A compare-and-set against the previous pair and row application commit together, rejecting stale concurrent batches without interpreting opaque offsets. Provider must-refetch clears live cache and restarts snapshot; tombstones and pending intents remain. Revoked/expired grants clear all disclosed rows and suspend replay/overlay. In-flight mutation receipts remain durable without repopulating revoked rows. Per-shape status aggregation prevents one live shape hiding another revoked grant.
+
+## Remaining consumer delivery work
+
+The separate KnowMe app Surreal adapter and UI presentation/recovery wiring are the next consumer boundary. Existing system entity IPC callers do not yet supply stable IPC retry IDs; the shared transport accepts them. No declaration here certifies an unrun packaged path.
 
 No compiler, test, build, packaged operation or certification gate ran for this
 increment, per the current production-first instruction. Those results remain pending.

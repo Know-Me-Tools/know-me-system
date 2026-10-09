@@ -94,6 +94,10 @@ impl LocalStore for PgLocalStore {
     async fn enqueue_pending(&self, write: &PendingWrite) -> CoreResult<()> { self.commit_intent(write).await }
     async fn queued_writes(&self, poison: bool) -> CoreResult<Vec<PendingWrite>> { self.read_intents(poison).await }
     async fn settle_write(&self, write: &PendingWrite, outcome: &WriteOutcome) -> CoreResult<()> { self.commit_outcome(write, outcome).await }
+    async fn read_cursor(&self, shape: &str) -> CoreResult<Option<gen_ui_types::sync::ReadCursor>> { self.load_read_cursor(shape).await }
+    async fn commit_read(&self, shape: &str, table: &str, previous: Option<&gen_ui_types::sync::ReadCursor>, poll: &gen_ui_types::sync::ReadPoll) -> CoreResult<bool> { self.apply_read(shape, table, previous, poll).await }
+    async fn command_history(&self) -> CoreResult<Vec<super::seam::CommandView>> { self.list_commands().await }
+    async fn retry_command(&self, id: &str) -> CoreResult<()> { self.recover_command(id).await }
 
 }
 

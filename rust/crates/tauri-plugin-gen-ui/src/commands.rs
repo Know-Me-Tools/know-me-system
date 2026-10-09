@@ -591,7 +591,7 @@ pub async fn attach_sync_shapes<R: Runtime>(app: tauri::AppHandle<R>) -> Result<
         .await
         .map_err(|e| gen_ui_types::CoreError::Transient(e.to_string()))?;
     let subject = gen_ui_agent::sync_sink::forge_write_subject(cfg.token.as_deref())?;
-    let scope = serde_json::json!([cfg.forge_base, cfg.endpoint, cfg.tenant_id, cfg.channel_path, cfg.consumer_id, subject]).to_string();
+    let scope = serde_json::json!([cfg.forge_base, cfg.endpoint, cfg.tenant_id, cfg.channel_path, cfg.consumer_id, subject, cfg.shape_gateway, cfg.shapes]).to_string();
     let local = Arc::new(PgLocalStore::scoped(store.store().pool().clone(), scope));
 
     let sink = gen_ui_agent::sync_sink::forge_write_sink(
@@ -600,7 +600,13 @@ pub async fn attach_sync_shapes<R: Runtime>(app: tauri::AppHandle<R>) -> Result<
         cfg.token.clone(),
     )?;
 
-    let transport = FrfSyncTransport::new(cfg.into_transport_config(), local, sink);
+    let mut sources = Vec::new();
+    for shape in &cfg.shapes {
+        let gateway = cfg.shape_gateway.clone().ok_or_else(|| gen_ui_types::CoreError::Terminal("selected shapes require shape_gateway".into()))?;
+        let token = cfg.token.clone().ok_or_else(|| gen_ui_types::CoreError::Terminal("selected shapes require authentication".into()))?;
+        sources.push(gen_ui_agent::sync_sink::fabric_shape_source(gateway, token, shape.shape_id.clone(), shape.table.clone())?);
+    }
+    let transport = FrfSyncTransport::new(cfg.into_transport_config(), local, sink).with_read_sources(sources)?;
     transport.start().await?;
 
     // Hold the transport for the process lifetime: dropping it stops the drain loop and
@@ -624,8 +630,15 @@ struct SyncSettings {
     consumer_id: String,
     forge_base: String,
     #[serde(default)]
+    shape_gateway: Option<String>,
+    #[serde(default)]
+    shapes: Vec<SelectedBusinessShape>,
+    #[serde(default)]
     token: Option<String>,
 }
+
+#[derive(serde::Deserialize, serde::Serialize)]
+struct SelectedBusinessShape { shape_id: String, table: String }
 
 impl SyncSettings {
     fn into_transport_config(self) -> gen_ui_db::sync::FrfSyncConfig {
