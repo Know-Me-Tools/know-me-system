@@ -24,3 +24,33 @@ pub trait SyncTransport: Send + Sync {
     /// Current status (drives the UI sync chip).
     fn status(&self) -> SyncStatus;
 }
+
+/// Opaque, indivisible provider position; only the authorized provider issues it.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ReadCursor {
+    pub handle: String,
+    pub offset: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ReplicaChange {
+    pub id: String,
+    pub deleted: bool,
+    pub data: serde_json::Value,
+}
+
+#[derive(Debug, Clone)]
+pub enum ReadPoll {
+    Batch { changes: Vec<ReplicaChange>, cursor: Option<ReadCursor>, caught_up: bool },
+    Resnapshot,
+    Revoked { reason: String },
+}
+
+/// L1 read authority seam. Client adapters own authentication and provider SDKs;
+/// local stores own atomic projection + cursor persistence.
+#[async_trait]
+pub trait AuthorizedReadSource: Send + Sync {
+    fn shape_id(&self) -> &str;
+    fn table(&self) -> &str;
+    async fn poll(&self, cursor: Option<&ReadCursor>) -> CoreResult<ReadPoll>;
+}

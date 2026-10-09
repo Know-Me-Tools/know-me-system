@@ -19,6 +19,9 @@ use gen_ui_types::{CoreError, CoreResult};
 use serde::Deserialize;
 use std::sync::Arc;
 
+#[path = "forge_mutations.rs"]
+mod mutations;
+
 #[derive(Debug, Clone)]
 pub struct ForgeConfig {
     /// e.g. `http://localhost:8080`.
@@ -49,6 +52,13 @@ pub struct ForgeClient {
 impl ForgeClient {
     pub fn new(http: reqwest::Client, config: ForgeConfig, auth: SharedAuth) -> Self {
         Self { http, config, auth }
+    }
+
+    /// Native consumers share the authenticated mutation client without owning its lock.
+    pub fn authenticated(config: ForgeConfig, bearer: String) -> CoreResult<Self> {
+        let token = crate::flint::Token::parse(bearer)?;
+        Ok(Self::new(reqwest::Client::new(), config,
+            Arc::new(parking_lot::RwLock::new(AuthState::Authenticated { token }))))
     }
 
     fn bearer(&self) -> Option<String> {
@@ -100,6 +110,10 @@ fn postgrest_op(op: FilterOp) -> &'static str {
 
 #[async_trait::async_trait]
 impl EntityTransport for ForgeClient {
+    async fn mutate_idempotent(&self, operation: &str, record: &EntityRecord, key: &str) -> CoreResult<Option<EntityRecord>> {
+        self.replay_mutation(operation, record, key).await
+    }
+
     async fn list(&self, view: &ViewDescriptor) -> CoreResult<ListResult> {
         let mut req = self.apply_bearer(self.http.get(self.table_url(&view.entity_type)));
         // PostgREST filter grammar: one query pair per filter.
@@ -243,6 +257,9 @@ fn row_to_record(entity_type: &str, row: serde_json::Value) -> EntityRecord {
 fn map_status(status: reqwest::StatusCode) -> CoreError {
     use reqwest::StatusCode;
     match status {
+        StatusCode::CONFLICT | StatusCode::PRECONDITION_FAILED => {
+            CoreError::Terminal("conflict: authoritative mutation precondition was refused".into())
+        }
         StatusCode::NOT_FOUND => CoreError::NotFound(status.to_string()),
         StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => {
             CoreError::Terminal(format!("forge auth: {status}"))

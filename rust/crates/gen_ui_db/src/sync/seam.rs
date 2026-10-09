@@ -37,6 +37,51 @@ pub trait LocalStore: Send + Sync {
     /// Wipe a table's synced rows — used on `must-refetch` (shape rotation) so the
     /// consumer can re-materialise the shape from offset `-1` without duplicates.
     async fn truncate_shape(&self, table: &str) -> CoreResult<()>;
+
+    /// Open the durable command log before starting replay. Stores without this
+    /// capability must not silently advertise durable offline writes.
+    async fn initialize_outbox(&self) -> CoreResult<()> {
+        Err(gen_ui_types::CoreError::Terminal("local store has no durable outbox".into()))
+    }
+
+    /// Commit the local projection and command intent in the same transaction.
+    async fn enqueue_pending(&self, _write: &PendingWrite) -> CoreResult<()> {
+        Err(gen_ui_types::CoreError::Terminal("local store has no durable outbox".into()))
+    }
+
+    async fn queued_writes(&self, _poison: bool) -> CoreResult<Vec<PendingWrite>> {
+        Err(gen_ui_types::CoreError::Terminal("local store has no durable outbox".into()))
+    }
+
+    /// Retain the committed result or refusal before removing work from replay.
+    async fn settle_write(&self, _write: &PendingWrite, _outcome: &WriteOutcome) -> CoreResult<()> {
+        Err(gen_ui_types::CoreError::Terminal("local store has no durable outbox".into()))
+    }
+
+    async fn read_cursor(&self, _shape: &str) -> CoreResult<Option<gen_ui_types::sync::ReadCursor>> {
+        Err(gen_ui_types::CoreError::Terminal("local store has no durable read cursor".into()))
+    }
+
+    async fn commit_read(&self, _shape: &str, _table: &str, _previous: Option<&gen_ui_types::sync::ReadCursor>, _poll: &gen_ui_types::sync::ReadPoll) -> CoreResult<bool> {
+        Err(gen_ui_types::CoreError::Terminal("local store has no durable read cursor".into()))
+    }
+
+    async fn command_history(&self) -> CoreResult<Vec<CommandView>> {
+        Err(gen_ui_types::CoreError::Terminal("local store has no command history".into()))
+    }
+
+    async fn retry_command(&self, _id: &str) -> CoreResult<()> {
+        Err(gen_ui_types::CoreError::Terminal("local store has no command recovery".into()))
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommandView {
+    pub command_id: String,
+    pub table: String,
+    pub status: String,
+    pub attempts: u32,
+    pub reason: Option<String>,
 }
 
 /// One durable, idempotent local mutation awaiting replay to the server.
@@ -57,6 +102,8 @@ pub struct PendingWrite {
 pub enum WriteOutcome {
     /// Server accepted (or idempotently deduped) the write — drop it from the queue.
     Applied,
+    /// Authoritative row returned by Forge's transaction receipt (including replay).
+    Committed { change: RowChange },
     /// Transient failure (network / 5xx / conflict-retryable) — keep and back off.
     Retry,
     /// Terminal rejection (4xx validation) — quarantine as poison, stop retrying.

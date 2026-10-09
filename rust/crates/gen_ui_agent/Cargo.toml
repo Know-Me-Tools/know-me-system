@@ -13,7 +13,7 @@ gen_ui_context  = { path = "../gen_ui_context" }
 gen_ui_document = { path = "../gen_ui_document" }
 # gen_ui_agent is native-only (consumed by gen_ui_ffi mobile + tauri-plugin-gen-ui
 # desktop, never gen_ui_wasm), so native-http is unconditional here.
-gen_ui_client   = { path = "../gen_ui_client", default-features = false, features = ["native-http"] }
+gen_ui_client   = { path = "../gen_ui_client", default-features = false, features = ["native-http", "frf"] }
 gen_ui_db_graph = { path = "../gen_ui_db_graph", features = ["embed-native"] }
 gen_ui_mcp      = { path = "../gen_ui_mcp" }
 # The library NEVER names a concrete engine: it drives local inference purely
@@ -54,6 +54,7 @@ sha2.workspace = true
 # size would cost hundreds of ms on the attach path; already in the lockfile.
 imagesize = "0.14"
 scraper.workspace = true
+ego-tree.workspace = true
 universal-agent-runtime-sdk = { path = "../../vendor/universal-agent-runtime/sdks/rust", default-features = false, features = ["http-client", "embedded-mobile"] }
 # The agent layer owns the in-process UAR/local-model seam.  Mobile and desktop
 # inject a platform `InferenceProvider`; this dependency supplies only the

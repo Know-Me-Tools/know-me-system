@@ -18,6 +18,7 @@ mod imp {
     pub struct SyncStatusHandle {
         tx: Arc<watch::Sender<SyncStatus>>,
         pending: Arc<AtomicU32>,
+        reads: Arc<std::sync::Mutex<std::collections::BTreeMap<String, SyncStatus>>>,
     }
 
     /// A live subscription to status transitions (`watch::Receiver`).
@@ -29,6 +30,7 @@ mod imp {
             Self {
                 tx: Arc::new(tx),
                 pending: Arc::new(AtomicU32::new(0)),
+                reads: Arc::new(std::sync::Mutex::new(std::collections::BTreeMap::new())),
             }
         }
 
@@ -48,9 +50,26 @@ mod imp {
             let _ = self.tx.send_replace(status);
         }
 
+        pub(crate) fn set_read(&self, shape: &str, state: SyncStatus) {
+            let mut reads = self.reads.lock().unwrap_or_else(|e| e.into_inner());
+            reads.insert(shape.to_owned(), state);
+            self.set(Self::read_status(&reads, self.pending()));
+        }
+
+        fn read_status(reads: &std::collections::BTreeMap<String, SyncStatus>, pending: u32) -> SyncStatus {
+            if let Some(error) = reads.values().find(|s| matches!(s, SyncStatus::Error { .. })) { return error.clone(); }
+            if reads.values().any(|s| matches!(s, SyncStatus::Offline)) { return SyncStatus::Offline; }
+            if pending > 0 || reads.values().any(|s| matches!(s, SyncStatus::Syncing { .. })) {
+                return SyncStatus::Syncing { pending_writes: pending };
+            }
+            SyncStatus::Live
+        }
+
         pub(crate) fn set_pending(&self, n: u32) {
             self.pending.store(n, Ordering::Relaxed);
-            if n > 0 {
+            let reads = self.reads.lock().unwrap_or_else(|e| e.into_inner());
+            if !reads.is_empty() { self.set(Self::read_status(&reads, n)); return; }
+            if n > 0 || matches!(self.current(), SyncStatus::Syncing { .. }) {
                 self.set(SyncStatus::Syncing { pending_writes: n });
             }
         }

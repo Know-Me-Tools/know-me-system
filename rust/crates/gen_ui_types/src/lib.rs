@@ -10,6 +10,7 @@ pub mod config;
 pub mod content_block;
 pub mod error;
 pub mod events;
+pub mod execution_profiles;
 pub mod inference;
 pub mod lifecycle;
 pub mod sync;

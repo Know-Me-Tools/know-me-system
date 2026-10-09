@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description = "OFP — Open Fang Protocol peer sync (FUNC-SPEC §07). Skeleton crate: entity/peer/clock domain types are real; QUIC transport, gossip rounds, and CRDT merge are stubbed."
+description = "OFP personal-class peer sync with durable consent and mutual QUIC admission"
 
 [dependencies]
 # gen_ui_types::sync / gen_ui_db_graph become dependencies when transport + CRDT merge land (roadmap M2).
@@ -12,3 +12,14 @@ workspace-hack = { path = "../workspace-hack" }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+async-trait.workspace = true
+sha2.workspace = true
+loro = "1.13.1"
+tokio = { workspace = true, features = ["fs", "io-util", "sync", "time"] }
+frf-p2p = { git = "ssh://git@github.com/Prometheus-AGS/flint-realtime-fabric", rev = "f67f93e4520fa1775851441c1178a7c4a06e7ae3" }
+frf-domain = { git = "ssh://git@github.com/Prometheus-AGS/flint-realtime-fabric", rev = "f67f93e4520fa1775851441c1178a7c4a06e7ae3" }
+frf-ports = { git = "ssh://git@github.com/Prometheus-AGS/flint-realtime-fabric", rev = "f67f93e4520fa1775851441c1178a7c4a06e7ae3" }
+frf-store-redb = { git = "ssh://git@github.com/Prometheus-AGS/flint-realtime-fabric", rev = "f67f93e4520fa1775851441c1178a7c4a06e7ae3" }
+frf-crdt = { git = "ssh://git@github.com/Prometheus-AGS/flint-realtime-fabric", rev = "f67f93e4520fa1775851441c1178a7c4a06e7ae3" }

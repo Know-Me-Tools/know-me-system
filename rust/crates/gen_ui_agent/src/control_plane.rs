@@ -82,7 +82,10 @@ fn local_user_context() -> universal_agent_runtime_sdk::runtime::UserContext {
 }
 
 impl UnavailableResource {
-    #[allow(dead_code, reason = "retained for resources that are still embedded-unavailable")]
+    #[allow(
+        dead_code,
+        reason = "retained for resources that are still embedded-unavailable"
+    )]
     fn embedded(resource: &str) -> Self {
         Self {
             resource: resource.to_string(),
@@ -393,7 +396,9 @@ pub async fn create_knowledge_base(
 
 pub async fn delete_knowledge_base(id: &str) -> Result<(), AgentError> {
     if let Backend::Embedded = backend().await? {
-        return crate::state::embedded_uar()?.delete_knowledge_base(id).await;
+        return crate::state::embedded_uar()?
+            .delete_knowledge_base(id)
+            .await;
     }
     chat::uar_service_client()
         .await?
@@ -500,8 +505,14 @@ mod tests {
         };
         let json = serde_json::to_value(&catalog).expect("serializes");
 
-        let listed = json["unavailable"].as_array().expect("unavailable is an array");
-        assert_eq!(listed.len(), 3, "every empty registry must be accounted for");
+        let listed = json["unavailable"]
+            .as_array()
+            .expect("unavailable is an array");
+        assert_eq!(
+            listed.len(),
+            3,
+            "every empty registry must be accounted for"
+        );
 
         for entry in listed {
             assert!(

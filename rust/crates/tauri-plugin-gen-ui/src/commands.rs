@@ -590,7 +590,9 @@ pub async fn attach_sync_shapes<R: Runtime>(app: tauri::AppHandle<R>) -> Result<
     let store = gen_ui_db::relational::PgliteStore::open(data_dir.join("config-db"))
         .await
         .map_err(|e| gen_ui_types::CoreError::Transient(e.to_string()))?;
-    let local = Arc::new(PgLocalStore::new(store.store().pool().clone()));
+    let subject = gen_ui_agent::sync_sink::forge_write_subject(cfg.token.as_deref())?;
+    let scope = serde_json::json!([cfg.forge_base, cfg.endpoint, cfg.tenant_id, cfg.channel_path, cfg.consumer_id, subject, cfg.shape_gateway, cfg.shapes]).to_string();
+    let local = Arc::new(PgLocalStore::scoped(store.store().pool().clone(), scope));
 
     let sink = gen_ui_agent::sync_sink::forge_write_sink(
         cfg.forge_base.clone(),
@@ -598,7 +600,13 @@ pub async fn attach_sync_shapes<R: Runtime>(app: tauri::AppHandle<R>) -> Result<
         cfg.token.clone(),
     )?;
 
-    let transport = FrfSyncTransport::new(cfg.into_transport_config(), local, sink);
+    let mut sources = Vec::new();
+    for shape in &cfg.shapes {
+        let gateway = cfg.shape_gateway.clone().ok_or_else(|| gen_ui_types::CoreError::Terminal("selected shapes require shape_gateway".into()))?;
+        let token = cfg.token.clone().ok_or_else(|| gen_ui_types::CoreError::Terminal("selected shapes require authentication".into()))?;
+        sources.push(gen_ui_agent::sync_sink::fabric_shape_source(gateway, token, shape.shape_id.clone(), shape.table.clone())?);
+    }
+    let transport = FrfSyncTransport::new(cfg.into_transport_config(), local, sink).with_read_sources(sources)?;
     transport.start().await?;
 
     // Hold the transport for the process lifetime: dropping it stops the drain loop and
@@ -622,8 +630,15 @@ struct SyncSettings {
     consumer_id: String,
     forge_base: String,
     #[serde(default)]
+    shape_gateway: Option<String>,
+    #[serde(default)]
+    shapes: Vec<SelectedBusinessShape>,
+    #[serde(default)]
     token: Option<String>,
 }
+
+#[derive(serde::Deserialize, serde::Serialize)]
+struct SelectedBusinessShape { shape_id: String, table: String }
 
 impl SyncSettings {
     fn into_transport_config(self) -> gen_ui_db::sync::FrfSyncConfig {
@@ -662,6 +677,23 @@ async fn read_sync_config(data_dir: &std::path::Path) -> Result<Option<SyncSetti
     Ok(Some(parsed))
 }
 
+/// Sync-eligible business edits commit their projection and intent together.
+/// Other entities retain their existing local-only behavior.
+async fn enqueue_business_write(operation: &str, record: &EntityRecord, command_id: Option<&str>) -> Result<bool> {
+    use gen_ui_db::sync::SyncTransport;
+    if !matches!(record.entity_type.as_str(), "notes" | "memories") {
+        return Ok(false);
+    }
+    let Some(sync) = SYNC.get() else { return Ok(false) };
+    let data: serde_json::Value = serde_json::from_str(&record.data_json)
+        .map_err(|e| gen_ui_types::CoreError::Serde(e.to_string()))?;
+    sync.enqueue_write(&serde_json::json!({
+        "table": record.entity_type, "id": record.id,
+        "op": operation, "data": data, "idempotency_key": command_id
+    }).to_string()).await?;
+    Ok(true)
+}
+
 /// Ingest through the shared agent boundary, matching mobile's FFI command.
 #[tauri::command]
 pub async fn memory_ingest(text: String) -> Result<String> {
@@ -694,7 +726,7 @@ pub async fn entity_list<R: Runtime>(
     let limit = i64::from(view.limit.unwrap_or(200).min(1_000));
     let rows = sqlx::query(
         "SELECT id, entity_type, data_json::text AS data_json FROM entity_records \
-         WHERE entity_type = $1 ORDER BY updated_at DESC LIMIT $2",
+         WHERE entity_type = $1 AND data_json->'deleted' IS DISTINCT FROM 'true'::jsonb ORDER BY updated_at DESC LIMIT $2",
     )
     .bind(&view.entity_type)
     .bind(limit)
@@ -725,7 +757,7 @@ pub async fn entity_get<R: Runtime>(
         .map_err(|e| gen_ui_types::CoreError::Transient(e.to_string()))?;
     let row = sqlx::query(
         "SELECT id, entity_type, data_json::text AS data_json FROM entity_records \
-         WHERE entity_type = $1 AND id = $2",
+         WHERE entity_type = $1 AND id = $2 AND data_json->'deleted' IS DISTINCT FROM 'true'::jsonb",
     )
     .bind(&entity_type)
     .bind(&id)
@@ -743,7 +775,11 @@ pub async fn entity_get<R: Runtime>(
 pub async fn entity_create<R: Runtime>(
     app: tauri::AppHandle<R>,
     record: EntityRecord,
+    command_id: Option<String>,
 ) -> Result<EntityRecord> {
+    if enqueue_business_write("insert", &record, command_id.as_deref()).await? {
+        return Ok(record);
+    }
     let store = gen_ui_db::relational::PgliteStore::open(app_data_dir(&app)?.join("config-db"))
         .await
         .map_err(|e| gen_ui_types::CoreError::Transient(e.to_string()))?;
@@ -764,7 +800,11 @@ pub async fn entity_create<R: Runtime>(
 pub async fn entity_update<R: Runtime>(
     app: tauri::AppHandle<R>,
     record: EntityRecord,
+    command_id: Option<String>,
 ) -> Result<EntityRecord> {
+    if enqueue_business_write("update", &record, command_id.as_deref()).await? {
+        return Ok(record);
+    }
     let store = gen_ui_db::relational::PgliteStore::open(app_data_dir(&app)?.join("config-db"))
         .await
         .map_err(|e| gen_ui_types::CoreError::Transient(e.to_string()))?;
@@ -788,7 +828,12 @@ pub async fn entity_delete<R: Runtime>(
     app: tauri::AppHandle<R>,
     entity_type: String,
     id: String,
+    command_id: Option<String>,
 ) -> Result<()> {
+    let record = EntityRecord { id: id.clone(), entity_type: entity_type.clone(), data_json: "{}".into() };
+    if enqueue_business_write("delete", &record, command_id.as_deref()).await? {
+        return Ok(());
+    }
     let store = gen_ui_db::relational::PgliteStore::open(app_data_dir(&app)?.join("config-db"))
         .await
         .map_err(|e| gen_ui_types::CoreError::Transient(e.to_string()))?;

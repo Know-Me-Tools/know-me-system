@@ -564,14 +564,15 @@ export function entityGet(entityType: string, id: string): Promise<EntityRecord 
   return invoke<WireEntityRecord | null>(cmd("entity_get"), { entityType, id })
     .then((record) => (record ? fromWireEntity(record) : null));
 }
-export function entityCreate(record: EntityRecord): Promise<EntityRecord> {
-  return invoke<WireEntityRecord>(cmd("entity_create"), { record: toWireEntity(record) }).then(fromWireEntity);
+/** Retain commandId when retrying the same business submission across IPC. */
+export function entityCreate(record: EntityRecord, commandId?: string): Promise<EntityRecord> {
+  return invoke<WireEntityRecord>(cmd("entity_create"), { record: toWireEntity(record), commandId: commandId ?? null }).then(fromWireEntity);
 }
-export function entityUpdate(record: EntityRecord): Promise<EntityRecord> {
-  return invoke<WireEntityRecord>(cmd("entity_update"), { record: toWireEntity(record) }).then(fromWireEntity);
+export function entityUpdate(record: EntityRecord, commandId?: string): Promise<EntityRecord> {
+  return invoke<WireEntityRecord>(cmd("entity_update"), { record: toWireEntity(record), commandId: commandId ?? null }).then(fromWireEntity);
 }
-export function entityDelete(entityType: string, id: string): Promise<void> {
-  return invoke<void>(cmd("entity_delete"), { entityType, id });
+export function entityDelete(entityType: string, id: string, commandId?: string): Promise<void> {
+  return invoke<void>(cmd("entity_delete"), { entityType, id, commandId: commandId ?? null });
 }
 /** A hybrid graph-RAG search hit. Mirrors `gen_ui_db_graph::MemoryHit`. */
 export interface MemoryHit {
@@ -646,3 +647,20 @@ export function onSyncStatus<T>(handler: (payload: T) => void): Promise<Unlisten
 export function onLocalModelStatus(handler: (payload: ModelOperationState) => void): Promise<UnlistenFn> {
   return listen<ModelOperationState>(MODEL_STATUS, (e) => handler(e.payload));
 }
+
+/** Placement is explicit; detach never cancels or admits a replacement execution. */
+export interface ExecutionProfile {
+  schemaVersion: 1; kind: 'standalone-embedded' | 'home' | 'personal-cloud' | 'enterprise';
+  instanceId: string; serviceUrl: string | null; remoteInputApproved: boolean;
+}
+export interface ExecutionJob {
+  hostRunId: string; conversationId: string; runtimeRunId: string | null;
+  runtimeMode: string; profile: ExecutionProfile | null; cursor: number | null;
+  state: 'admission-pending' | 'running' | 'observation-detached' | 'completed' | 'cancelled' | 'uncertain';
+}
+export const executionProfile = () => invoke<ExecutionProfile | null>('plugin:gen-ui|profile');
+export const configureExecutionProfile = (profile: ExecutionProfile) => invoke<ExecutionProfile>('plugin:gen-ui|configure', { profile });
+export const executionJobs = () => invoke<ExecutionJob[]>('plugin:gen-ui|jobs');
+export const suspendExecution = (hostRunId: string) => invoke<ExecutionJob>('plugin:gen-ui|suspend', { hostRunId });
+export const resumeExecution = (hostRunId: string) => invoke<ExecutionJob>('plugin:gen-ui|resume', { hostRunId });
+export const cancelExecution = (hostRunId: string) => invoke<ExecutionJob>('plugin:gen-ui|cancel', { hostRunId });
