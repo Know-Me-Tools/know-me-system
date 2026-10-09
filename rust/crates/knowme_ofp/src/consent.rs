@@ -45,6 +45,30 @@ pub struct ConsentEvent {
     pub at_ms: u64,
     pub endpoint_id: String,
     pub action: String,
+    #[serde(default)]
+    pub consents: Vec<PeerConsent>,
+    #[serde(default)]
+    pub documents: Vec<PersonalDocument>,
+    #[serde(default)]
+    pub local_endpoint: Option<String>,
+}
+
+impl ConsentEvent {
+    pub(crate) fn capture(
+        state: &ConsentState,
+        endpoint: &str,
+        action: &str,
+    ) -> Result<Self, OfpError> {
+        Ok(Self {
+            revision: state.revision,
+            at_ms: now_ms()?,
+            endpoint_id: endpoint.into(),
+            action: action.into(),
+            consents: state.peers.values().cloned().collect(),
+            documents: state.documents.values().cloned().collect(),
+            local_endpoint: state.local_endpoint.clone(),
+        })
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -158,12 +182,8 @@ impl ConsentStore {
             .checked_add(1)
             .ok_or_else(|| OfpError::Authority("revision exhausted".into()))?;
         update(&mut state)?;
-        state.history.push(ConsentEvent {
-            revision: state.revision,
-            at_ms: now_ms()?,
-            endpoint_id: endpoint.into(),
-            action: action.into(),
-        });
+        let event = ConsentEvent::capture(&state, endpoint, action)?;
+        state.history.push(event);
         self.persist(&state).await?;
         Ok(state)
     }

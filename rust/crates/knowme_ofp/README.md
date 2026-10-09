@@ -9,11 +9,14 @@ OFP revalidates the admitted credential before each round, fences consent revisi
 changes, and checks current grant/offline expiry before every document and frame.
 The bounded disclosure transaction serializes with consent changes. Revocation
 closes admitted sessions after the authority change commits; dispatched plaintext
-cannot be recalled. A round can hold that authority transaction for at most30seconds.
+cannot be recalled. A round can hold that authority transaction for at most 30 seconds.
 
 Consent is an atomic, fsynced, versioned local file with stable revision/CAS and
 append-only inspectable event history. It contains public keys, credential hashes,
 selected document IDs, validity and tombstones, never raw credentials/private keys.
+Each new event preserves the public identity, exact consent scopes/validity and
+document classifications/tombstones at that revision. Older events without these
+snapshots remain readable and are marked as lacking historical scope details.
 One host owns that file and its write lock. Document classes are an exact closed
 vocabulary: personal notes, conversations, memory and personal settings. Unknown
 classes, unregistered IDs, class changes, grants/policies/organization membership
@@ -24,7 +27,7 @@ file-backed `RedbOpStore`. Local edits queue before checkpoint; queued operation
 replay on recovery. Full Loro snapshots are exchanged for a bounded manual round,
 so retries and disconnected concurrent edits converge through the existing merge
 engine. The durable op journal is retained; automated journal compaction and large
-document/chunk transfer are outside this profile. Frames over8MiB deny execution.
+document/chunk transfer are outside this profile. Frames over 8 MiB deny execution.
 
 The native Settings panel configures a local owner-asserted personal partition,
 imports identity only for this session, grants selected registered documents with

@@ -1,13 +1,13 @@
 //! Restricted personal CRDT frames. Authority never enters the merge engine.
 use crate::{
-    OfpError,
-    consent::{ConsentState, ConsentStore, PersonalClass, now_ms},
+    consent::{now_ms, ConsentState, ConsentStore, PersonalClass},
     service::PersonalPeerService,
+    OfpError,
 };
 use frf_domain::EntityId;
 use frf_p2p::{
+    protocol::{read_frame, write_frame, MAX_FRAME_BYTES},
     PeerSession,
-    protocol::{MAX_FRAME_BYTES, read_frame, write_frame},
 };
 use frf_ports::{ApplyDelta, CrdtSnapshot, OpStore, PendingOp};
 use serde::{Deserialize, Serialize};
@@ -234,12 +234,12 @@ impl PersonalPeerService {
                         .revision
                         .checked_add(1)
                         .ok_or_else(|| OfpError::Authority("consent revision exhausted".into()))?;
-                    state.history.push(crate::consent::ConsentEvent {
-                        revision: state.revision,
-                        at_ms: now_ms()?,
-                        endpoint_id: endpoint.into(),
-                        action: "consented-document-tombstone".into(),
-                    });
+                    let event = crate::consent::ConsentEvent::capture(
+                        state,
+                        endpoint,
+                        "consented-document-tombstone",
+                    )?;
+                    state.history.push(event);
                     self.store.persist(state).await?;
                 }
                 self.snapshots
