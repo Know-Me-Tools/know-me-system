@@ -40,8 +40,6 @@ wasm-http = ["liter-llm/wasm-http"]
 #
 # Authorized Fabric shape reads use the retained C08 SDK source.
 frf = ["dep:frf-sdk-rust"]
-#     peer-crdt = ["frf", "dep:frf-crdt", "dep:frf-store-redb"]
-frf = ["dep:frf-sdk-rust"]
 peer-crdt = ["frf"]
 
 # [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
