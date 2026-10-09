@@ -18,8 +18,8 @@ async-trait.workspace = true
 sha2.workspace = true
 loro = "1.13.1"
 tokio = { workspace = true, features = ["fs", "io-util", "sync", "time"] }
-frf-p2p = { git = "ssh://git@github.com/Prometheus-AGS/flint-realtime-fabric", rev = "e9672ea7489cad40762f1685f20eafb1976ec070" }
-frf-domain = { git = "ssh://git@github.com/Prometheus-AGS/flint-realtime-fabric", rev = "e9672ea7489cad40762f1685f20eafb1976ec070" }
-frf-ports = { git = "ssh://git@github.com/Prometheus-AGS/flint-realtime-fabric", rev = "e9672ea7489cad40762f1685f20eafb1976ec070" }
-frf-store-redb = { git = "ssh://git@github.com/Prometheus-AGS/flint-realtime-fabric", rev = "e9672ea7489cad40762f1685f20eafb1976ec070" }
-frf-crdt = { git = "ssh://git@github.com/Prometheus-AGS/flint-realtime-fabric", rev = "e9672ea7489cad40762f1685f20eafb1976ec070" }
+frf-p2p = { git = "ssh://git@github.com/Prometheus-AGS/flint-realtime-fabric", rev = "f67f93e4520fa1775851441c1178a7c4a06e7ae3" }
+frf-domain = { git = "ssh://git@github.com/Prometheus-AGS/flint-realtime-fabric", rev = "f67f93e4520fa1775851441c1178a7c4a06e7ae3" }
+frf-ports = { git = "ssh://git@github.com/Prometheus-AGS/flint-realtime-fabric", rev = "f67f93e4520fa1775851441c1178a7c4a06e7ae3" }
+frf-store-redb = { git = "ssh://git@github.com/Prometheus-AGS/flint-realtime-fabric", rev = "f67f93e4520fa1775851441c1178a7c4a06e7ae3" }
+frf-crdt = { git = "ssh://git@github.com/Prometheus-AGS/flint-realtime-fabric", rev = "f67f93e4520fa1775851441c1178a7c4a06e7ae3" }

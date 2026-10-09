@@ -150,6 +150,8 @@ impl PersonalPeerService {
     }
 
     pub async fn connect(&self, address: EndpointAddr) -> Result<Arc<PeerSession>, OfpError> {
+        let state = self.store.state().await?;
+        ConsentStore::current_peer(&state, &address.id.to_string(), now_ms()?)?;
         let session = Arc::new(self.transport.connect(address, &self.credential).await?);
         self.sessions
             .lock()
