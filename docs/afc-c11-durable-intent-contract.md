@@ -15,6 +15,7 @@ an IPC retry. The queue always reuses the stored identity across process restart
 Replay sends `Idempotency-Key` to Forge. Its returned row and local command settlement
 commit together; later pending edits are reapplied in sequence. Lost responses are
 recovered by repeating the identical request against Forge's stored receipt.
+An attempt is persisted before network IO; a crash/lost reply remains visibly uncertain until the identical command receipt settles. Conflict/precondition refusals are disclosed separately from other rejections. Rejected optimistic rows are removed and their selected shape is resnapshotted.
 Transient failures remain pending with bounded backoff, including prolonged offline
 periods. Authoritative terminal refusals remain inspectable as poison records.
 

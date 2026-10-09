@@ -140,12 +140,11 @@ impl WriteQueue {
     async fn drain_durable(&self, store: &Arc<dyn LocalStore>) -> CoreResult<u32> {
         for _ in 0..self.batch {
             let Some(mut write) = store.queued_writes(false).await?.into_iter().next() else { break };
+            // Persist uncertainty BEFORE network IO: a crash after server commit
+            // but before receipt settlement must never look like an unsent command.
+            write.attempts = write.attempts.saturating_add(1);
+            store.settle_write(&write, &WriteOutcome::Retry).await?;
             let outcome = self.sink.send(&write).await;
-            if outcome == WriteOutcome::Retry {
-                write.attempts = write.attempts.saturating_add(1);
-                // Offline duration does not turn a valid command into poison.
-                // Only an authoritative terminal refusal quarantines durable work.
-            }
             // A crash after Forge commit replays its same durable receipt.
             store.settle_write(&write, &outcome).await?;
             if outcome == WriteOutcome::Retry {

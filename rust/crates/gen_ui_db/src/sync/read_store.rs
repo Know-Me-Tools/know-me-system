@@ -63,7 +63,7 @@ impl PgLocalStore {
     }
 
     pub(super) async fn list_commands(&self) -> CoreResult<Vec<CommandView>> {
-        let rows = sqlx::query("SELECT command_id, table_name, status, attempts, rejection FROM sync_outbox WHERE scope = $1 ORDER BY sequence DESC LIMIT 100")
+        let rows = sqlx::query("SELECT command_id, table_name, CASE WHEN status = 'pending' AND EXISTS (SELECT 1 FROM sync_read_cursors c WHERE c.scope = o.scope AND c.table_name = o.table_name AND c.status = 'revoked') THEN 'blocked' WHEN status = 'pending' AND attempts > 0 THEN 'uncertain' WHEN status = 'poison' AND rejection LIKE 'conflict:%' THEN 'conflicted' ELSE status END AS status, attempts, rejection FROM sync_outbox o WHERE scope = $1 ORDER BY sequence DESC LIMIT 100")
             .bind(&self.scope).fetch_all(&self.pool).await.map_err(storage_error)?;
         rows.into_iter().map(|row| Ok(CommandView {
             command_id: row.try_get("command_id").map_err(storage_error)?,
