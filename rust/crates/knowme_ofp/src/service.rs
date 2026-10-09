@@ -77,6 +77,18 @@ impl PersonalPeerService {
         snapshots: Arc<dyn CrdtStore>,
         op_path: impl AsRef<Path>,
     ) -> Result<Self, OfpError> {
+        let ops = RedbOpStore::open(op_path).map_err(|e| OfpError::Authority(e.to_string()))?;
+        Self::bind_with_ops(store, key, credential, snapshots, ops).await
+    }
+
+    /// Reuse the host's single durable op-store across session lock/unlock.
+    pub async fn bind_with_ops(
+        store: Arc<ConsentStore>,
+        key: SecretKey,
+        credential: String,
+        snapshots: Arc<dyn CrdtStore>,
+        ops: RedbOpStore,
+    ) -> Result<Self, OfpError> {
         let state = store.state().await?;
         if state.local_endpoint.as_deref() != Some(key.public().to_string().as_str())
             || credential.len() < 32
@@ -100,7 +112,6 @@ impl PersonalPeerService {
             local_endpoint: state.local_endpoint.unwrap_or_default(),
             local_hash: credential_hash(&credential),
         }));
-        let ops = RedbOpStore::open(op_path).map_err(|e| OfpError::Authority(e.to_string()))?;
         Ok(Self {
             store,
             snapshots,

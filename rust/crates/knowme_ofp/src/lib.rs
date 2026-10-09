@@ -24,6 +24,8 @@ pub use frf_domain::{EntityId, TenantId};
 #[cfg(not(target_arch = "wasm32"))]
 pub use frf_ports::{CrdtSnapshot, CrdtStore, PortError};
 #[cfg(not(target_arch = "wasm32"))]
+pub use frf_store_redb::RedbOpStore;
+#[cfg(not(target_arch = "wasm32"))]
 pub use frf_p2p::{EndpointAddr, EndpointId, SecretKey};
 
 /// The four instance types (FUNC-SPEC §07 table).
