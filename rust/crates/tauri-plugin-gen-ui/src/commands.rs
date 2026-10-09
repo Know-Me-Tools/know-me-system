@@ -679,7 +679,7 @@ async fn read_sync_config(data_dir: &std::path::Path) -> Result<Option<SyncSetti
 
 /// Sync-eligible business edits commit their projection and intent together.
 /// Other entities retain their existing local-only behavior.
-async fn enqueue_business_write(operation: &str, record: &EntityRecord) -> Result<bool> {
+async fn enqueue_business_write(operation: &str, record: &EntityRecord, command_id: Option<&str>) -> Result<bool> {
     use gen_ui_db::sync::SyncTransport;
     if !matches!(record.entity_type.as_str(), "notes" | "memories") {
         return Ok(false);
@@ -689,7 +689,7 @@ async fn enqueue_business_write(operation: &str, record: &EntityRecord) -> Resul
         .map_err(|e| gen_ui_types::CoreError::Serde(e.to_string()))?;
     sync.enqueue_write(&serde_json::json!({
         "table": record.entity_type, "id": record.id,
-        "op": operation, "data": data
+        "op": operation, "data": data, "idempotency_key": command_id
     }).to_string()).await?;
     Ok(true)
 }
@@ -775,8 +775,9 @@ pub async fn entity_get<R: Runtime>(
 pub async fn entity_create<R: Runtime>(
     app: tauri::AppHandle<R>,
     record: EntityRecord,
+    command_id: Option<String>,
 ) -> Result<EntityRecord> {
-    if enqueue_business_write("insert", &record).await? {
+    if enqueue_business_write("insert", &record, command_id.as_deref()).await? {
         return Ok(record);
     }
     let store = gen_ui_db::relational::PgliteStore::open(app_data_dir(&app)?.join("config-db"))
@@ -799,8 +800,9 @@ pub async fn entity_create<R: Runtime>(
 pub async fn entity_update<R: Runtime>(
     app: tauri::AppHandle<R>,
     record: EntityRecord,
+    command_id: Option<String>,
 ) -> Result<EntityRecord> {
-    if enqueue_business_write("update", &record).await? {
+    if enqueue_business_write("update", &record, command_id.as_deref()).await? {
         return Ok(record);
     }
     let store = gen_ui_db::relational::PgliteStore::open(app_data_dir(&app)?.join("config-db"))
@@ -826,9 +828,10 @@ pub async fn entity_delete<R: Runtime>(
     app: tauri::AppHandle<R>,
     entity_type: String,
     id: String,
+    command_id: Option<String>,
 ) -> Result<()> {
     let record = EntityRecord { id: id.clone(), entity_type: entity_type.clone(), data_json: "{}".into() };
-    if enqueue_business_write("delete", &record).await? {
+    if enqueue_business_write("delete", &record, command_id.as_deref()).await? {
         return Ok(());
     }
     let store = gen_ui_db::relational::PgliteStore::open(app_data_dir(&app)?.join("config-db"))

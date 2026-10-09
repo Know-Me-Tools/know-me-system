@@ -564,14 +564,15 @@ export function entityGet(entityType: string, id: string): Promise<EntityRecord 
   return invoke<WireEntityRecord | null>(cmd("entity_get"), { entityType, id })
     .then((record) => (record ? fromWireEntity(record) : null));
 }
-export function entityCreate(record: EntityRecord): Promise<EntityRecord> {
-  return invoke<WireEntityRecord>(cmd("entity_create"), { record: toWireEntity(record) }).then(fromWireEntity);
+/** Retain commandId when retrying the same business submission across IPC. */
+export function entityCreate(record: EntityRecord, commandId?: string): Promise<EntityRecord> {
+  return invoke<WireEntityRecord>(cmd("entity_create"), { record: toWireEntity(record), commandId: commandId ?? null }).then(fromWireEntity);
 }
-export function entityUpdate(record: EntityRecord): Promise<EntityRecord> {
-  return invoke<WireEntityRecord>(cmd("entity_update"), { record: toWireEntity(record) }).then(fromWireEntity);
+export function entityUpdate(record: EntityRecord, commandId?: string): Promise<EntityRecord> {
+  return invoke<WireEntityRecord>(cmd("entity_update"), { record: toWireEntity(record), commandId: commandId ?? null }).then(fromWireEntity);
 }
-export function entityDelete(entityType: string, id: string): Promise<void> {
-  return invoke<void>(cmd("entity_delete"), { entityType, id });
+export function entityDelete(entityType: string, id: string, commandId?: string): Promise<void> {
+  return invoke<void>(cmd("entity_delete"), { entityType, id, commandId: commandId ?? null });
 }
 /** A hybrid graph-RAG search hit. Mirrors `gen_ui_db_graph::MemoryHit`. */
 export interface MemoryHit {

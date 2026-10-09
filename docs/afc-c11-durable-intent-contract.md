@@ -42,9 +42,9 @@ Fabric SDK source `8966d6b1fef002a663d98f762955b2d273f8c07d` is declared on the 
 
 Additive migration `0005_sync_read_cursors.sql` stores opaque handle/offset pairs. A compare-and-set against the previous pair and row application commit together, rejecting stale concurrent batches without interpreting opaque offsets. Provider must-refetch clears live cache and restarts snapshot; tombstones and pending intents remain. Revoked/expired grants clear all disclosed rows and suspend replay/overlay. In-flight mutation receipts remain durable without repopulating revoked rows. Per-shape status aggregation prevents one live shape hiding another revoked grant.
 
-## Remaining consumer delivery work
+## Consumer source boundary
 
-The separate KnowMe app Surreal adapter and UI presentation/recovery wiring are the next consumer boundary. Existing system entity IPC callers do not yet supply stable IPC retry IDs; the shared transport accepts them. No declaration here certifies an unrun packaged path.
+KnowMe app source 64b1d0a implements the Surreal3.0.5 adapter, native composition, registered row/write/status/recovery APIs and real scope/freshness/outcome settings UI using this shared queue. System entity IPC and guest wrappers now accept optional commandId for retained submission identities; omitting it preserves the existing new-submission behavior. No declaration here certifies an unrun packaged path.
 
 No compiler, test, build, packaged operation or certification gate ran for this
 increment, per the current production-first instruction. Those results remain pending.
