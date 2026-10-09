@@ -111,7 +111,19 @@ impl PgLocalStore {
                 ("committed", Some(serde_json::json!({"table": change.table, "id": change.key, "op": if change.op == RowOp::Delete { "delete" } else { "upsert" }, "data": serde_json::from_str::<serde_json::Value>(&change.value_json).map_err(|e| CoreError::Serde(e.to_string()))?}).to_string()), None)
             }
             WriteOutcome::Retry => ("pending", None, None),
-            WriteOutcome::Poison { reason } => ("poison", None, Some(reason.as_str())),
+            WriteOutcome::Poison { reason } => {
+                // A rejected optimistic edit is not authoritative. Drop that row,
+                // reset the selected shape, and let its snapshot restore authority.
+                let change = local_change(write)?;
+                let table = check_table(&write.table)?;
+                sqlx::query(sqlx::AssertSqlSafe(format!("DELETE FROM {table} WHERE id = $1")))
+                    .bind(&change.key).execute(&mut *tx).await.map_err(storage_error)?;
+                sqlx::query("DELETE FROM entity_records WHERE entity_type = $1 AND id = $2")
+                    .bind(table).bind(&change.key).execute(&mut *tx).await.map_err(storage_error)?;
+                sqlx::query("UPDATE sync_read_cursors SET handle = NULL, offset_value = NULL, status = 'resnapshot', generation = generation + 1 WHERE scope = $1 AND table_name = $2 AND status != 'revoked'")
+                    .bind(&self.scope).bind(table).execute(&mut *tx).await.map_err(storage_error)?;
+                ("poison", None, Some(reason.as_str()))
+            },
         };
         sqlx::query("UPDATE sync_outbox SET status = $3, attempts = $4, result_json = $5::jsonb, rejection = $6, settled_at = CASE WHEN $3 = 'pending' THEN NULL ELSE CURRENT_TIMESTAMP END WHERE scope = $1 AND command_id = $2 AND status = 'pending'")
             .bind(&self.scope).bind(&write.idempotency_key).bind(status).bind(i64::from(write.attempts))
