@@ -814,6 +814,9 @@ pub trait UarRuntimeFacade: Send + Sync {
     fn status(&self) -> UarRuntimeStatus;
     async fn start_run(&self, request: UarRunRequest) -> Result<UarProjectedRun, AgentError>;
     async fn cancel_run(&self, run_id: &str) -> Result<bool, AgentError>;
+    async fn observe_run(&self, _run_id: &str, _cursor: Option<u64>) -> Result<UarProjectedRun, AgentError> {
+        Err(AgentError::Interaction("EXECUTION_OBSERVATION_UNSUPPORTED".into()))
+    }
     async fn submit_artifact_response(
         &self,
         run_id: &str,
@@ -1418,6 +1421,7 @@ impl UarRuntimeFacade for UarEmbeddedRuntime {
 
     async fn start_run(&self, request: UarRunRequest) -> Result<UarProjectedRun, AgentError> {
         let conversation_id = request.session_id;
+        let journal_session = conversation_id.clone();
         let seed_history: Vec<universal_agent_runtime_sdk::SeedMessage> = request
             .history
             .into_iter()
@@ -1463,7 +1467,14 @@ impl UarRuntimeFacade for UarEmbeddedRuntime {
                 )
                 .await
         };
+        crate::execution_profiles::admitted_session(journal_session.as_deref(), &run_id).await?;
         self.subscribe_projected(run_id).await
+    }
+
+    async fn observe_run(&self, run_id: &str, cursor: Option<u64>) -> Result<UarProjectedRun, AgentError> {
+        let receiver = self.runtime.subscribe(run_id).await.map_err(embedded_sdk_error)?;
+        let history = self.runtime.history_since(run_id, cursor).await.map_err(embedded_sdk_error)?;
+        Ok(self.projected_run(run_id.into(), history, receiver))
     }
 
     async fn cancel_run(&self, run_id: &str) -> Result<bool, AgentError> {
@@ -1567,6 +1578,7 @@ fn project_embedded_stream(
         universal_agent_runtime::uar::runtime::manager::StreamEvent,
     >,
 ) -> BoxStream<'static, Result<A2uiEvent, AgentError>> {
+    let journal_runtime = run_id.clone();
     let last_history_id = history.last().map(|event| event.id).unwrap_or(0);
     let pending = history.into_iter().collect::<VecDeque<_>>();
     futures::stream::unfold(
@@ -1577,7 +1589,9 @@ fn project_embedded_stream(
             VecDeque::<A2uiEvent>::new(),
             last_history_id,
         ),
-        |(mut receiver, mut projector, mut source, mut projected, last_history_id)| async move {
+        move |(mut receiver, mut projector, mut source, mut projected, last_history_id)| {
+            let journal_runtime = journal_runtime.clone();
+            async move {
             loop {
                 if let Some(event) = projected.pop_front() {
                     return Some((
@@ -1603,10 +1617,14 @@ fn project_embedded_stream(
                     }
                 };
                 if let Some(payload) = embedded_stream_payload(&event) {
+                    if let Err(error) = crate::execution_profiles::record_frame(&journal_runtime, Some(event.id),
+                        payload.get("type").and_then(serde_json::Value::as_str).unwrap_or("message"), &payload).await {
+                        return Some((Err(error), (receiver, projector, source, projected, last_history_id)));
+                    }
                     projected.extend(projector.ingest_agui_payload(&payload));
                 }
             }
-        },
+        }},
     )
     .boxed()
 }
@@ -1688,6 +1706,7 @@ impl UarRuntimeFacade for UarServiceRuntime {
                 events: project_sdk_stream(session_id, stream),
             });
         }
+        let journal_session = request.session_id.clone();
         let run = self
             .client
             .runs()
@@ -1698,6 +1717,7 @@ impl UarRuntimeFacade for UarServiceRuntime {
             })
             .await
             .map_err(uar_sdk_error)?;
+        crate::execution_profiles::admitted_session(journal_session.as_deref(), &run.run_id).await?;
         let stream = self
             .client
             .runs()
@@ -1710,7 +1730,18 @@ impl UarRuntimeFacade for UarServiceRuntime {
         })
     }
 
+    async fn observe_run(&self, run_id: &str, cursor: Option<u64>) -> Result<UarProjectedRun, AgentError> {
+        let stream = self.client.runs().stream(run_id, cursor).await.map_err(uar_sdk_error)?;
+        Ok(UarProjectedRun { run_id: run_id.into(), events: project_sdk_stream(run_id.into(), stream) })
+    }
+
     async fn cancel_run(&self, run_id: &str) -> Result<bool, AgentError> {
+        // Compiled execution profiles use native run IDs. The legacy chat path
+        // still exposes its session alias and retains session cancellation.
+        if crate::execution_profiles::jobs().await?.iter().any(|job| job.runtime_run_id.as_deref() == Some(run_id) &&
+            job.profile.is_some()) {
+            return self.client.runs().cancel(run_id).await.map(|response| response.cancelled).map_err(uar_sdk_error);
+        }
         self.client
             .runs()
             .cancel_session(run_id)
@@ -1803,17 +1834,25 @@ fn project_sdk_stream(
     run_id: String,
     stream: universal_agent_runtime_sdk::EventStream,
 ) -> BoxStream<'static, Result<A2uiEvent, AgentError>> {
+    let journal_runtime = run_id.clone();
     let projector = UarEventProjector::new(run_id);
     futures::stream::unfold(
         (stream, projector, Vec::<A2uiEvent>::new()),
-        |(mut stream, mut projector, mut pending)| async move {
+        move |(mut stream, mut projector, mut pending)| {
+            let journal_runtime = journal_runtime.clone();
+            async move {
             loop {
                 if let Some(event) = pending.pop() {
                     return Some((Ok(event), (stream, projector, pending)));
                 }
                 match stream.next().await {
                     Some(Ok(event)) => {
+                        let source_id = event.id.as_deref().and_then(|id| id.parse::<u64>().ok());
                         let payload = sdk_stream_payload_to_agui(event);
+                        if let Err(error) = crate::execution_profiles::record_frame(&journal_runtime, source_id,
+                            payload.get("type").and_then(serde_json::Value::as_str).unwrap_or("message"), &payload).await {
+                            return Some((Err(error), (stream, projector, pending)));
+                        }
                         pending = projector.ingest_agui_payload(&payload);
                         pending.reverse();
                     }
@@ -1823,7 +1862,7 @@ fn project_sdk_stream(
                     None => return None,
                 }
             }
-        },
+        }},
     )
     .boxed()
 }

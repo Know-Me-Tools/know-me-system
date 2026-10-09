@@ -1368,15 +1368,16 @@ struct UarRunConfig {
     session_id: Option<String>,
 }
 
-struct UarServiceChatConfig {
-    service_url: String,
-    api_key: Option<String>,
-    artifact: Option<serde_json::Value>,
-    session_id: Option<String>,
+pub(crate) struct UarServiceChatConfig {
+    pub(crate) service_url: String,
+    pub(crate) api_key: Option<String>,
+    pub(crate) artifact: Option<serde_json::Value>,
+    pub(crate) session_id: Option<String>,
 }
 
 pub(crate) async fn selected_uar_deployment_mode(
 ) -> Result<crate::uar::UarDeploymentMode, AgentError> {
+    if let Some(mode) = crate::execution_profiles::deployment_mode().await? { return Ok(mode); }
     let configured = string_setting(SETTING_UAR_DEPLOYMENT_MODE)
         .await?
         .or_else(|| std::env::var("KNOWME_UAR_DEPLOYMENT_MODE").ok());
@@ -1429,6 +1430,7 @@ async fn selected_uar_runtime() -> Result<
         crate::uar::UarDeploymentMode::HttpService
         | crate::uar::UarDeploymentMode::CloudService => {
             let config = load_uar_service_chat_config().await?;
+            crate::execution_profiles::guard_remote(&config.service_url).await?;
             let runtime: std::sync::Arc<dyn crate::uar::UarRuntimeFacade> = std::sync::Arc::new(
                 crate::uar::UarServiceRuntime::new(&config.service_url, config.api_key)?,
             );
@@ -1501,6 +1503,18 @@ async fn send_uar(
             message: "Starting Universal Agent Runtime run".into(),
         });
 
+        if let Err(error) = crate::execution_profiles::begin(&run_id_for_task, &conversation_id, runtime_mode).await {
+            publish_run_error(&run_id_for_task, "uar_admission_journal_failed", RunPhase::Generation, error.to_string(), true);
+            return;
+        }
+        let selected_profile = match crate::execution_profiles::current().await {
+            Ok(profile) => profile,
+            Err(error) => {
+                let _ = crate::execution_profiles::terminal(&run_id_for_task, false).await;
+                publish_run_error(&run_id_for_task, "uar_profile_failed", RunPhase::Generation, error.to_string(), true);
+                return;
+            }
+        };
         // Key the session strictly by the per-conversation id. A global
         // `uar_session_id` setting (a service-era concept) must NOT collapse every
         // conversation into one shared session on the embedded runtime — that
@@ -1508,10 +1522,12 @@ async fn send_uar(
         // where the session id is the caller's contract with a remote UAR.
         let session_id = match runtime_mode {
             "embedded_library" => Some(conversation_id.clone()),
+            _ if selected_profile.is_some() => Some(conversation_id.clone()),
             _ => config.session_id.clone().or(Some(conversation_id.clone())),
         };
         // Seed the embedded session from the host's durable history so a
         // cold-started conversation still presents the full thread to the model.
+        let history = if selected_profile.as_ref().is_some_and(|profile| profile.kind != crate::execution_profiles::ProfileKind::StandaloneEmbedded) { Vec::new() } else { history };
         let seed_history = history
             .into_iter()
             .map(|message| crate::uar::UarSeedMessage {
@@ -1533,6 +1549,7 @@ async fn send_uar(
         {
             Ok(projected) => projected,
             Err(error) => {
+                let _ = crate::execution_profiles::terminal(&run_id_for_task, false).await;
                 publish_run_error(
                     &run_id_for_task,
                     "uar_run_start_failed",
@@ -1544,6 +1561,17 @@ async fn send_uar(
             }
         };
 
+        if let Err(error) = crate::execution_profiles::admitted(&run_id_for_task, &projected.run_id).await {
+            publish_run_error(&run_id_for_task, "uar_admission_journal_failed", RunPhase::Generation, error.to_string(), true);
+            return;
+        }
+        let _observation_lease = match crate::execution_profiles::claim_observation(&run_id_for_task) {
+            Ok(Some(lease)) => lease,
+            _ => {
+                publish_run_error(&run_id_for_task, "uar_observer_conflict", RunPhase::Generation, "Execution already has an observation owner".into(), true);
+                return;
+            }
+        };
         state::publish(A2uiEvent::ContextTelemetry {
             run_id: run_id_for_task.clone(),
             payload: serde_json::json!({
@@ -1555,6 +1583,7 @@ async fn send_uar(
         let uar_run_id = projected.run_id.clone();
         state::register_uar_run(&conversation_id, &run_id_for_task, &uar_run_id);
         let mut events = std::pin::pin!(projected.events);
+        let mut completed = false;
         while let Some(event) = events.next().await {
             if active_run.cancelled() {
                 let _ = runtime.cancel_run(&uar_run_id).await;
@@ -1562,8 +1591,15 @@ async fn send_uar(
                 return;
             }
             match event {
-                Ok(event) => state::publish(event_with_run_id(event, &run_id_for_task)),
+                Ok(event) => {
+                    completed |= matches!(&event, A2uiEvent::RunFinished { .. });
+                    if !crate::execution_profiles::observation_detached(&run_id_for_task).await {
+                        state::publish(event_with_run_id(event, &run_id_for_task));
+                    }
+                    if completed { break; }
+                },
                 Err(error) => {
+                    let _ = crate::execution_profiles::terminal(&run_id_for_task, false).await;
                     publish_run_error(
                         &run_id_for_task,
                         "uar_stream_failed",
@@ -1576,14 +1612,16 @@ async fn send_uar(
             }
         }
 
-        for event in adapter.ingest(&StreamEvent::Done) {
-            state::publish(event);
+        let _ = crate::execution_profiles::terminal(&run_id_for_task, completed).await;
+        if !completed {
+            publish_run_error(&run_id_for_task, "uar_stream_interrupted", RunPhase::Generation,
+                "Execution stream ended without a completion event; reconnect to the existing run".into(), true);
         }
     });
     Ok(run_id)
 }
 
-async fn load_uar_service_chat_config() -> Result<UarServiceChatConfig, AgentError> {
+pub(crate) async fn load_uar_service_chat_config() -> Result<UarServiceChatConfig, AgentError> {
     let service_url = string_setting(SETTING_UAR_SERVICE_URL)
         .await?
         .or_else(|| std::env::var("KNOWME_UAR_SERVICE_URL").ok())
@@ -1804,7 +1842,7 @@ fn uar_a2ui_promotion_from_interaction(
     ))
 }
 
-fn event_with_run_id(event: A2uiEvent, run_id: &str) -> A2uiEvent {
+pub(crate) fn event_with_run_id(event: A2uiEvent, run_id: &str) -> A2uiEvent {
     match event {
         A2uiEvent::RunStarted { .. } => A2uiEvent::RunStarted {
             run_id: run_id.to_owned(),

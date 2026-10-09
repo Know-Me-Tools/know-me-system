@@ -12,6 +12,7 @@ use tauri::{
 };
 
 mod commands;
+mod execution_profiles;
 mod dev_ollama;
 mod error;
 
@@ -43,6 +44,12 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::local_model_status,
             commands::cancel_model_operation,
             commands::local_runtime_diagnostics,
+            execution_profiles::profile,
+            execution_profiles::configure,
+            execution_profiles::jobs,
+            execution_profiles::suspend,
+            execution_profiles::resume,
+            execution_profiles::cancel,
             commands::uar_runtime_status,
             commands::uar_service_config,
             commands::uar_service_save,
