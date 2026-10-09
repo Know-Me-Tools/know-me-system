@@ -1,26 +1,30 @@
-//! # knowme_ofp — Open Fang Protocol peer sync (FUNC-SPEC §07)
+//! Personal-class OFP peer replication (AFC C12).
 //!
-//! OFP is the peer-to-peer gossip layer that lets the user's devices talk to
-//! the user's own BossFang instances directly — no hub, no broker, no
-//! KnowMe LLC server in the path. Transport is QUIC; application payloads are
-//! encrypted with the user's identity key (a `did:key:` the user controls) and
-//! peers authenticate with mutual TLS. Conflict resolution is structural:
-//! Lamport clocks and CRDT-friendly merges, never "server says so".
+//! Native services exchange endpoint-bound credentials over authenticated QUIC,
+//! consume durable explicit consent, and merge selected personal Loro documents.
+//! Authority records, organizations, runtime grants/policies and execution state
+//! are excluded from the replicated document vocabulary.
+//! The host drives bounded rounds; this crate installs no gossip scheduler.
+//! Keys and credentials are session-only. Public identity, consent history,
+//! validity and document tombstones persist independently of CRDT payloads.
 //!
-//! ## What is real in this skeleton
-//! The sync domain model: instance types, peer roles, per-entity sync policy
-//! (with the spec's conservative defaults), Lamport clocks, and the gossip
-//! round summary that drives the Settings → Sync card in the UI.
-//!
-//! ## What is stubbed
-//! The wire. QUIC transport, the gossip scheduler, payload encryption, and
-//! CRDT merge against `gen_ui_db_graph` are tracked in
-//! `docs/implementation-roadmap.md` (M2). The existing `gen_ui_types::sync`
-//! module and `gen_ui_agent::sync_sink` are the integration points.
-//!
-//! Spec anchors: FUNC-SPEC §07 (BossFang Sync), UX-MOOD Screens 05–06.
+//! Historical instance/sync UI domain types below remain compatibility types;
+//! their defaults grant no access through the personal replication service.
 
 use serde::{Deserialize, Serialize};
+
+#[cfg(not(target_arch = "wasm32"))]
+pub mod consent;
+#[cfg(not(target_arch = "wasm32"))]
+mod replica;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod service;
+#[cfg(not(target_arch = "wasm32"))]
+pub use frf_domain::{EntityId, TenantId};
+#[cfg(not(target_arch = "wasm32"))]
+pub use frf_ports::{CrdtSnapshot, CrdtStore, PortError};
+#[cfg(not(target_arch = "wasm32"))]
+pub use frf_p2p::{EndpointAddr, EndpointId, SecretKey};
 
 /// The four instance types (FUNC-SPEC §07 table).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -106,6 +110,18 @@ pub struct GossipRoundSummary {
 
 #[derive(Debug, thiserror::Error)]
 pub enum OfpError {
+    #[error("personal peer authority denied: {0}")]
+    Authority(String),
+    #[error("personal peer storage: {0}")]
+    Storage(#[from] std::io::Error),
+    #[error("personal peer frame: {0}")]
+    Codec(#[from] serde_json::Error),
+    #[cfg(not(target_arch = "wasm32"))]
+    #[error("personal peer transport: {0}")]
+    Transport(#[from] frf_p2p::P2pError),
+    #[cfg(not(target_arch = "wasm32"))]
+    #[error("personal peer persistence: {0}")]
+    Persistence(#[from] frf_ports::PortError),
     #[error("peer unreachable: {0}")]
     PeerUnreachable(String),
     #[error("entity kind '{0:?}' is not enabled for sync")]
