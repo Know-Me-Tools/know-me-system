@@ -305,6 +305,14 @@ async fn bootstrap_inner(
         inference,
         embedded_uar,
     );
+    // First desktop local-lane tool; registration failure degrades chat, not
+    // the app, so it must never take down host boot. Known limitation: the
+    // llama.cpp engine lacks continue_with_tool_results, so on Windows/Linux
+    // local-lane tool calls fail at continuation (macOS runs MLXC, which
+    // supports it; the UAR service lane covers Windows/Linux agent runs).
+    if let Err(error) = gen_ui_agent::web_fetch::register_fetch_mcp().await {
+        tracing::warn!(%error, "web fetch MCP registration failed; local fetch tool unavailable");
+    }
     tracing::info!(path = %config.data_dir.display(), "shared application host ready");
 
     Ok(AppServices {

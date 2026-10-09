@@ -26,6 +26,8 @@ use universal_agent_runtime::{
         registry::ModelConfig, registry::ProtocolSetting, LiterLlmDriver, LlmDriver, LlmRequest,
     },
     normalized::{Citation as UarCitation, NormalizedEvent as UarNormalizedEvent},
+    uar::runtime::native_skill::NativeSkillRegistry,
+    uar::tools::web_fetch::WebFetchTool,
 };
 
 use crate::error::AgentError;
@@ -883,9 +885,28 @@ impl UarEmbeddedRuntime {
         ));
         let driver: Arc<dyn LlmDriver> = routing.clone();
         let persistence = Self::open_persistence(storage_dir).await?;
+        // The embedded runtime boots with an EMPTY native-skill registry (the
+        // vendor's register_builtins runs only in its HTTP-server composition
+        // root), so every agent-callable native capability must be registered
+        // here explicitly. Only web_fetch is exposed — deliberately NOT
+        // register_builtins(), which would also pull in file/terminal tools
+        // KnowMe has not decided to ship on-device. PDF/docx extraction inside
+        // web_fetch degrades to a clean `platformLimitation` response because
+        // the `document-intelligence` feature is off in embedded-mobile builds.
+        let native_skills = Arc::new(NativeSkillRegistry::new());
+        native_skills
+            .register(WebFetchTool {
+                timeout_secs: 30,
+                max_size_kb: 2048,
+                // Empty = any public host; the runtime's SSRF guard
+                // (fetch_guard) stays the security control.
+                allowed_domains: Vec::new(),
+            })
+            .await;
         let mut builder = universal_agent_runtime_sdk::Runtime::builder()
             .local_provider(driver, provider_config)
             .persistence(persistence)
+            .native_skills(native_skills)
             .seed_defaults(true);
         if let Some(memory) = Self::open_memory(storage_dir).await {
             builder = builder.memory_service(memory);
@@ -2389,6 +2410,34 @@ mod tests {
         assert!(saw_thinking, "reasoning must survive UAR projection");
         assert!(saw_answer, "answer text must survive UAR projection");
         assert_eq!(provider.requests.lock().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn embedded_uar_registers_the_web_fetch_native_skill() {
+        let runtime = UarEmbeddedRuntime::build_local(
+            Arc::new(RecordingInferenceProvider::default()),
+            LocalModelSpec {
+                model: "gemma-4-e2b-it-litertlm".into(),
+                context_len: Some(8_192),
+            },
+            android_litert_lm_provider_config("gemma-4-e2b-it-litertlm"),
+            None,
+        )
+        .await
+        .expect("embedded UAR builds without a transport");
+
+        // The vendor's register_builtins never runs in embedded mode, so
+        // web_fetch reaching the registry proves build_local's explicit
+        // registration — the only path that makes the tool exist on device.
+        assert!(
+            runtime
+                .runtime
+                .native_skills()
+                .get("web_fetch")
+                .await
+                .is_some(),
+            "web_fetch must be registered in the embedded runtime"
+        );
     }
 
     #[tokio::test]

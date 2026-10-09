@@ -99,9 +99,10 @@ pub struct RuntimeGateReport {
     pub error_code: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "state", rename_all = "snake_case")]
 pub enum ModelOperationState {
+    #[default]
     NotInstalled,
     Downloading {
         bytes_received: u64,
@@ -119,10 +120,4 @@ pub enum ModelOperationState {
     Failed {
         error: RunError,
     },
-}
-
-impl Default for ModelOperationState {
-    fn default() -> Self {
-        Self::NotInstalled
-    }
 }
