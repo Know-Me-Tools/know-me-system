@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KnowMe — The Company of One</title>
+<meta name="description" content="How a solo operator replicates a multi-team organization with KnowMe connected to UAR, BossFang, Fabric, Flint-Gate, Forge and The Boss — derived from the UAR governed agent teams research (24 Sep 2026)." />
+<meta name="author" content="Travis James · KnowMe" />
+<meta name="theme-color" content="#0B0F14" />
+<!-- OpenGraph -->
+<meta property="og:type" content="article" />
+<meta property="og:site_name" content="KnowMe" />
+<meta property="og:locale" content="en_US" />
+<meta property="og:title" content="KnowMe — The Company of One" />
+<meta property="og:description" content="How a solo operator runs strategy, finance, marketing, product, design, engineering, security and customer intelligence as governed agent teams — KnowMe as the personal cockpit, UAR and its fabric doing the work under authority you issue, scope and revoke." />
+<meta property="og:image" content="https://ipfs.prometheusags.ai/ipfs/QmfWdYPpLGtksNHeyFvJ5bt2WwNzWwwvyWifaAhgVxPNky" />
+<meta property="og:image:secure_url" content="https://ipfs.prometheusags.ai/ipfs/QmfWdYPpLGtksNHeyFvJ5bt2WwNzWwwvyWifaAhgVxPNky" />
+<meta property="og:image:type" content="image/png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="KnowMe architecture brief: The company of one — hero section with the document's table of contents." />
+<meta property="article:published_time" content="2026-09-24T00:00:00-05:00" />
+<meta property="article:author" content="Travis James" />
+<meta property="article:section" content="Architecture" />
+<meta property="article:tag" content="KnowMe" />
+<meta property="article:tag" content="UAR" />
+<meta property="article:tag" content="Agent teams" />
+<meta property="article:tag" content="Cedar governance" />
+<!-- Twitter / X -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="KnowMe — The Company of One" />
+<meta name="twitter:description" content="How a solo operator runs strategy, finance, marketing, product, design, engineering, security and customer intelligence as governed agent teams — KnowMe as the personal cockpit, UAR and its fabric doing the work under authority you issue, scope and revoke." />
+<meta name="twitter:image" content="https://ipfs.prometheusags.ai/ipfs/QmfWdYPpLGtksNHeyFvJ5bt2WwNzWwwvyWifaAhgVxPNky" />
+<meta name="twitter:image:alt" content="KnowMe architecture brief: The company of one — hero section with the document's table of contents." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js" defer></script>
+<style>
+  /* ── KnowMe tokens · Flat 2.0: regions differ only by background ── */
+  :root, [data-theme="dark"] {
+    --bg:#0B0F14; --bg-2:#111620; --surface:#141B26; --card:#1C2535; --card-2:#222D40; --muted:#2A3548;
+    --fg:#E8EDF3; --fg-sub:#A7B0BC; --fg-faint:#8A93A3; --on-accent:#0B0F14;
+    --ember:#FF6A3D; --ember-soft:rgba(255,106,61,.14); --ember-tint:rgba(255,106,61,.07);
+    --cyan:#00C2DC;  --cyan-soft:rgba(0,194,220,.14);
+    --green:#22C55E; --green-soft:rgba(34,197,94,.14);
+    --amber:#F59E0B; --amber-soft:rgba(245,158,11,.16);
+    --red:#EF4444;   --red-soft:rgba(239,68,68,.14);
+    --line:#5B6577;
+  }
+  [data-theme="light"] {
+    --bg:#F5F6F8; --bg-2:#FFFFFF; --surface:#EBEEF2; --card:#FFFFFF; --card-2:#F4F6F9; --muted:#DDE2E9;
+    --fg:#0B0F14; --fg-sub:#414B5A; --fg-faint:#5B6472; --on-accent:#FFFFFF;
+    --ember:#D2461F; --ember-soft:rgba(210,70,31,.12); --ember-tint:rgba(210,70,31,.05);
+    --cyan:#0A7F9C;  --cyan-soft:rgba(10,127,156,.12);
+    --green:#15803D; --green-soft:rgba(21,128,61,.12);
+    --amber:#B45309; --amber-soft:rgba(180,83,9,.12);
+    --red:#B91C1C;   --red-soft:rgba(185,28,28,.10);
+    --line:#8A93A3;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior:smooth; scroll-padding-top:72px; }
+  @media (prefers-reduced-motion: reduce){ html{ scroll-behavior:auto; } }
+  body { font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--fg); line-height:1.62; font-size:16px; -webkit-font-smoothing:antialiased; }
+  a { color:var(--cyan); text-underline-offset:3px; }
+  a:focus-visible, button:focus-visible { outline:2px solid var(--ember); outline-offset:2px; border-radius:6px; }
+  code, .mono { font-family:'JetBrains Mono',ui-monospace,monospace; font-size:.86em; }
+  code { background:var(--muted); padding:1px 6px; border-radius:5px; color:var(--fg); overflow-wrap:anywhere; }
+
+  /* Top bar */
+  .topnav { position:sticky; top:0; z-index:50; background:var(--bg-2); padding:12px 16px; display:flex; align-items:center; gap:14px; }
+  .lockup { display:flex; align-items:center; gap:10px; color:var(--fg); text-decoration:none; }
+  .wordmark { font-family:'Space Grotesk',sans-serif; font-size:19px; font-weight:700; letter-spacing:-.025em; line-height:1; }
+  .wordmark .me { color:var(--ember); }
+  .doc-meta { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--fg-faint); letter-spacing:.06em; text-transform:uppercase; }
+  .spacer { flex:1; }
+  .btn { background:var(--muted); color:var(--fg); border:0; border-radius:999px; padding:7px 14px; font:500 13px 'Inter',sans-serif; cursor:pointer; min-height:36px; }
+  .btn:hover { background:var(--card-2); }
+  @media (max-width:640px){ .doc-meta{ display:none; } }
+
+  /* Layout */
+  .shell { display:grid; grid-template-columns:240px minmax(0,1fr); max-width:1280px; margin:0 auto; }
+  .toc { position:sticky; top:60px; align-self:start; height:calc(100vh - 60px); overflow:auto; padding:28px 12px 28px 20px; }
+  .toc p { font:600 10.5px 'JetBrains Mono',monospace; letter-spacing:.08em; color:var(--fg-faint); text-transform:uppercase; margin:0 0 10px 10px; }
+  .toc a { display:block; color:var(--fg-sub); text-decoration:none; font-size:13.5px; padding:6px 10px; border-radius:8px; }
+  .toc a:hover { background:var(--surface); color:var(--fg); }
+  .toc a .n { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--fg-faint); margin-right:8px; }
+  main { padding:0 16px 96px; min-width:0; }
+  @media (max-width:980px){ .shell{ grid-template-columns:1fr; } .toc{ display:none; } }
+  .wrap { max-width:920px; margin:0 auto; }
+
+  /* Hero */
+  .hero { background:var(--surface); border-radius:22px; padding:44px 36px 38px; margin:28px 0 12px; position:relative; overflow:hidden; }
+  .hero::after { content:""; position:absolute; right:-120px; top:-120px; width:360px; height:360px; border-radius:50%; background:var(--ember-tint); }
+  .eyebrow { font:600 11px 'JetBrains Mono',monospace; letter-spacing:.1em; color:var(--ember); text-transform:uppercase; }
+  h1 { font-family:'Space Grotesk',sans-serif; font-size:clamp(34px,6vw,58px); line-height:1.02; letter-spacing:-.035em; margin:14px 0 18px; max-width:15ch; position:relative; z-index:1; }
+  h1 .me { color:var(--ember); }
+  .lede { font-size:18.5px; color:var(--fg-sub); max-width:62ch; position:relative; z-index:1; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:24px; position:relative; z-index:1; }
+  .chip { font:500 12px 'JetBrains Mono',monospace; background:var(--card); color:var(--fg-sub); padding:6px 11px; border-radius:999px; }
+  .chip.ember { background:var(--ember-soft); color:var(--ember); }
+  .chip.cyan { background:var(--cyan-soft); color:var(--cyan); }
+  @media (max-width:640px){ .hero{ padding:30px 20px 26px; border-radius:18px; } .lede{ font-size:16.5px; } }
+
+  /* Sections */
+  section { padding:56px 0 8px; }
+  .sec-num { font:600 11px 'JetBrains Mono',monospace; letter-spacing:.1em; color:var(--ember); }
+  h2 { font-family:'Space Grotesk',sans-serif; font-size:clamp(26px,3.6vw,34px); letter-spacing:-.025em; line-height:1.12; margin:6px 0 16px; }
+  h3 { font-family:'Space Grotesk',sans-serif; font-size:20px; letter-spacing:-.015em; margin:30px 0 10px; }
+  p { margin:0 0 14px; color:var(--fg-sub); max-width:72ch; }
+  p strong, li strong { color:var(--fg); }
+  ul.clean { list-style:none; margin:0 0 16px; }
+  ul.clean li { position:relative; padding-left:20px; margin:0 0 8px; color:var(--fg-sub); max-width:72ch; }
+  ul.clean li::before { content:""; position:absolute; left:2px; top:.66em; width:7px; height:7px; border-radius:2px; background:var(--ember); }
+
+  /* Callouts */
+  .callout { background:var(--surface); border-radius:16px; padding:20px 22px; margin:20px 0; }
+  .callout.ember { background:var(--ember-tint); }
+  .callout.cyan { background:var(--cyan-soft); }
+  .callout .k { font:600 10.5px 'JetBrains Mono',monospace; letter-spacing:.09em; text-transform:uppercase; color:var(--ember); display:block; margin-bottom:6px; }
+  .callout.cyan .k { color:var(--cyan); }
+  .callout p:last-child { margin-bottom:0; }
+
+  /* Pull quote */
+  .pull { font-family:'Space Grotesk',sans-serif; font-size:clamp(20px,2.6vw,25px); line-height:1.3; letter-spacing:-.015em; color:var(--fg); padding:6px 0 6px 20px; margin:26px 0; position:relative; max-width:40ch; }
+  .pull::before { content:""; position:absolute; left:0; top:4px; bottom:4px; width:4px; border-radius:4px; background:var(--ember); }
+
+  /* Figures */
+  figure { background:var(--surface); border-radius:20px; padding:22px 18px 16px; margin:26px 0; }
+  .fig-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .fig-scroll svg { display:block; width:100%; min-width:720px; height:auto; }
+  figcaption { font-size:13px; color:var(--fg-faint); padding:12px 6px 0; }
+  figcaption b { color:var(--fg-sub); font-weight:600; }
+  .swipe-hint { display:none; font:500 11px 'JetBrains Mono',monospace; color:var(--fg-faint); padding:0 6px 8px; }
+  @media (max-width:760px){ .swipe-hint{ display:block; } }
+
+  /* SVG vocabulary */
+  svg text { font-family:'Inter',sans-serif; }
+  .f-bg{fill:var(--bg)} .f-surface{fill:var(--surface)} .f-card{fill:var(--card)} .f-card2{fill:var(--card-2)} .f-muted{fill:var(--muted)}
+  .f-ember{fill:var(--ember)} .f-ember-soft{fill:var(--ember-soft)} .f-cyan{fill:var(--cyan)} .f-cyan-soft{fill:var(--cyan-soft)}
+  .f-green{fill:var(--green)} .f-green-soft{fill:var(--green-soft)} .f-amber{fill:var(--amber)} .f-amber-soft{fill:var(--amber-soft)} .f-red-soft{fill:var(--red-soft)} .f-red{fill:var(--red)}
+  .t-fg{fill:var(--fg)} .t-sub{fill:var(--fg-sub)} .t-faint{fill:var(--fg-faint)} .t-ember{fill:var(--ember)} .t-cyan{fill:var(--cyan)} .t-green{fill:var(--green)} .t-amber{fill:var(--amber)} .t-red{fill:var(--red)} .t-on{fill:var(--on-accent)}
+  .t-title{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px}
+  .t-big{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:20px}
+  .t-body{font-size:12px}
+  .t-label{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em;font-weight:600}
+  .ln{stroke:var(--line);stroke-width:1.6;fill:none}
+  .ln-ember{stroke:var(--ember);stroke-width:2;fill:none}
+  .ln-cyan{stroke:var(--cyan);stroke-width:1.8;fill:none}
+  .ln-red{stroke:var(--red);stroke-width:1.6;fill:none}
+  .dash{stroke-dasharray:5 5}
+  .mk-line{fill:var(--line)} .mk-ember{fill:var(--ember)} .mk-cyan{fill:var(--cyan)} .mk-red{fill:var(--red)}
+
+  /* Tables (Flat 2.0: zebra backgrounds, no rules) */
+  .tbl { overflow-x:auto; margin:18px 0 22px; border-radius:16px; background:var(--surface); }
+  table { width:100%; border-collapse:collapse; font-size:14px; min-width:620px; }
+  th { text-align:left; font:600 10.5px 'JetBrains Mono',monospace; letter-spacing:.08em; text-transform:uppercase; color:var(--fg-faint); padding:14px 16px 10px; background:var(--surface); }
+  td { padding:12px 16px; vertical-align:top; color:var(--fg-sub); }
+  td:first-child { color:var(--fg); font-weight:600; }
+  tbody tr:nth-child(odd) td { background:var(--card); }
+  tbody tr:nth-child(even) td { background:var(--card-2); }
+  tbody tr:last-child td:first-child { border-bottom-left-radius:16px; }
+  tbody tr:last-child td:last-child { border-bottom-right-radius:16px; }
+
+  /* Badges */
+  .badge { display:inline-block; font:600 10px 'JetBrains Mono',monospace; letter-spacing:.06em; text-transform:uppercase; padding:3px 8px; border-radius:999px; white-space:nowrap; vertical-align:1px; }
+  .b-exists { background:var(--green-soft); color:var(--green); }
+  .b-spec { background:var(--cyan-soft); color:var(--cyan); }
+  .b-prop { background:var(--amber-soft); color:var(--amber); }
+  .b-gap { background:var(--red-soft); color:var(--red); }
+  .b-doc { background:var(--ember-soft); color:var(--ember); }
+
+  /* Card grid */
+  .grid { display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); margin:18px 0; }
+  .card { background:var(--surface); border-radius:16px; padding:18px 18px 16px; }
+  .card h4 { font-family:'Space Grotesk',sans-serif; font-size:16.5px; letter-spacing:-.01em; margin:4px 0 8px; }
+  .card p { font-size:14px; margin:0 0 8px; }
+  .card .k { font:600 10px 'JetBrains Mono',monospace; letter-spacing:.09em; color:var(--ember); text-transform:uppercase; }
+  .card.cy .k { color:var(--cyan); }
+
+  /* Team tabs (htmx hx-on driven) */
+  .tabs { display:flex; flex-wrap:wrap; gap:6px; margin:18px 0 0; }
+  .tab { background:var(--surface); color:var(--fg-sub); border:0; border-radius:999px; padding:8px 14px; font:500 13.5px 'Inter',sans-serif; cursor:pointer; min-height:40px; }
+  .tab[aria-selected="true"] { background:var(--ember); color:var(--on-accent); }
+  .panel { background:var(--surface); border-radius:18px; padding:22px; margin-top:12px; }
+  .panel[hidden] { display:none; }
+  .panel .cols { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-top:10px; }
+  .panel .col { background:var(--card); border-radius:12px; padding:14px 16px; }
+  .panel .col .k { font:600 10px 'JetBrains Mono',monospace; letter-spacing:.09em; color:var(--fg-faint); text-transform:uppercase; display:block; margin-bottom:6px; }
+  .panel .col p, .panel .col li { font-size:14px; }
+  .roles { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 4px; }
+  .role { background:var(--card); color:var(--fg); font-size:13px; padding:5px 10px; border-radius:8px; }
+
+  /* Steps */
+  ol.steps { list-style:none; counter-reset:s; margin:16px 0; }
+  ol.steps li { counter-increment:s; position:relative; padding:14px 16px 14px 58px; background:var(--surface); border-radius:14px; margin-bottom:8px; color:var(--fg-sub); }
+  ol.steps li::before { content:counter(s); position:absolute; left:16px; top:13px; width:28px; height:28px; border-radius:8px; background:var(--ember-soft); color:var(--ember); font:700 13px 'JetBrains Mono',monospace; display:grid; place-items:center; }
+  ol.steps li strong { color:var(--fg); }
+
+  footer { background:var(--bg-2); padding:36px 16px 48px; margin-top:40px; }
+  footer .wrap { color:var(--fg-faint); font-size:13px; }
+  footer p { color:var(--fg-faint); font-size:13px; }
+  .src li { margin-bottom:6px; font-size:13.5px; }
+</style>
+</head>
+<body>
+
+<!-- Shared SVG markers -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk-line"/></marker>
+    <marker id="ah-e" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk-ember"/></marker>
+    <marker id="ah-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk-cyan"/></marker>
+    <marker id="ah-r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk-red"/></marker>
+  </defs>
+</svg>
+
+<nav class="topnav" aria-label="Document">
+  <a class="lockup" href="#top" aria-label="KnowMe — back to top">
+    <svg viewBox="0 0 200 200" width="28" height="28" aria-hidden="true">
+      <g transform="translate(50,38)">
+        <rect x="0" y="0" width="20" height="124" rx="10" fill="currentColor"/>
+        <path d="M16,62 C26,52 44,32 62,18 C72,10 80,8 84,14 C86,18 82,24 76,28 C60,40 40,56 28,66 C22,70 18,68 16,64 Z" fill="currentColor"/>
+        <path d="M16,62 C26,72 44,92 62,106 C72,114 80,116 84,110 C86,106 82,100 76,96 C60,84 40,68 28,58 C22,54 18,56 16,60 Z" fill="currentColor"/>
+        <circle cx="18" cy="62" r="10" fill="var(--ember)"/>
+      </g>
+    </svg>
+    <span class="wordmark">Know<span class="me">Me</span></span>
+  </a>
+  <span class="doc-meta">Company of One · Architecture Brief · Proposal</span>
+  <span class="spacer"></span>
+  <button class="btn" id="themeBtn" type="button" aria-label="Toggle light or dark theme"
+          hx-on:click="kmToggleTheme()">☀ Light</button>
+</nav>
+
+<div class="shell">
+  <aside class="toc" aria-label="Contents">
+    <p>Contents</p>
+    <a href="#premise"><span class="n">01</span>The premise</a>
+    <a href="#cockpit"><span class="n">02</span>KnowMe as cockpit</a>
+    <a href="#fabric"><span class="n">03</span>The fabric stack</a>
+    <a href="#model"><span class="n">04</span>What you actually own</a>
+    <a href="#teams"><span class="n">05</span>Your teams</a>
+    <a href="#offices"><span class="n">06</span>Your executive offices</a>
+    <a href="#authority"><span class="n">07</span>Staying in control</a>
+    <a href="#day"><span class="n">08</span>A day in the company</a>
+    <a href="#modes"><span class="n">09</span>How agents stay alive</a>
+    <a href="#status"><span class="n">10</span>What's real today</a>
+    <a href="#roadmap"><span class="n">11</span>Build sequence</a>
+    <a href="#tests"><span class="n">12</span>Must-pass scenarios</a>
+    <a href="#decisions"><span class="n">13</span>Open decisions</a>
+    <a href="#sources"><span class="n">—</span>Sources</a>
+  </aside>
+
+  <main id="top">
+    <div class="wrap">
+
+      <header class="hero">
+        <span class="eyebrow">KnowMe · Architecture brief · 24 Sep 2026</span>
+        <h1>The company <span class="me">of one.</span></h1>
+        <p class="lede">How a single operator runs strategy, finance, marketing, product, design, engineering, security and customer intelligence as governed agent teams — with KnowMe as the personal cockpit and the Universal Agent Runtime (UAR) and its fabric doing the work under authority you issue, scope and revoke.</p>
+        <div class="chips">
+          <span class="chip ember">Proposal · no implementation changes</span>
+          <span class="chip">Source: UAR governed agent teams research</span>
+          <span class="chip">Confidence 0.86 · verification partial</span>
+          <span class="chip cyan">60 indexed sources</span>
+        </div>
+      </header>
+
+      <!-- 01 PREMISE -->
+      <section id="premise">
+        <span class="sec-num">01 · THE PREMISE</span>
+        <h2>One accountable human. Many offices. Every office is a governed team.</h2>
+        <p>A solo business still has the functions of a company: someone sets strategy, someone watches cash, someone ships product, someone talks to customers, someone worries about security. In a company of one, <strong>you hold every office</strong>. The goal is not to invent a crowd of executive personas. It is to give each office a <strong>reusable, governed agent team</strong> that does the work, while you keep the decisions that carry real authority.</p>
+        <p>The research behind this brief makes the order of operations explicit: <strong>governance closure → lossless definitions → bounded teams → durable business workflows → consented executive representation → federation.</strong> A roster of executive "twins" before those foundations is the wrong way round. That is even more true for a solo operator: when one person holds every office, a badly scoped CEO agent effectively holds all of them.</p>
+
+        <figure>
+          <div class="swipe-hint">← swipe diagram →</div>
+          <div class="fig-scroll">
+          <svg viewBox="0 0 960 575" role="img" aria-labelledby="d1t d1d">
+            <title id="d1t">The company of one</title>
+            <desc id="d1d">You at the top as the sole accountable human, KnowMe as your cockpit, eight offices each instantiated as a governed UAR team, and the fabric layer underneath.</desc>
+            <!-- You -->
+            <rect x="360" y="18" width="240" height="70" rx="16" class="f-ember"/>
+            <text x="480" y="48" text-anchor="middle" class="t-big t-on">You</text>
+            <text x="480" y="70" text-anchor="middle" class="t-body t-on">sole accountable human · final approver</text>
+            <line x1="480" y1="88" x2="480" y2="116" class="ln-ember" marker-end="url(#ah-e)"/>
+            <!-- KnowMe bar -->
+            <rect x="170" y="120" width="620" height="60" rx="14" class="f-card"/>
+            <text x="200" y="146" class="t-title t-fg">Know<tspan class="t-ember">Me</tspan> — your cockpit</text>
+            <text x="200" y="166" class="t-body t-sub">consented personal context · memory · goals · approvals inbox · morning brief</text>
+            <text x="770" y="146" text-anchor="end" class="t-label t-faint">MOBILE · DESKTOP · WEB</text>
+            <line x1="480" y1="180" x2="480" y2="218" class="ln" marker-end="url(#ah)"/>
+            <!-- Office group -->
+            <rect x="15" y="222" width="930" height="262" rx="18" class="f-bg"/>
+            <text x="35" y="243" class="t-label t-faint">EACH OFFICE = A GOVERNED UAR TEAM, INSTANTIATED FROM PORTABLE DEFINITIONS</text>
+            <!-- Row 1 -->
+            <g>
+              <rect x="30" y="255" width="215" height="100" rx="12" class="f-card"/>
+              <text x="46" y="277" class="t-label t-ember">CEO · STRATEGY</text>
+              <text x="46" y="299" class="t-title t-fg">Strategy office</text>
+              <text x="46" y="320" class="t-body t-sub">Synthesis · operating review</text>
+              <text x="46" y="338" class="t-body t-sub">Scenario comparison</text>
+            </g>
+            <g>
+              <rect x="258" y="255" width="215" height="100" rx="12" class="f-card"/>
+              <text x="274" y="277" class="t-label t-ember">CFO · FINANCE</text>
+              <text x="274" y="299" class="t-title t-fg">Finance office</text>
+              <text x="274" y="320" class="t-body t-sub">Forecasts · variance analysis</text>
+              <text x="274" y="338" class="t-body t-sub">Reconciliation preparation</text>
+            </g>
+            <g>
+              <rect x="486" y="255" width="215" height="100" rx="12" class="f-card"/>
+              <text x="502" y="277" class="t-label t-ember">CMO · MARKETING</text>
+              <text x="502" y="299" class="t-title t-fg">Marketing team</text>
+              <text x="502" y="320" class="t-body t-sub">Research · positioning · brand</text>
+              <text x="502" y="338" class="t-body t-sub">Channels · measurement</text>
+            </g>
+            <g>
+              <rect x="714" y="255" width="215" height="100" rx="12" class="f-card"/>
+              <text x="730" y="277" class="t-label t-ember">CPO · PRODUCT</text>
+              <text x="730" y="299" class="t-title t-fg">Product team</text>
+              <text x="730" y="320" class="t-body t-sub">Discovery · feedback analysis</text>
+              <text x="730" y="338" class="t-body t-sub">Prioritization · experiments</text>
+            </g>
+            <!-- Row 2 -->
+            <g>
+              <rect x="30" y="370" width="215" height="100" rx="12" class="f-card"/>
+              <text x="46" y="392" class="t-label t-cyan">CTO · DEVELOPMENT</text>
+              <text x="46" y="414" class="t-title t-fg">Development team</text>
+              <text x="46" y="435" class="t-body t-sub">Architect · implementers · tests</text>
+              <text x="46" y="453" class="t-body t-sub">Standards &amp; security review</text>
+            </g>
+            <g>
+              <rect x="258" y="370" width="215" height="100" rx="12" class="f-card"/>
+              <text x="274" y="392" class="t-label t-cyan">DESIGN</text>
+              <text x="274" y="414" class="t-title t-fg">Design team</text>
+              <text x="274" y="435" class="t-body t-sub">Identity · mobile UX · web UI</text>
+              <text x="274" y="453" class="t-body t-sub">Accessibility review</text>
+            </g>
+            <g>
+              <rect x="486" y="370" width="215" height="100" rx="12" class="f-card"/>
+              <text x="502" y="392" class="t-label t-cyan">CISO · SECURITY</text>
+              <text x="502" y="414" class="t-title t-fg">Security office</text>
+              <text x="502" y="435" class="t-body t-sub">Threat &amp; control analysis</text>
+              <text x="502" y="453" class="t-body t-sub">Incident coordination</text>
+            </g>
+            <g>
+              <rect x="714" y="370" width="215" height="100" rx="12" class="f-card"/>
+              <text x="730" y="392" class="t-label t-cyan">CUSTOMER INTEL</text>
+              <text x="730" y="414" class="t-title t-fg">Customer intelligence</text>
+              <text x="730" y="435" class="t-body t-sub">Intake observer · deduplication</text>
+              <text x="730" y="453" class="t-body t-sub">Issue drafting · responses</text>
+            </g>
+            <line x1="480" y1="484" x2="480" y2="512" class="ln" marker-end="url(#ah)"/>
+            <!-- Fabric strip -->
+            <rect x="15" y="515" width="930" height="48" rx="14" class="f-cyan-soft"/>
+            <text x="35" y="544" class="t-label t-cyan">FABRIC</text>
+            <text x="100" y="544" class="t-body t-fg">UAR execution · Cedar action gate · BossFang channels · Fabric events · Flint-Gate identity · Forge stores · The Boss admin</text>
+          </svg>
+          </div>
+          <figcaption><b>Figure 1.</b> The company of one. Office names are labels for work, not credentials. The reporting hierarchy is not a permission hierarchy, so the Strategy office cannot inherit Finance's authority.</figcaption>
+        </figure>
+
+        <div class="callout ember">
+          <span class="k">The solo-operator rule</span>
+          <p>Create a team only when <strong>parallel work, independent review, or separate authority</strong> justifies the coordination cost. Most days, one agent with the right skill is enough. Multi-agent mode has to earn its place in accepted-result quality or time, against a single-agent baseline.</p>
+        </div>
+      </section>
+
+      <!-- 02 COCKPIT -->
+      <section id="cockpit">
+        <span class="sec-num">02 · KNOWME AS COCKPIT</span>
+        <h2>KnowMe is where the person lives. UAR is where the work runs.</h2>
+        <p>In the proposed split, KnowMe supplies <strong>consented context and personal representation</strong>. It is the surface where you see what your teams are doing, answer approvals, set goals and decide what each agent may know about you. It does not run the teams. That boundary is what lets the business outlive any single device, and it is what keeps your private memory out of your business agents.</p>
+
+        <div class="grid">
+          <div class="card"><span class="k">Context</span><h4>Consented personal context</h4><p>Your memory, notes and preferences stay yours. Business agents get an explicit, scoped slice under a representation grant, never your whole history because you hold an office.</p></div>
+          <div class="card"><span class="k">Attention</span><h4>One approvals inbox</h4><p>One approval request per external action, visible in KnowMe and The Boss alike. No duplicate queues. Routine steps run under standing scoped grants so you are not asked twice.</p></div>
+          <div class="card"><span class="k">Direction</span><h4>Goals and engagements</h4><p>Objectives and engagements are gated state machines (<code>prometheus-container</code>). Agents propose and cite evidence. Completing a commitment stays a human act.</p></div>
+          <div class="card"><span class="k">Rhythm</span><h4>Morning brief</h4><p>Your operating review: what each team finished, what is waiting on you, which effects are in an unknown state, and which grants are about to expire.</p></div>
+          <div class="card cy"><span class="k">Identity</span><h4>Agents are principals</h4><p>Each deployed agent instance gets its own <code>did:key</code>. Every governed action carries <em>you as subject</em> and <em>the agent as actor</em>, so "what did this agent do on my behalf" is a query.</p></div>
+          <div class="card cy"><span class="k">Placement</span><h4>Same contracts on every device</h4><p>An embedded UAR kernel on mobile, and full UAR on desktop or server. Capabilities are negotiated. A high-assurance profile never silently downgrades on a phone.</p></div>
+        </div>
+      </section>
+
+      <!-- 03 FABRIC -->
+      <section id="fabric">
+        <span class="sec-num">03 · THE FABRIC STACK</span>
+        <h2>Who owns what, from your thumb to the final API call.</h2>
+        <p>This is a <strong>proposed responsibility split</strong>, not a diagram of an already integrated deployment. Each component has one job, and each authoritative record has one owner.</p>
+
+        <figure>
+          <div class="swipe-hint">← swipe diagram →</div>
+          <div class="fig-scroll">
+          <svg viewBox="0 0 960 640" role="img" aria-labelledby="d2t d2d">
+            <title id="d2t">KnowMe fabric stack</title>
+            <desc id="d2d">You and outside channels enter through KnowMe, The Boss and BossFang. UAR team and workflow control schedules runs on the existing thread and actor host. Every external effect passes through a trusted action gate backed by Flint-Gate identity, then through a connector broker to SaaS systems. Fabric carries events between BossFang and UAR. Forge holds durable records.</desc>
+            <!-- Row A -->
+            <rect x="40" y="16" width="260" height="54" rx="14" class="f-ember"/>
+            <text x="170" y="40" text-anchor="middle" class="t-title t-on">You</text>
+            <text x="170" y="58" text-anchor="middle" class="t-body t-on">phone · desktop · web</text>
+            <rect x="640" y="16" width="280" height="54" rx="14" class="f-muted"/>
+            <text x="780" y="40" text-anchor="middle" class="t-title t-fg">Customers &amp; channels</text>
+            <text x="780" y="58" text-anchor="middle" class="t-body t-sub">Slack · email · support · webhooks</text>
+            <!-- Row B -->
+            <rect x="40" y="108" width="260" height="78" rx="14" class="f-card"/>
+            <text x="58" y="132" class="t-label t-ember">KNOWME</text>
+            <text x="58" y="152" class="t-title t-fg">Personal cockpit</text>
+            <text x="58" y="172" class="t-body t-sub">consented context · goals · approvals</text>
+            <rect x="340" y="108" width="260" height="78" rx="14" class="f-card"/>
+            <text x="358" y="132" class="t-label t-ember">THE BOSS</text>
+            <text x="358" y="152" class="t-title t-fg">Administration</text>
+            <text x="358" y="172" class="t-body t-sub">catalog · task graph · budgets · audit</text>
+            <rect x="640" y="108" width="280" height="78" rx="14" class="f-card"/>
+            <text x="658" y="132" class="t-label t-ember">BOSSFANG</text>
+            <text x="658" y="152" class="t-title t-fg">Channels &amp; app orchestration</text>
+            <text x="658" y="172" class="t-body t-sub">ingress · normalization · schedules</text>
+            <line x1="170" y1="70" x2="170" y2="104" class="ln-ember" marker-end="url(#ah-e)"/>
+            <path d="M260,70 C300,90 360,86 400,104" class="ln-ember" marker-end="url(#ah-e)"/>
+            <line x1="780" y1="70" x2="780" y2="104" class="ln" marker-end="url(#ah)"/>
+            <!-- Row C: UAR control -->
+            <rect x="200" y="230" width="560" height="74" rx="14" class="f-ember-soft"/>
+            <text x="222" y="256" class="t-label t-ember">UAR · NEW CONTROL LAYER</text>
+            <text x="222" y="278" class="t-title t-fg">Team &amp; workflow control</text>
+            <text x="222" y="295" class="t-body t-sub">definition resolution · membership · task claims · durable waits · budgets</text>
+            <line x1="170" y1="186" x2="300" y2="226" class="ln" marker-end="url(#ah)"/>
+            <line x1="470" y1="186" x2="470" y2="226" class="ln" marker-end="url(#ah)"/>
+            <!-- Fabric (right column) -->
+            <rect x="800" y="230" width="140" height="170" rx="14" class="f-cyan-soft"/>
+            <text x="870" y="258" text-anchor="middle" class="t-label t-cyan">FABRIC</text>
+            <text x="870" y="282" text-anchor="middle" class="t-body t-fg">routed events</text>
+            <text x="870" y="300" text-anchor="middle" class="t-body t-fg">&amp; commands</text>
+            <text x="870" y="330" text-anchor="middle" class="t-body t-sub">subscriptions</text>
+            <text x="870" y="348" text-anchor="middle" class="t-body t-sub">delivery progress</text>
+            <text x="870" y="366" text-anchor="middle" class="t-body t-sub">bounded replay</text>
+            <line x1="870" y1="186" x2="870" y2="226" class="ln-cyan" marker-end="url(#ah-c)" marker-start="url(#ah-c)"/>
+            <line x1="764" y1="267" x2="796" y2="267" class="ln-cyan" marker-end="url(#ah-c)" marker-start="url(#ah-c)"/>
+            <!-- Forge (left column) -->
+            <rect x="20" y="230" width="150" height="112" rx="14" class="f-card"/>
+            <text x="38" y="256" class="t-label t-faint">FORGE</text>
+            <text x="38" y="278" class="t-title t-fg">Durable stores</text>
+            <text x="38" y="298" class="t-body t-sub">grants · tasks · runs</text>
+            <text x="38" y="316" class="t-body t-sub">one owner per record</text>
+            <line x1="170" y1="267" x2="196" y2="267" class="ln dash"/>
+            <!-- Row D: host -->
+            <rect x="200" y="324" width="560" height="60" rx="14" class="f-card"/>
+            <text x="222" y="350" class="t-label t-green">UAR · EXISTS TODAY</text>
+            <text x="222" y="370" class="t-body t-fg">Thread / actor / run host — child lineage, attenuation, mailboxes, one tool loop</text>
+            <line x1="480" y1="304" x2="480" y2="320" class="ln" marker-end="url(#ah)"/>
+            <!-- Row E: gate -->
+            <rect x="200" y="410" width="560" height="74" rx="14" class="f-cyan-soft"/>
+            <text x="222" y="436" class="t-label t-cyan">TRUSTED ACTION GATE</text>
+            <text x="222" y="458" class="t-title t-fg">Identity · Cedar · approvals · budgets</text>
+            <text x="222" y="475" class="t-body t-sub">one gate for managed, direct, embedded and remote paths · recheck before effect</text>
+            <line x1="480" y1="384" x2="480" y2="406" class="ln" marker-end="url(#ah)"/>
+            <!-- Flint-Gate -->
+            <rect x="20" y="410" width="150" height="74" rx="14" class="f-card"/>
+            <text x="38" y="436" class="t-label t-faint">FLINT-GATE</text>
+            <text x="38" y="458" class="t-title t-fg">Identity</text>
+            <text x="38" y="475" class="t-body t-sub">sub = you · act = agent</text>
+            <line x1="170" y1="447" x2="196" y2="447" class="ln-cyan" marker-end="url(#ah-c)"/>
+            <!-- Row F: broker -->
+            <rect x="200" y="508" width="560" height="54" rx="14" class="f-card"/>
+            <text x="222" y="540" class="t-body t-fg"><tspan class="t-label t-faint">CONNECTORS  </tspan> adapters + credential broker — no shared owner tokens</text>
+            <line x1="480" y1="484" x2="480" y2="504" class="ln" marker-end="url(#ah)"/>
+            <!-- Row G: SaaS -->
+            <rect x="200" y="584" width="560" height="44" rx="14" class="f-muted"/>
+            <text x="480" y="611" text-anchor="middle" class="t-body t-fg">Notion · Slack · Jira · GitHub · finance &amp; business systems</text>
+            <line x1="480" y1="562" x2="480" y2="580" class="ln" marker-end="url(#ah)"/>
+            <!-- side note -->
+            <text x="800" y="440" class="t-label t-faint">ONE EXECUTION</text>
+            <text x="800" y="456" class="t-label t-faint">OWNER PER TASK</text>
+            <text x="800" y="480" class="t-body t-sub">BossFang may call a</text>
+            <text x="800" y="496" class="t-body t-sub">UAR team as a remote</text>
+            <text x="800" y="512" class="t-body t-sub">task; both never advance</text>
+            <text x="800" y="528" class="t-body t-sub">the same task's state.</text>
+          </svg>
+          </div>
+          <figcaption><b>Figure 2.</b> Proposed responsibility split. Green marks inspected, existing UAR infrastructure. Ember marks the missing collaboration layer. Cyan marks the boundaries that carry authority and events.</figcaption>
+        </figure>
+
+        <div class="tbl"><table>
+          <thead><tr><th>Component</th><th>Owns</th><th>Must not</th></tr></thead>
+          <tbody>
+            <tr><td>KnowMe</td><td>Your consented context, representation profiles, goals, approvals surface</td><td>Hand an office holder's full private memory to organizational agents</td></tr>
+            <tr><td>UAR</td><td>Execution truth: definition resolution, instance binding, child admission, workflow state, result contracts, budget charging, host-side action gates</td><td>Add a second token/tool loop inside each run; depend on BossFang to run standalone</td></tr>
+            <tr><td>BossFang</td><td>Channel subscriptions, inbound normalization, app routing, schedules</td><td>Advance a task that UAR is executing; turn an external sender string into a trusted principal</td></tr>
+            <tr><td>Fabric</td><td>Canonical envelopes, routing, subscription authorization, delivery and replay</td><td>Decide who may act just because a message arrived</td></tr>
+            <tr><td>Flint-Gate</td><td>Verified identity; short-lived, audience-scoped delegated tokens</td><td>Pass tokens through; treat signed discovery metadata as authority</td></tr>
+            <tr><td>Forge</td><td>Designated durable records behind versioned APIs</td><td>Let generic sync rewrite grants or task ownership</td></tr>
+            <tr><td>The Boss</td><td>Team catalog, placement, live task graph, authority explanations, budgets, audit, shutdown and revocation</td><td>Keep a second approval queue for the same external action</td></tr>
+          </tbody>
+        </table></div>
+      </section>
+
+      <!-- 04 MODEL -->
+      <section id="model">
+        <span class="sec-num">04 · WHAT YOU ACTUALLY OWN</span>
+        <h2>Definitions travel. Identity and authority stay home.</h2>
+        <p>Replicating an organization is mostly a modeling problem. The research separates things that are usually collapsed into one "agent" string. For a solo operator, this separation is what lets you share a team template with a peer, hire your first employee into an office, or sell the business without leaking your personal history or your authority.</p>
+
+        <figure>
+          <div class="swipe-hint">← swipe diagram →</div>
+          <div class="fig-scroll">
+          <svg viewBox="0 0 960 470" role="img" aria-labelledby="d3t d3d">
+            <title id="d3t">Entity model</title>
+            <desc id="d3d">Three columns: portable signed definitions, installed instances with their own identities, and private authority records you issue. Below them are execution records produced when instances run.</desc>
+            <!-- column headers -->
+            <text x="30" y="30" class="t-label t-ember">PORTABLE · SIGNED · SHAREABLE</text>
+            <text x="350" y="30" class="t-label t-cyan">INSTALLED · PER-INSTANCE IDENTITY</text>
+            <text x="670" y="30" class="t-label t-amber">PRIVATE AUTHORITY · NEVER BUNDLED</text>
+            <!-- col 1 -->
+            <rect x="20" y="44" width="280" height="250" rx="16" class="f-bg"/>
+            <rect x="36" y="60" width="248" height="62" rx="10" class="f-card"/><text x="52" y="86" class="t-title t-fg">AgentDefinition</text><text x="52" y="106" class="t-body t-sub">role · skills · typed I/O · requested caps</text>
+            <rect x="36" y="134" width="248" height="62" rx="10" class="f-card"/><text x="52" y="160" class="t-title t-fg">TeamDefinition</text><text x="52" y="180" class="t-body t-sub">roles · topology · shared artifacts</text>
+            <rect x="36" y="208" width="248" height="70" rx="10" class="f-card"/><text x="52" y="234" class="t-title t-fg">WorkflowDefinition</text><text x="52" y="254" class="t-body t-sub">tasks · joins · approvals · effects</text><text x="52" y="270" class="t-body t-faint">versioned; pinned per run</text>
+            <!-- col 2 -->
+            <rect x="340" y="44" width="280" height="250" rx="16" class="f-bg"/>
+            <rect x="356" y="60" width="248" height="62" rx="10" class="f-card"/><text x="372" y="86" class="t-title t-fg">AgentInstance</text><text x="372" y="106" class="t-body t-sub">own did:key · executor · tenant</text>
+            <rect x="356" y="134" width="248" height="62" rx="10" class="f-card"/><text x="372" y="160" class="t-title t-fg">TeamInstance</text><text x="372" y="180" class="t-body t-sub">deployed group · mailbox · budget</text>
+            <rect x="356" y="208" width="248" height="70" rx="10" class="f-card"/><text x="372" y="234" class="t-title t-fg">DeploymentBinding</text><text x="372" y="254" class="t-body t-sub">placement · credential refs</text><text x="372" y="270" class="t-body t-faint">installed policy revisions</text>
+            <!-- col 3 -->
+            <rect x="660" y="44" width="280" height="250" rx="16" class="f-bg"/>
+            <rect x="676" y="60" width="248" height="62" rx="10" class="f-card"/><text x="692" y="86" class="t-title t-fg">RepresentationGrant</text><text x="692" y="106" class="t-body t-sub">what may use you, for what</text>
+            <rect x="676" y="134" width="248" height="62" rx="10" class="f-card"/><text x="692" y="160" class="t-title t-fg">RoleAssignment</text><text x="692" y="180" class="t-body t-sub">time-scoped office membership</text>
+            <rect x="676" y="208" width="248" height="70" rx="10" class="f-card"/><text x="692" y="234" class="t-title t-fg">Delegation &amp; approvals</text><text x="692" y="254" class="t-body t-sub">scoped · expiring · single-use</text><text x="692" y="270" class="t-body t-faint">revocable by you</text>
+            <!-- arrows -->
+            <line x1="284" y1="91" x2="352" y2="91" class="ln-ember" marker-end="url(#ah-e)"/>
+            <text x="318" y="82" text-anchor="middle" class="t-label t-ember">INSTALL</text>
+            <line x1="676" y1="91" x2="608" y2="91" class="ln" marker-end="url(#ah)"/>
+            <text x="642" y="82" text-anchor="middle" class="t-label t-faint">GRANT</text>
+            <line x1="284" y1="165" x2="352" y2="165" class="ln-ember" marker-end="url(#ah-e)"/>
+            <line x1="676" y1="165" x2="608" y2="165" class="ln" marker-end="url(#ah)"/>
+            <!-- Execution records -->
+            <line x1="480" y1="294" x2="480" y2="330" class="ln" marker-end="url(#ah)"/>
+            <text x="494" y="318" class="t-label t-faint">RUNS PRODUCE</text>
+            <rect x="20" y="334" width="920" height="120" rx="16" class="f-surface"/>
+            <text x="40" y="360" class="t-label t-green">EXECUTION RECORDS · LIVE STATE, NOT DEFINITIONS</text>
+            <rect x="40" y="376" width="140" height="56" rx="10" class="f-card"/><text x="110" y="409" text-anchor="middle" class="t-body t-fg">Thread / Run</text>
+            <rect x="192" y="376" width="140" height="56" rx="10" class="f-card"/><text x="262" y="409" text-anchor="middle" class="t-body t-fg">WorkflowRun</text>
+            <rect x="344" y="376" width="110" height="56" rx="10" class="f-card"/><text x="399" y="409" text-anchor="middle" class="t-body t-fg">Task</text>
+            <rect x="466" y="376" width="120" height="56" rx="10" class="f-card"/><text x="526" y="409" text-anchor="middle" class="t-body t-fg">Subscription</text>
+            <rect x="598" y="376" width="140" height="56" rx="10" class="f-amber-soft"/><text x="668" y="401" text-anchor="middle" class="t-body t-fg">EffectIntent</text><text x="668" y="419" text-anchor="middle" class="t-body t-sub">before the call</text>
+            <line x1="738" y1="404" x2="776" y2="404" class="ln" marker-end="url(#ah)"/>
+            <rect x="780" y="376" width="140" height="56" rx="10" class="f-green-soft"/><text x="850" y="401" text-anchor="middle" class="t-body t-fg">EffectReceipt</text><text x="850" y="419" text-anchor="middle" class="t-body t-sub">reconciled result</text>
+          </svg>
+          </div>
+          <figcaption><b>Figure 3.</b> Installing a received definition mints a fresh agent DID, shows its permissions for review, and treats its Cedar policy as a <em>proposal</em>. A shared artifact never carries its author's authority into your system.</figcaption>
+        </figure>
+
+        <h3>Why this matters specifically when you are solo</h3>
+        <ul class="clean">
+          <li><strong>Your first hire is a role assignment, not a migration.</strong> The office's role memory, team and workflows move with the <code>OrganizationalRoleAssignment</code>. Your personal KnowMe history and representation profile do not. The successor inherits the office, not your persona.</li>
+          <li><strong>Sharing a team template is safe by construction.</strong> Send a peer your marketing <code>TeamDefinition</code> and their install gets new identities and their own grants.</li>
+          <li><strong>Team membership never unions capabilities.</strong> Putting the Finance analyst and the Brand designer on one launch team does not give the designer finance credentials or the analyst publish rights.</li>
+          <li><strong>A team can be independent peer roots.</strong> Do not force them into one parent tree just to reuse child messaging. Authorize a team mailbox explicitly. A lead can still spawn children to satisfy one team task.</li>
+        </ul>
+      </section>
+
+      <!-- 05 TEAMS -->
+      <section id="teams">
+        <span class="sec-num">05 · YOUR TEAMS</span>
+        <h2>Six working teams, each with a hard edge on what it can do outside.</h2>
+        <p>These are <strong>recommended role templates</strong>, not mandatory permanent agents. Each role references reviewed skills instead of embedding giant instructions. The compiler must keep each skill's publisher, path, version or content digest, required/optional status, configuration and permission requests. Discovery must never silently swap a pinned skill.</p>
+
+        <div class="tabs" role="tablist" aria-label="Teams">
+          <button class="tab" role="tab" id="tab-dev" aria-controls="p-dev" aria-selected="true" hx-on:click="kmTab(this)">Development</button>
+          <button class="tab" role="tab" id="tab-mkt" aria-controls="p-mkt" aria-selected="false" tabindex="-1" hx-on:click="kmTab(this)">Marketing</button>
+          <button class="tab" role="tab" id="tab-prd" aria-controls="p-prd" aria-selected="false" tabindex="-1" hx-on:click="kmTab(this)">Product</button>
+          <button class="tab" role="tab" id="tab-dsn" aria-controls="p-dsn" aria-selected="false" tabindex="-1" hx-on:click="kmTab(this)">Design</button>
+          <button class="tab" role="tab" id="tab-doc" aria-controls="p-doc" aria-selected="false" tabindex="-1" hx-on:click="kmTab(this)">Documentation</button>
+          <button class="tab" role="tab" id="tab-cus" aria-controls="p-cus" aria-selected="false" tabindex="-1" hx-on:click="kmTab(this)">Customer intel</button>
+        </div>
+
+        <div class="panel" role="tabpanel" id="p-dev" aria-labelledby="tab-dev">
+          <div class="roles"><span class="role">Product analyst</span><span class="role">Architect</span><span class="role">Implementers</span><span class="role">Test specialist</span><span class="role">Standards reviewer</span><span class="role">Security reviewer</span><span class="role">Documentation specialist</span></div>
+          <div class="cols">
+            <div class="col"><span class="k">Shared artifacts</span><p>Requirements, ADRs, patch, test evidence, review disposition.</p></div>
+            <div class="col"><span class="k">External-action boundary</span><p>Repository scope. Creating a PR is separate from merging. Deployment is authorized separately.</p></div>
+            <div class="col"><span class="k">Solo note</span><p>You approve merge and release. Reviews run in fresh context, ideally on a different model or a deterministic verifier.</p></div>
+          </div>
+        </div>
+        <div class="panel" role="tabpanel" id="p-mkt" aria-labelledby="tab-mkt" hidden>
+          <div class="roles"><span class="role">Campaign lead</span><span class="role">Market researcher</span><span class="role">Positioning writer</span><span class="role">Brand designer</span><span class="role">Channel specialist</span><span class="role">Measurement analyst</span></div>
+          <div class="cols">
+            <div class="col"><span class="k">Shared artifacts</span><p>Source-backed brief, approved claims, creative variants, campaign plan.</p></div>
+            <div class="col"><span class="k">External-action boundary</span><p>Drafting is separate from publishing. Campaign budget, recipients and channels are each scoped.</p></div>
+            <div class="col"><span class="k">Solo note</span><p>A factual-claims reviewer checks copy before it reaches the publisher. Observing a channel never grants posting rights.</p></div>
+          </div>
+        </div>
+        <div class="panel" role="tabpanel" id="p-prd" aria-labelledby="tab-prd" hidden>
+          <div class="roles"><span class="role">Discovery lead</span><span class="role">Feedback analyst</span><span class="role">Product manager</span><span class="role">Prioritization analyst</span><span class="role">Experiment designer</span></div>
+          <div class="cols">
+            <div class="col"><span class="k">Shared artifacts</span><p>Evidence clusters, problem statement, acceptance criteria, roadmap proposal.</p></div>
+            <div class="col"><span class="k">External-action boundary</span><p>Issue intake can be preauthorized. Customer promises and roadmap commitments stay separate.</p></div>
+            <div class="col"><span class="k">Solo note</span><p>Roadmap proposals land as KnowMe Objectives. Agents propose them, and you commit to them.</p></div>
+          </div>
+        </div>
+        <div class="panel" role="tabpanel" id="p-dsn" aria-labelledby="tab-dsn" hidden>
+          <div class="roles"><span class="role">Design lead</span><span class="role">Logo / identity</span><span class="role">Mobile UX</span><span class="role">Web / UI</span><span class="role">Brand / marketing</span><span class="role">Accessibility &amp; usability reviewer</span></div>
+          <div class="cols">
+            <div class="col"><span class="k">Shared artifacts</span><p>Design brief, tokens, assets, flows, handoff and test evidence.</p></div>
+            <div class="col"><span class="k">External-action boundary</span><p>Brand asset approval and publication. Access to licensed assets and customer research is scoped.</p></div>
+            <div class="col"><span class="k">Solo note</span><p>Candidate skills include Impeccable, Anthropic frontend design, Vercel React guidance, Flutter/Dart practices and accessibility. This brief does not re-certify them.</p></div>
+          </div>
+        </div>
+        <div class="panel" role="tabpanel" id="p-doc" aria-labelledby="tab-doc" hidden>
+          <div class="roles"><span class="role">Technical writer</span><span class="role">API specialist</span><span class="role">Knowledge curator</span><span class="role">Documentation reviewer</span></div>
+          <div class="cols">
+            <div class="col"><span class="k">Shared artifacts</span><p>Versioned docs, Confluence/Notion updates, release notes.</p></div>
+            <div class="col"><span class="k">External-action boundary</span><p>Destination and page ownership. Publish rights are separate.</p></div>
+            <div class="col"><span class="k">Solo note</span><p>Acts only on <em>confirmed release events</em>, never on "tests passed".</p></div>
+          </div>
+        </div>
+        <div class="panel" role="tabpanel" id="p-cus" aria-labelledby="tab-cus" hidden>
+          <div class="roles"><span class="role">Intake observer</span><span class="role">Deduplicator</span><span class="role">Analyst</span><span class="role">Issue drafter</span><span class="role">Response specialist</span></div>
+          <div class="cols">
+            <div class="col"><span class="k">Shared artifacts</span><p>Redacted feedback evidence, existing-issue matches, enhancement proposal.</p></div>
+            <div class="col"><span class="k">External-action boundary</span><p>Authorized issue creation is separate from replying, promising delivery, or implementing.</p></div>
+            <div class="col"><span class="k">Solo note</span><p>This is the recommended <strong>first thin slice</strong>. It exercises eventing, teams, external effects and governance without touching money.</p></div>
+          </div>
+        </div>
+
+        <h3>Four coordination patterns, not a full mesh</h3>
+        <div class="grid">
+          <div class="card"><span class="k">Pattern</span><h4>Supervisor / worker</h4><p>A lead decomposes the work and children return typed results.</p></div>
+          <div class="card"><span class="k">Pattern</span><h4>Parallel map / reduce</h4><p>Bounded item batches with retry by item.</p></div>
+          <div class="card"><span class="k">Pattern</span><h4>Peer team + task board</h4><p>Durable task IDs, leases with fencing epochs, and atomic claim and reassign.</p></div>
+          <div class="card"><span class="k">Pattern</span><h4>Event-driven observer</h4><p>A subscription and cursor that survive process exit.</p></div>
+        </div>
+        <p>Prefer task-linked requests, explicit ownership, structured critiques and bounded revision rounds. Escalate unresolved requirements or authority conflicts to KnowMe. Agents must not invent agreement, and <strong>several agreeing personas are not independent evidence.</strong></p>
+      </section>
+
+      <!-- 06 OFFICES -->
+      <section id="offices">
+        <span class="sec-num">06 · YOUR EXECUTIVE OFFICES</span>
+        <h2>Role assistants first. Your digital twin is a separate, consented layer.</h2>
+        <p>Represent each executive function as a <strong>role assistant plus a governed team</strong>. Add your own calibrated style and decision precedents only through a separate representation profile that you consent to in KnowMe. Accountability stays with you, the actual authorized person.</p>
+
+        <div class="tbl"><table>
+          <thead><tr><th>Office</th><th>Useful agent &amp; team work</th><th>Authority boundary</th></tr></thead>
+          <tbody>
+            <tr><td>CEO / strategy</td><td>Strategy synthesis, operating review, scenario comparison, coordinating executive briefs</td><td>Commitments and organizational authority need real delegated mandates</td></tr>
+            <tr><td>CFO</td><td>Forecast explanations, variance analysis, reconciliation help, financial scenarios</td><td>Payments, account changes and disclosures need defined controls and independent approval</td></tr>
+            <tr><td>Chief Intelligence</td><td>Authorized market and competitive intelligence, source validation, contradiction analysis</td><td>No invented access rights or covert collection; protect licensed sources</td></tr>
+            <tr><td>CIO</td><td>IT portfolio, vendor evaluation, service health, migration planning</td><td>Production changes, account administration and procurement are scoped separately</td></tr>
+            <tr><td>CISO</td><td>Threat and control analysis, incident coordination, risk evidence</td><td>Emergency actions need explicit incident grants; the producing agent cannot accept its own residual risk</td></tr>
+            <tr><td>CMO</td><td>Campaign strategy, positioning, brand consistency, channel performance</td><td>Publish scope, spend ceilings, customer-data use</td></tr>
+            <tr><td>CPO</td><td>Discovery synthesis, portfolio tradeoffs, prioritization</td><td>Roadmap commitments and customer promises need granted authority</td></tr>
+            <tr><td>COO</td><td>Process monitoring, capacity, operational improvement</td><td>Operational changes and contractual commitments are governed separately</td></tr>
+            <tr><td>People</td><td>Policy explanation, aggregate workforce analysis (once you hire)</td><td>Individual personnel decisions go through appropriate human processes</td></tr>
+            <tr><td>Legal / compliance</td><td>Evidence collection, obligation mapping, review packets</td><td>No model or skill confers legal sign-off or certification</td></tr>
+          </tbody>
+        </table></div>
+
+        <figure>
+          <div class="swipe-hint">← swipe diagram →</div>
+          <div class="fig-scroll">
+          <svg viewBox="0 0 960 330" role="img" aria-labelledby="d4t d4d">
+            <title id="d4t">Four levels of representation</title>
+            <desc id="d4d">A rising staircase: role assistant, personalized advisor, disclosed representative and delegated actor. Each step needs more explicit, revocable consent, and none of them counts as a human approver.</desc>
+            <!-- step 1 -->
+            <rect x="20" y="190" width="220" height="110" rx="14" class="f-card"/>
+            <text x="38" y="214" class="t-label t-faint">LEVEL 1</text>
+            <text x="38" y="238" class="t-title t-fg">Role assistant</text>
+            <text x="38" y="260" class="t-body t-sub">Organization-owned capability.</text>
+            <text x="38" y="278" class="t-body t-sub">No claim to simulate you.</text>
+            <!-- step 2 -->
+            <rect x="250" y="140" width="220" height="160" rx="14" class="f-card"/>
+            <text x="268" y="164" class="t-label t-cyan">LEVEL 2</text>
+            <text x="268" y="188" class="t-title t-fg">Personalized advisor</text>
+            <text x="268" y="210" class="t-body t-sub">Uses approved preferences</text>
+            <text x="268" y="228" class="t-body t-sub">and precedents.</text>
+            <text x="268" y="256" class="t-body t-red">Cannot speak as you.</text>
+            <!-- step 3 -->
+            <rect x="480" y="90" width="220" height="210" rx="14" class="f-card"/>
+            <text x="498" y="114" class="t-label t-amber">LEVEL 3</text>
+            <text x="498" y="138" class="t-title t-fg">Disclosed representative</text>
+            <text x="498" y="160" class="t-body t-sub">Speaks as your AI</text>
+            <text x="498" y="178" class="t-body t-sub">representative, within audience,</text>
+            <text x="498" y="196" class="t-body t-sub">channel and purpose limits.</text>
+            <text x="498" y="224" class="t-body t-red">Always disclosed.</text>
+            <!-- step 4 -->
+            <rect x="710" y="40" width="230" height="260" rx="14" class="f-ember-soft"/>
+            <text x="728" y="64" class="t-label t-ember">LEVEL 4</text>
+            <text x="728" y="88" class="t-title t-fg">Delegated actor</text>
+            <text x="728" y="110" class="t-body t-sub">Explicitly scoped actions</text>
+            <text x="728" y="128" class="t-body t-sub">under a revocable grant,</text>
+            <text x="728" y="146" class="t-body t-sub">possibly with co-approval.</text>
+            <text x="728" y="178" class="t-body t-red">Never counts as you for</text>
+            <text x="728" y="196" class="t-body t-red">separation of duties.</text>
+            <text x="728" y="232" class="t-label t-faint">GRANT HOLDS</text>
+            <text x="728" y="250" class="t-body t-sub">sources · purpose · audience</text>
+            <text x="728" y="268" class="t-body t-sub">abstention rules · retention</text>
+            <text x="728" y="286" class="t-body t-sub">profile version · revocation</text>
+            <!-- rising arrow -->
+            <path d="M40,160 C220,120 420,70 640,40" class="ln-ember dash" marker-end="url(#ah-e)"/>
+            <text x="40" y="150" class="t-label t-ember">MORE CONSENT · NARROWER SCOPE · MORE AUDIT</text>
+          </svg>
+          </div>
+          <figcaption><b>Figure 4.</b> Consent to use your writing style is not consent to approve a purchase. Consent to act in a company role is not consent to disclose private KnowMe history.</figcaption>
+        </figure>
+
+        <div class="callout">
+          <span class="k">Evaluate your twin like any other claim</span>
+          <p>Person-specific simulation has empirical support on <strong>bounded behavioral prediction</strong>, not on executive judgment under novel pressure. Test your advisor on held-out decisions: factual recall, disagreement rate, false claims of authority, abstention quality, sensitive disclosure, style fidelity and correction retention. Disagreement is useful signal, so do not tune for flattering agreement. You can correct or retire the profile at any time.</p>
+        </div>
+      </section>
+
+      <!-- 07 AUTHORITY -->
+      <section id="authority">
+        <span class="sec-num">07 · STAYING IN CONTROL</span>
+        <h2>Every boundary must allow. Any deny wins. Recheck right before the effect.</h2>
+        <p>Authenticate the <strong>deployed agent instance</strong>, not a role name the model supplied. The trusted host builds principal, action, resource and context itself. A definition's declared capabilities set an upper bound on the request. They are then evaluated against every live boundary.</p>
+
+        <figure>
+          <div class="swipe-hint">← swipe diagram →</div>
+          <div class="fig-scroll">
+          <svg viewBox="0 0 960 430" role="img" aria-labelledby="d5t d5d">
+            <title id="d5t">Authority composition and the effect gate</title>
+            <desc id="d5d">A proposed action is normalized, then checked against seven independent boundaries. Any deny ends it. If all allow, an approval from you may be required, and the decision is re-evaluated against the exact payload digest immediately before the connector call. The effect then produces a receipt.</desc>
+            <!-- proposed action -->
+            <rect x="20" y="30" width="200" height="170" rx="14" class="f-card"/>
+            <text x="38" y="56" class="t-label t-faint">HOST-DERIVED</text>
+            <text x="38" y="80" class="t-title t-fg">Proposed action</text>
+            <text x="38" y="104" class="t-body t-sub"><tspan class="t-cyan">P</tspan> agent instance · tenant</text>
+            <text x="38" y="124" class="t-body t-sub"><tspan class="t-cyan">A</tspan> canonical business op</text>
+            <text x="38" y="144" class="t-body t-sub"><tspan class="t-cyan">R</tspan> exact target resource</text>
+            <text x="38" y="164" class="t-body t-sub"><tspan class="t-cyan">C</tspan> you · task · purpose ·</text>
+            <text x="54" y="182" class="t-body t-sub">labels · payload digest</text>
+            <line x1="220" y1="115" x2="256" y2="115" class="ln" marker-end="url(#ah)"/>
+            <!-- boundaries -->
+            <rect x="260" y="20" width="250" height="310" rx="16" class="f-bg"/>
+            <text x="278" y="44" class="t-label t-cyan">ALL MUST ALLOW</text>
+            <g class="t-body">
+              <rect x="276" y="56" width="218" height="32" rx="8" class="f-card"/><text x="290" y="77" class="t-fg">Tenant ceiling</text>
+              <rect x="276" y="94" width="218" height="32" rx="8" class="f-card"/><text x="290" y="115" class="t-fg">Deployment profile</text>
+              <rect x="276" y="132" width="218" height="32" rx="8" class="f-card"/><text x="290" y="153" class="t-fg">Root budget reservation</text>
+              <rect x="276" y="170" width="218" height="32" rx="8" class="f-card"/><text x="290" y="191" class="t-fg">Delegation grant (from you)</text>
+              <rect x="276" y="208" width="218" height="32" rx="8" class="f-card"/><text x="290" y="229" class="t-fg">Team membership</text>
+              <rect x="276" y="246" width="218" height="32" rx="8" class="f-card"/><text x="290" y="267" class="t-fg">Resource owner policy</text>
+              <rect x="276" y="284" width="218" height="32" rx="8" class="f-card"/><text x="290" y="305" class="t-fg">Connector scope &amp; egress</text>
+            </g>
+            <!-- deny -->
+            <line x1="385" y1="330" x2="385" y2="370" class="ln-red" marker-end="url(#ah-r)"/>
+            <rect x="290" y="374" width="190" height="42" rx="10" class="f-red-soft"/>
+            <text x="385" y="400" text-anchor="middle" class="t-body t-red">any deny → stop · audit</text>
+            <!-- approval -->
+            <line x1="510" y1="115" x2="546" y2="115" class="ln" marker-end="url(#ah)"/>
+            <rect x="550" y="60" width="170" height="110" rx="14" class="f-ember"/>
+            <text x="566" y="86" class="t-label t-on">IF REQUIRED</text>
+            <text x="566" y="110" class="t-title t-on">You approve</text>
+            <text x="566" y="132" class="t-body t-on">in KnowMe · scoped ·</text>
+            <text x="566" y="150" class="t-body t-on">expiring · single-use</text>
+            <!-- recheck -->
+            <line x1="635" y1="170" x2="635" y2="206" class="ln" marker-end="url(#ah)"/>
+            <rect x="550" y="210" width="170" height="110" rx="14" class="f-cyan-soft"/>
+            <text x="566" y="236" class="t-label t-cyan">JUST BEFORE EFFECT</text>
+            <text x="566" y="260" class="t-title t-fg">Re-evaluate</text>
+            <text x="566" y="282" class="t-body t-sub">grant still valid? payload</text>
+            <text x="566" y="300" class="t-body t-sub">digest unchanged?</text>
+            <path d="M635,320 L635,395 L484,395" class="ln-red dash" marker-end="url(#ah-r)"/>
+            <text x="645" y="352" class="t-body t-red">changed → new approval</text>
+            <!-- effect -->
+            <line x1="720" y1="265" x2="756" y2="265" class="ln" marker-end="url(#ah)"/>
+            <rect x="760" y="186" width="180" height="70" rx="14" class="f-amber-soft"/>
+            <text x="776" y="212" class="t-label t-amber">EFFECT INTENT</text>
+            <text x="776" y="236" class="t-body t-fg">idempotency key · call</text>
+            <line x1="850" y1="256" x2="850" y2="286" class="ln" marker-end="url(#ah)"/>
+            <rect x="760" y="290" width="180" height="70" rx="14" class="f-green-soft"/>
+            <text x="776" y="316" class="t-label t-green">RECEIPT</text>
+            <text x="776" y="340" class="t-body t-fg">or "outcome unknown"</text>
+            <text x="760" y="390" class="t-body t-sub">unknown → reconcile first</text>
+          </svg>
+          </div>
+          <figcaption><b>Figure 5.</b> Cedar permits if any permit matches and no forbid matches, so independent permit sets do <em>not</em> intersect when concatenated. The composition above has to be implemented explicitly, or as an equivalently verified ceiling/forbid design.</figcaption>
+        </figure>
+
+        <h3>Govern the control plane, not just tool calls</h3>
+        <p>Registering definitions, activating instances, changing team membership, assigning tasks, spawning children, peer messaging, memory access, subscriptions, skill installation, policy changes and issuing or revoking grants are all <strong>explicit actions with resource scopes</strong>. An agent allowed to execute a task cannot, by that permission, edit its own definition, join a team or issue a grant.</p>
+
+        <div class="callout ember">
+          <span class="k">The solo separation-of-duties problem</span>
+          <p>The research sets a hard rule: when an action needs two people, both approvers must be <strong>distinct authorized humans</strong>, and neither the requester nor its twin can fill a slot. In a company of one, <em>no internal pairing can satisfy that rule</em>. Plan for it rather than paper over it.</p>
+          <p><span class="badge b-doc">This brief's proposal</span> For money movement and other high-impact effects, name an <strong>external second party</strong> (your bookkeeper, accountant, or a bank's own dual-control feature) as the second approver. Keep standing grants under explicit ceilings. Consider a mandatory cooling-off window with re-evaluation for anything above the ceiling. These are design options to test, not findings of the source research.</p>
+        </div>
+
+        <h3>Cedar is the decision engine, not the ledger</h3>
+        <ul class="clean">
+          <li>Atomically reserve spend and quotas, resolve role assignments and revocation, validate data classification and record approvals <strong>outside</strong> the evaluator, then pass the authoritative results into policy.</li>
+          <li>In governed profiles, reject invalid policy deployments and <strong>deny on relevant evaluation errors</strong>. A Cedar error on a forbid policy is not automatically a whole-request deny, so the host has to choose that posture explicitly.</li>
+          <li>A read grant plus a write grant can add up to a leak. Carry trusted data labels and provenance, and check egress by destination and payload. Cedar evaluates the labels it is given. It does not find sensitive content on its own.</li>
+          <li>Treat connector outputs, customer messages and skill instructions as <strong>untrusted input</strong>.</li>
+        </ul>
+      </section>
+
+      <!-- 08 DAY -->
+      <section id="day">
+        <span class="sec-num">08 · A DAY IN THE COMPANY</span>
+        <h2>From one customer message to a shipped improvement, with one decision for you.</h2>
+        <p>The recommended first slice is the product-feedback loop. It crosses every team boundary, produces real external effects and never touches money. Here is how it runs in a company of one.</p>
+
+        <figure>
+          <div class="swipe-hint">← swipe diagram →</div>
+          <div class="fig-scroll">
+          <svg viewBox="0 0 1080 500" role="img" aria-labelledby="d6t d6d">
+            <title id="d6t">Customer feedback to released improvement</title>
+            <desc id="d6d">A swimlane with six lanes. A Slack or support message enters BossFang and routes to an observer. Customer intelligence redacts and deduplicates, then creates an issue under a standing grant. The product, design and development teams produce criteria, design and a patch. Independent reviewers check it in fresh context. You approve the release scope in KnowMe. Only on the release event do documentation and customer response act.</desc>
+            <!-- lanes -->
+            <rect x="0" y="10" width="1080" height="64" rx="12" class="f-bg"/>
+            <rect x="0" y="80" width="1080" height="64" rx="12" class="f-bg"/>
+            <rect x="0" y="150" width="1080" height="64" rx="12" class="f-bg"/>
+            <rect x="0" y="220" width="1080" height="64" rx="12" class="f-bg"/>
+            <rect x="0" y="290" width="1080" height="64" rx="12" class="f-ember-soft"/>
+            <rect x="0" y="360" width="1080" height="64" rx="12" class="f-bg"/>
+            <text x="16" y="38" class="t-label t-faint">CHANNELS</text><text x="16" y="56" class="t-body t-sub">BossFang</text>
+            <text x="16" y="108" class="t-label t-faint">CUSTOMER INTEL</text><text x="16" y="126" class="t-body t-sub">observer team</text>
+            <text x="16" y="178" class="t-label t-faint">BUILD</text><text x="16" y="196" class="t-body t-sub">product · design · dev</text>
+            <text x="16" y="248" class="t-label t-faint">REVIEW</text><text x="16" y="266" class="t-body t-sub">independent</text>
+            <text x="16" y="318" class="t-label t-ember">YOU</text><text x="16" y="336" class="t-body t-fg">KnowMe inbox</text>
+            <text x="16" y="388" class="t-label t-faint">PUBLISH</text><text x="16" y="406" class="t-body t-sub">docs · response</text>
+            <!-- steps -->
+            <rect x="170" y="17" width="110" height="50" rx="10" class="f-card"/><text x="225" y="38" text-anchor="middle" class="t-body t-fg">Slack / support</text><text x="225" y="55" text-anchor="middle" class="t-body t-sub">message</text>
+            <rect x="300" y="17" width="110" height="50" rx="10" class="f-card"/><text x="355" y="38" text-anchor="middle" class="t-body t-fg">Authenticate,</text><text x="355" y="55" text-anchor="middle" class="t-body t-sub">normalize, route</text>
+            <rect x="430" y="87" width="110" height="50" rx="10" class="f-card"/><text x="485" y="108" text-anchor="middle" class="t-body t-fg">Redact PII,</text><text x="485" y="125" text-anchor="middle" class="t-body t-sub">find duplicates</text>
+            <rect x="560" y="87" width="110" height="50" rx="10" class="f-amber-soft"/><text x="615" y="108" text-anchor="middle" class="t-body t-fg">Create issue</text><text x="615" y="125" text-anchor="middle" class="t-body t-sub">standing grant</text>
+            <rect x="690" y="157" width="110" height="50" rx="10" class="f-card"/><text x="745" y="178" text-anchor="middle" class="t-body t-fg">Criteria,</text><text x="745" y="195" text-anchor="middle" class="t-body t-sub">design, patch</text>
+            <rect x="820" y="227" width="110" height="50" rx="10" class="f-card"/><text x="875" y="248" text-anchor="middle" class="t-body t-fg">Fresh-context</text><text x="875" y="265" text-anchor="middle" class="t-body t-sub">reviews</text>
+            <rect x="950" y="297" width="116" height="50" rx="10" class="f-ember"/><text x="1008" y="318" text-anchor="middle" class="t-body t-on">Approve</text><text x="1008" y="335" text-anchor="middle" class="t-body t-on">release scope</text>
+            <rect x="950" y="367" width="116" height="50" rx="10" class="f-amber-soft"/><text x="1008" y="388" text-anchor="middle" class="t-body t-fg">Docs + customer</text><text x="1008" y="405" text-anchor="middle" class="t-body t-sub">reply</text>
+            <!-- arrows -->
+            <line x1="280" y1="42" x2="296" y2="42" class="ln" marker-end="url(#ah)"/>
+            <path d="M410,42 H420 V112 H426" class="ln" marker-end="url(#ah)"/>
+            <line x1="540" y1="112" x2="556" y2="112" class="ln" marker-end="url(#ah)"/>
+            <path d="M670,112 H680 V182 H686" class="ln" marker-end="url(#ah)"/>
+            <path d="M800,182 H810 V252 H816" class="ln" marker-end="url(#ah)"/>
+            <path d="M930,252 H940 V322 H946" class="ln-ember" marker-end="url(#ah-e)"/>
+            <line x1="1008" y1="347" x2="1008" y2="363" class="ln-ember" marker-end="url(#ah-e)"/>
+            <!-- revision loop -->
+            <path d="M875,227 C875,200 830,190 802,190" class="ln dash" marker-end="url(#ah)"/>
+            <text x="836" y="212" class="t-label t-faint">REVISE</text>
+            <!-- legend -->
+            <rect x="170" y="448" width="14" height="14" rx="3" class="f-amber-soft"/><text x="192" y="460" class="t-body t-sub">external effect: intent, idempotency key, receipt</text>
+            <rect x="520" y="448" width="14" height="14" rx="3" class="f-ember"/><text x="542" y="460" class="t-body t-sub">the one human decision</text>
+            <text x="720" y="460" class="t-body t-sub">each arrow is a separate authorized transition</text>
+          </svg>
+          </div>
+          <figcaption><b>Figure 6.</b> "Issue created" is not permission to implement. "Tests passed" is not permission to deploy. "Release published" is not permission to contact every customer. Keeping these as separate transitions is what lets routine steps run without asking you repeatedly.</figcaption>
+        </figure>
+
+        <h3>Observers without accidental authority</h3>
+        <ol class="steps">
+          <li><strong>Subscribe to a logical instance, team or workflow</strong>, optionally filtered by conversation, event type, labels and lifecycle state. The subscription is a host-authorized record: principal, tenant, filters, delivery mode, cursor, expiry, replay range and granted actions.</li>
+          <li><strong>Authorize four things independently:</strong> creating the subscription, delivering an event, expanding the payload and taking the resulting action. Observing a channel does not grant permission to post to it.</li>
+          <li><strong>Carry lineage on every event:</strong> event ID, origin instance, conversation/workflow/run IDs, causation and correlation IDs. Use inbox deduplication, bounded replay, backpressure, dead letters and hop limits.</li>
+          <li><strong>Replays inform. They do not re-act.</strong> Old events can feed analysis but must never automatically repeat an external action.</li>
+          <li><strong>Revocation stops future delivery and actions</strong> and invalidates cached sensitive access where it can. It does not pretend that already disclosed information can be recalled.</li>
+        </ol>
+      </section>
+
+      <!-- 09 MODES -->
+      <section id="modes">
+        <span class="sec-num">09 · HOW AGENTS STAY ALIVE</span>
+        <h2>"Stateful" is not "a process that stays up."</h2>
+        <p>Invocation style, context retention, persistence, placement and authority are <strong>independent axes</strong>. A stateless worker can serve a durable state machine, and a resident process can lose everything on a crash. For a solo operator this matters in practice: your laptop sleeps and your phone goes offline, but your workflows should not care.</p>
+        <div class="tbl"><table>
+          <thead><tr><th>Mode</th><th>Recommended behavior</th><th>Company-of-one example</th></tr></thead>
+          <tbody>
+            <tr><td>On-demand isolated task</td><td>Resolve definition, create fresh context, return a typed result</td><td>"Summarize this contract's obligations"</td></tr>
+            <tr><td>Parent-owned subagent</td><td>Narrowed scope under host lineage; cancelled with the parent</td><td>Research child under the Strategy lead</td></tr>
+            <tr><td>Resident collaborator</td><td>Durable address and mailbox; serialized mutations; stable routing</td><td>Design lead holding the brand system</td></tr>
+            <tr><td>Event-driven observer</td><td>Subscription and cursor survive process exit</td><td>Customer-intel intake on Slack and support</td></tr>
+            <tr><td>Durable business workflow</td><td>Waits and approvals survive restart; versions pinned or migrated explicitly</td><td>Monthly close preparation awaiting your sign-off</td></tr>
+            <tr><td>Embedded / mobile</td><td>Same contracts with negotiated capabilities; no silent downgrade</td><td>KnowMe on your phone, offline: only explicitly allowed actions</td></tr>
+            <tr><td>Remote / federated</td><td>Explicit trust boundary, resource-owner authorization, bounded tokens</td><td>A contractor's runtime doing a result-only task</td></tr>
+          </tbody>
+        </table></div>
+      </section>
+
+      <!-- 10 STATUS -->
+      <section id="status">
+        <span class="sec-num">10 · WHAT'S REAL TODAY</span>
+        <h2>UAR already has a multi-agent story. It lacks the team product and full governance coverage.</h2>
+        <p>Source inspection targeted UAR revision <code>ba12845</code> (phase: runtime-harness-gap-closure). <span class="badge b-exists">Exists</span> means code was located and inspected, <span class="badge b-spec">Specified</span> means a document states the intent, and <span class="badge b-prop">Proposed</span> means the research recommends it. None of these establishes production security, recovery reliability or compliance.</p>
+
+        <div class="tbl"><table>
+          <thead><tr><th>Surface</th><th>State</th><th>Implication for the company of one</th></tr></thead>
+          <tbody>
+            <tr><td>Subagents</td><td><span class="badge b-exists">Exists</span> Child persisted before launch; immutable lineage; native spawn/send/wait/list/interrupt</td><td>Build team operations on this host path</td></tr>
+            <tr><td>Actors</td><td><span class="badge b-exists">Exists</span> Serialized mailbox over the same run machinery</td><td>Resident collaborators need no second LLM loop</td></tr>
+            <tr><td>Graphs</td><td><span class="badge b-exists">Exists</span> AgentNode delegation; walks one node at a time</td><td>Not a general parallel DAG scheduler yet</td></tr>
+            <tr><td>Agent documents</td><td><span class="badge b-exists">Exists</span> UAR-AGENT-MD → IR → compiler → artifact</td><td>Extend it; do not replace it with frontmatter-only files</td></tr>
+            <tr><td>Skills in conversion</td><td><span class="badge b-gap">Gap</span> Version, required and config collapse into preferred IDs</td><td>Strict skill contracts are lost today</td></tr>
+            <tr><td>v2 IR fields</td><td><span class="badge b-gap">Gap</span> Five sections missing from the "lossless" catch-all</td><td>A compiled descriptor does not prove runtime enforcement</td></tr>
+            <tr><td>Teams / workflows</td><td><span class="badge b-prop">Proposed</span> No first-class TeamDefinition, TeamRun or persisted WorkflowDefinition found</td><td>This is the missing product layer</td></tr>
+            <tr><td>KnowMe identity &amp; sharing</td><td><span class="badge b-spec">Specified</span> Per-instance DIDs, dual identity, org-over-personal Cedar</td><td>Reuse the boundary; integration is not yet proven</td></tr>
+          </tbody>
+        </table></div>
+
+        <h3>Governance gaps to close before expanding authority</h3>
+        <div class="tbl"><table>
+          <thead><tr><th>Finding</th><th>Consequence</th><th>Priority</th></tr></thead>
+          <tbody>
+            <tr><td>Default minimal build lacks Cedar; disabled facade permits</td><td>"UAR uses Cedar" must name the deployment profile</td><td><span class="badge b-gap">P0</span></td></tr>
+            <tr><td>Policy-load error can install permit-all</td><td>A blanket fail-closed claim is false</td><td><span class="badge b-gap">P0</span></td></tr>
+            <tr><td>Managed request uses artifact ID, tool name and empty context</td><td>Cannot express tenant, amount, purpose or data class</td><td><span class="badge b-gap">P0</span></td></tr>
+            <tr><td>Direct HTTP tool route with optional <code>X-Agent-Id</code></td><td>Identity, approval and budget coverage differ from managed runs</td><td><span class="badge b-gap">P0</span></td></tr>
+            <tr><td>Inline Cedar emitted; no runtime installation consumer found</td><td>A signed agent document does not prove its policy is active</td><td><span class="badge b-gap">P0/P1</span></td></tr>
+            <tr><td>Approval wait returns Approved without a Cedar recheck</td><td>Policy changes while waiting are not shown to invalidate the action</td><td><span class="badge b-gap">P0</span></td></tr>
+            <tr><td>Skill governance hook has no callers; validation hardcoded</td><td>Policy text overstates mutation enforcement</td><td><span class="badge b-prop">P1</span></td></tr>
+            <tr><td>Event buffering is not a durable authorization/effect audit</td><td>Cannot reconstruct a full action chain</td><td><span class="badge b-prop">P1</span></td></tr>
+          </tbody>
+        </table></div>
+        <p>These are <strong>source findings, not demonstrated exploits</strong>. The constrained local governance-off mode is intentional and should stay clearly labeled. It is not an acceptable default for executive authority or remote teams.</p>
+      </section>
+
+      <!-- 11 ROADMAP -->
+      <section id="roadmap">
+        <span class="sec-num">11 · BUILD SEQUENCE</span>
+        <h2>Governance first. Your twin comes near the end.</h2>
+
+        <figure>
+          <div class="swipe-hint">← swipe diagram →</div>
+          <div class="fig-scroll">
+          <svg viewBox="0 0 960 220" role="img" aria-labelledby="d7t d7d">
+            <title id="d7t">Phased implementation</title>
+            <desc id="d7d">Seven phases from zero to six: inventory and contracts, governance closure, definition integrity, bounded teams, business workflows, human representation, and federation with studio. The company of one becomes usable at phase four, with the product-feedback slice as the first thin slice.</desc>
+            <g class="t-body">
+              <rect x="10"  y="40" width="128" height="120" rx="12" class="f-card"/>
+              <rect x="145" y="40" width="128" height="120" rx="12" class="f-cyan-soft"/>
+              <rect x="280" y="40" width="128" height="120" rx="12" class="f-card"/>
+              <rect x="415" y="40" width="128" height="120" rx="12" class="f-card"/>
+              <rect x="550" y="40" width="128" height="120" rx="12" class="f-ember-soft"/>
+              <rect x="685" y="40" width="128" height="120" rx="12" class="f-card"/>
+              <rect x="820" y="40" width="128" height="120" rx="12" class="f-card"/>
+            </g>
+            <text x="24" y="64" class="t-label t-faint">PHASE 0</text><text x="24" y="86" class="t-title t-fg">Inventory</text><text x="24" y="108" class="t-body t-sub">capability map,</text><text x="24" y="124" class="t-body t-sub">threat model,</text><text x="24" y="140" class="t-body t-sub">action vocabulary</text>
+            <text x="159" y="64" class="t-label t-cyan">PHASE 1</text><text x="159" y="86" class="t-title t-fg">Governance</text><text x="159" y="108" class="t-body t-sub">one effect gate,</text><text x="159" y="124" class="t-body t-sub">fail-closed profile,</text><text x="159" y="140" class="t-body t-sub">approval recheck</text>
+            <text x="294" y="64" class="t-label t-faint">PHASE 2</text><text x="294" y="86" class="t-title t-fg">Definitions</text><text x="294" y="108" class="t-body t-sub">lossless skills</text><text x="294" y="124" class="t-body t-sub">&amp; v2 fields,</text><text x="294" y="140" class="t-body t-sub">binding receipts</text>
+            <text x="429" y="64" class="t-label t-faint">PHASE 3</text><text x="429" y="86" class="t-title t-fg">Teams</text><text x="429" y="108" class="t-body t-sub">membership, task</text><text x="429" y="124" class="t-body t-sub">claims, context</text><text x="429" y="140" class="t-body t-sub">sharing, budgets</text>
+            <text x="564" y="64" class="t-label t-ember">PHASE 4</text><text x="564" y="86" class="t-title t-fg">Workflows</text><text x="564" y="108" class="t-body t-sub">durable waits,</text><text x="564" y="124" class="t-body t-sub">subscriptions,</text><text x="564" y="140" class="t-body t-sub">reconciliation</text>
+            <text x="699" y="64" class="t-label t-faint">PHASE 5</text><text x="699" y="86" class="t-title t-fg">Representation</text><text x="699" y="108" class="t-body t-sub">consent, offboard,</text><text x="699" y="124" class="t-body t-sub">disclosed twins,</text><text x="699" y="140" class="t-body t-sub">evaluation</text>
+            <text x="834" y="64" class="t-label t-faint">PHASE 6</text><text x="834" y="86" class="t-title t-fg">Federation</text><text x="834" y="108" class="t-body t-sub">placement, studio</text><text x="834" y="124" class="t-body t-sub">views, BossFang</text><text x="834" y="140" class="t-body t-sub">integration</text>
+            <text x="10" y="26" class="t-label t-cyan">START HERE ↓ PHASE 1 BLOCKS EVERYTHING WITH EXTERNAL EFFECTS</text>
+            <path d="M614,168 L614,186" class="ln-ember"/>
+            <text x="614" y="204" text-anchor="middle" class="t-label t-ember">COMPANY OF ONE USABLE · FEEDBACK SLICE</text>
+          </svg>
+          </div>
+          <figcaption><b>Figure 7.</b> No dates or effort estimates are asserted. Each phase exits on test evidence rather than a calendar date.</figcaption>
+        </figure>
+
+        <div class="tbl"><table>
+          <thead><tr><th>Phase</th><th>Exit evidence</th></tr></thead>
+          <tbody>
+            <tr><td>0 · Inventory</td><td>Every entry point mapped to an action gate; the implemented/specified/proposed distinction approved</td></tr>
+            <tr><td>1 · Governance</td><td>Negative tests across managed, direct, embedded and remote routes; invalid policy and revoked grants cannot cause protected effects</td></tr>
+            <tr><td>2 · Definitions</td><td>Round-trip fixtures authoring → IR → persisted artifact → effective runtime capability; unsupported mandatory semantics block installation</td></tr>
+            <tr><td>3 · Teams</td><td>Crash and reassignment, concurrency, tenant isolation, parent cancellation, peer-mailbox tests</td></tr>
+            <tr><td>4 · Workflows</td><td>Duplicate, reordered and replayed event tests; uncertain-effect recovery</td></tr>
+            <tr><td>5 · Representation</td><td>You review held-out scenarios; zero simulated approvals accepted as human approvals</td></tr>
+            <tr><td>6 · Federation</td><td>The same contract suite passes on local, embedded and cloud; unsupported profiles are visibly refused</td></tr>
+          </tbody>
+        </table></div>
+        <p>Use isolated worktrees per repository with a common initiative name and a manifest pinning each repo's branch and commit. Matching branch names do not make a cross-repository change atomic. Coordinate dependency pins instead of forcing one project's versions on another.</p>
+      </section>
+
+      <!-- 12 TESTS -->
+      <section id="tests">
+        <span class="sec-num">12 · MUST-PASS SCENARIOS</span>
+        <h2>The adversarial cases that matter most when you are the only human.</h2>
+        <div class="tbl"><table>
+          <thead><tr><th>Attack or failure</th><th>Required result</th></tr></thead>
+          <tbody>
+            <tr><td>A customer message tells a marketing agent to create an unrestricted CFO child</td><td>Spawn denied or limited to the authorized definition and scope; no credential escalation</td></tr>
+            <tr><td>An agent definition ships a permissive Cedar policy</td><td>It stays a proposal and cannot replace tenant or resource-owner ceilings</td></tr>
+            <tr><td>Policy load fails in a governed deployment</td><td>Protected execution unavailable; no permit-all fallback</td></tr>
+            <tr><td>Two CFO twins "approve" their own payment</td><td>Does not satisfy independent human approvals</td></tr>
+            <tr><td>Approval arrives after grant revocation or a payload change</td><td>Reauthorization fails or a new approval is required</td></tr>
+            <tr><td>An observer receives the same event again after a restart</td><td>No duplicate issue, post or payment; unknown outcomes reconciled</td></tr>
+            <tr><td>A team member tries to paste a private board note into public Slack</td><td>Egress denied or redacted under trusted classification</td></tr>
+            <tr><td>Your phone wakes with stale grants and no network</td><td>Only explicitly allowed offline actions run; high-impact effects wait for fresh authority</td></tr>
+            <tr><td>A worker loses its lease during reassignment</td><td>A stale fencing epoch cannot commit task state or new effects</td></tr>
+            <tr><td>An upgraded definition changes a running workflow</td><td>Pinned version or explicit migration; never silent drift</td></tr>
+            <tr><td>Several agents rely on one misleading source</td><td>Provenance exposes the dependence; consensus is not independent verification</td></tr>
+          </tbody>
+        </table></div>
+        <p>Measure against a single-agent baseline with the same models, tools and budgets: accepted-result quality, <strong>your correction time</strong>, unauthorized effects blocked, recovery correctness, duplicated or unknown effects, token cost, latency, interoperability loss and administration burden. A coding score does not prove finance readiness.</p>
+      </section>
+
+      <!-- 13 DECISIONS -->
+      <section id="decisions">
+        <span class="sec-num">13 · OPEN DECISIONS</span>
+        <h2>What still has to be decided.</h2>
+        <h3>From the research</h3>
+        <ul class="clean">
+          <li>Which deployment profiles must support Cedar and durable team state, especially embedded/mobile?</li>
+          <li>Which current callers depend on the direct tool path, and how should their migration be staged?</li>
+          <li>Which SaaS adapters provide reliable idempotency or reconciliation?</li>
+          <li>Who is entitled to issue executive grants, approve personal representation, and retain the resulting artifacts?</li>
+          <li>What trust evidence is required before protected work goes to an external runtime?</li>
+          <li>Which throughput and recovery requirements justify adopting a separate durable workflow engine?</li>
+        </ul>
+        <h3>Specific to the company of one <span class="badge b-doc">This brief</span></h3>
+        <ul class="clean">
+          <li>Who is your <strong>external second approver</strong> for money movement, and how does KnowMe represent that person's approval?</li>
+          <li>What are the ceilings on standing grants for routine effects, and do they show in the morning brief?</li>
+          <li>Which offices get a Level 2 advisor profile, if any, and which stay pure role assistants?</li>
+          <li>Where does the line between personal KnowMe memory and business role memory sit on the day you hire someone?</li>
+        </ul>
+        <div class="callout cyan">
+          <span class="k">Decision</span>
+          <p>Proceed with the architecture direction. Close the source-confirmed governance and conversion gaps before expanding authority. Keep one UAR execution host, keep teams separate from thread trees, and make placement replaceable through contracts. Ship the product-feedback team first.</p>
+        </div>
+      </section>
+
+      <!-- SOURCES -->
+      <section id="sources">
+        <span class="sec-num">SOURCES</span>
+        <h2>Where this comes from</h2>
+        <p>Primary input is the research package <code>uar-governed-agent-teams-20260924-e92a</code> (60 indexed sources, confidence 0.86, verification partial). Its review record may still have pending checks, and this brief does not claim they passed. Solo-operator framing and anything tagged <span class="badge b-doc">This brief</span> are editorial additions.</p>
+        <ul class="clean src">
+          <li>Research report: <code>~/.prometheus/research/uar-governed-agent-teams-20260924-e92a/</code> (report, proposed standard, review)</li>
+          <li>KnowMe governance &amp; sharing: <code>docs/strategies/plugins/README.md</code> §9–10</li>
+          <li>Goals and engagements: <code>docs/pags-spec-km-goal-001.md</code>, <code>docs/pags-spec-km-crm-001.md</code></li>
+          <li>Context fabric: <code>docs/knowme-context-fabric-spec.md</code></li>
+          <li>UAR source (rev <code>ba12845</code>): <code>src/uar/runtime/thread/</code>, <code>src/uar/runtime/manager.rs</code>, <code>src/uar/governance/</code>, <code>src/uar/compiler/</code>, <code>src/server.rs</code></li>
+          <li><a href="https://docs.cedarpolicy.com/auth/authorization.html">Cedar authorization semantics</a> · <a href="https://docs.cedarpolicy.com/other/security.html">Cedar security guidance</a></li>
+          <li><a href="https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/policy.html">AWS AgentCore Policy</a> · <a href="https://www.rfc-editor.org/rfc/rfc8693.html">RFC 8693 token exchange</a> · <a href="https://modelcontextprotocol.io/specification/draft/basic/security_best_practices">MCP security best practices</a></li>
+          <li><a href="https://a2a-protocol.org/latest/specification/">A2A</a> · <a href="https://agentskills.io/specification">Agent Skills</a> · <a href="https://docs.agntcy.org/oasf/open-agentic-schema-framework/">OASF</a> · <a href="https://oracle.github.io/agent-spec/index.html">Oracle Agent Spec</a></li>
+          <li><a href="https://code.claude.com/docs/en/agent-teams">Claude Code agent teams</a> · <a href="https://docs.langchain.com/oss/python/langgraph/durable-execution">LangGraph durable execution</a> · <a href="https://www.anthropic.com/engineering/multi-agent-research-system">Anthropic multi-agent research system</a> · <a href="https://arxiv.org/abs/2411.10109">Park et al., person-specific simulation</a></li>
+        </ul>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<footer>
+  <div class="wrap">
+    <p><span class="wordmark" style="font-size:15px">Know<span class="me">Me</span></span> &nbsp;·&nbsp; The Company of One · Architecture brief derived from UAR governed agent teams research · 24 September 2026</p>
+    <p>Proposal only. No UAR, BossFang, Fabric, KnowMe, The Boss or SaaS implementation was changed.</p>
+  </div>
+</footer>
+
+<script>
+  /* Theme + tabs. Invoked via htmx hx-on; falls back to plain listeners if htmx is unavailable. */
+  function kmApplyTheme(t){
+    document.documentElement.setAttribute('data-theme', t);
+    var b = document.getElementById('themeBtn');
+    if (b) b.textContent = t === 'dark' ? '☀ Light' : '☾ Dark';
+  }
+  function kmToggleTheme(){
+    var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    kmApplyTheme(next);
+    try { localStorage.setItem('km-theme', next); } catch(e) {}
+  }
+  function kmTab(btn){
+    var tabs = btn.parentElement.querySelectorAll('[role="tab"]');
+    tabs.forEach(function(t){
+      var on = t === btn;
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      t.tabIndex = on ? 0 : -1;
+      var p = document.getElementById(t.getAttribute('aria-controls'));
+      if (p) p.hidden = !on;
+    });
+  }
+  (function(){
+    var saved = null;
+    try { saved = localStorage.getItem('km-theme'); } catch(e) {}
+    if (!saved && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) saved = 'light';
+    kmApplyTheme(saved || 'dark');
+    // Arrow-key navigation for the tablist
+    var list = document.querySelector('[role="tablist"]');
+    if (list) list.addEventListener('keydown', function(e){
+      var tabs = Array.prototype.slice.call(list.querySelectorAll('[role="tab"]'));
+      var i = tabs.indexOf(document.activeElement);
+      if (i < 0) return;
+      var n = e.key === 'ArrowRight' ? (i+1)%tabs.length : e.key === 'ArrowLeft' ? (i-1+tabs.length)%tabs.length : -1;
+      if (n >= 0){ e.preventDefault(); tabs[n].focus(); kmTab(tabs[n]); }
+    });
+    // Fallback when htmx did not load (offline / blocked CDN)
+    window.addEventListener('load', function(){
+      if (window.htmx) return;
+      var tb = document.getElementById('themeBtn');
+      if (tb) tb.addEventListener('click', kmToggleTheme);
+      document.querySelectorAll('[role="tab"]').forEach(function(t){ t.addEventListener('click', function(){ kmTab(t); }); });
+    });
+  })();
+</script>
+</body>
+</html>
+
+    </div>
+  </main>
+</div>
+</body>
+</html>

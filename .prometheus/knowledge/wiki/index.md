@@ -99,6 +99,8 @@
 * [embedded-UAR offline-agents session ended at 2026-07-29T13:36Z](/embedded-uar-offline-agents-session-ended-at-2026-07-29t13-36z.md)
 * [embedded-UAR offline-agents session ended at 2026-07-29T13:42Z](/embedded-uar-offline-agents-session-ended-at-2026-07-29t13-42z.md)
 * [embedded-UAR offline-agents session ended at 2026-07-29T13:53Z](/embedded-uar-offline-agents-session-ended-at-2026-07-29t13-53z.md)
+* [embedded-UAR offline-agents session ended at 2026-07-29T14:33Z](/embedded-uar-offline-agents-session-ended-at-2026-07-29t14-33z.md)
+* [embedded-UAR offline-agents session ended at 2026-07-29T14:39Z](/embedded-uar-offline-agents-session-ended-at-2026-07-29t14-39z.md)
 * [embedded-uar-offline-agents completion marker with unknown change](/embedded-uar-offline-agents-completion-marker-with-unknown-change.md)
 * [embedded-uar-offline-agents completion marker, change unknown](/embedded-uar-offline-agents-completion-marker-change-unknown.md)
 * [embedded-uar-offline-agents completion marker, unknown change](/embedded-uar-offline-agents-completion-marker-unknown-change.md)

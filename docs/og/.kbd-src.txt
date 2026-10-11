@@ -1,0 +1,1192 @@
+ 
+ KBD Roles and Skills 
+ Contents 
+ KBD-ARCH-001 · Rev 2 · Roles & Skills 
+ Light 
+ Contents ✕ 
+ I Multi-agent theory 
+ 1.1 Why several agents 
+ 1.2 Coordination models 
+ 1.3 Determinism boundary 
+ 1.4 Maker ≠ evaluator 
+ 1.5 Bounded loops 
+ II KBD substrate 
+ 2.1 Journal authority 
+ 2.2 Nested loops 
+ 2.3 Completion dimensions 
+ 2.4 Concurrency · worktrees 
+ 2.5 Hooks · observers 
+ 2.6 Startup · recovery 
+ III Roles · skills · definitions 
+ 3.1 Seven concepts 
+ 3.2 Core lifecycle roles 
+ 3.3 Specialists 
+ 3.4 Definition contents 
+ 3.5 Ownership 
+ IV Harness architecture 
+ 4.1 Capability mapping 
+ 4.2 Topologies 
+ 4.3 Effective read-only 
+ 4.x Session flows 
+ V Handoffs · ownership 
+ 5.1 Revision-bound handoff 
+ 5.2 Product architecture 
+ 5.3 External actions 
+ A Specialist roles 
+ B Feedback · issues · observers 
+ B.1 Feedback Analyst 
+ B.2 Issue Curator 
+ B.3 Feedback → issue 
+ B.4 Subscriptions 
+ B.5 Other observers 
+ C Skill catalog 
+ C.1 Public candidates 
+ C.2 Local process skills 
+ C.3 Skill lock record 
+ D Templates · example 
+ D.1 Templates 
+ D.3 Handoff checklist 
+ D.4 Worked example 
+ N Evidence notes 
+Research report · Knowledge-Based Development 
+Multi-Agent Development, KBD Process Loops, and Specialist Roles 
+ A revised, skill-aware edition covering durable coordination, specialist agents, customer-feedback loops, and heterogeneous execution harnesses. 
+ Document KBD-ARCH-001 · Rev 2 
+ Research date 24 Sep 2026 
+ Verification partial 
+ Sources 38 records · 46 claims 
+ Conflicts 8 of 10 resolved 
+ Confidence 0.84 
+ Explanation grade 0.985 
+ Contradictions resolved 8 / 10 
+This edition preserves the original five-part structure and its central ideas: scoped workers, independent evaluation, durable process state, bounded loops, and cross-harness handoffs. Addenda A–D introduce specialist roles, a customer-feedback and enhancement-intake loop, a researched skill catalog, and portable role templates. 
+It also corrects several assumptions in the original. Current installed KBD uses an event journal as authority and compatibility JSON as projections ( KBD contract ). Codex supports native agent roles; Part IV gives the sourced harness comparison ( Codex source ). Worktrees isolate edits but do not enforce a security sandbox, and recovery must reconcile in-flight actions rather than promise zero loss ( handoff contract ). 
+ Status. This is a design and operating-model document. Role definitions, routing policies and templates are recommendations unless explicitly described as verified current behavior. Reading it does not install skills, create agents, authorize customer communication, or create issues. 
+ I Multi-agent theory 
+ 1.1 Why several agents 
+ 1.2 Coordination models 
+ 1.3 Determinism boundary 
+ 1.4 Maker ≠ evaluator 
+ 1.5 Bounded loops 
+ II KBD substrate 
+ 2.1 Journal authority 
+ 2.2 Nested loops 
+ 2.3 Completion dimensions 
+ 2.4 Concurrency · worktrees 
+ 2.5 Hooks · observers 
+ 2.6 Startup · recovery 
+ III Roles · skills · definitions 
+ 3.1 Seven concepts 
+ 3.2 Core lifecycle roles 
+ 3.3 Specialists 
+ 3.4 Definition contents 
+ 3.5 Ownership 
+ IV Harness architecture 
+ 4.1 Capability mapping 
+ 4.2 Topologies 
+ 4.3 Effective read-only 
+ 4.x Session flows 
+ V Handoffs · ownership 
+ 5.1 Revision-bound handoff 
+ 5.2 Product architecture 
+ 5.3 External actions 
+ A Specialist roles 
+ B Feedback · issues · observers 
+ B.1 Feedback Analyst 
+ B.2 Issue Curator 
+ B.3 Feedback → issue 
+ B.4 Subscriptions 
+ B.5 Other observers 
+ C Skill catalog 
+ C.1 Public candidates 
+ C.2 Local process skills 
+ C.3 Skill lock record 
+ D Templates · example 
+ D.1 Templates 
+ D.3 Handoff checklist 
+ D.4 Worked example 
+ N Evidence notes 
+ PART I 
+Multi-agent theory 
+ 1.1 Why use several agents? 
+Separate agents are useful when they create a meaningful boundary: 
+ Boundary Benefit Remaining limitation 
+ Context Each worker receives a bounded problem and relevant evidence A bad task brief can still omit essential constraints 
+ Responsibility Designer, implementer, tester and evaluator produce different outputs Different titles do not guarantee independent judgment 
+ Authority Each role receives only the tools and resources its assignment requires A prompt or skill file alone does not enforce permissions 
+ Lifetime A worker can finish while the project continues Recovery still needs durable records and reconciliation 
+ Parallelism Independent tasks can proceed together Shared files, state and external actions need coordination 
+Use a single agent for a small, coherent task. Add agents when isolation, specialization, independent evaluation or useful parallel work justifies the dispatch and coordination cost. 
+ A role is an accountability boundary, not necessarily a permanently running process. One developer may use several roles sequentially. Several developers may share a pool of the same role definitions, with distinct project, tenant and task scopes. 
+ 1.2 Three coordination models 
+ Model Mechanism Appropriate use 
+ Orchestrator and workers A coordinator assigns bounded work and collects results Work decomposition and independent parallel tasks 
+ Pipeline A stage consumes the preceding stage’s accepted artifact Assess, analyze, specify, plan, execute and evaluate 
+ Shared durable state Participants read a common authority and submit controlled changes Recovery, auditability and cross-harness operation 
+KBD combines these models. A stage pipeline defines the lifecycle, an authoritative runtime records transitions, and orchestrators dispatch workers within stages. Conversations and agent-to-agent messages can transport information, but they do not replace the durable record of accepted work. 
+ Fig. 1 · Pipeline over a journal-backed authority Expand 
+ FIG. 1 The pipeline defines the lifecycle; the append-only journal is the authority. Workers read generated views, confirm the runtime revision, and return reports — a single control-plane writer turns accepted results into typed commands. *Copilot is added in this edition and is outside the researched source set. 
+ Deployment boundary. A filesystem-backed journal works for its documented deployment boundary. Different machines do not share authority merely because they have clones of the same repository. 
+ 1.3 The determinism boundary 
+ Agents 
+Analyze requirements, design, implement, diagnose and review. The model may propose “this change is complete.” 
+ Deterministic host logic 
+Validates task identity, authority, revisions, transition preconditions and recorded completion — checking whether the proposed transition is valid for the assigned change and current revision. 
+Passing a syntactic transition check does not prove the design is correct; independent evidence and evaluation remain necessary. 
+Prefer replaceable workers with durable inputs, outputs and checkpoints. A crash can still leave an uncommitted edit, a running tool or an external API action whose outcome is uncertain. Recovery must reconcile those cases before replaying work. 
+ 1.4 Maker and evaluator are separate assignments 
+An implementer can run tests and self-check. A separate evaluator judges the resulting artifact against the specification and evidence. Fresh context reduces dependence on the implementer’s narrative. A different model can add diversity, but neither measure guarantees correctness. A different harness is not necessarily a different model or provider. 
+The evaluator receives the goal, constraints, exact artifact revision, relevant source and evidence. It produces findings or a verdict, not a hidden repair. A repair becomes a separately scoped executor assignment, followed by review of the new revision. For code, design, documentation and security alike, distinguish four things: 
+ Fig. 4 · Maker and evaluator are separate assignments Expand 
+ FIG. 4 Fresh context and a different model add diversity, but neither guarantees correctness — and a different harness is not necessarily a different model. 
+ 1.5 Loops need stopping conditions and budgets 
+Give every loop an acceptance condition, attempt/time/cost limits, blocker behavior and a pause path. Completion of a roadmap does not authorize endless background work. 
+ Fig. 3 · Loops need stopping conditions and budgets Expand 
+ FIG. 3 Research may propose another phase; the project’s continuation policy decides whether it is admitted. 
+ PART II 
+KBD as the coordination substrate 
+ 2.1 Current authority: journal, projections and artifacts 
+For the installed runtime-managed KBD contract, the append-only journal at .kbd-orchestrator/runtime/events.jsonl is authoritative. Waypoint, progress and position JSON are generated views. Workflow changes go through typed KBD CLI, MCP or REST operations; runtime-generated projections are not edited directly ( installed KBD contract ). 
+ Record Kind Role 
+ runtime/events.jsonl authority Accepted workflow history and runtime authority 
+ project.json config Project identity and configuration 
+ current-waypoint.json / .md projection Resume view and human-readable next-work summary 
+ position.json projection Revision-bound position in nested work 
+ phases/<phase>/progress.json projection Derived completion and evidence view 
+ assessment.md · analysis.md artifact Findings and investigated options 
+ library-candidates.json artifact Build-versus-adopt evidence 
+ plan.md · execution.md artifact Accepted work and execution-backend contract 
+ handoffs/*.handoff.json artifact Stage preconditions and accepted output references 
+ reflection.md artifact Lessons and proposed next work 
+ hooks.log.jsonl · hooks-status.json telemetry Lifecycle telemetry; supplementary to canonical history 
+ AGENTS.md · constraints.md instructions Project instructions and explicit constraints 
+ Corrected in this revision. The previous edition described a port using lib/kbd/*.mjs . Those module names are not the universal interface verified here. Some installed legacy references still describe direct JSON mutations; the newer runtime contract explicitly rejects that practice after migration. Treat the project’s authority mode as explicit and avoid mixed writers. Current handoff contract · legacy reference 
+ 2.2 Nested loops 
+ Phase Assess the situation, investigate options, specify and plan work, execute accepted changes, then reflect. 
+ Change Execute bounded tasks, collect the required evidence, evaluate and record the result. 
+ Artifact Refine a particular design, document, implementation or assessment against its own criteria. 
+ Fig. 2 · Three nested loops, one shape Expand 
+ FIG. 2 A worker owns an assignment at one level. It can propose work at another level through an artifact or command request, but it does not silently rewrite the parent goal. Use the deployed runtime’s schema for parent/child fields. 
+Nested phases need explicit parent/child identity and revision-aware progress aggregation. Do not assume field spelling from one port is a portable schema: use the deployed runtime’s schema and adapter. 
+ 2.3 Four completion dimensions 
+ Primary count · Executor Implementation Is the requested code or artifact and its integration contract implemented? 
+ Tester or specialist Evidence Has the required verification evidence been collected? 
+ Evaluators · approvers Certification Have the configured acceptance/authorization gates been satisfied? 
+ Delivery role Publication Has the accepted result been delivered to its intended environment? 
+The current KBD contract keeps implementation as the primary completed/total count. Pending evidence, authorization, elapsed-time, external-review or publication gates do not automatically reopen completed implementation. They can still prevent release. A subsequently discovered defect is recorded and handled according to the change policy rather than hidden by manipulating counts ( completion invariant ). 
+ “Certification” is a workflow dimension. It does not mean HIPAA certification, CMMC certification, a banking regulator’s approval, or a qualified assessor’s attestation. 
+ 2.4 Concurrency and worktrees 
+The installed KBD handoff contract describes an exclusive journal lock over the whole read/validate/append transaction and rejection of stale expected revisions. Atomic replacement of a JSON file is not equivalent to that transaction. Git commits are useful snapshots, but do not provide live mutual exclusion ( KBD transaction boundary ). 
+For parallel code changes, use separate worktrees and explicit ownership. Prefer one designated KBD control-plane writer receiving revision-bound worker reports until a shared-runtime deployment has been verified. 
+ Provides 
+Exclusive lock over read → validate → append 
+Stale expected revisions rejected 
+Separate worktree per parallel change 
+ Does not provide 
+Atomic JSON replace ≠ a transaction 
+Git commits ≠ live mutual exclusion 
+A worktree ≠ a sandbox 
+A worktree is still writable filesystem content; it is not a sandbox. Path restrictions require actual host enforcement. The installed child-scope hook is advisory by default, so its allowed paths must not be represented as a hard security boundary ( scope hook ). 
+ 2.5 Hooks and observer agents 
+Hooks announce lifecycle boundaries and support telemetry, notifications and follow-up work. An observer may request a new assessment or propose a blocker, but the runtime admits any resulting transition under its normal authorization and revision rules. 
+ A hook log is not automatically a durable delivery queue. An observer that must recover missed events needs a subscription, cursor, retention policy and acknowledged work record. Section B.4 describes the proposed event contract. 
+ 2.6 Startup and recovery 
+A dispatched worker should: 
+ Establish identity Project, worktree, principal and assigned task. 
+ Load context Relevant project instructions and phase artifacts. 
+ Confirm position Read the waypoint, then confirm authoritative runtime status and revision. 
+ Load skills + grants The required skill revisions and tool grants. 
+ Execute The assigned bounded work. 
+ Return a report Artifacts, evidence, unresolved outcomes and a requested transition. 
+ Let the writer record The authorized runtime writer records the accepted result. 
+A graceful handoff includes the last completed work, exact next work, decisions, blockers, dirty state and plan revision. A receiving worker validates that checkpoint before continuing. After an ungraceful interruption, reconcile repository state, active processes and external action receipts first ( resume and handoff contract ). 
+ PART III 
+Roles, skills, and agent definitions 
+ 3.1 Keep role, skill, tool, harness and instance distinct 
+ Concept Meaning 
+ Role Responsibility, expected outputs and decision rights 
+ Skill Reusable procedure and supporting knowledge/resources 
+ Tool or connector Mechanism that reads or changes a system 
+ Harness / runtime Execution, model/tool loop, permissions and lifecycle 
+ Agent definition Versioned configuration combining a role with selected skills and policies 
+ Agent instance A particular authorized identity with its own scope and optional state 
+ Task / turn One bounded execution of an assignment 
+ Fig. 12 · Seven concepts that must stay distinct Expand 
+ FIG. 12 One developer may use several roles sequentially; several developers may share a pool of the same definitions with distinct project, tenant and task scopes. 
+Agent Skills is the format at agentskills.io . The directory requested as “skill.sh” is skills.sh . They serve different purposes: the former specifies skill packaging; the latter helps discover and install skills. A directory listing is not an assurance of suitability or security. 
+The format supports metadata such as name, description, compatibility and license, with optional supporting files. Its experimental allowed-tools field is not a universal enforcement mechanism — the host still owns effective permissions. A skill does not supply credentials, an event subscription, a daemon or a compliance certification. 
+ 3.2 Core lifecycle roles 
+The supplied taxonomy enumerates nine useful core roles, despite describing them as six; they are retained below ( original document ). 
+ Role Responsibility Main output 
+ Orchestrator Select admitted work, dispatch, gate and record transitions Dispatches and accepted runtime transitions 
+ Assessor Compare current state with goals Assessment and gaps 
+ Analyst Investigate alternatives, dependencies and evidence Analysis and candidate evaluation 
+ Planner / spec-writer Define acceptance criteria, interfaces and bounded tasks Specifications and change plan 
+ Executor Implement authorized work in its assigned scope Patch or artifact and self-check evidence 
+ Evaluator Independently judge a specified revision Findings and PASS / CONTINUE / BLOCK as configured 
+ Tester Collect reproducible verification evidence Test results, traces, screenshots and environment details 
+ Debugger / triage Classify and diagnose incoming failures Reproduction, diagnosis and routing recommendation 
+ Delivery Engineer delivery infrastructure and operate authorized promotion Deployment/publication records and rollout evidence 
+A tester may need an isolated output directory for screenshots and logs even when source is read-only. If test authoring is required, assign it as implementation work; do not let an evidence-only tester silently change the subject being tested. 
+Likewise, pipeline engineering is an implementation assignment. Release operation is a separate authorized action. The same role definition can support both through different grants and fresh assignments. 
+ 3.3 Specialist roles supplement the lifecycle 
+The six roles in Addendum A apply expertise across lifecycle stages. A UI designer may contribute to analysis, specification and evaluation. A Security Officer may assess a threat model, define security criteria and review release evidence. They do not each need their own independent project orchestrator. 
+ Fig. 13 · Specialists across the lifecycle 
+Assess 
+Analyze 
+Specify 
+Execute 
+Evaluate 
+Deliver 
+UI/UX Designer 
+ Analyze Specify Execute Evaluate 
+Mobile Designer 
+ Analyze Specify Execute Evaluate 
+Security Officer 
+ Assess Specify Evaluate Deliver 
+Product Manager 
+ Assess Analyze Specify Evaluate 
+Documentation 
+ Assess Execute Evaluate Deliver 
+Code Reviewer 
+ Evaluate 
+Feedback Analyst 
+ Assess Analyze 
+Issue Curator 
+ Assess FIG. 13 leads the contribution   contributes. Specialists supply expertise to stages; none needs its own project orchestrator. 
+A role’s authority should fit the developer’s actual responsibility: 
+ Team situation Suggested arrangement 
+ Individual developer One orchestrator; load specialist roles on demand; retain a fresh evaluator 
+ Small product team Shared design, product, documentation and review definitions; separate instances per project 
+ Mobile product Add platform-specific design and device-verification assignments 
+ Regulated or enterprise project Explicit security/control profiles, evidence ownership and authorized approvers 
+ Customer-facing product Add feedback intake and issue-curation roles with scoped channel and tracker access 
+Combine production roles where helpful, but preserve separation when the same work is being judged or a sensitive authority is exercised. 
+ 3.4 What an agent definition should contain 
+purpose 
+tenant / project scope 
+allowed assignment types 
+required inputs 
+selected skill references 
+allowed tools + resources 
+output schema 
+event interests 
+state / retention policy 
+completion criteria 
+budget 
+blocker behavior 
+independent-review requirements 
+Record actual model/provider and harness separately. Specify whether the agent creates a proposal , applies a scoped change , or performs an external action . 
+Skill selection should be task-driven. Load the procedure needed for the current assignment, not every skill associated with a job title. A Product Manager writing a PRD needs specification and research-synthesis skills; it does not automatically need customer-message sending or Jira administration. 
+ 3.5 Write and decision ownership 
+Every artifact or external resource needs a designated owner and conflict policy. Shared visibility does not mean unrestricted writes. 
+ Product Problem statements and prioritization recommendations; accepted scope changes follow project governance. 
+ Design Approved interaction and visual specifications. 
+ Executors Patches for assigned implementation tasks. 
+ Reviewers Findings — not silent repairs. 
+ Documentation Designated pages and links; Product may own roadmap fields on the same Jira project. 
+ Delivery Release permissions granted by the project, including standing authorization and protected-environment gates. 
+ Approval is a policy, not a blanket rule. The original’s rule that every action beyond staging needs a fresh human approval is better expressed as an explicit project policy. An existing authorization may already cover a routine action. Where approval is required, prepare the concrete release package first, then stop at that boundary. 
+ PART IV 
+Harness-by-harness architecture 
+ 4.1 Capability mapping, not a fixed hierarchy 
+The following reflects inspected primary documentation and source, not verified installation of each feature on this machine. 
+ Harness Current evidence KBD integration rule Source 
+ Claude Code Custom subagents, model/tool configuration and skill loading Adapt the portable role contract to its own agent schema Claude subagents 
+ Codex Native agent roles and delegation exist Can coordinate workers as well as serve as a bounded executor/reviewer Codex role implementation 
+ OpenCode Primary agents, subagents and per-agent permissions Use the deployed agent and permission configuration OpenCode agents 
+ Kimi Code Custom agents and tool restrictions; prompt mode has automatic permissions with static denies Confirm effective policy for the selected mode Kimi agents · CLI 
+ DeepSeek Harness Headless JSON output and sessions; composable subagent tooling Verify the chosen profile enables the needed tools Headless · Tools 
+ MiniMax Code Primary documentation describes subagents, headless operation and permissions Verify installed schema, permission mode and output contract MiniMax capabilities 
+ GitHub Copilot CLI added · outside research set Custom agents run as subagents with isolated context; per-tool allow/deny; hooks Adapt to .agent.md profiles; enforce with tool flags and hooks Copilot custom agents 
+ Replaces outdated claims that Codex has no subagents, that DeepSeek Harness has only plain-text output, or that changing harness necessarily changes model family. 
+ 4.2 Two composable topologies 
+ In-harness delegation The coordinator dispatches role workers using native facilities. KBD remains the workflow authority. 
+ Adapter / headless dispatch The coordinator starts a bounded invocation through a verified adapter. The adapter normalizes task identity, outputs, tool policy, cancellation, timeouts and errors. 
+ Fig. 6 · Two composable topologies Expand 
+In-harness delegation 
+Adapter / headless dispatch FIG. 6 The topologies coexist. Agent-definition Markdown, permission flags and output schemas are not interchangeable across products — the adapter is where that difference is absorbed. 
+These topologies can coexist. Agent-definition Markdown, permission flags and output schemas are not interchangeable across products; the appendix provides a portable conceptual contract rather than pretending one YAML file configures every harness. Before enabling an adapter, verify its installed version, headless syntax, structured-output behavior, writable directories, network permissions, model identity, cancellation and failure semantics. Exit zero alone does not prove that a task met its acceptance criteria. 
+ 4.3 Effective read-only operation 
+ Not read-only 
+Edit tool removed, but unrestricted shell remains 
+Write-capable connector still granted 
+Role text says “do not modify” 
+ Read-only 
+Filesystem, tool and network boundaries enforced by the host 
+May write its own report to a separate permitted path 
+Cannot modify reviewed source, merge, change branch protection or post externally 
+Session flows, harness by harness 
+Every diagram uses one grammar: the harness process runs down the left, the KBD runtime down the right; dashed connectors mark reads ( R ) of views and writes ( W ) of reports or typed commands. Only the control-plane writer’s typed command reaches events.jsonl . On a phone the diagram becomes a numbered step list — tap Diagram for the drawing. 
+ Coordinator 
+ Worker / role agent 
+ Evaluator 
+ Adapter · control-plane writer 
+ Host enforcement · trust boundary 
+ Stage gate 
+ Claude Code host Codex host OpenCode host Copilot host Kimi Code worker DeepSeek worker MiniMax worker 
+Loading harness… 
+ PART V 
+Cross-harness handoffs and runtime ownership 
+ 5.1 A revision-bound handoff 
+A worker returns a report bound to the revision it started from: 
+ yaml Copy 
+# Conceptual report; adapt to the deployed KBD command schema.
+assignment_id: change-42/task-3
+project_id: example-project
+input_revision: 184
+artifact_revision: "<commit-or-content-hash>"
+result: completed
+outputs:
+ - path: "review/task-3.json"
+ digest: "<sha256>"
+evidence:
+ - kind: test-report
+ reference: "<artifact-reference>"
+unresolved_external_actions: []
+requested_transition: task-complete 
+ Fig. 7 · A revision-bound handoff Expand 
+ FIG. 7 The dispatcher validates before it submits; the runtime rejects stale expected revisions inside one locked transaction. A stale report is reconciled — it never overwrites newer state. 
+When transferring execution, the current writer checkpoints and stops issuing commands. The receiver establishes its own session/device identity, verifies runtime status and resumes under the supported contract. Preserve operator pause and cancellation. 
+ 5.2 KBD and the wider product architecture 
+The recommended integration model, consistent with the preceding architecture assessment: 
+ Fig. 9 · KBD in the wider product architecture Expand 
+ FIG. 9 Recommended integration model. A UI can administer several local or remote instances without owning their model loops; persistent subscriptions do not require permanently resident model processes. 
+ Component Responsibility 
+ KBD runtime Accepted development-process state and transitions 
+ UAR Agent identity, bounded execution, instance state and execution-side authorization 
+ BossFang Channel ingress, external interaction routing and higher-level orchestration 
+ The Boss Role configuration, instance selection, grants, inspection and administration 
+ Fabric Optional event transport and delivery infrastructure 
+ Gate Configured boundary authentication and policy enforcement 
+ Forge / domain stores Explicitly assigned domain records and APIs 
+ KnowMe Personal context and preferences under consent and sharing rules 
+ Use one execution owner for each turn. A BossFang workflow can invoke a UAR agent through a full runtime adapter; a provider-only integration is not the same delegation boundary. A UI can administer several local or remote instances without owning their model loops. 
+Specialists and feedback monitors can run as request-scoped workers or stateful logical instances. Persistent subscriptions and cursors do not require permanently resident model processes. These are proposed integration contracts, not a claim that all cross-product wiring already exists ( prior UAR/observer assessment ). 
+ 5.3 External actions are separate transactions 
+A KBD journal transaction does not atomically include a GitHub issue, Confluence update, deployment or customer message. Use action identity, bounded retries, receipts and reconciliation. 
+ Fig. 8 · External actions are separate transactions Expand 
+ FIG. 8 Action identity, bounded retries, receipts and reconciliation. Record an uncertain outcome as uncertain. 
+ ADDENDUM A 
+Six specialist development roles 
+Each role includes its KBD contribution, deliverables, skill use and decision boundary. Public skill candidates are detailed in Addendum C. 
+ A.1 UI/UX A.2 Mobile A.3 Security A.4 Product A.5 Docs A.6 Reviewer 
+Loading role… 
+ ADDENDUM B 
+Customer feedback, enhancement issues, and observer agents 
+ B.1 Customer Feedback Analyst 
+This role watches authorized support tickets, feedback forms, customer conversations, issue discussions, app feedback or product signals. It groups related observations and produces evidence-backed opportunities. 
+It distinguishes a defect , usability problem , documentation gap , feature request , security report and contractual issue . Customer messages are untrusted task data, not instructions to change agent policy or reveal internal information. 
+ Outputs Normalized feedback records, recurring themes, impact evidence, confidence/uncertainty and routing recommendations. Preserve evidence from one customer without pretending it represents many — and do not dismiss a serious single report merely because it is uncommon. 
+ Skills ticket-triage , customer-research , user-research-synthesis , response-drafting and escalation , selected by task. Replying to a customer is optional and separately authorized. 
+ State Cursors, source identities, deduplication keys, issue links and bounded topic summaries. Avoid retaining full conversations in every agent’s private history. 
+ B.2 Enhancement Issue Curator 
+Converts qualified opportunities into reviewable GitHub issues or updates an existing issue. It can be a separate agent, or a distinct assignment of the Feedback Analyst with a stronger grant. 
+ 01 
+ Observe Internal feedback record and recommendation. 
+ 02 
+ Draft Complete issue proposal awaiting admission. 
+ 03 
+ Authorized automatic intake Create or update an issue in allowlisted repositories under standing policy. 
+ 04 
+ Product commitment Prioritize, promise or schedule work only within separately delegated authority. 
+ Automatic intake is a valid mode. It should not require a person to approve every ordinary issue once the policy is authorized. The policy defines repositories, visibility, allowed fields/labels, content restrictions, deduplication, rate limits and escalation cases. 
+Creating an issue must not by itself authorize implementation. The planner admits accepted work into KBD, and the runtime records that decision. 
+ B.3 Feedback-to-issue transaction 
+ Fig. 10 · Feedback-to-issue transaction Expand 
+ FIG. 10 Two kinds of deduplication: delivery (the same source event never creates another action) and semantic grouping (related reports strengthen one opportunity — a similarity score is not proof of identity). 
+The issue should include: 
+user problem 
+affected audience / workflow 
+sanitized evidence 
+impact 
+current workaround 
+desired outcome 
+uncertainties 
+suggested acceptance criteria 
+links to related work 
+Label proposed solutions as proposals. 
+ Delivery deduplication 
+The same source event/revision never creates another action. 
+Needs a durable action ledger with the intended action reserved before writing. 
+ Semantic grouping 
+Related reports strengthen one opportunity. 
+Grouping requires evidence and may be revised; a similarity score is not proof that two problems are identical. 
+An idempotency key in an issue body alone is insufficient. If the request times out, reconcile the remote result before retrying; search can lag, so uncertain cases may need a paused reconciliation state (Fig. 8). Serialize or coordinate competing writers for the same opportunity. 
+GitHub documents issue creation, relevant token permissions and secondary rate limiting. Use a scoped application/credential and host policy rather than a general-purpose credential in model context. Do not assume a generic create-issue call is exactly-once ( GitHub issue API ). 
+ Public issues are public. Bodies must not expose private customer transcripts, ePHI, CUI, credentials or private-support links that reveal identities. Private evidence stays in its authorized store behind a sanitized public summary. Security reports route to the designated confidential process. 
+ B.4 Subscription semantics across UAR and BossFang 
+An observer subscription specifies: 
+source principal 
+event types 
+watched agents 
+authorized conversations 
+permitted projection 
+target definition / instance 
+start position 
+replay policy 
+action grants 
+resource limits 
+ Fig. 11 · Subscription semantics Expand 
+Within UAR 
+Across BossFang channels FIG. 11 Each independent observer needs its own progress; a shared worker queue merely divides work among consumers. Observation alone does not make every subscriber answer. 
+ Within UAR Committed events are matched to authorized subscriptions and admitted into each observer’s own work stream. The monitor gets a bounded turn under its own authority; it does not inherit the producer’s tools or approval context. 
+ Across BossFang channels BossFang owns the channel source and primary routing. A feedback observer receives authorized copies. A separate handler subscription can make a Product Manager or support agent the primary respondent, but observation alone does not make every subscriber answer. 
+ Across hosts Source-side permission to disclose and recipient-side permission to execute are both required. Fabric may transport events. The Boss displays subscription scope, placement, lag, delivery failures and permitted actions. 
+Replay should be observe-only by default, with catch-up actions explicitly authorized. Preserve causation, suppress provider echoes, bound reaction depth and cost, and avoid starting another loop from the agent’s own issue-created notification ( observer architecture assessment ). 
+ B.5 Other useful event-driven assignments 
+ Assignment Watches Produces 
+ Documentation freshness monitor Accepted interface changes and releases Proposed documentation updates 
+ Dependency / security monitor Approved advisory and dependency sources Scoped risk findings and candidate remediation work 
+ Release feedback monitor Rollout metrics, crashes and support spikes Evidence for rollback or triage decisions 
+ Accessibility regression reviewer UI changes and accessibility evidence Findings against the project’s acceptance criteria 
+These can reuse existing specialist definitions and do not all require separate resident agents. Detection and intervention remain distinct: an asynchronous observer cannot prevent an already completed action. 
+ ADDENDUM C 
+Researched skill catalog and selection policy 
+ C.1 Verified public candidates 
+The catalog records publisher/repository and declared skill name or documented skill family. It establishes existence and described purpose — not a local installation, security audit or benchmark. Pin a reviewed revision before adoption. 
+ All Design Mobile Security Product Docs Feedback Review 
+ UI/UX design pbakaus/impeccable 
+ impeccable 
+Current publisher presents one skill with commands such as shape, critique, audit and polish; older separately listed names can be stale. Publisher ↗ 
+ UI visual direction anthropics/skills 
+ frontend-design 
+Alternative primary creative procedure; not a substitute for user research or accessibility evidence. Skill ↗ 
+ Interface review vercel-labs/agent-skills 
+ web-design-guidelines 
+Review UI against its interface guidelines. Skill ↗ 
+ React implementation / review vercel-labs/agent-skills 
+ vercel-react-best-practices 
+React/Next.js performance guidance; declared name and repository directory (react-best-practices) differ. Skill ↗ 
+ React Native mobile vercel-labs/agent-skills 
+ vercel-react-native-skills 
+React Native/Expo patterns (directory react-native-skills); not a Flutter skill. Skill ↗ 
+ Flutter design / prototyping flutter/agent-plugins 
+ flutter-build-responsive-layout flutter-add-widget-preview flutter-setup-localization 
+Platform-specific layout, previews and localized UI work. Official catalog ↗ 
+ Flutter evidence / architecture flutter/agent-plugins 
+ flutter-add-widget-test flutter-add-integration-test flutter-apply-architecture-best-practices 
+Assign test authoring and implementation writes explicitly. Official catalog ↗ 
+ Dart quality / documentation dart-lang/skills 
+ dart-run-static-analysis dart-add-unit-test dart-write-documentation 
+Separate analysis, fixes, test authoring and documentation permissions. Official catalog ↗ 
+ Security / change review trailofbits/skills 
+ differential-review 
+Security review informed by the diff and surrounding code (plugin differential-review). Skill ↗ 
+ Static-analysis evidence trailofbits/skills 
+ semgrep 
+Scoped scanning (plugin static-analysis); engine, rulesets and their dependencies need separate provisioning and review. Skill ↗ 
+ Product definition anthropics/knowledge-work-plugins · product-management 
+ feature-spec user-research-synthesis 
+PRDs and research-backed requirements. Publisher catalog ↗ 
+ Product planning / communication anthropics/knowledge-work-plugins · product-management 
+ roadmap-management stakeholder-comms metrics-tracking 
+Options, updates and outcome assessment; a skill does not grant commitment or send authority. Publisher catalog ↗ 
+ Documentation writing anthropics/skills 
+ doc-coauthoring 
+Collaborative drafting and reader-focused refinement. Skill ↗ 
+ Mintlify sites mintlify/docs 
+ mintlify 
+Site-specific guidance, published as lowercase skill.md; confirm packaging/discovery for the selected harness before installing. Publisher document ↗ 
+ Jira / Confluence status atlassian/atlassian-mcp-server 
+ generate-status-report 
+Can create/update Confluence content; scope its connector writes and publication policy. Skill ↗ 
+ Feedback intake anthropics/knowledge-work-plugins · customer-support 
+ ticket-triage customer-research escalation 
+Classification, investigation and escalation. Publisher catalog ↗ 
+ Customer and support knowledge anthropics/knowledge-work-plugins · customer-support 
+ response-drafting knowledge-management 
+Draft responses and maintain support articles; sending and publication remain separate operations. Publisher catalog ↗ 
+ match(c))" x-cloak>No skills match that filter. 
+ Commands are not skills. The product-management README lists commands such as write-spec alongside skills such as feature-spec , and some publishers expose migration aliases. Resolve the actual selected file and its frontmatter at the pinned revision. 
+ C.2 Local process skills 
+The installed KBD orchestrator provides the process framework and references assessment, analysis, specification, planning, execution, goal-checking and refinement integrations. These are local process dependencies, not proof that every candidate above is installed. A practical role combines: 
+ Project constraints + domain knowledge 
+ The relevant KBD procedure 
+ One primary specialist skill 
+ Optional evidence or review skills for this assignment only 
+A UI implementation task may use its KBD execution procedure plus one design skill and React performance guidance. Its independent review is a separate assignment with the accepted design, diff and review criteria. 
+ C.3 A proposed skill lock record 
+ yaml Copy 
+# Proposed control-plane metadata, not an existing UAR or KBD schema.
+skill:
+ publisher: vercel-labs
+ repository: agent-skills
+ path: skills/react-best-practices/SKILL.md
+ declared_name: vercel-react-best-practices
+ revision: "<reviewed-commit>"
+ digest: "<content-digest>"
+ license_review: "<record-reference>"
+ compatibility: "<verified-harness-and-tool-dependencies>"
+ allowed_assignments: [react-implementation, react-review]
+ tool_grant: "<separate-host-policy-reference>"
+ evaluated_examples: ["<project-relevant-evaluation>"] 
+Review supporting scripts, downloads, hooks and network behavior as well as the Markdown. Resolve dependencies without giving the skill broader authority than the role. Record licenses and update history; a popularity count is not a substitute. 
+If instructions conflict, use the project’s configured precedence and explicit user authority. Select one procedure to govern the task rather than blending incompatible workflows. Review and test skill updates on representative assignments before replacing the pinned revision. 
+ ADDENDUM D 
+Portable templates and example operating loop 
+ D.1–D.2 Templates 
+Conceptual definitions to compile through a harness-specific adapter. The adapter must enforce them through actual tools and host permissions — treat the fields as design vocabulary, not a drop-in configuration file. 
+ D.1 Specialist agent contract D.2 Feedback observer + issue policy 
+Loading template… 
+ D.3 Evidence and handoff checklist 
+ Per handoff 0 / 7 
+ Correct project, principal, task, source revision and accepted specification. 
+ Required skill revisions resolved; effective tools and destinations scoped. 
+ Output tied to an artifact revision with reproducible evidence. 
+ Independent review completed where required; findings addressed or explicitly accepted by the proper owner. 
+ Runtime transition submitted through the authoritative interface. 
+ External actions recorded as confirmed, rejected or uncertain. 
+ Exact next work or blocker recorded; paused work stays paused. 
+ Reset 
+ D.4 Example: a mobile accessibility enhancement 
+ 1 
+ Customer 
+Reports that large text obscures a mobile confirmation button. 
+ 2 
+ Feedback Analyst 
+Preserves a sanitized example and checks whether the problem is already tracked. 
+ 3 
+ Issue Curator 
+Under the standing intake policy, creates one enhancement/defect candidate and records the issue receipt. 
+ 4 
+ Product 
+Identifies affected users, desired outcome and priority; the accepted decision enters KBD. 
+ 5 
+ Mobile Designer 
+Specifies text scaling, keyboard and narrow-screen states. A Flutter assignment selects responsive-layout and preview skills. 
+ 6 
+ Executor test authoring 
+Implements the accepted change in its worktree. A test-authoring assignment adds relevant widget coverage. 
+ 7 
+ Tester Code Reviewer design review 
+The tester records device evidence. A fresh Code Reviewer checks the exact patch; design review checks the interaction against the accepted specification. 
+ 8 
+ Security conditional 
+Included if the change affects sensitive data, permissions or a required control — not invoked merely to increase the agent count. 
+ 9 
+ Documentation Delivery 
+Documentation updates the relevant support guidance. Delivery follows the project’s release authorization. 
+ 10 
+ Product authorized reply 
+A separately authorized customer response reports what shipped without inventing a promise or disclosing internal information. 
+ 11 
+ Observer 
+Links release evidence back to the original opportunity and avoids re-ingesting its own issue/update as new demand. 
+ Short-lived workers, durable continuity. Each step can use a short-lived worker. Durable project records, subscription progress and action receipts provide continuity. 
+ NOTES 
+Evidence and revision notes 
+This is a refined replacement for the supplied document, with clearly labeled addenda rather than a verbatim transcription. 
+ Material corrections include journal authority versus projections; transaction locking versus atomic file writes; checkpoints versus zero-loss recovery; native-agent support across current harnesses; actual model identity versus harness identity; real permissions versus advisory role text; and explicit external-action policy. 
+The skill catalog uses publisher repositories and official documentation. It does not claim that all skills are format-perfect, installed, interoperable, maintained to a particular service level, or safe without inspection. Current names and packaging may change. 
+No framework was installed or project code changed. Research subagents verified sources and reviewed the document; no development-role agents were deployed, and no tracker issues, customer messages or publications were created. The next step can use this document to select a project-specific roster, pinned skill set, connector grants and verified harness adapters. 
+Research record 
+ Research date 24 Sep Package manifest 
+ Source records 38 Source registry 
+ Tracked claims 46 Claim graph 
+ Conflicts resolved 8 / 10 Contradiction log 
+ Two items remain open: the actual deployed adapter/connector capabilities, and the project-specific regulatory applicability decision. Neither is implied by a skill listing. 
+package kbd-agent-roles-skills-20260924-d4e7 · job session-20260924-kbd-roles · OKF 0.1 · confidence 0.8413 · explanation grade 0.985 
+ KBD-ARCH-001 · Rev 2 · Multi-Agent Development, KBD Process Loops, and Specialist Roles 
+ Back to top ↑ 
+ Close 
+ Session flow · Claude Code Expand 
+claude · in-harness delegation 
+ 01 
+ Session start R constraints.md 
+CLAUDE.md → AGENTS.md · skills on demand 
+ 02 
+ Coordinator R view + rev 
+reads the view, confirms runtime revision 
+ 03 
+ Stage gate R handoffs/ 
+accepted predecessor handoff? 
+ 04 
+ SUBAGENTS · OWN TOOLS, MODEL, SKILLS W outputs/ 
+ assessor read-only host policy 
+ planner criteria · tasks 
+ executor worktree · own scope 
+ tester evidence dir only 
+ evaluator fresh ctx · exact rev 
+ specialist skill per assignment 
+ 05 
+ Host enforcement 
+host-enforced tools · fs · network 
+ 06 
+ Verdict on exact revision 
+PASS · CONTINUE · BLOCK as configured 
+↺ REWORK — back to step 04 
+ 07 
+ Typed KBD command W events.jsonl 
+CLI · MCP · REST · revision-checked 
+ 08 
+ claude -p "…" --output-format json 
+bounded headless worker via an adapter 
+ §4.1 · can coordinate 
+Claude Code 
+ Current evidence 
+Custom subagents, model/tool configuration and skill loading 
+ KBD integration rule 
+Adapt the portable role contract to its own agent schema 
+ Delegation native subagents 
+ Headless claude -p … --output-format json 
+ Defs .claude/agents/*.md 
+ Instructions CLAUDE.md + AGENTS.md 
+Subagent definitions are Markdown with frontmatter; the tools and model fields let one project run executors, evaluators and specialists with different grants and model choices. Skills load per assignment, so a specialist carries one primary procedure instead of every skill associated with its job title. 
+Frontmatter tool lists shape the role, but they are not the whole boundary: a worker without Edit is not read-only if an unrestricted shell or write-capable connector remains. Enforce the role in settings.json permissions and hooks — for example, a PreToolUse hook that denies direct writes to generated projections such as progress.json , so every transition goes through the typed KBD interface. 
+ sh Copy 
+claude -p "Run the startup ritual, execute assignment change-42/task-3, return a revision-bound report, and stop." \
+ --output-format json --allowedTools "Read,Edit,Write,Bash(npm test:*)" 
+Treat a nonzero exit or an error field as a failed dispatch recorded by the dispatcher — and treat success as a report to validate , not as completion. 
+ Verify before enabling the adapter 
+installed version 
+headless syntax 
+structured output 
+writable dirs 
+network permissions 
+model identity 
+cancellation 
+failure semantics 
+ Sources Claude subagents 
+ Session flow · Codex Expand 
+codex · native agent roles 
+ 01 
+ Session start R constraints.md 
+AGENTS.md · role configuration 
+ 02 
+ Coordinator or single role R view + rev 
+can delegate to native agent roles 
+ 03 
+ NATIVE AGENT ROLES · VERIFY SCHEMA W outputs/ 
+ executor workspace-write 
+ reviewer read-only sandbox 
+ analyst read-only 
+ tester evidence output 
+ 04 
+ Sandbox + approval policy 
+read-only means no write path at all 
+ 05 
+ codex exec "…" --json 
+adapter: JSONL events · cancel · timeout 
+ 06 
+ Adapter validates report 
+exit 0 alone ≠ acceptance met 
+ 07 
+ Typed KBD command W events.jsonl 
+control-plane writer · expected rev 
+↺ NEXT ASSIGNMENT — back to step 02 
+ §4.2 · can coordinate 
+Codex 
+ Current evidence 
+Native agent roles and delegation exist 
+ KBD integration rule 
+Can coordinate workers as well as serve as a bounded executor/reviewer 
+ Delegation native agent roles 
+ Headless codex exec … --json 
+ Output JSONL event stream 
+ Instructions AGENTS.md 
+ Corrected in this revision. The earlier edition treated Codex as a single-agent worker only. Its source implements native agent roles and delegation, so Codex can host coordination as well as act as a bounded executor or reviewer. 
+Codex reads AGENTS.md natively, which is where KBD project instructions live. Its sandbox remains the mechanical write boundary for bounded dispatches: --sandbox read-only for assessors and reviewers, the narrowest writable sandbox for executors, and never --dangerously-bypass-approvals-and-sandbox . 
+ sh Copy 
+codex exec "$(cat assignment-prompt.md)" --json --sandbox read-only 
+Preserve JSONL event order and take the final agent message as the report. A read-only reviewer cannot record its own verdict; the dispatcher validates the report and submits the transition. Codex on a read-only sandbox remains a strong independent reviewer for work produced elsewhere — provided the model genuinely differs; a different harness is not necessarily a different model. 
+ Verify before enabling the adapter 
+installed version 
+headless syntax 
+structured output 
+writable dirs 
+network permissions 
+model identity 
+cancellation 
+failure semantics 
+ Sources Codex role implementation 
+ Session flow · OpenCode Expand 
+opencode · primary + subagents 
+ 01 
+ Session start R constraints.md 
+AGENTS.md · agent configuration 
+ 02 
+ Primary agent · coordinator R view + rev 
+per-agent permissions and models 
+ 03 
+ Stage gate R handoffs/ 
+accepted predecessor handoff? 
+ 04 
+ SUBAGENTS · PER-AGENT PERMISSIONS W outputs/ 
+ assessor read-only perms 
+ executor edit + scoped bash 
+ evaluator alt model · read-only 
+ tester evidence only 
+ 05 
+ Verdict on exact revision 
+findings, not hidden repairs 
+↺ REWORK — back to step 04 
+ 06 
+ Typed KBD command W events.jsonl 
+control-plane writer · expected rev 
+ 07 
+ opencode run "…" --format json 
+headless: permission prompts denied 
+ §4.3 · can coordinate 
+OpenCode 
+ Current evidence 
+Primary agents, subagents and per-agent permissions 
+ KBD integration rule 
+Use the deployed agent and permission configuration 
+ Delegation primary + subagents 
+ Headless opencode run … --format json 
+ Output JSON event stream 
+ Instructions AGENTS.md 
+OpenCode distinguishes primary agents from subagents and scopes permissions and models per agent — the same ingredients as Claude Code, in its own syntax. The coordinator runs as a primary agent; assessors, executors, testers and evaluators run as subagents with the permissions their assignments need. 
+ sh Copy 
+opencode run "<assignment prompt>" --format json 
+Headless mode denies permission prompts by default. Keep that posture for analysis and evaluation. If a read-only dispatch hits a denial, the assignment asked for more than the role allows — fix the role definition rather than silencing the denial with a broader flag. 
+ Verify before enabling the adapter 
+installed version 
+headless syntax 
+structured output 
+writable dirs 
+network permissions 
+model identity 
+cancellation 
+failure semantics 
+ Sources OpenCode agents 
+ Session flow · GitHub Copilot CLI Expand 
+copilot · custom agents (added) 
+ 01 
+ Session start R constraints.md 
+copilot-instructions.md + AGENTS.md 
+ 02 
+ Main agent · coordinator R view + rev 
+.github/agents/*.agent.md 
+ 03 
+ Stage gate R handoffs/ 
+accepted predecessor handoff? 
+ 04 
+ CUSTOM AGENTS AS SUBAGENTS W outputs/ 
+ assessor tools: read, search 
+ executor tools: edit, shell 
+ reviewer read-only profile 
+ triage shell(gh) only 
+ 05 
+ Hooks · .github/hooks/*.json 
+preToolUse denies projection edits 
+ 06 
+ Verdict on exact revision 
+PASS · CONTINUE · BLOCK 
+↺ REWORK — back to step 04 
+ 07 
+ Typed KBD command W events.jsonl 
+control-plane writer · expected rev 
+ 08 
+ copilot -p "…" --agent <role> 
+--allow-tool / --deny-tool · -s 
+ §4.7 · can coordinate 
+GitHub Copilot CLI added · outside research set 
+ Current evidence 
+Custom agents in *.agent.md run as subagents with isolated context; per-tool allow/deny flags; hooks 
+ KBD integration rule 
+Adapt the portable contract to .agent.md profiles; enforce with --allow-tool / --deny-tool and hooks 
+ Delegation custom agents as subagents 
+ Headless copilot -p … -s --output-format json 
+ Defs .github/agents/*.agent.md 
+ Instructions copilot-instructions.md + AGENTS.md 
+ Outside the researched source set. Copilot CLI was added in the previous edition of this page at the author’s request. It is mapped from GitHub’s published CLI documentation and was not part of the 38-source research package; verify against your installed version. 
+Copilot CLI reads .github/copilot-instructions.md , path-scoped .github/instructions/**/*.instructions.md and AGENTS.md . Custom agents live in .github/agents/ (repository) or ~/.copilot/agents/ (user, which wins on a name clash) and run as subagents with their own context. Hook definitions in .github/hooks/*.json can deny edits to generated projections. 
+ sh Copy 
+copilot -p "Execute assignment change-42/task-3 and return a revision-bound report." \
+ --agent kbd-executor \
+ --allow-tool 'write' --allow-tool 'shell(npm test)' \
+ --deny-tool 'shell(git push)' \
+ -s --output-format json 
+Never use --allow-all / --yolo for dispatches. /delegate hands work to the cloud coding agent outside your checkout — treat it as a separate executor that reports through a pull request, reconciled by the dispatcher. 
+ Verify before enabling the adapter 
+installed version 
+headless syntax 
+structured output 
+writable dirs 
+network permissions 
+model identity 
+cancellation 
+failure semantics 
+ Sources Custom agents for Copilot CLI · Copilot CLI reference 
+ Session flow · Kimi Code Expand 
+kimi · custom agents · prompt mode 
+ 01 
+ Coordinator / adapter R view + rev 
+renders assignment from view + rev 
+ 02 
+ Confirm effective policy 
+prompt mode auto-permits · static denies 
+ 03 
+ Disposable worktree 
+isolates edits — it is not a sandbox 
+ 04 
+ kimi -p "…" --output-format stream-json 
+custom agent with tool restrictions 
+ 05 
+ CUSTOM AGENT LOOP W outputs/ 
+ AGENTS.md project rules 
+ edits worktree assigned scope 
+ session state KIMI_CODE_HOME 
+ report JSONL events 
+ 06 
+ Dispatcher diff review 
+approve → merge · reject → blocker 
+ 07 
+ Typed KBD command W events.jsonl 
+only after review passes 
+↺ NEXT ASSIGNMENT — back to step 01 
+ §4.4 · bounded worker by default 
+Kimi Code 
+ Current evidence 
+Custom agents and tool restrictions; prompt mode has automatic permissions with static denies 
+ KBD integration rule 
+Confirm effective policy for the selected mode 
+ Delegation custom agents 
+ Headless kimi -p … --output-format stream-json 
+ Permissions auto in prompt mode · static denies 
+ State KIMI_CODE_HOME 
+Kimi Code supports custom agents with tool restrictions. In prompt mode, tool calls are approved automatically except for statically denied tools — so the effective policy for the mode you run is what matters, not the role text. Confirm it before each new deployment. 
+A disposable worktree isolates edits, but it is still writable filesystem content and not a security sandbox. Use it to contain changes and let the dispatcher inspect the diff before any transition is submitted; Kimi’s run alone never advances the workflow. 
+ sh Copy 
+kimi -p "<assignment prompt>" --output-format stream-json 
+Session state persists under KIMI_CODE_HOME ; in sandboxed environments that path needs a write exception even for otherwise read-only dispatches. 
+ Verify before enabling the adapter 
+installed version 
+headless syntax 
+structured output 
+writable dirs 
+network permissions 
+model identity 
+cancellation 
+failure semantics 
+ Sources Kimi agents · Kimi CLI 
+ Session flow · DeepSeek Harness Expand 
+dsh · headless JSON · sessions 
+ 01 
+ Coordinator / adapter R view + rev 
+renders assignment from view + rev 
+ 02 
+ Verify profile + tools 
+chosen profile must enable needed tools 
+ 03 
+ dsh --profile headless "…" 
+structured JSON output · verify flags 
+ 04 
+ SESSION + COMPOSABLE SUBAGENT TOOLING W outputs/ 
+ session cache, not authority 
+ subagents if profile enables 
+ one task per invocation 
+ JSON result parsed by adapter 
+ 05 
+ Adapter validates report 
+exit code alone ≠ acceptance 
+ 06 
+ Verify git diff 
+clean for read-only roles 
+ 07 
+ Typed KBD command W events.jsonl 
+control-plane writer · expected rev 
+↺ NEXT ASSIGNMENT — back to step 01 
+ §4.5 · bounded worker by default 
+DeepSeek Harness 
+ Current evidence 
+Headless JSON output and sessions; composable subagent tooling 
+ KBD integration rule 
+Verify the chosen profile enables the needed tools 
+ Delegation composable subagent tooling 
+ Headless dsh --profile headless … 
+ Output structured JSON (verify flag) 
+ State persistent sessions 
+ Corrected in this revision. The earlier edition described plain-text output only. The headless bundle documents JSON output, and the tool catalog includes composable subagent tooling — whether a given profile exposes them is a deployment fact to verify. 
+Headless runs create persistent sessions. Treat a session as a cache, never as workflow authority: nothing another harness can’t see should decide what happens next. One session per change keeps drift from outliving the change loop. 
+Parse the structured result through the adapter and still inspect the diff: exit codes report the process, not whether acceptance criteria were met. 
+ Verify before enabling the adapter 
+installed version 
+headless syntax 
+structured output 
+writable dirs 
+network permissions 
+model identity 
+cancellation 
+failure semantics 
+ Sources DeepSeek headless · DeepSeek tools 
+ Session flow · MiniMax Code Expand 
+mcode · subagents · permission modes 
+ 01 
+ Coordinator / adapter R view + rev 
+renders assignment from view + rev 
+ 02 
+ Pick permission mode 
+smart for analysis · never full 
+ 03 
+ mcode exec "…" --permission smart 
+headless · verify output contract 
+ 04 
+ SUBAGENTS · VERIFY INSTALLED SCHEMA W outputs/ 
+ primary coordinates 
+ subagent bounded task 
+ permission mode host guard 
+ final answer + structured trailer 
+ 05 
+ Adapter validates report 
+nonzero exit = failed dispatch 
+ 06 
+ Verify git diff 
+matches the role’s grant 
+ 07 
+ Typed KBD command W events.jsonl 
+control-plane writer · expected rev 
+↺ NEXT ASSIGNMENT — back to step 01 
+ §4.6 · bounded worker by default 
+MiniMax Code 
+ Current evidence 
+Primary documentation describes subagents, headless operation and permissions 
+ KBD integration rule 
+Verify installed schema, permission mode and output contract 
+ Delegation subagents (documented) 
+ Headless mcode exec … --permission smart 
+ Permissions modes · never full 
+ Output verify contract 
+MiniMax Code’s documentation describes subagents, headless operation and permission modes. Pass --permission smart explicitly for analysis and evaluation, never --permission full , and never relax the mode to silence a denial. 
+ sh Copy 
+mcode exec "<assignment prompt>" --permission smart 
+Keep prompt instructions read-only for read-only roles as well — prompt text and permission modes fail independently. Where the output contract is unverified, require a structured trailer in the report and let the adapter parse it. 
+ Verify before enabling the adapter 
+installed version 
+headless syntax 
+structured output 
+writable dirs 
+network permissions 
+model identity 
+cancellation 
+failure semantics 
+ Sources MiniMax capabilities 
+ D.1 · Conceptual definition; compile through a harness-specific adapter. 
+ yaml Copy 
+# Conceptual definition; compile through a harness-specific adapter.
+role: code-reviewer
+scope:
+ tenant: "<tenant>"
+ project: "<project>"
+ assignment: "<change-and-review-task>"
+inputs:
+ specification: "<accepted-spec-revision>"
+ artifact: "<commit>"
+ evidence: ["<test-report>"]
+skills:
+ - reference: "<pinned-project-standards>"
+ - reference: "<pinned-stack-review-skill>"
+authority:
+ source: read
+ reports: write-own-artifacts
+ external_actions: none
+execution:
+ lifetime: bounded-task
+ max_cost: "<project-limit>"
+ timeout: "<project-limit>"
+outputs:
+ - findings-with-locations-and-evidence
+ - reviewed-artifact-digest
+ - verdict-and-unresolved-questions
+separation:
+ cannot_evaluate_own_authored_change: true
+on_blocker:
+ return: blocker-and-exact-missing-input
+ transition: request-through-kbd-runtime 
+ D.2 · Proposed policy, enabled only after its authority is granted. A separate permission governs customer replies: the same event may produce an internal opportunity, an issue and a response draft, but each action has its own receipt and authority. 
+ yaml Copy 
+# Proposed policy, enabled only after its authority is granted.
+role: enhancement-issue-curator
+subscription:
+ owner: "<tenant/project>"
+ source: "<authorized-BossFang-channel-or-UAR-event-source>"
+ conversations: ["<approved-scope>"]
+ event_types: ["feedback.accepted"]
+ target_instance: "<logical-instance>"
+ start: now
+ historical_replay_actions: disabled
+actions:
+ github:
+ repositories: ["<owner/repository>"]
+ mode: authorized-automatic-intake
+ allowed: [create-issue, add-approved-context]
+ labels: [enhancement, needs-triage]
+ max_actions_per_day: "<project-limit>"
+ may_commit_roadmap: false
+ may_start_implementation: false
+data:
+ public_body: sanitized-summary-only
+ private_evidence: "<authorized-evidence-store>"
+reliability:
+ own_delivery_cursor: true
+ durable_action_ledger: true
+ reconcile_uncertain_remote_writes: true
+ suppress_self_generated_feedback: true 
+ Addendum A.1 
+UI/UX Designer 
+Translate user goals into understandable, accessible interactions and a coherent visual system. 
+ Assignments 
+user journeys 
+information architecture 
+screen flows 
+component states 
+content hierarchy 
+responsive behavior 
+design tokens 
+prototypes 
+design review 
+ Inputs 
+Product brief, user evidence, existing design system, platform constraints and accessibility targets. 
+ Outputs 
+Design brief, annotated flows, state matrix, component/token specifications, prototype or scoped UI patch, and design acceptance criteria — covering loading, empty, error, denied-permission and recovery states. 
+ Skill use 
+Choose impeccable or Anthropic frontend-design as the primary creative procedure. Use Vercel web-design-guidelines for a focused interface review and vercel-react-best-practices when React/Next.js performance matters. These have different purposes and should not compete to redefine the same design direction. 
+ Loop 
+research / brief 
+design 
+independent critique 
+accepted spec 
+implementation handoff 
+visual + interaction verification 
+ Boundary. A design assignment may edit design artifacts and an authorized prototype. Production application changes require an implementation assignment. The designer does not unilaterally change product scope or certify accessibility from a screenshot. 
+ Acceptance. Task flows are understandable; states and responsive behavior are specified; the agreed accessibility checks are evidenced; implementation deviations are recorded. 
+ Addendum A.2 
+Mobile Designer 
+Design for actual mobile operating conditions, not merely a narrow web viewport. 
+ Assignments 
+navigation 
+gestures + discoverability 
+safe areas 
+keyboard behavior 
+text scaling 
+permission requests 
+offline states 
+deep links 
+interruption / resume 
+platform interaction 
+ Outputs 
+Platform interaction specification, device/state matrix, reusable mobile components, previews and verification criteria — including denied permissions, connectivity loss and app suspension. 
+ Skill use 
+For Flutter, select flutter-build-responsive-layout , flutter-add-widget-preview and flutter-setup-localization ; bring widget and integration testing into tester/executor assignments; Dart documentation and analysis skills support the handoff. For React Native/Expo, select vercel-react-native-skills — web React guidance does not cover native behavior. 
+ Loop 
+platform brief 
+flows + states 
+prototype 
+device evidence 
+independent design review 
+ Boundary. The designer specifies behavior and may build authorized prototypes. Store submission, signing and release operation belong to Delivery. Background-execution assumptions require platform verification; a mockup cannot establish runtime continuity. 
+ Acceptance. Relevant phone/tablet layouts and input modes work; navigation and interruption behavior are explicit; accessibility and device evidence match the supported platforms. 
+ Addendum A.3 
+Security Officer / Security and Compliance Lead 
+Maintain security requirements, assess engineering evidence and make scoped risk recommendations. 
+ Assignments 
+threat modeling 
+data + trust boundaries 
+tenant isolation 
+identity + authorization 
+dependency / tool risk 
+secrets handling 
+incident readiness 
+security acceptance criteria 
+evidence review 
+ Outputs 
+Applicability decision, threat model, control-to-evidence matrix, findings with severity and reproduction, exception register, remediation recommendations and a release security assessment tied to an exact revision. 
+ Skill use 
+Trail of Bits differential-review for security-sensitive changes and semgrep for scoped static-analysis evidence, supplemented with project-specific threat-model and control-mapping skills built from the applicable authoritative requirements. Do not invent or recommend an unverified “HIPAA certification” skill. 
+ Loop 
+applicability decision 
+threat model 
+security criteria 
+evidence review 
+release assessment @ exact rev 
+Compliance profiles — a project may require several 
+ Profile Scope decision Agent contribution 
+ HIPAA / ePHI Is the organization a covered entity or business associate, and which systems handle ePHI? Map applicable safeguards to risk analysis and engineering evidence 
+ DoD FCI / CUI / CMMC What information, contract, assessment obligations and control revision apply? Maintain boundaries, requirements and evidence for the authorized assessment process 
+ Banking Which institution, jurisdiction, regulator and outsourced-service obligations apply? Support governance, access, operational resilience and third-party risk review 
+ Payment cards / PCI DSS What is in or can affect the cardholder-data environment? Support scoped control review and payment-data evidence 
+HIPAA applicability is not implied merely by having a health-related app. NIST’s latest publication is not automatically the contractually applicable DoD baseline. CUI handling does not authorize classified-data processing. Banking regulation is not synonymous with PCI DSS.
+ HHS Security Rule ·
+ NIST SP 800-171r3 ·
+ FFIEC information security ·
+ PCI DSS ·
+ HHS on certification 
+ Boundary. Maintain independence from implementation and operations when judging their work. An authorized human remains accountable for legal interpretation, contractual attestations and residual-risk acceptance. HHS does not recognize private Security Rule certifications as removing legal obligations; an agent result certainly does not. 
+ Acceptance. Findings are reproducible and scoped; control claims point to actual evidence; unresolved risks and applicability uncertainties are explicit. A clean scan is not proof of compliance. 
+ Addendum A.4 
+Product Manager 
+Connect customer problems, product outcomes and development priorities. 
+ Assignments 
+discovery 
+research synthesis 
+problem statements 
+PRDs 
+acceptance criteria 
+outcome metrics 
+roadmap options 
+stakeholder updates 
+scope negotiation 
+ Outputs 
+Evidence-backed problem brief, feature specification, prioritization rationale, assumptions, success metrics and decision log. 
+ Skill use 
+Anthropic’s product-management skills — feature-spec , user-research-synthesis , roadmap-management , stakeholder-comms , metrics-tracking . Load the subset the current assignment needs. Tools are separate: analytics, trackers, research repositories, meeting records and customer channels — and reading research, drafting a response, sending it and making a delivery commitment are four separate permissions. 
+ Loop 
+collect evidence 
+separate need from suggested solution 
+propose options 
+record accepted decision 
+specify outcomes 
+review shipped results 
+ Boundary. The role can interact directly with product owners and customers under a defined communication mandate. It must not promise a delivery date, contractual term or roadmap commitment outside that mandate. An automatically filed enhancement issue is a candidate, not an accepted priority. 
+ Acceptance. Claims link to evidence; alternatives and uncertainties are visible; acceptance criteria are testable; decision authority is recorded. 
+ Addendum A.5 
+Documentation Specialist / Knowledge Steward 
+Keep product, API, operational and team documentation usable and aligned with released behavior. 
+ Assignments 
+documentation architecture 
+tutorials 
+API references 
+runbooks 
+migration notes 
+release notes 
+internal knowledge 
+stale-content review 
+approved Jira / Confluence maintenance 
+ Outputs 
+Versioned documentation changes, validated examples, navigation/link checks, ownership and review dates, and release-to-documentation traceability. 
+ Skill use 
+ doc-coauthoring for collaborative writing; mintlify when the site actually uses Mintlify; Dart documentation skills for Dart APIs; customer-support knowledge-management for support articles; Atlassian generate-status-report for scoped status reporting. Skill instructions teach the workflow; a separate connector provides Jira/Confluence access — grant only the relevant projects, spaces, page trees and fields, preserve versions and authorship, preview changes and detect conflicts rather than overwriting. 
+ Loop 
+change / release / support signal 
+identify affected content 
+draft 
+technical + reader review 
+authorized publication 
+verify rendered result 
+ Regulated content and the Atlassian MCP path. Atlassian documents permissions-based MCP access, but its product FAQ currently says the MCP server does not support FedRAMP or HIPAA requirements. Do not route regulated content through it merely because the underlying Jira/Confluence project is accessible — the Security Officer approves the actual connector and data path for that profile. Atlassian MCP 
+ Boundary. Documentation edits must not silently alter requirements or roadmap ownership. Publishing publicly, notifying customers and deleting pages need the appropriate standing or per-action authorization. 
+ Acceptance. Examples match the supported version; links and navigation work; intended readers can complete the task; ownership and freshness are visible. 
+ Addendum A.6 
+Code Reviewer / Standards and Quality Specialist 
+Enforce project standards and identify correctness, maintainability and integration risks on a specific change. 
+ Assignments 
+source + interfaces 
+architecture boundaries 
+test adequacy 
+regressions 
+dependency changes 
+project conventions 
+ Outputs 
+Structured findings with severity, precise location, violated rule or failure scenario, and verification expectation. Record the reviewed commit/hash; rerun affected review when it changes. 
+ Skill use 
+Project coding guidelines and independent adversarial-review procedures form the base. Add vercel-react-best-practices for React/Next.js, web-design-guidelines for UI review, differential-review for security-sensitive diffs, and dart-run-static-analysis for Dart — restricted to its analysis path, since the published workflow includes a fix operation that loading the skill does not authorize. 
+ Loop 
+exact commit 
+standards + review skills 
+findings with evidence 
+fixes → executor 
+re-review new revision 
+ Boundary. Standards come from the repository’s agreed rules and relevant platform constraints; a generic skill’s stylistic preference does not override the project. The reviewer does not patch, merge, waive branch protection or approve its own authored change under the same assignment. 
+ Acceptance. Material findings are evidenced; speculative preferences are distinguished from blockers; automated checks and manual reasoning complement each other. A successful linter run is not the whole review. 

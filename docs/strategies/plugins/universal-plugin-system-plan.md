@@ -1,10 +1,54 @@
 # KnowMe Universal Plugin System — Recommendation, Architecture, Functional Specification & Project Plan
 
+> **AMENDMENT — 2026-08-04 (v1.1, authoritative deltas).** This plan is amended by
+> `uar-plugin-system-research-2026-08-04.md` (this directory; canonical copy in
+> `universal-agent-runtime/docs/plugins/`). The following supersede the corresponding
+> sections below wherever they conflict:
+>
+> 1. **Contract ownership moved to UAR.** The plugin *contract* (WIT family, host
+>    interfaces, capability-card schema, manifest+signing, lifecycle, shared sandbox
+>    host crate, runtime-generic recognized set) is owned by the Universal Agent
+>    Runtime and published from the UAR repo. KnowMe retains the *product* layer:
+>    `knowme:*` capabilities (theme, app-shell chrome, Hands binding), marketplace,
+>    entitlement VC issuance, trust-pill/review UX, distribution channels, and the
+>    container-inversion roadmap. `knowme_plugin_host` remains the product host
+>    wrapping the UAR-owned shared host crate (D3 unchanged in structure).
+> 2. **D1 target renamed:** `knowme:plugin@1.0.0` → **`uar:plugin@0.2.0`** (version
+>    humility: 1.0.0 only after real plugins across ≥3 kinds and ≥2 hosts). The
+>    convergence now has **four** inputs, not three: `knowme:plugin@0.1.0`,
+>    `librefang:plugin@0.1.0`, `uar-plugin.wit`, **and `prometheus:component@0.1.0`**
+>    (skill pack) — adjudicated in one UAR ADR (skill-task world).
+> 3. **Host profiles introduced:** `headless` (base host + skill-task + hook —
+>    librefang/BossFang nodes) and `full-ui` (+ events/a2ui/settings/app-shell/
+>    provider — KnowMe). Cards declare `profile_required`; installers reject
+>    mechanically at install, not at runtime.
+> 4. **Performance claims corrected (§2.2/D2):** no "zero-cost"/"1–5 ms" blanket
+>    claims. Honest budgets: Cranelift ≈1.45–1.6× native on real workloads; **iOS
+>    runs Pulley interpretation (~order of magnitude slower; `.cwasm` AOT native
+>    code cannot be loaded on iOS)**; JS components carry ~8 MB engine each;
+>    browser host is jco-transpiled (not wasmtime) with a host-parity conformance
+>    seam. Bundled-vs-synced distribution split for App Store 3.3.2.
+> 5. **Settings substrate unified:** JSON Schema **2020-12** everywhere (the
+>    draft-7 references in §2.9/§3.4 are superseded); one scope enum to be emitted
+>    from the Rust types (docs-from-code) — the README/plan scope-vocabulary
+>    divergence is a known defect.
+> 6. **Twelve review holes have normative fixes** (research doc Part 3 SR-1…SR-12):
+>    namespace proof (did:web/DNS-TXT or transparency log), signed advisory/
+>    revocation blocklist with auto-quarantine, permission **combination** risk
+>    surfacing at install, host-stamped event provenance + emit-allowlist + rate
+>    caps, contributor reentrancy guard (no `infer` in pipeline stages), sidecar
+>    OS-fence + UDS broker, content-addressed generations with atomic
+>    payload+registry+catalog+settings swap and rollback, crash-loop circuit
+>    breaker, contribution ordering/aggregate budgets, universal action I/O schema
+>    validation, mobile execution reality (Pulley), and 0.2.0 versioning.
+> 7. **app-shell / service / workflow worlds stay 0.x** until proven; skill-task +
+>    hook ship first (evidence order).
+
 | Field | Value |
 |---|---|
-| Version | 1.0 (revises and finalizes the plugin model) |
-| Date | 2026-07-22 |
-| Status | Proposed — supersedes nothing; extends `docs/strategies/plugins/README.md` v1.0 |
+| Version | 1.1 (v1.0 amended 2026-08-04 per banner above) |
+| Date | 2026-07-22 (amended 2026-08-04) |
+| Status | Proposed — extends `docs/strategies/plugins/README.md`; contract layer re-homed to UAR per amendment |
 | Audience | AI build agents (primary), human reviewers |
 | Execution model | This plan assumes an AI agent performs the implementation |
 
@@ -29,7 +73,7 @@ This is the same inversion the industry has converged on: MCP standardizes agent
 
 ## 1.2 Decisions (each with rationale)
 
-**D1 — One component model, one WIT family: `knowme:plugin@1.0.0`.**
+**D1 — One component model, one WIT family: `uar:plugin@0.2.0` *(amended 2026-08-04; was `knowme:plugin@1.0.0` — see banner: UAR-owned, four-dialect convergence incl. `prometheus:component`)*.**
 Today there are three divergent WIT dialects in the repo: `knowme:plugin@0.1.0` (`rust/crates/knowme_plugin_host/wit/knowme-plugin.wit`), `librefang:plugin@0.1.0` (`rust/vendor/librefang/crates/librefang-skills/wit/`), and `uar-plugin.wit` (vendored UAR). We converge them into a single `knowme:plugin` WIT package with multiple *worlds* (one per plugin kind: `hook`, `service-contributor`, `agent`, `provider`, `app-shell`). librefang's host interface set (`fs`, `net` SSRF-guarded, `kv`, `agent`, `env`, `time`) is the most mature and is adopted as the substrate of `knowme:plugin/host`; UAR's `embedded-mobile` profile becomes the `mobile` world variant. The builder-extensibility spec already flagged this convergence ("one extension component model… instead of two WIT dialects") — this plan executes it.
 
 **D2 — Wasmtime 46 everywhere; component model + WASI P2 only.**
@@ -134,12 +178,12 @@ All plugins share: manifest v2, capability cards, signed WASM component (or supe
 
 A single `.pxt` bundle may combine kinds (e.g., an App that is also a Workflow and exposes an MCP server).
 
-## 2.3 The WIT family — `knowme:plugin@1.0.0`
+## 2.3 The WIT family — `uar:plugin@0.2.0` *(amended 2026-08-04; authored in the UAR repo, consumed here)*
 
 One package; host imports shared; worlds per kind. (Sketch — authoritative WIT lives in `rust/crates/knowme_plugin_host/wit/`.)
 
 ```wit
-package knowme:plugin@1.0.0;
+package uar:plugin@0.2.0;
 
 // ---- shared host imports (capability subset granted at instantiation) ----
 interface host-log     { log: func(level: level, msg: string); }
@@ -436,7 +480,7 @@ settings_value(slug, scope, scope_id, value | secret_ref, clock: crdt, updated_b
 
 ### P0 — Convergence & conformance harness (foundation)
 **Goal:** one WIT family, one wasmtime, executable acceptance.
-- P0.1 Author `knowme:plugin@1.0.0` WIT package (worlds: hook, contributor, agent, provider, app-shell, service, workflow) in `rust/crates/knowme_plugin_host/wit/`, absorbing `librefang:plugin` host interfaces and `uar-plugin` needs. *Verify: `wasm-tools component wit` validates; mapping doc from both legacy dialects.*
+- P0.1 Author `uar:plugin@0.2.0` WIT package (in the UAR repo per the amendment banner; this repo consumes it) (worlds: hook, contributor, agent, provider, app-shell, service, workflow) in `rust/crates/knowme_plugin_host/wit/`, absorbing `librefang:plugin` host interfaces and `uar-plugin` needs. *Verify: `wasm-tools component wit` validates; mapping doc from both legacy dialects.*
 - P0.2 Align workspace on wasmtime 46 (remove the commented 41 refs; unpin/liberate `knowme_plugin_host` deps). *Verify: `cargo tree | grep wasmtime` shows single major.*
 - P0.3 Extract/generalize librefang `sandbox_component.rs` into `knowme_plugin_host::sandbox` behind `PluginHost` trait (capability subset, `MissingCapability`, typed `host-error`, additive semver check). *Verify: vendored conformance corpus (`rust/vendor/librefang/conformance/`) passes against the new host.*
 - P0.4 Conformance harness: `plugins/conformance/` — fixture components per world (Rust + TinyGo minimum), golden manifests, negative fixtures (undeclared import, budget bomb, ssrf attempt). *Verify: CI job green.*

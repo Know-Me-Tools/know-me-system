@@ -1,5 +1,17 @@
 # KnowMe Builder — Local-First × Realtime × WASM Extensibility
 
+> **AMENDMENT — 2026-08-04.** The extension-contract layer referenced in this document
+> (`knowme:plugin@0.1.0` and the two-WIT-dialect convergence in §5/§appendix) is
+> superseded at the contract level: the converged WIT family is **`uar:plugin@0.2.0`,
+> owned and published by the Universal Agent Runtime**, with `knowme_plugin_host` as the
+> KnowMe product host wrapping the UAR-owned shared sandbox host crate. Existing
+> `knowme:plugin@0.1.0` / `librefang:plugin@0.1.0` references below describe the legacy
+> dialects that the convergence absorbs (an unmodified `librefang:plugin@0.1.0` plugin
+> remains loadable — conformance requirement). See
+> `docs/strategies/plugins/uar-plugin-system-research-2026-08-04.md` (canonical copy in
+> `universal-agent-runtime/docs/plugins/`) and the amendment banners on
+> `docs/strategies/plugins/README.md` and `universal-plugin-system-plan.md`.
+
 **Status:** DRAFT v0.1 — pre-research thoughts, 2026-07-18.
 This document seeds the spec that will be finalized once the commissioned deep-research
 report lands. It captures the current inventory, the architectural position I believe the
