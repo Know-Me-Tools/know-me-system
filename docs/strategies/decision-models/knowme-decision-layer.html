@@ -1,0 +1,1228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KnowMe Decision Layer</title>
+<meta name="description" content="Self-hosted decision models in place of TypeSafe's Jev: a Rust crate family and MCP sidecar for The Boss, UAR and KnowMe, with CounselMe and prior-auth use cases and a decision-skills marketplace.">
+<meta name="author" content="Travis James · KnowMe, LLC">
+<meta name="keywords" content="decision models, Jev, Kev, LitJev, Qwen3.8, conformal prediction, MCP, rmcp, Rust, candle, UAR, KnowMe, The Boss, CounselMe, prior authorization, AgentSkills">
+<meta name="application-name" content="KnowMe">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#0B0F14" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F5F6F8" media="(prefers-color-scheme: light)">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20200%20200%22%3E%3Crect%20width%3D%22200%22%20height%3D%22200%22%20rx%3D%2242%22%20fill%3D%22%230B0F14%22/%3E%3Cg%20transform%3D%22translate%2850%2C38%29%22%3E%3Crect%20width%3D%2220%22%20height%3D%22124%22%20rx%3D%2210%22%20fill%3D%22%23E8EDF3%22/%3E%3Cpath%20d%3D%22M16%2C62C26%2C52%2044%2C32%2062%2C18C72%2C10%2080%2C8%2084%2C14C86%2C18%2082%2C24%2076%2C28C60%2C40%2040%2C56%2028%2C66C22%2C70%2018%2C68%2016%2C64Z%22%20fill%3D%22%23E8EDF3%22/%3E%3Cpath%20d%3D%22M16%2C62C26%2C72%2044%2C92%2062%2C106C72%2C114%2080%2C116%2084%2C110C86%2C106%2082%2C100%2076%2C96C60%2C84%2040%2C68%2028%2C58C22%2C54%2018%2C56%2016%2C60Z%22%20fill%3D%22%23E8EDF3%22/%3E%3Ccircle%20cx%3D%2218%22%20cy%3D%2262%22%20r%3D%2212%22%20fill%3D%22%23FF6A3D%22/%3E%3C/g%3E%3C/svg%3E">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="KnowMe">
+<meta property="og:locale" content="en_US">
+<meta property="og:title" content="KnowMe Decision Layer">
+<meta property="og:description" content="Self-hosted decision models in place of TypeSafe's Jev: a Rust crate family and MCP sidecar for The Boss, UAR and KnowMe, with CounselMe and prior-auth use cases and a decision-skills marketplace.">
+<meta property="og:image" content="https://ipfs.prometheusags.ai/ipfs/bafkreifb4zsklm3rbumx5uvz3iqx4kjorrfbwv26nunmhrz4azqwvibjea">
+<meta property="og:image:secure_url" content="https://ipfs.prometheusags.ai/ipfs/bafkreifb4zsklm3rbumx5uvz3iqx4kjorrfbwv26nunmhrz4azqwvibjea">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="KnowMe Decision Layer report: hero section with the section navigation and the four headline findings.">
+<meta property="article:published_time" content="2026-09-27T19:00:00-05:00">
+<meta property="article:author" content="Travis James">
+<meta property="article:section" content="Architecture research">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="KnowMe Decision Layer">
+<meta name="twitter:description" content="Self-hosted decision models in place of TypeSafe's Jev: a Rust crate family and MCP sidecar for The Boss, UAR and KnowMe, with CounselMe and prior-auth use cases and a decision-skills marketplace.">
+<meta name="twitter:image" content="https://ipfs.prometheusags.ai/ipfs/bafkreifb4zsklm3rbumx5uvz3iqx4kjorrfbwv26nunmhrz4azqwvibjea">
+<meta name="twitter:image:alt" content="KnowMe Decision Layer report: hero section with the section navigation and the four headline findings.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=Roboto:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.11/dist/htmx.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/htmx-ext-class-tools@2.0.3/dist/class-tools.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.17.4/dist/cdn.min.js"></script>
+<style>
+/* KnowMe brand tokens — docs/knowme-ui-ux-standard.md §3–4 (Flat 2.0: no borders, depth by surface ladder) */
+:root{
+  --canvas:#F5F6F8; --chrome:#FFFFFF; --surface:#EBEEF2; --raised:#FFFFFF; --hover:#F2F4F7; --muted:#E3E7EC;
+  --fg:#0B0F14; --fg-sub:#414B5A; --fg-faint:#6B7280;
+  --ember:#D2461F; --ember-2:#C13E1E; --ember-soft:#FBE8E1; --on-ember:#FFFFFF;
+  --cyan:#0A7F9C; --cyan-soft:#DDF1F5;
+  --green:#15803D; --green-soft:#DDF3E4; --amber:#B45309; --amber-soft:#FBEBD6; --red:#B91C1C; --red-soft:#FBE1E1;
+  --font-display:"Space Grotesk","Inter",system-ui,sans-serif;
+  --font-ui:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-prose:"Roboto","Inter",system-ui,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  --r:12px; --r-sm:8px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --canvas:#0B0F14; --chrome:#111620; --surface:#161D29; --raised:#1C2535; --hover:#202B40; --muted:#253044;
+  --fg:#E8EDF3; --fg-sub:#A7B0BC; --fg-faint:#8A93A3;
+  --ember:#FF6A3D; --ember-2:#E04E28; --ember-soft:#2B1A18; --on-ember:#0B0F14;
+  --cyan:#00C2DC; --cyan-soft:#0F2A33;
+  --green:#22C55E; --green-soft:#10281A; --amber:#F59E0B; --amber-soft:#2E2210; --red:#EF4444; --red-soft:#2E1414;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --canvas:#0B0F14; --chrome:#111620; --surface:#161D29; --raised:#1C2535; --hover:#202B40; --muted:#253044;
+  --fg:#E8EDF3; --fg-sub:#A7B0BC; --fg-faint:#8A93A3;
+  --ember:#FF6A3D; --ember-2:#E04E28; --ember-soft:#2B1A18; --on-ember:#0B0F14;
+  --cyan:#00C2DC; --cyan-soft:#0F2A33;
+  --green:#22C55E; --green-soft:#10281A; --amber:#F59E0B; --amber-soft:#2E2210; --red:#EF4444; --red-soft:#2E1414;
+  color-scheme:dark}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:24px}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{background:var(--canvas);color:var(--fg);font:15px/1.6 var(--font-ui);margin:0;padding-inline:16px;padding-block:0 64px}
+[x-cloak]{display:none!important}
+
+/* layout */
+.shell{max-width:1240px;margin:0 auto;display:grid;grid-template-columns:232px minmax(0,1fr);gap:40px}
+@media (max-width:980px){.shell{grid-template-columns:minmax(0,1fr);gap:0}}
+.nav{position:sticky;top:env(safe-area-inset-top,0px);align-self:start;max-height:100vh;overflow:auto;padding-block:28px 24px}
+@media (max-width:980px){.nav{position:static;max-height:none;padding-block:16px 0}}
+.brand{display:flex;align-items:center;gap:10px;font:700 20px/1 var(--font-display);letter-spacing:-.025em;color:var(--fg);text-decoration:none}
+.brand svg{width:28px;height:28px;flex:none}
+.brand .me{color:var(--ember)}
+.nav-toggle{display:none}
+@media (max-width:980px){.nav-toggle{display:inline-flex;margin-left:auto;background:var(--surface);color:var(--fg);font:500 13px var(--font-ui);padding:6px 12px;border:0;border-radius:var(--r-sm);cursor:pointer}}
+.navhead{display:flex;align-items:center}
+.toc{list-style:none;margin:20px 0 0;padding:0;display:grid;gap:2px}
+.toc a{display:block;padding:6px 10px;border-radius:var(--r-sm);color:var(--fg-sub);text-decoration:none;font:500 13.5px/1.35 var(--font-ui)}
+.toc a:hover{background:var(--hover);color:var(--fg)}
+.toc a.active{background:var(--surface);color:var(--fg)}
+.toc .grp{font:500 11px/1 var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--fg-faint);padding:14px 10px 6px}
+.toc .new{font:500 10px/1 var(--font-mono);color:var(--cyan);margin-left:6px;letter-spacing:.04em}
+main{min-width:0;padding-block:28px 0}
+
+/* type */
+.eyebrow{font:500 12px/1.4 var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--fg-faint);margin:0}
+h1{font:700 clamp(32px,5vw,50px)/1.05 var(--font-display);letter-spacing:-.03em;margin:10px 0 14px;text-wrap:balance}
+h2{font:600 clamp(24px,3vw,30px)/1.15 var(--font-display);letter-spacing:-.02em;margin:0 0 6px;text-wrap:balance}
+h3{font:600 19px/1.3 var(--font-display);letter-spacing:-.01em;margin:28px 0 8px;text-wrap:balance}
+h4{font:600 15px/1.35 var(--font-ui);margin:18px 0 6px}
+p,li{font-family:var(--font-prose);font-size:16px;line-height:1.65}
+.prose{max-width:72ch}
+.lede{font:400 18px/1.6 var(--font-prose);color:var(--fg-sub);max-width:68ch;margin:0}
+.sub{color:var(--fg-sub)}
+code,kbd{font-family:var(--font-mono);font-size:.86em;background:var(--surface);padding:1px 5px;border-radius:5px}
+a{color:var(--cyan);text-underline-offset:3px}
+a:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--ember);outline-offset:2px}
+section.block{padding-block:44px 8px;scroll-margin-top:12px}
+.sechead{display:flex;flex-direction:column;gap:6px;margin-bottom:18px}
+.tag{display:inline-block;font:500 11px/1 var(--font-mono);letter-spacing:.05em;padding:5px 8px;border-radius:999px;background:var(--surface);color:var(--fg-sub);white-space:nowrap}
+.tag.new{background:var(--cyan-soft);color:var(--cyan)}
+.tag.crit{background:var(--red-soft);color:var(--red)}
+.tag.mod{background:var(--amber-soft);color:var(--amber)}
+.tag.low{background:var(--green-soft);color:var(--green)}
+.tag.human{background:var(--muted);color:var(--fg)}
+
+/* hero */
+.hero{background:var(--chrome);border-radius:var(--r);padding:32px clamp(20px,4vw,40px);display:grid;gap:18px}
+.meta{display:flex;flex-wrap:wrap;gap:8px 20px;font:400 12.5px/1.4 var(--font-mono);color:var(--fg-faint)}
+.verdict{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-top:6px}
+.verdict div{background:var(--surface);border-radius:var(--r-sm);padding:14px 16px}
+.verdict b{display:block;font:600 14px/1.3 var(--font-ui);margin-bottom:4px}
+.verdict span{font:400 14px/1.5 var(--font-prose);color:var(--fg-sub)}
+.verdict .key{background:var(--ember-soft)}
+.verdict .key b{color:var(--ember)}
+
+/* callouts & cards */
+.note{background:var(--surface);border-radius:var(--r-sm);padding:14px 18px;max-width:72ch}
+.note p{margin:0;font-size:15px}
+.note.warn{background:var(--amber-soft)}
+.note.warn b{color:var(--amber)}
+.note.crit{background:var(--red-soft)}
+.note.crit b{color:var(--red)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr));gap:14px}
+.card{background:var(--chrome);border-radius:var(--r);padding:18px 20px}
+.card h4{margin-top:0}
+.card p,.card li{font-size:15px}
+.card ul{padding-left:18px;margin:6px 0 0}
+
+/* tables */
+.tbl{overflow-x:auto;border-radius:var(--r);background:var(--chrome);margin:14px 0}
+table{border-collapse:collapse;width:100%;font:400 13.5px/1.5 var(--font-ui);font-variant-numeric:tabular-nums}
+th{font:600 12px/1.3 var(--font-ui);letter-spacing:.02em;text-align:left;background:var(--surface);color:var(--fg-sub);padding:10px 12px;white-space:nowrap}
+td{padding:10px 12px;vertical-align:top}
+tbody tr:nth-child(even) td{background:var(--hover)}
+td b{font-weight:600}
+td code{white-space:nowrap}
+
+/* code */
+pre{background:var(--chrome);border-radius:var(--r);padding:16px 18px;overflow-x:auto;font:400 12.8px/1.6 var(--font-mono);margin:14px 0;tab-size:2}
+pre code{background:none;padding:0;font-size:inherit}
+.c-k{color:var(--ember)} .c-s{color:var(--green)} .c-c{color:var(--fg-faint)} .c-t{color:var(--cyan)}
+.filehead{font:500 12px/1 var(--font-mono);color:var(--fg-faint);margin:18px 0 -8px}
+
+/* figures */
+figure{margin:22px 0;background:var(--chrome);border-radius:var(--r);padding:18px clamp(12px,2vw,22px)}
+figure svg{display:block;width:100%;height:auto;max-width:100%}
+figcaption{font:400 13.5px/1.5 var(--font-prose);color:var(--fg-sub);margin-top:12px;max-width:80ch}
+.figbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.chip{background:var(--surface);color:var(--fg-sub);border:0;border-radius:999px;padding:7px 13px;font:500 12.5px/1 var(--font-ui);cursor:pointer}
+.chip:hover{background:var(--hover);color:var(--fg)}
+.chip[aria-pressed="true"]{background:var(--fg);color:var(--canvas)}
+.chip.ghost{margin-left:auto}
+.outcome{font:400 14px/1.5 var(--font-prose);color:var(--fg-sub);background:var(--surface);border-radius:var(--r-sm);padding:10px 14px;margin-top:10px;min-height:44px}
+.outcome b{color:var(--fg)}
+
+/* svg diagram styling (page CSS, applied to inline SVG) */
+.dg text{font-family:var(--font-ui);fill:var(--fg)}
+.dg .t{font:600 13px var(--font-ui)}
+.dg .s{font:400 11px var(--font-mono);fill:var(--fg-sub)}
+.dg .lbl{font:500 11px var(--font-mono);fill:var(--fg-sub)}
+.dg .n{fill:var(--surface)}
+.dg .n2{fill:var(--raised)}
+.dg .nm{fill:var(--muted)}
+.dg .accent{fill:var(--ember-soft)}
+.dg .accent-t{fill:var(--ember)}
+.dg .ai{fill:var(--cyan-soft)}
+.dg .ai-t{fill:var(--cyan)}
+.dg .human{fill:var(--muted)}
+.dg .e{fill:none;stroke:var(--fg-faint);stroke-width:1.6}
+.dg .e.ai{fill:none;stroke:var(--cyan)}
+.dg .e.hot{stroke:var(--ember)}
+.dg .ah{fill:var(--fg-faint)}
+.dg .ah-ai{fill:var(--cyan)}
+.dg .ah-hot{fill:var(--ember)}
+.dg .lane{stroke:var(--muted);stroke-width:2;stroke-dasharray:3 5}
+.dg .dim{opacity:.28;transition:opacity .35s}
+.dg .on{opacity:1;transition:opacity .35s}
+.dg .flow{stroke-dasharray:6 6;animation:dash 1.1s linear infinite}
+@keyframes dash{to{stroke-dashoffset:-24}}
+.dg .pkt{fill:var(--ember)}
+.dg .pkt-ai{fill:var(--cyan)}
+/* sequence reveal */
+.seq .step{animation:reveal 10s ease-in-out infinite backwards}
+@keyframes reveal{0%{opacity:.32}5%{opacity:1}90%{opacity:1}100%{opacity:.32}}
+.seq.paused .step{animation-play-state:paused;opacity:1}
+/* stage travel */
+.stages .stg{fill:var(--surface);animation:stagepulse 8.4s ease-in-out infinite backwards}
+@keyframes stagepulse{0%,100%{fill:var(--surface)}6%{fill:var(--cyan-soft)}14%{fill:var(--surface)}}
+.stages .stg-h{fill:var(--muted);animation:stagepulseh 8.4s ease-in-out infinite backwards}
+@keyframes stagepulseh{0%,100%{fill:var(--muted)}6%{fill:var(--amber-soft)}14%{fill:var(--muted)}}
+@media (prefers-reduced-motion:reduce){
+  .dg .flow{animation:none}
+  .seq .step{animation:none;opacity:1}
+  .stages .stg,.stages .stg-h{animation:none}
+  .dg .pkt,.dg .pkt-ai{display:none}
+}
+
+/* explorer (HTMX fragment panes) */
+.explorer{display:grid;grid-template-columns:minmax(220px,300px) minmax(0,1fr);gap:14px;margin:16px 0}
+@media (max-width:760px){.explorer{grid-template-columns:minmax(0,1fr)}}
+.xlist{display:flex;flex-direction:column;gap:4px;background:var(--chrome);border-radius:var(--r);padding:8px;max-height:640px;overflow:auto}
+.xlist button{all:unset;display:grid;grid-template-columns:52px 1fr;gap:8px;align-items:baseline;padding:9px 10px;border-radius:var(--r-sm);cursor:pointer;color:var(--fg-sub)}
+.xlist button:hover{background:var(--hover);color:var(--fg)}
+.xlist button[aria-selected="true"]{background:var(--surface);color:var(--fg)}
+.xlist button:focus-visible{outline:2px solid var(--ember);outline-offset:-2px}
+.xlist .id{font:500 11.5px/1 var(--font-mono);color:var(--fg-faint)}
+.xlist .nm{font:500 13.5px/1.35 var(--font-ui)}
+.xpane{background:var(--chrome);border-radius:var(--r);padding:20px 22px;min-height:320px}
+.xpane h4{font:600 18px/1.3 var(--font-display);margin:0 0 6px}
+.xpane .tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.xpane dl{display:grid;grid-template-columns:140px minmax(0,1fr);gap:8px 14px;margin:14px 0 0}
+@media (max-width:520px){.xpane dl{grid-template-columns:minmax(0,1fr)}}
+.xpane dt{font:500 12px/1.5 var(--font-mono);color:var(--fg-faint);letter-spacing:.02em}
+.xpane dd{margin:0;font:400 14.5px/1.55 var(--font-prose)}
+.xpane pre{background:var(--surface);margin:8px 0 0}
+.swapin{animation:swapin .28s ease-out}
+@keyframes swapin{from{opacity:.2;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.swapin{animation:none}}
+.htmx-request .xpane{opacity:.6}
+
+/* tree */
+.tree{font:400 12.8px/1.65 var(--font-mono);white-space:pre;background:var(--chrome);border-radius:var(--r);padding:16px 18px;overflow-x:auto;margin:14px 0}
+.tree .d{color:var(--cyan)} .tree .f{color:var(--fg)} .tree .c{color:var(--fg-faint)}
+
+/* roadmap */
+.phases{display:grid;gap:10px;counter-reset:ph}
+.phase{background:var(--chrome);border-radius:var(--r);padding:16px 20px;display:grid;grid-template-columns:120px minmax(0,1fr);gap:14px}
+@media (max-width:600px){.phase{grid-template-columns:minmax(0,1fr)}}
+.phase .when{font:500 12px/1.5 var(--font-mono);color:var(--fg-faint)}
+.phase .when b{display:block;font:600 16px/1.2 var(--font-display);color:var(--fg);letter-spacing:-.01em}
+.phase ul{margin:0;padding-left:18px}
+.phase li{font-size:15px}
+.sources{columns:2 320px;column-gap:28px;padding-left:20px}
+.sources li{font:400 13px/1.5 var(--font-ui);break-inside:avoid;margin-bottom:4px;color:var(--fg-sub)}
+footer{margin-top:48px;padding-block:20px;color:var(--fg-faint);font:400 12.5px/1.5 var(--font-mono);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+footer svg{width:18px;height:18px}
+</style>
+
+</head>
+<body>
+<div class="shell" hx-ext="local-fragments,class-tools" x-data="{navOpen:false}">
+<nav class="nav" aria-label="Report sections" x-data="scrollSpy()" x-init="init()">
+  <div class="navhead">
+    <a class="brand" href="#top" aria-label="KnowMe">
+      <svg viewBox="0 0 100 130" aria-hidden="true"><g><rect x="0" y="0" width="20" height="124" rx="10" fill="currentColor"/><path d="M 16,62 C 26,52 44,32 62,18 C 72,10 80,8 84,14 C 86,18 82,24 76,28 C 60,40 40,56 28,66 C 22,70 18,68 16,64 Z" fill="currentColor"/><path d="M 16,62 C 26,72 44,92 62,106 C 72,114 80,116 84,110 C 86,106 82,100 76,96 C 60,84 40,68 28,58 C 22,54 18,56 16,60 Z" fill="currentColor"/><circle cx="18" cy="62" r="10" fill="var(--ember)"/></g></svg>
+      <span>Know<span class="me">Me</span></span>
+    </a>
+    <button class="nav-toggle" type="button" @click="navOpen=!navOpen" :aria-expanded="navOpen.toString()" aria-controls="toc">Sections</button>
+  </div>
+  <ul class="toc" id="toc" :class="{'mobile-hidden':!navOpen}" x-show="navOpen || wide" x-cloak>
+    <li class="grp">Research</li>
+    <li><a href="#summary">Summary</a></li>
+    <li><a href="#origin">Where this came from</a></li>
+    <li><a href="#landscape">Open model landscape</a></li>
+    <li><a href="#technique">Technique layer</a></li>
+    <li class="grp">Build</li>
+    <li><a href="#architecture">Crate &amp; sidecar architecture<span class="new">NEW</span></a></li>
+    <li><a href="#cascade">The decision cascade<span class="new">NEW</span></a></li>
+    <li><a href="#tools">MCP tool surface<span class="new">NEW</span></a></li>
+    <li><a href="#integration">Product integration<span class="new">NEW</span></a></li>
+    <li class="grp">Use cases</li>
+    <li><a href="#counselme">CounselMe<span class="new">NEW</span></a></li>
+    <li><a href="#priorauth">Prior-auth workbench<span class="new">NEW</span></a></li>
+    <li><a href="#skills">Decision skills &amp; marketplace<span class="new">NEW</span></a></li>
+    <li><a href="#uses">Original seven uses</a></li>
+    <li class="grp">Decide</li>
+    <li><a href="#jev">Versus Jev</a></li>
+    <li><a href="#safety">Safety &amp; regulation</a></li>
+    <li><a href="#roadmap">Roadmap</a></li>
+    <li><a href="#caveats">Caveats &amp; sources</a></li>
+  </ul>
+</nav>
+
+<main id="top">
+<header class="hero">
+  <p class="eyebrow">KnowMe · Architecture research · 27 Sep 2026</p>
+  <h1>KnowMe Decision Layer</h1>
+  <p class="lede">Self-hosted decision models in place of TypeSafe's Jev, packaged as one Rust crate family. The Boss ships it as a standard MCP sidecar, UAR and KnowMe link it natively, and CounselMe and the Prior Authorization Workbench get their decisions from it.</p>
+  <div class="meta"><span>Mentor session source: Treston · 2026-09-27</span><span>Repos read: universal-agent-runtime · know-me-system · the-boss · prior-auth</span><span>Status: proposal</span></div>
+  <div class="verdict" id="summary">
+    <div class="key"><b>Build it as one crate family</b><span><code>knowme-decide</code> is a pure-Rust core with pluggable backends. The same types run in-process inside UAR, KnowMe and the prior-auth host, and behind an rmcp server that The Boss bundles as a sidecar.</span></div>
+    <div><b>No single open model replaces Jev</b><span>Stack them instead: tripwires, an encoder router (Laya or ModernBERT), a Jev-style head (Kev, or your LitJev port on Qwen3.8-27B), guard models (Qwen3Guard, Granite Guardian), and conformal calibration fitted on your own labels.</span></div>
+    <div><b>Calibration is the product</b><span>The open models give you the interface for free. Recall guarantees on escalation, crisis and met/gap/void classes come from your counselor and coordinator overrides, which the audit log turns into labels.</span></div>
+    <div><b>Propose, never act, on clinical state</b><span>CounselMe escalates and never treats. Prior-auth proposes met/gap/void and never writes or denies. Both rules already match how each codebase is built.</span></div>
+  </div>
+</header>
+
+<section class="block" id="origin">
+  <div class="sechead"><p class="eyebrow">01 · Context</p><h2>Where this came from</h2></div>
+  <div class="prose">
+    <p>In the 27 September mentoring session with Treston (46:55–49:11), Travis described a decision model sitting between a patient and a counselor's digital twin. The model routes each message to the right agent, then decides whether the twin's draft answer can go out or should be handed to the human counselor, with a summary and a pointer. He expected about 90% of questions to be handled without the counselor, all logged for the counselor's next session.</p>
+    <p>The model he named was TypeSafe AI's <b>Jev</b>, a "System One" model. It fills a typed schema in one non-autoregressive pass and attaches a calibrated probability to each answer. Its three primitives are <b>Choice</b> (up to 255 options), <b>Score</b> (an ordinal rubric) and <b>Noul</b> (the probability that a statement is true). Jev is hosted-only, with no weights, no on-prem option and no published BAA. That rules it out for an architecture where PHI and counseling data stay on the user's devices.</p>
+    <p>This report covers four things:</p>
+    <ul>
+      <li>the self-hostable alternatives (from the research run)</li>
+      <li>how to package them as a Rust crate library and MCP server that fits the existing codebases (from reading the four repos)</li>
+      <li>concrete decision use cases for CounselMe and the Prior Authorization Workbench</li>
+      <li>a set of AgentSkills-compatible decision skills, distributed through a plugin marketplace</li>
+    </ul>
+  </div>
+  <div class="note warn"><p><b>Honesty about the numbers.</b> Nearly every benchmark for the open Jev-style models is self-reported. The models are days or weeks old and were measured against Jev reference values, not in a head-to-head run. Treat them as a shortlist to evaluate on your own data, not as settled rankings.</p></div>
+</section>
+
+<section class="block" id="landscape">
+  <div class="sechead"><p class="eyebrow">02 · Research</p><h2>Open model landscape</h2><p class="lede">Four families matter: Jev-shaped decision models, guard and verifier models, routers and zero-shot encoders, and clinical models.</p></div>
+
+  <h3>Jev-shaped "System One" models (released 15–27 Sep 2026)</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Model</th><th>Base / size</th><th>License</th><th>Latency (self-reported)</th><th>Calibration evidence</th><th>Rust / serving</th></tr></thead>
+    <tbody>
+      <tr><td><b>Kev</b></td><td>Qwen3.5/3.8 at 0.8B, 4B, 9B, 27B; LoRA plus pointer head on a frozen backbone</td><td>Apache-2.0, with training code and evals</td><td>Kev-4B about 495 ms for 3 questions on an M5; Kev-27B needs ~55 GB (an 80 GB GPU)</td><td>Kev-27B out-of-distribution: accuracy 0.896, Brier 0.160, coverage at ≤5% error 0.835. Kev-9B ECE 0.106→0.042 after temperature fitting</td><td>Python server; TypeSafe <code>/v1/systemone</code> wire format</td></tr>
+      <tr><td><b>Laya</b></td><td>ModernBERT-large 421M (EN), mmBERT-base 322M (multilingual)</td><td>Apache-2.0</td><td>33–40 ms on a T4; 193–464 ms on CPU</td><td>ECE 0.466 as shipped → 0.081 after temperature fitting</td><td><b>Pure-Rust candle port</b> (<code>laya-rust</code>): CPU, Metal and CUDA, with a ModernBERT f16 mask fix</td></tr>
+      <tr><td><b>Julia 1</b></td><td>mmBERT-small, 144.3M</td><td>Apache-2.0</td><td>33 ms median on an Apple M4; 203 ms on a tablet CPU (ONNX)</td><td>Accuracy only. 73.15% vs Jev's 72.70% on Typed Decisions, but <b>64% vs 87% on Banking77</b> (72 labels)</td><td>ONNX Runtime, WebGPU</td></tr>
+      <tr><td><b>CLM-8B</b></td><td>Frozen Qwen3-8B plus two 20M heads</td><td>Apache-2.0</td><td>28 ms per new state on an RTX 4090</td><td>None claimed</td><td>vLLM pooling; scores candidate actions</td></tr>
+      <tr><td><b>litjev · AnyJev · jevfire · jevmlx</b></td><td>Logit readers over any frozen LLM</td><td>MIT / Apache</td><td>Your hardware</td><td>AnyJev fits a head on 100–300 labels; jevfire warns its label probabilities are not correctness probabilities</td><td>vLLM, MLX; the pattern your LitJev port copies</td></tr>
+    </tbody></table></div>
+  <div class="prose"><p><b>What this tells you:</b> the small open models match Jev when there are a handful of well-described options. They fall behind when there are many similar labels, long inputs, or policy and date reasoning. Kev-27B uses exactly <code>Qwen/Qwen3.8-27B</code>, the base you chose for the LitJev port, and is the best-calibrated open option the research found. That makes it the reference your port should match.</p></div>
+
+  <h3>Guard, judge and verifier models</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Model</th><th>Size</th><th>License</th><th>Output</th><th>Role here</th></tr></thead>
+    <tbody>
+      <tr><td><b>Qwen3Guard-Gen / -Stream</b></td><td>0.6B, 4B, 8B</td><td>Apache-2.0</td><td>Safe / Unsafe / Controversial plus a category (incl. Suicide &amp; Self-Harm, PII, Jailbreak). The Stream variant labels each token as it is generated</td><td>Real-time monitoring of the twin's output. A second, uncorrelated crisis signal</td></tr>
+      <tr><td><b>Granite Guardian 4.1 8B</b></td><td>8B</td><td>Apache-2.0</td><td>Yes/no score from logprobs, with criteria you supply</td><td>Answer sufficiency, groundedness and citation support. English only</td></tr>
+      <tr><td><b>gpt-oss-safeguard-20b</b></td><td>20B (≥12 GB)</td><td>Apache-2.0</td><td>Reasoning plus a label against a policy you write</td><td>Async audit of sent answers against a written escalation policy. Too slow to run inline</td></tr>
+    </tbody></table></div>
+  <div class="note crit"><p><b>No guard model is a validated suicide-risk detector.</b> A 2026 study of 127 open-weight LLMs found that mental-health-, medical- and safety-tuned variants gave no reliable gain over their base models. On PsyCrisisBench, a fine-tuned 1.5B Qwen reached suicidal-ideation F1 0.8925, beating larger zero-shot models. Fine-tune a small classifier on labeled crisis data. Don't rely on a guard model's generic self-harm category.</p></div>
+
+  <h3>Routers, encoders and clinical models</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Model</th><th>What it is</th><th>License</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><b>ModernBERT / mmBERT fine-tunes</b></td><td>Encoder classifiers</td><td>Apache-2.0</td><td>The cheapest and most accurate option once you have labels. Rust paths exist today: <code>candle-pipelines</code>, <code>candle-semantic-router</code></td></tr>
+      <tr><td><b>GLiClass</b></td><td>Zero-shot, label-conditioned classifier on ModernBERT, 8k context</td><td>Apache-2.0</td><td>Multi-label and hierarchical labels. The vendor claims it is up to 50× faster than cross-encoders</td></tr>
+      <tr><td><b>Arch-Router-1.5B</b></td><td>Qwen2.5-1.5B router; routes are defined in natural language</td><td>Katanemo license (not Apache)</td><td>93.17% routing accuracy (self-reported). Check the license before commercial use</td></tr>
+      <tr><td><b>MedGemma 27B text</b></td><td>Clinical LLM, 128K context</td><td>HAI-DEF terms</td><td>MedQA 87.7, EHRQA 86.3. <b>The license bans automated decisions in healthcare and insurance</b>, so it can only be used to extract evidence for human review</td></tr>
+      <tr><td><b>MedGemma 1.5 4B</b></td><td>Multimodal, including EHR and lab reports</td><td>HAI-DEF terms</td><td>On-device summarization of FHIR and lab data. Not evaluated for multi-turn use</td></tr>
+    </tbody></table></div>
+</section>
+
+<section class="block" id="technique">
+  <div class="sechead"><p class="eyebrow">03 · Research</p><h2>Technique layer</h2><p class="lede">Four techniques turn any open LLM into a decision model. They are what <code>decide-llm</code> and <code>decide-calibrate</code> implement.</p></div>
+  <div class="grid2">
+    <div class="card"><h4>One-pass option scoring</h4><p>Prefill the state once, then read the next-token logits restricted to the option tokens. For several questions over one state, fork the cache for each question. On Qwen3.8's hybrid Gated DeltaNet layers, paged-attention KV reuse doesn't cover the linear-attention state, so the candle-vllm fork needs a <b>state snapshot and fork</b> primitive.</p></div>
+    <div class="card"><h4>Constrained decoding</h4><p>Use it for the fields you actually generate: action items, missing-evidence lists, criteria decomposition. <b>llguidance</b> is a Rust crate that computes token masks at about 40–50 µs per token, so it fits directly in the candle-vllm fork. It guarantees the output structure, but says nothing about calibration.</p></div>
+    <div class="card"><h4>Calibration</h4><p>Temperature scaling fixes average overconfidence (Laya's ECE went from 0.466 to 0.081). For escalation, crisis and void classes, use <b>class-conditional (Mondrian) split conformal</b> so recall is guaranteed at a floor you set. Recalibrate for each counselor, clinic and population.</p></div>
+    <div class="card"><h4>Fine-tune on your decisions</h4><p>Options range from SetFit (dozens of labels, CPU) to a full ModernBERT fine-tune to LoRA plus a head on Qwen (Kev's recipe; soft targets beat hard labels). The counselor's transaction log and the coordinator's confirmations are the labeling pipeline, so capture overrides from day one.</p></div>
+  </div>
+</section>
+<section class="block" id="architecture">
+  <div class="sechead"><p class="eyebrow">04 · Build <span class="tag new">NEW</span></p><h2>Crate &amp; sidecar architecture</h2><p class="lede">One workspace, <code>knowme-decide</code>, with a no-I/O core and feature-gated backends. The same library runs in-process in three products and behind an MCP server in the fourth.</p></div>
+
+  <figure>
+    <svg class="dg" viewBox="0 0 1000 540" role="img" aria-label="Architecture: The Boss spawns the knowme-decide sidecar, which wraps the decide-mcp server. UAR, KnowMe and the Prior-Auth host link the decide-policy API in-process. External agents reach the sidecar over MCP. Local weights feed the encoder, LLM and guard backends. Everything rests on decide-core.">
+      <defs>
+        <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
+        <marker id="a1h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah-hot"/></marker>
+        <marker id="a1c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah-ai"/></marker>
+      </defs>
+      <!-- hosts -->
+      <rect x="10" y="16" width="220" height="92" rx="12" class="n"/>
+      <text x="26" y="44" class="t">The Boss</text><text x="26" y="66" class="s">Electron · MCP host</text><text x="26" y="86" class="s">BinaryManager · presets</text>
+      <rect x="260" y="16" width="220" height="92" rx="12" class="n"/>
+      <text x="276" y="44" class="t">UAR</text><text x="276" y="66" class="s">Rust runtime · rmcp 3.1</text><text x="276" y="86" class="s">IntentClassifier · RouterNode</text>
+      <rect x="510" y="16" width="220" height="92" rx="12" class="n"/>
+      <text x="526" y="44" class="t">KnowMe</text><text x="526" y="66" class="s">Tauri · Flutter FFI</text><text x="526" y="86" class="s">gen_ui_decide (L2)</text>
+      <rect x="760" y="16" width="230" height="92" rx="12" class="n"/>
+      <text x="776" y="44" class="t">Prior-Auth Workbench</text><text x="776" y="66" class="s">aso-host port · rmcp 3.4</text><text x="776" y="86" class="s">aso-decide kernel</text>
+      <!-- sidecar -->
+      <rect x="10" y="172" width="220" height="96" rx="12" class="accent"/>
+      <text x="26" y="200" class="t" style="fill:var(--ember)">knowme-decide</text><text x="26" y="222" class="s">sidecar binary</text><text x="26" y="242" class="s">stdio · streamable HTTP</text><text x="26" y="258" class="s">READY:{port}</text>
+      <!-- external -->
+      <rect x="10" y="316" width="220" height="80" rx="12" class="nm"/>
+      <text x="26" y="344" class="t">External agents</text><text x="26" y="366" class="s">Claude Code · Codex</text><text x="26" y="384" class="s">plugins · .mcp.json</text>
+      <!-- weights -->
+      <rect x="10" y="432" width="220" height="92" rx="12" class="ai"/>
+      <text x="26" y="460" class="t" style="fill:var(--cyan)">Local weights</text><text x="26" y="482" class="s">Laya · ModernBERT heads</text><text x="26" y="500" class="s">Kev / LitJev-Qwen3.8</text><text x="26" y="518" class="s">Qwen3Guard · Granite</text>
+      <!-- crate stack -->
+      <rect x="260" y="170" width="240" height="56" rx="10" class="n2"/>
+      <text x="276" y="194" class="t">decide-mcp</text><text x="276" y="214" class="s">#[tool_router] · resources</text>
+      <rect x="514" y="170" width="476" height="56" rx="10" class="n2"/>
+      <text x="530" y="194" class="t">decide-policy · Decider API</text><text x="530" y="214" class="s">cascade · outcome = act | review | escalate</text>
+      <rect x="260" y="240" width="730" height="46" rx="10" class="n"/>
+      <text x="276" y="268" class="lbl">cascade: tripwire → encoder → (p &lt; τ) LLM head → guard → calibrate → outcome</text>
+      <rect x="260" y="300" width="172" height="72" rx="10" class="n2"/>
+      <text x="274" y="326" class="t">decide-tripwire</text><text x="274" y="346" class="s">aho-corasick · regex</text><text x="274" y="362" class="s">clinician rule packs</text>
+      <rect x="446" y="300" width="172" height="72" rx="10" class="n2"/>
+      <text x="460" y="326" class="t">decide-encoder</text><text x="460" y="346" class="s">candle ModernBERT</text><text x="460" y="362" class="s">ort (Julia, LiteRT)</text>
+      <rect x="632" y="300" width="172" height="72" rx="10" class="n2"/>
+      <text x="646" y="326" class="t">decide-llm</text><text x="646" y="346" class="s">logit reader · fork</text><text x="646" y="362" class="s">candle-vllm · llguidance</text>
+      <rect x="818" y="300" width="172" height="72" rx="10" class="n2"/>
+      <text x="832" y="326" class="t">decide-guard</text><text x="832" y="346" class="s">Qwen3Guard · Granite</text><text x="832" y="362" class="s">BYOC criteria</text>
+      <rect x="260" y="386" width="358" height="56" rx="10" class="n2"/>
+      <text x="276" y="410" class="t">decide-calibrate</text><text x="276" y="430" class="s">temperature · Mondrian conformal</text>
+      <rect x="632" y="386" width="358" height="56" rx="10" class="n2"/>
+      <text x="648" y="410" class="t">decide-audit</text><text x="648" y="430" class="s">hash-chained log · events · labels</text>
+      <rect x="260" y="456" width="730" height="68" rx="10" class="nm"/>
+      <text x="276" y="484" class="t">decide-core</text><text x="276" y="506" class="s">DecisionSpec · Choice / Score / Noul · Decision · traits · no I/O · wasm32 ok</text>
+      <!-- edges -->
+      <path d="M120,108 V166" class="e hot flow" marker-end="url(#a1h)"/><text x="128" y="144" class="lbl">spawns</text>
+      <path d="M230,198 H254" class="e hot" marker-end="url(#a1h)"/>
+      <path d="M120,316 V274" class="e" marker-end="url(#a1)"/><text x="128" y="300" class="lbl">MCP</text>
+      <path d="M370,108 V136 H560 V164" class="e" marker-end="url(#a1)"/><text x="400" y="130" class="lbl">links crate</text>
+      <path d="M640,108 V164" class="e" marker-end="url(#a1)"/><text x="648" y="140" class="lbl">links (FFI)</text>
+      <path d="M875,108 V164" class="e" marker-end="url(#a1)"/><text x="883" y="140" class="lbl">port</text>
+      <path d="M500,198 H508" class="e"/>
+      <path d="M230,470 H244 V336 H254" class="e ai flow" marker-end="url(#a1c)"/>      <text x="236" y="420" class="lbl" transform="rotate(-90 236 420)" style="fill:var(--cyan)">loads</text>
+    </svg>
+    <figcaption>One library, four ways in. The Boss is the only host that talks to it over a process boundary: it spawns the <code>knowme-decide</code> sidecar the same way it ships <code>rust-mcp-filesystem</code> and <code>uar-sidecar</code> today. UAR, KnowMe and the Prior-Auth host link <code>decide-policy</code> directly, so decisions on PHI never leave the process.</figcaption>
+  </figure>
+
+  <h3>Workspace layout</h3>
+  <div class="prose"><p>The layering follows conventions all three Rust codebases already use: KnowMe's L0 types crate that builds for wasm, prior-auth's <code>clinical-docs</code> pure engine with no I/O, and UAR's rmcp <code>#[tool_router]</code> house style. Every heavy dependency is behind a feature, so a phone build pulls in only the tripwire, encoder and calibration layers.</p></div>
+  <div class="tbl"><table>
+    <thead><tr><th>Crate</th><th>Responsibility</th><th>Key deps (feature)</th><th>Runs on</th></tr></thead>
+    <tbody>
+      <tr><td><code>decide-core</code></td><td><code>DecisionSpec</code>, <code>Choice/Score/Noul</code>, <code>Decision</code>, <code>Outcome</code>, and the traits <code>DecisionBackend</code>, <code>Calibrator</code>, <code>Tripwire</code>, <code>AuditSink</code>. No I/O, no async runtime</td><td>serde, schemars, thiserror</td><td>Everywhere, including wasm32 and Android</td></tr>
+      <tr><td><code>decide-schema</code></td><td>TypeSafe <code>/v1/systemone</code> wire compatibility, so Jev SDKs, Kev eval suites and Jev replay traffic run unchanged. JSON Schema export for MCP tool inputs</td><td>serde_json</td><td>Everywhere</td></tr>
+      <tr><td><code>decide-tripwire</code></td><td>Deterministic, versioned, signed rule packs (crisis lexicon, means, abuse, overdose, PHI patterns). A hit always escalates</td><td>aho-corasick, regex</td><td>Everywhere; always compiled in</td></tr>
+      <tr><td><code>decide-encoder</code></td><td>ModernBERT/mmBERT heads (Laya weights, your fine-tunes, GLiClass). Zero-shot and fine-tuned Choice</td><td>candle (<code>candle</code>), ort (<code>onnx</code>), tokenizers</td><td>Mac Metal, CUDA, CPU; ONNX on Android and Windows</td></tr>
+      <tr><td><code>decide-llm</code></td><td>Jev-style logit reader over Qwen3.8 (your LitJev port). Prefix prefill, per-question fork, DeltaNet state snapshot. llguidance for generated fields. A remote OpenAI-compatible logprobs adapter for liter-llm</td><td>candle-vllm fork (<code>local-llm</code>), llguidance, reqwest (<code>remote</code>)</td><td>Desktop GPU, on-prem GPU</td></tr>
+      <tr><td><code>decide-guard</code></td><td>Qwen3Guard categories, Granite Guardian yes/no logprob with criteria you supply, streaming token hooks</td><td>shares <code>decide-llm</code> runtime</td><td>Desktop and on-prem GPU (0.6B Qwen3Guard is phone-capable)</td></tr>
+      <tr><td><code>decide-calibrate</code></td><td>Temperature fitting, Mondrian split conformal, recall floors per class. Versioned, signed calibration artifacts per spec, clinic or counselor</td><td>ndarray (small)</td><td>Everywhere (fit on desktop or server, apply on device)</td></tr>
+      <tr><td><code>decide-policy</code></td><td>The <code>Decider</code> cascade. Locality enforcement (never escalates locality on its own), budgets, act/review/escalate mapping, Cedar context export</td><td>tokio (<code>rt</code>)</td><td>Everywhere</td></tr>
+      <tr><td><code>decide-audit</code></td><td>Append-only, hash-chained decision records. Override capture, so human corrections become calibration labels. Event emission</td><td>blake3, serde</td><td>Everywhere; the host provides storage</td></tr>
+      <tr><td><code>decide-mcp</code></td><td>rmcp server: tools, resources, <code>ui://</code> review card. stdio and streamable HTTP</td><td>rmcp (<code>server</code>, <code>transport-streamable-http-server</code>)</td><td>Desktop and server</td></tr>
+      <tr><td><code>knowme-decide</code> (bin)</td><td>Sidecar: <code>mcp --stdio</code> or <code>serve --port 0</code> printing <code>READY:{port}</code>, exits when stdin closes, weight manager, <code>calibrate fit</code> CLI</td><td>clap, axum</td><td>darwin-arm64, darwin-x64, win32-x64, win32-arm64</td></tr>
+    </tbody></table></div>
+
+  <div class="note warn"><p><b>Two version pins to settle first.</b> UAR pins <code>rmcp =3.1.2</code> and prior-auth uses <code>rmcp 3.4.0</code>, so either <code>decide-mcp</code> is generic over the rmcp minor version or UAR moves to 3.4. UAR builds on <code>candle 0.11</code> while KnowMe's workspace still declares <code>candle 0.7</code> (through the mistral.rs fork patch). <code>decide-encoder</code> should target 0.11, and KnowMe needs the bump before it can link the candle backends. Until then, KnowMe can use the <code>onnx</code> feature.</p></div>
+
+  <h3>The Rust API everyone links</h3>
+<pre><code><span class="c-c">// decide-core types, decide-policy cascade: identical in UAR, KnowMe and aso-host</span>
+<span class="c-k">use</span> knowme_decide::{DecisionSpec, Decider, Locality, Outcome};
+
+<span class="c-k">let</span> spec = DecisionSpec::choice(<span class="c-s">"counselme.sufficiency.v3"</span>)
+    .question(<span class="c-s">"Can this draft reply go to the patient without counselor review?"</span>)
+    .options([<span class="c-s">"send"</span>, <span class="c-s">"send_and_flag"</span>, <span class="c-s">"hold_for_clinician"</span>, <span class="c-s">"crisis_protocol"</span>])
+    .recall_floor(<span class="c-s">"crisis_protocol"</span>, <span class="c-t">0.99</span>)      <span class="c-c">// Mondrian conformal guarantee</span>
+    .recall_floor(<span class="c-s">"hold_for_clinician"</span>, <span class="c-t">0.95</span>)
+    .tripwires(<span class="c-s">"counselme-crisis@2026.10"</span>)        <span class="c-c">// signed, clinician-owned pack</span>
+    .locality(Locality::DeviceOnly);                 <span class="c-c">// PHI never leaves the process</span>
+
+<span class="c-k">let</span> d = decider.decide(&amp;spec, &amp;state).<span class="c-k">await</span>?;
+<span class="c-k">match</span> d.outcome {
+    Outcome::Act(v)                     =&gt; send(v, &amp;draft),
+    Outcome::Review { set, .. }         =&gt; queue_for_counselor(set, &amp;draft, d.audit_id),
+    Outcome::Escalate { reason, .. }    =&gt; crisis_protocol(reason),   <span class="c-c">// 988 + counselor alert</span>
+}</code></pre>
+</section>
+
+<section class="block" id="cascade" x-data="cascade()">
+  <div class="sechead"><p class="eyebrow">05 · Build <span class="tag new">NEW</span></p><h2>The decision cascade</h2><p class="lede">Each layer either decides or passes the case on. Tripwires can exit straight to escalation. A confident encoder skips the LLM head. Calibration is the last step before any outcome.</p></div>
+  <figure>
+    <div class="figbar" role="group" aria-label="Scenario">
+      <template x-for="s in scenarios" :key="s.id">
+        <button type="button" class="chip" :aria-pressed="(active===s.id).toString()" @click="active=s.id" x-text="s.label"></button>
+      </template>
+    </div>
+    <svg class="dg" viewBox="0 0 1000 340" role="img" aria-label="Decision cascade: input state goes to tripwires, then the encoder. If the encoder is confident, it skips to the guard; otherwise the LLM decision head runs first. The guard feeds calibration, which picks act, review or escalate. A tripwire hit goes directly to escalate.">
+      <defs>
+        <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
+      </defs>
+      <g :class="n('in')"><rect x="10" y="60" width="130" height="64" rx="10" class="n"/><text x="75" y="88" text-anchor="middle" class="t">Input state</text><text x="75" y="108" text-anchor="middle" class="s">msg + context</text></g>
+      <g :class="n('trip')"><rect x="175" y="60" width="130" height="64" rx="10" class="n2"/><text x="240" y="88" text-anchor="middle" class="t">Tripwires</text><text x="240" y="108" text-anchor="middle" class="s">&lt;1 ms · rules</text></g>
+      <g :class="n('enc')"><rect x="340" y="60" width="130" height="64" rx="10" class="n2"/><text x="405" y="88" text-anchor="middle" class="t">Encoder</text><text x="405" y="108" text-anchor="middle" class="s">~30 ms · Laya</text></g>
+      <g :class="n('llm')"><rect x="505" y="60" width="130" height="64" rx="10" class="ai"/><text x="570" y="88" text-anchor="middle" class="t">LLM head</text><text x="570" y="108" text-anchor="middle" class="s">Kev / LitJev</text></g>
+      <g :class="n('guard')"><rect x="670" y="60" width="130" height="64" rx="10" class="n2"/><text x="735" y="88" text-anchor="middle" class="t">Guard</text><text x="735" y="108" text-anchor="middle" class="s">Granite · Qwen3G</text></g>
+      <g :class="n('cal')"><rect x="835" y="60" width="155" height="64" rx="10" class="nm"/><text x="912" y="88" text-anchor="middle" class="t">Calibrate</text><text x="912" y="108" text-anchor="middle" class="s">conformal set</text></g>
+      <g :class="n('act')"><rect x="500" y="240" width="150" height="56" rx="10" class="n"/><text x="575" y="264" text-anchor="middle" class="t" style="fill:var(--green)">Act</text><text x="575" y="284" text-anchor="middle" class="s">set = {one}</text></g>
+      <g :class="n('rev')"><rect x="670" y="240" width="150" height="56" rx="10" class="n"/><text x="745" y="264" text-anchor="middle" class="t" style="fill:var(--amber)">Review</text><text x="745" y="284" text-anchor="middle" class="s">human confirms</text></g>
+      <g :class="n('esc')"><rect x="840" y="240" width="150" height="56" rx="10" class="accent"/><text x="915" y="264" text-anchor="middle" class="t" style="fill:var(--ember)">Escalate</text><text x="915" y="284" text-anchor="middle" class="s">always, logged</text></g>
+
+      <path :class="e('in-trip')" d="M140,92 H169" class="e" marker-end="url(#a2)"/>
+      <path :class="e('trip-enc')" d="M305,92 H334" class="e" marker-end="url(#a2)"/><text x="310" y="84" class="lbl">clear</text>
+      <path :class="e('enc-llm')" d="M470,92 H499" class="e" marker-end="url(#a2)"/><text x="472" y="84" class="lbl">p&lt;τ</text>
+      <path :class="e('enc-guard')" d="M405,60 V30 H735 V54" class="e" marker-end="url(#a2)"/><text x="560" y="24" text-anchor="middle" class="lbl">p ≥ τ · skip LLM head</text>
+      <path :class="e('llm-guard')" d="M635,92 H664" class="e" marker-end="url(#a2)"/>
+      <path :class="e('guard-cal')" d="M800,92 H829" class="e" marker-end="url(#a2)"/>
+      <path :class="e('cal-bus')" d="M912,124 V200" class="e"/>
+      <path :class="e('cal-act')" d="M912,200 H575 V234" class="e" marker-end="url(#a2)"/>
+      <path :class="e('cal-rev')" d="M745,200 V234" class="e" marker-end="url(#a2)"/>
+      <path :class="e('cal-esc')" d="M912,200 H915 V234" class="e" marker-end="url(#a2)"/>
+      <path :class="e('trip-esc')" d="M240,124 V320 H960 V302" class="e" marker-end="url(#a2)"/><text x="250" y="312" class="lbl">hit → escalate, no model can override</text>
+
+      <circle r="6" class="pkt-ai" x-show="active==='routine'"><animateMotion dur="3.2s" repeatCount="indefinite" path="M75,92 H240 H405 V30 H735 V92 H912 V200 H575 V268"/></circle>
+      <circle r="6" class="pkt-ai" x-show="active==='ambiguous'"><animateMotion dur="3.6s" repeatCount="indefinite" path="M75,92 H240 H405 H570 H735 H912 V200 H745 V268"/></circle>
+      <circle r="6" class="pkt" x-show="active==='crisis'"><animateMotion dur="2.4s" repeatCount="indefinite" path="M75,92 H240 V320 H960 V268"/></circle>
+      <circle r="6" class="pkt-ai" x-show="active==='pa'"><animateMotion dur="3.6s" repeatCount="indefinite" path="M75,92 H240 H405 H570 H735 H912 V200 H745 V268"/></circle>
+    </svg>
+    <div class="outcome" aria-live="polite" x-html="current().outcome"></div>
+    <figcaption>Choose a scenario to see which layers make the call. Every path ends in the audit log. Human corrections at Review become the labels the next calibration fit uses.</figcaption>
+  </figure>
+</section>
+
+<section class="block" id="tools">
+  <div class="sechead"><p class="eyebrow">06 · Build <span class="tag new">NEW</span></p><h2>MCP tool surface</h2><p class="lede">The sidecar exposes the same <code>Decider</code> as MCP tools. Decision tools are read-only by annotation. Only calibration fitting changes state, and it is admin-gated.</p></div>
+  <div class="tbl"><table>
+    <thead><tr><th>Tool / resource</th><th>Input</th><th>Returns</th><th>Effect</th></tr></thead>
+    <tbody>
+      <tr><td><code>decide_choice</code></td><td>state, options[] (≤255), spec id or inline spec</td><td>value, per-option probs, prediction set, outcome</td><td><span class="tag low">readOnly</span></td></tr>
+      <tr><td><code>decide_score</code></td><td>state, ordinal rubric</td><td>level, distribution, expected score, outcome</td><td><span class="tag low">readOnly</span></td></tr>
+      <tr><td><code>decide_noul</code></td><td>state, statement(s)</td><td>P(true) for each statement, calibrated</td><td><span class="tag low">readOnly</span></td></tr>
+      <tr><td><code>decide_batch</code></td><td>one state, many questions</td><td>all answers; shared prefill, forked per question</td><td><span class="tag low">readOnly</span></td></tr>
+      <tr><td><code>route_intent</code></td><td>message, route table (hierarchical)</td><td>domain → agent path with probs, abstain flag</td><td><span class="tag low">readOnly</span></td></tr>
+      <tr><td><code>tripwire_scan</code></td><td>text, pack id</td><td>hits with rule ids and spans</td><td><span class="tag low">readOnly</span></td></tr>
+      <tr><td><code>guard_check</code></td><td>text, policy (Qwen3Guard categories or your own criteria)</td><td>label, category, score</td><td><span class="tag low">readOnly</span></td></tr>
+      <tr><td><code>sufficiency_check</code></td><td>question, draft, knowledge refs</td><td>grounded / consistent / no new directive / answers the question: each P(yes)</td><td><span class="tag low">readOnly</span></td></tr>
+      <tr><td><code>decision_explain</code></td><td>audit id</td><td>which layer decided, thresholds, calibration version</td><td><span class="tag low">readOnly</span></td></tr>
+      <tr><td><code>decision_log_query</code></td><td>spec, time range, outcome</td><td>audit records (redacted per locality)</td><td><span class="tag low">readOnly</span></td></tr>
+      <tr><td><code>calibrate_fit</code></td><td>spec, labeled set ref, recall floors</td><td>new signed calibration artifact and coverage report</td><td><span class="tag mod">admin · approval</span></td></tr>
+      <tr><td><code>decide://specs/{id}</code></td><td colspan="2">Resource: the versioned DecisionSpec (JSON Schema)</td><td>resource</td></tr>
+      <tr><td><code>decide://calibration/{spec}@{ver}</code></td><td colspan="2">Resource: coverage, ECE and recall per class; the automation rate the floors allow</td><td>resource</td></tr>
+      <tr><td><code>ui://decide/review-card</code></td><td colspan="2">MCP App resource: a review card that shows the decision, its prediction set and a confirm/override control, so hosts can render the human step</td><td>resource</td></tr>
+    </tbody></table></div>
+  <p class="filehead">decide_choice → result (MCP structuredContent)</p>
+<pre><code>{
+  <span class="c-t">"spec"</span>: <span class="c-s">"counselme.sufficiency.v3"</span>,
+  <span class="c-t">"value"</span>: <span class="c-s">"hold_for_clinician"</span>,
+  <span class="c-t">"probs"</span>: { <span class="c-t">"send"</span>: 0.08, <span class="c-t">"send_and_flag"</span>: 0.37, <span class="c-t">"hold_for_clinician"</span>: 0.52, <span class="c-t">"crisis_protocol"</span>: 0.03 },
+  <span class="c-t">"prediction_set"</span>: [<span class="c-s">"send_and_flag"</span>, <span class="c-s">"hold_for_clinician"</span>],
+  <span class="c-t">"outcome"</span>: <span class="c-s">"review"</span>,
+  <span class="c-t">"decided_by"</span>: <span class="c-s">"llm-head"</span>,
+  <span class="c-t">"tripwires"</span>: [],
+  <span class="c-t">"calibration"</span>: { <span class="c-t">"method"</span>: <span class="c-s">"mondrian-split-conformal"</span>, <span class="c-t">"version"</span>: <span class="c-s">"2026-10-12.c4"</span>, <span class="c-t">"recall_floor"</span>: { <span class="c-t">"crisis_protocol"</span>: 0.99 } },
+  <span class="c-t">"backend"</span>: <span class="c-s">"litjev-qwen3.8-27b@candle-vllm"</span>,
+  <span class="c-t">"locality"</span>: <span class="c-s">"device-only"</span>,
+  <span class="c-t">"latency_ms"</span>: 214,
+  <span class="c-t">"audit_id"</span>: <span class="c-s">"dec_01K6ZQ3M4T9V"</span>
+}</code></pre>
+  <p class="sub" style="font-size:13.5px">The example numbers are illustrative, not measured.</p>
+</section>
+<section class="block" id="integration">
+  <div class="sechead"><p class="eyebrow">07 · Build <span class="tag new">NEW</span></p><h2>Product integration</h2><p class="lede">Each host already has the seam. These are the exact files and types where the crate plugs in, taken from reading each repo on 27 September.</p></div>
+
+  <div class="grid2">
+    <div class="card">
+      <h4>The Boss · standard sidecar</h4>
+      <ul>
+        <li><b>Build:</b> pin the source in <code>build/integration-sources.json</code> and the per-platform artifacts plus sha256 in <code>build/integration-artifacts.json</code>. Add <code>knowme-decide</code> to <code>scripts/release-profile.cjs</code> next to <code>rust-mcp-filesystem</code>.</li>
+        <li><b>Ship:</b> it lands in <code>resources/binaries/&lt;platform&gt;</code>. Add it to <code>BUNDLED_TOOLS</code> in <code>BinaryManager.ts</code> and resolve it with <code>getBinaryPath('knowme-decide')</code>.</li>
+        <li><b>Register:</b> as <code>@prometheus/decide</code> in the unbuilt <code>prometheus-005-mcp-server-presets</code> change, with <code>installSource: 'builtin'</code> and stdio by default. Today's workspace-managed rows (<code>workspaceMcp.ts</code>) are the fallback pattern.</li>
+        <li><b>Shared mode:</b> when UAR is enabled, run <code>knowme-decide serve --port 0</code> under a <code>DecideSidecarService</code> copied from <code>UarSidecarService.ts</code> (READY:{port}, <code>ensureReady()</code>, process-tree kill). UAR and the renderer then share one model cache.</li>
+        <li><b>Weights:</b> download on first use with the checksums pinned in the release manifest, the same way onnxruntime is fetched for local embeddings, so the installer stays small.</li>
+        <li><b>Operator view:</b> per <code>PRODUCT.md</code>, show requested vs. effective state: which specs are loaded, their calibration versions, the backend on each device, and the automation rate at the current floors.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>UAR · native crate</h4>
+      <ul>
+        <li><b>Intent routing:</b> add <code>ClassifierBackend::Decision</code> implementing <code>IntentClassifier</code> (<code>src/uar/runtime/matching/intent/mod.rs</code>). Its calibrated prediction set replaces the <code>should_accept</code> top-1 plus margin heuristic and the <code>out_of_scope</code> &lt; 0.1 rule.</li>
+        <li><b>Graph routing:</b> swap the LLM prompt in <code>RouterNode</code> (<code>runtime/graph/nodes/router_node.rs</code>) for <code>decide_choice</code> over the edge labels.</li>
+        <li><b>Model routing:</b> feed a task-type Choice into <code>ModelRouter</code>. This closes <code>docs/uar-next.md</code> "Gap 1: No Dynamic Model Router".</li>
+        <li><b>Governance:</b> export decision outcomes as Cedar context for <code>ToolApprovalGate</code>, replacing the 6-keyword <code>tool_requires_approval</code> heuristic. <code>mount-governance-guardrails</code> explicitly ruled out ML guards, so this needs a new openspec change.</li>
+        <li><b>Tools and MCP:</b> register the decide tools as <code>NativeSkill</code>s, and add them to <code>UarRuntimeMcpServer</code> so <code>/mcp/uar</code> exposes them too.</li>
+        <li><b>Config and features:</b> a new <code>decision_models:</code> section. The <code>decide</code> feature goes into <code>desktop-full</code> and <code>server-full</code>, and <code>decide-lite</code> (tripwire, encoder, calibrate) into <code>embedded-mobile</code>. Emit events through <code>RuntimeEventSink</code>.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>KnowMe · on-device L2 crate</h4>
+      <ul>
+        <li><b>New crate:</b> <code>gen_ui_decide</code> at L2, behind a <code>DecisionProvider</code> trait in <code>gen_ui_types</code>, mirroring <code>InferenceProvider</code>.</li>
+        <li><b>Where it runs:</b> desktop links it in-process through <code>tauri-plugin-gen-ui</code>, and mobile through <code>gen_ui_ffi</code> (flutter_rust_bridge). Android uses the <code>onnx</code> encoder feature until the candle bump lands.</li>
+        <li><b>Agent tools:</b> register native tools in <code>gen_ui_agent/src/uar.rs</code>. Surface decisions through the existing <code>agui.guardrail</code> and <code>uar.guardrail.flagged</code> events, which the UI already understands.</li>
+        <li><b>Locality:</b> each spec declares its locality, and <code>decide-policy</code> enforces the model-configuration rule that resolution never escalates locality without a Cedar grant or a user prompt.</li>
+        <li><b>First outbound MCP server:</b> <code>decide-mcp</code> can be KnowMe's first outbound MCP server, the one <code>docs/strategies/skill-support/README.md</code> §3 designs but hasn't built.</li>
+        <li><b>Data sources:</b> the P2P layer (<code>knowme_ofp</code>) and the SurrealDB graph (<code>gen_ui_db_graph</code>) hold the state the decisions read. Omi, Oura and FHIR ingestion don't exist in the repo yet, so CounselMe signal decisions depend on those connectors.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>Prior-Auth Workbench · pure kernel</h4>
+      <ul>
+        <li><b>New crate:</b> <code>aso-decide</code> sits beside <code>clinical-docs</code> with no I/O, and <code>aso-host</code> reaches it through a port. It follows "agent kernels do not write" and "proposes; never writes".</li>
+        <li><b>Outputs map to existing states:</b> met, gap or void (never two states). Abstaining maps to the existing <code>classification_needs_review</code> fixture path. Proposals are persisted only through the evidence and reassessment commands after a coordinator or surgeon confirms.</li>
+        <li><b>Agent slots it fills:</b> 04 Criteria Matcher, 06 Gap Analyst, 12 Response Parser, 13 Denial Classifier and 18 Gold Card Tracker. None has been built yet.</li>
+        <li><b>Calibration data:</b> ground truth is <code>criterion_observations</code> and <code>determinations</code>. The Wilson-bound <code>shared_criterion_summaries</code> is the only statistical precedent in the codebase.</li>
+        <li><b>MCP:</b> read-only tools join <code>aso-document-assembly/src/mcp.rs</code>, or the sidecar is allowlisted in <code>generation_mcp.rs</code>. There are no affirm, sign or submit tools, ever.</li>
+        <li><b>Why it matters:</b> production PHI inference is disabled today until a US provider signs a BAA. On-prem <code>decide-llm</code> removes that blocker for decisions.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Deployment tiers</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Tier</th><th>Hardware</th><th>Backends compiled in</th><th>Models</th><th>Typical specs</th></tr></thead>
+    <tbody>
+      <tr><td><b>Phone</b> (KnowMe mobile)</td><td>Android / iOS CPU, NPU</td><td>tripwire, encoder (onnx), calibrate, audit</td><td>Julia 1 or mmBERT-small head; Qwen3Guard-0.6B optional</td><td>crisis tripwire, intent route, consent/locality, check-in timing</td></tr>
+      <tr><td><b>Desktop</b> (The Boss, KnowMe desktop)</td><td>Apple Silicon Metal; Windows CUDA/CPU</td><td>+ encoder (candle), llm (Kev-4B/9B), guard</td><td>Laya-rust, Kev-4B or 9B, Qwen3Guard-Stream-4B, Granite Guardian 8B (Q4)</td><td>sufficiency gate, action items, completion checks, UAR routing</td></tr>
+      <tr><td><b>Clinic on-prem</b> (prior-auth)</td><td>48–80 GB GPU</td><td>all backends</td><td>LitJev-Qwen3.8-27B or Kev-27B, Granite Guardian 8B, MedGemma 27B for extraction only</td><td>criterion evidence, denial triage, response parsing</td></tr>
+      <tr><td><b>Async audit</b></td><td>Any GPU, batch</td><td>llm, guard</td><td>gpt-oss-safeguard-20b</td><td>policy re-review of sent answers, drift reports</td></tr>
+    </tbody></table></div>
+</section>
+<section class="block" id="counselme">
+  <div class="sechead"><p class="eyebrow">08 · Use cases <span class="tag new">NEW</span></p><h2>CounselMe</h2><p class="lede">This is the between-session product from the Treston session: a counselor's digital twin in the patient's pocket, fed by session transcripts, with the counselor always reachable. Twelve decisions make it work. Three of them are safety-critical.</p></div>
+
+  <figure x-data="{playing:true}">
+    <div class="figbar"><span class="eyebrow">Scenario · an ambiguous medication question at 9:40 pm</span><button type="button" class="chip ghost" @click="playing=!playing" x-text="playing?'Pause':'Play'" :aria-pressed="(!playing).toString()"></button></div>
+    <svg class="dg seq" :class="{paused:!playing}" viewBox="0 0 1000 480" role="img" aria-label="Sequence: the patient asks a question. On-device tripwires clear it and the router picks the homework coach. The twin drafts a reply. The sufficiency gate returns a two-option prediction set, so it holds the reply and sends the counselor a summary. The patient is told when to expect a reply. The counselor edits and approves, the final reply goes out, and the edit becomes a calibration label.">
+      <defs>
+        <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
+        <marker id="a3h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah-hot"/></marker>
+      </defs>
+      <rect x="30" y="10" width="140" height="40" rx="10" class="n"/><text x="100" y="35" text-anchor="middle" class="t">Patient</text>
+      <rect x="230" y="10" width="140" height="40" rx="10" class="n"/><text x="300" y="35" text-anchor="middle" class="t">KnowMe on device</text>
+      <rect x="430" y="10" width="140" height="40" rx="10" class="ai"/><text x="500" y="35" text-anchor="middle" class="t">Counselor twin</text>
+      <rect x="630" y="10" width="140" height="40" rx="10" class="nm"/><text x="700" y="35" text-anchor="middle" class="t">Decision gate</text>
+      <rect x="830" y="10" width="140" height="40" rx="10" class="n"/><text x="900" y="35" text-anchor="middle" class="t">Counselor</text>
+      <line x1="100" y1="50" x2="100" y2="470" class="lane"/><line x1="300" y1="50" x2="300" y2="470" class="lane"/><line x1="500" y1="50" x2="500" y2="470" class="lane"/><line x1="700" y1="50" x2="700" y2="470" class="lane"/><line x1="900" y1="50" x2="900" y2="470" class="lane"/>
+
+      <g class="step" style="animation-delay:0s"><path d="M100,92 H294" class="e" marker-end="url(#a3)"/><text x="110" y="84" class="lbl">"Can I take my sleep aid with…"</text></g>
+      <g class="step" style="animation-delay:.9s"><rect x="200" y="112" width="200" height="40" rx="8" class="n2"/><text x="300" y="129" text-anchor="middle" class="s">tripwire clear · 0.4 ms</text><text x="300" y="145" text-anchor="middle" class="s">route → psychoeducation</text></g>
+      <g class="step" style="animation-delay:1.8s"><path d="M300,178 H494" class="e" marker-end="url(#a3)"/><text x="310" y="170" class="lbl">state + route (on device)</text></g>
+      <g class="step" style="animation-delay:2.7s"><path d="M500,218 H694" class="e" marker-end="url(#a3)"/><text x="510" y="210" class="lbl">draft reply + KB refs</text></g>
+      <g class="step" style="animation-delay:3.6s"><rect x="590" y="236" width="220" height="44" rx="8" class="accent"/><text x="700" y="254" text-anchor="middle" class="s" style="fill:var(--ember)">set = {send_and_flag, hold}</text><text x="700" y="271" text-anchor="middle" class="s">new clinical directive: P=0.61</text></g>
+      <g class="step" style="animation-delay:4.5s"><path d="M700,304 H894" class="e hot" marker-end="url(#a3h)"/><text x="710" y="296" class="lbl">summary + pointer + draft</text></g>
+      <g class="step" style="animation-delay:5.4s"><path d="M700,340 H106" class="e" marker-end="url(#a3)"/><text x="330" y="332" class="lbl">"Your counselor will reply by 10 am."</text></g>
+      <g class="step" style="animation-delay:6.3s"><path d="M900,382 H506" class="e" marker-end="url(#a3)"/><text x="620" y="374" class="lbl">edits + approves</text></g>
+      <g class="step" style="animation-delay:7.2s"><path d="M500,424 H106" class="e" marker-end="url(#a3)"/><text x="230" y="416" class="lbl">final reply</text><text x="700" y="430" text-anchor="middle" class="s">override → calibration label</text></g>
+    </svg>
+    <figcaption>The gate held the reply because the prediction set included <code>hold_for_clinician</code>, not because the top option crossed a threshold. The counselor's edit goes into the audit log as a labeled example for the next conformal fit.</figcaption>
+  </figure>
+
+  <h3>Decision catalog</h3>
+  <p class="sub" style="font-size:14px;margin:0">Select a use case to load its decision spec. Each one is served as an HTMX fragment.</p>
+  <div class="explorer" x-data="{sel:'cm-01'}">
+    <div class="xlist" role="tablist" aria-label="CounselMe use cases">
+      <button role="tab" hx-get="#cm-01" hx-target="#cm-pane" @click="sel='cm-01'" :aria-selected="(sel==='cm-01').toString()"><span class="id">CM-01</span><span class="nm">Crisis detection</span></button>
+      <button role="tab" hx-get="#cm-02" hx-target="#cm-pane" @click="sel='cm-02'" :aria-selected="(sel==='cm-02').toString()"><span class="id">CM-02</span><span class="nm">Twin intent routing</span></button>
+      <button role="tab" hx-get="#cm-03" hx-target="#cm-pane" @click="sel='cm-03'" :aria-selected="(sel==='cm-03').toString()"><span class="id">CM-03</span><span class="nm">Answer sufficiency gate</span></button>
+      <button role="tab" hx-get="#cm-04" hx-target="#cm-pane" @click="sel='cm-04'" :aria-selected="(sel==='cm-04').toString()"><span class="id">CM-04</span><span class="nm">Scope &amp; jurisdiction boundary</span></button>
+      <button role="tab" hx-get="#cm-05" hx-target="#cm-pane" @click="sel='cm-05'" :aria-selected="(sel==='cm-05').toString()"><span class="id">CM-05</span><span class="nm">Session commitments</span></button>
+      <button role="tab" hx-get="#cm-06" hx-target="#cm-pane" @click="sel='cm-06'" :aria-selected="(sel==='cm-06').toString()"><span class="id">CM-06</span><span class="nm">Check-in timing</span></button>
+      <button role="tab" hx-get="#cm-07" hx-target="#cm-pane" @click="sel='cm-07'" :aria-selected="(sel==='cm-07').toString()"><span class="id">CM-07</span><span class="nm">Completion evidence</span></button>
+      <button role="tab" hx-get="#cm-08" hx-target="#cm-pane" @click="sel='cm-08'" :aria-selected="(sel==='cm-08').toString()"><span class="id">CM-08</span><span class="nm">Wellness signal context</span></button>
+      <button role="tab" hx-get="#cm-09" hx-target="#cm-pane" @click="sel='cm-09'" :aria-selected="(sel==='cm-09').toString()"><span class="id">CM-09</span><span class="nm">Counselor digest triage</span></button>
+      <button role="tab" hx-get="#cm-10" hx-target="#cm-pane" @click="sel='cm-10'" :aria-selected="(sel==='cm-10').toString()"><span class="id">CM-10</span><span class="nm">Consent &amp; locality gate</span></button>
+      <button role="tab" hx-get="#cm-11" hx-target="#cm-pane" @click="sel='cm-11'" :aria-selected="(sel==='cm-11').toString()"><span class="id">CM-11</span><span class="nm">Intake: which counselor</span></button>
+      <button role="tab" hx-get="#cm-12" hx-target="#cm-pane" @click="sel='cm-12'" :aria-selected="(sel==='cm-12').toString()"><span class="id">CM-12</span><span class="nm">Twin fidelity &amp; drift</span></button>
+    </div>
+    <div id="cm-pane" class="xpane" role="tabpanel" aria-live="polite" hx-get="#cm-01" hx-trigger="load"></div>
+  </div>
+</section>
+
+<template id="frag-cm-01"><div classes="add swapin">
+  <h4>Crisis detection</h4>
+  <div class="tags"><span class="tag crit">safety-critical</span><span class="tag">phone + desktop</span><span class="tag">every inbound message</span></div>
+  <dl>
+    <dt>Trigger</dt><dd>Every patient message, before any other layer runs, and every twin output token (streaming).</dd>
+    <dt>Spec</dt><dd><code>counselme.crisis.v1</code>, a Choice over <code>none · passive_ideation · active_ideation_or_plan · harm_to_others · abuse_disclosure · medical_emergency</code>.</dd>
+    <dt>Layers</dt><dd>1) The signed <code>counselme-crisis</code> tripwire pack, which the clinician owns. 2) A fine-tuned ~1.5B Qwen crisis classifier (PsyCrisisBench shows a fine-tuned small model beats larger zero-shot ones). 3) Qwen3Guard-Stream's Suicide &amp; Self-Harm category as a second, uncorrelated signal.</dd>
+    <dt>Outcome</dt><dd>Any tripwire hit, or any non-<code>none</code> class in the prediction set, means <b>Escalate</b>: show 988 and the counselor's safety plan, alert the counselor, and keep the twin out of the reply.</dd>
+    <dt>Calibration</dt><dd>Mondrian conformal with a recall floor of ≥0.99 on every crisis class. False positives are cheap here and false negatives are catastrophic.</dd>
+    <dt>Human</dt><dd>The counselor sets the after-hours protocol and reviews every escalation. The patient can always reach a human directly.</dd>
+    <dt>Labels</dt><dd>Clinician-labeled transcripts, plus synthetic crisis examples reviewed by a clinician to oversample the rare classes.</dd>
+  </dl></div></template>
+
+<template id="frag-cm-02"><div classes="add swapin">
+  <h4>Twin intent routing</h4>
+  <div class="tags"><span class="tag mod">moderate</span><span class="tag">phone</span><span class="tag">UAR IntentClassifier</span></div>
+  <dl>
+    <dt>Trigger</dt><dd>After CM-01 clears the message.</dd>
+    <dt>Spec</dt><dd><code>counselme.route.v1</code>, a hierarchical Choice. The domain is one of <code>reflection · accountability · psychoeducation · scheduling_admin · out_of_scope</code>, then an agent within that domain.</dd>
+    <dt>Layers</dt><dd>Start with Laya or Julia 1 zero-shot, and switch to a fine-tuned mmBERT head once each agent has 50+ labeled messages. Two levels avoid the many-similar-labels weakness (Julia: 64% on Banking77).</dd>
+    <dt>Outcome</dt><dd>A single-agent set routes the message. A multi-agent set asks the patient one clarifying question. <code>out_of_scope</code> produces a polite handoff.</dd>
+    <dt>Integration</dt><dd>The same spec powers <code>ClassifierBackend::Decision</code> in UAR, so the twin's sub-agents are ordinary UAR skills.</dd>
+  </dl></div></template>
+
+<template id="frag-cm-03"><div classes="add swapin">
+  <h4>Answer sufficiency gate</h4>
+  <div class="tags"><span class="tag crit">safety-critical</span><span class="tag">desktop / on-prem</span><span class="tag">the gate from the Treston session</span></div>
+  <dl>
+    <dt>Trigger</dt><dd>Every draft the twin produces, before the patient sees it.</dd>
+    <dt>Spec</dt><dd><code>counselme.sufficiency.v3</code>, a Choice over <code>send · send_and_flag · hold_for_clinician · crisis_protocol</code>.</dd>
+    <dt>Layers</dt><dd>Granite Guardian 4.1 criteria scores feed the Kev/LitJev head as state features. The criteria are: grounded in the counselor's knowledge base; consistent with prior guidance; <b>contains no new clinical directive</b> (medication, diagnosis, stopping treatment); and answers the question asked.</dd>
+    <dt>Outcome</dt><dd>A set of <code>{send}</code> sends the reply. A set that includes <code>send_and_flag</code> sends it and adds it to the digest. A set that includes <code>hold_for_clinician</code> holds it, sends the counselor a summary and pointer, and tells the patient when to expect a reply.</dd>
+    <dt>Automation rate</dt><dd>Fix the recall floor on <code>hold_for_clinician</code> (≥0.95) first, then measure the automation rate it leaves. Kev-27B covered 84% of general decisions at a 5% error budget, and clinical budgets are tighter. The 90% target is a result to measure, not an input.</dd>
+    <dt>Labels</dt><dd>Every counselor approval, edit or rewrite of a held draft.</dd>
+  </dl></div></template>
+
+<template id="frag-cm-04"><div classes="add swapin">
+  <h4>Scope &amp; jurisdiction boundary</h4>
+  <div class="tags"><span class="tag crit">regulatory</span><span class="tag">all tiers</span></div>
+  <dl>
+    <dt>Trigger</dt><dd>Session start (jurisdiction), and every draft (content).</dd>
+    <dt>Spec</dt><dd>First a deterministic rule on the patient's state of residence and the counselor's license. Then <code>counselme.scope.v1</code>, a Noul: "this reply constitutes therapeutic communication or a therapeutic decision".</dd>
+    <dt>Why</dt><dd>Illinois HB 1806 (Public Act 104-0054) bars AI from independent therapeutic decisions and from therapeutic communication with clients. An escalation gate does not cure that.</dd>
+    <dt>Outcome</dt><dd>In restricted jurisdictions the twin is limited to administrative and supplementary support, with explicit consent. Anything with P above the floor is held for the counselor.</dd>
+    <dt>Human</dt><dd>Counsel reviews the jurisdiction table. It is a versioned artifact, not a model.</dd>
+  </dl></div></template>
+
+<template id="frag-cm-05"><div classes="add swapin">
+  <h4>Session commitments</h4>
+  <div class="tags"><span class="tag mod">moderate</span><span class="tag">desktop</span><span class="tag">Omi / Zoom transcript</span></div>
+  <dl>
+    <dt>Trigger</dt><dd>End of each counseling session, from the recorded transcript. This is the workflow Travis demonstrated with the Omi device.</dd>
+    <dt>Spec</dt><dd>Extraction uses llguidance-constrained JSON on Qwen3.8 (<code>{action, owner, due, evidence_type}</code>). Each item then gets a Noul: "the patient committed to this".</dd>
+    <dt>Outcome</dt><dd>High-confidence items go straight onto the accountability plan. Low-confidence items appear in the counselor's session summary as "confirm?".</dd>
+    <dt>Labels</dt><dd>Counselor confirmations and deletions.</dd>
+  </dl></div></template>
+
+<template id="frag-cm-06"><div classes="add swapin">
+  <h4>Check-in timing</h4>
+  <div class="tags"><span class="tag low">low risk</span><span class="tag">phone</span></div>
+  <dl>
+    <dt>Spec</dt><dd><code>counselme.checkin.v1</code>, a Score over <code>same_day · two_days · one_week · next_session</code>.</dd>
+    <dt>Inputs</dt><dd>Commitment type, the patient's response history, their stated preference, and CM-08 context.</dd>
+    <dt>Layers</dt><dd>An encoder head on device. Kev-4B on desktop when the history is long.</dd>
+    <dt>Outcome</dt><dd>Always acts, and the patient can reschedule. Missed check-ins adjust the next decision.</dd>
+  </dl></div></template>
+
+<template id="frag-cm-07"><div classes="add swapin">
+  <h4>Completion evidence</h4>
+  <div class="tags"><span class="tag mod">moderate</span><span class="tag">desktop</span></div>
+  <dl>
+    <dt>Spec</dt><dd><code>counselme.done.v1</code>, a Noul: "the submitted evidence shows task X is complete". Granite Guardian groundedness gives a second opinion.</dd>
+    <dt>Outcome</dt><dd>High P checks the task off. Low P asks the patient "Did you finish this?". The system never marks a task failed on its own.</dd>
+    <dt>Human</dt><dd>The counselor sees completion evidence in the digest, just as Travis described ("put it in a Word document… push it into the app").</dd>
+  </dl></div></template>
+
+<template id="frag-cm-08"><div classes="add swapin">
+  <h4>Wellness signal context</h4>
+  <div class="tags"><span class="tag mod">moderate</span><span class="tag crit">FDA pattern boundary</span><span class="tag">phone</span></div>
+  <dl>
+    <dt>Inputs</dt><dd>Deterministic features, never raw time series: HRV z-score against the patient's 30-day baseline, sleep debt, and schedule load from Oura and the calendar.</dd>
+    <dt>Spec</dt><dd><code>counselme.blocker.v1</code>, a Choice over <code>sleep · stress · schedule · motivation · health_event · unknown</code>.</dd>
+    <dt>Framing</dt><dd>Wellness and coaching language only ("you slept less this week"). Under the January 2026 CDS guidance, interpreting physiologic patterns for clinical meaning is likely a device function.</dd>
+    <dt>Outcome</dt><dd>Context for the counselor and for CM-06 timing. Not a risk score.</dd>
+    <dt>Dependency</dt><dd>Oura, Omi and FHIR connectors don't exist in know-me-system yet.</dd>
+  </dl></div></template>
+
+<template id="frag-cm-09"><div classes="add swapin">
+  <h4>Counselor digest triage</h4>
+  <div class="tags"><span class="tag low">low risk</span><span class="tag">desktop</span></div>
+  <dl>
+    <dt>Spec</dt><dd><code>counselme.digest.v1</code>, a Score over <code>read_first · this_week · fyi</code> for each logged interaction.</dd>
+    <dt>Why</dt><dd>In the session, the counselor "knows a lot more stuff" at the next meeting because the transaction log exists. Triage makes that log readable in the five minutes before a session.</dd>
+    <dt>Outcome</dt><dd>Ordering only. The counselor still has everything.</dd>
+  </dl></div></template>
+
+<template id="frag-cm-10"><div classes="add swapin">
+  <h4>Consent &amp; locality gate</h4>
+  <div class="tags"><span class="tag mod">privacy</span><span class="tag">phone</span></div>
+  <dl>
+    <dt>Trigger</dt><dd>Any movement of data off the device, and any recording that captures other people's voices.</dd>
+    <dt>Spec</dt><dd>The consent decision is deterministic Cedar. The model only runs a Noul on content: "this segment contains third-party personal information" (Omi recordings pick up everyone nearby).</dd>
+    <dt>Outcome</dt><dd>Third-party segments are redacted or kept on device. Locality never escalates without a grant, matching KnowMe's model-configuration rule.</dd>
+  </dl></div></template>
+
+<template id="frag-cm-11"><div classes="add swapin">
+  <h4>Intake: which counselor</h4>
+  <div class="tags"><span class="tag mod">moderate</span><span class="tag">desktop</span><span class="tag">from the session: "people don't know what kind of counselor they need"</span></div>
+  <dl>
+    <dt>Spec</dt><dd><code>counselme.intake.v1</code>, a ranked Choice over modality: <code>cbt · trauma_informed · couples_family · substance_use · grief · psychiatry_referral</code>. Plus a Noul: "the plan requires pre-authorization for this service".</dd>
+    <dt>Outcome</dt><dd>Always shown as ranked options to a human intake coordinator. The pre-authorization flag reuses the prior-auth decision specs.</dd>
+    <dt>Caution</dt><dd>Matching must not become a therapeutic recommendation in restricted states (CM-04).</dd>
+  </dl></div></template>
+
+<template id="frag-cm-12"><div classes="add swapin">
+  <h4>Twin fidelity &amp; drift</h4>
+  <div class="tags"><span class="tag mod">moderate</span><span class="tag">async audit</span></div>
+  <dl>
+    <dt>Spec</dt><dd>Granite Guardian with your own criteria: "reply is consistent with the counselor's stated philosophy and prior guidance", run on a sample of sent replies. gpt-oss-safeguard-20b re-reviews borderline replies against a written policy.</dd>
+    <dt>Outcome</dt><dd>A weekly drift report for the counselor. Coverage dropping below the calibrated level triggers a refit.</dd>
+    <dt>Why</dt><dd>The twin is built from writing samples and personality data, and both of those drift as the knowledge base grows.</dd>
+  </dl></div></template>
+<section class="block" id="priorauth">
+  <div class="sechead"><p class="eyebrow">09 · Use cases <span class="tag new">NEW</span></p><h2>Prior Authorization Workbench</h2><p class="lede">The workbench already has the right shape: three evidence states, a surgeon gate, cited claims and deterministic QA. Decision models fill the five agent slots the spec names but hasn't built. Every output is a proposal a person confirms.</p></div>
+
+  <figure>
+    <svg class="dg stages" viewBox="0 0 1000 300" role="img" aria-label="The existing prior-auth workflow in seven stages with decision points under each. Intake: payer and plan, document type, gold card. Evidence timeline: criteria decomposition, met/gap/void, and where to obtain voids. The surgeon gate is human-only. Letter and QA: claim support. Review and sign is human-only. Submit: approval likelihood. Payer response: parse, denial triage and peer-to-peer prep. A denial loops back to the surgeon gate for a fresh affirmation.">
+      <defs><marker id="a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker><marker id="a4h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah-hot"/></marker></defs>
+      <path d="M904,40 V20 H364 V34" class="e" marker-end="url(#a4)"/><text x="634" y="14" text-anchor="middle" class="lbl">denial → fresh affirmation → resubmit or appeal</text>
+      <rect x="10" y="40" width="128" height="60" rx="10" class="stg" style="animation-delay:0s"/><text x="74" y="66" text-anchor="middle" class="t">Intake</text><text x="74" y="85" text-anchor="middle" class="s">checklist</text>
+      <rect x="150" y="40" width="128" height="60" rx="10" class="stg" style="animation-delay:1.2s"/><text x="214" y="66" text-anchor="middle" class="t">Evidence</text><text x="214" y="85" text-anchor="middle" class="s">timeline</text>
+      <rect x="290" y="40" width="128" height="60" rx="10" class="stg-h" style="animation-delay:2.4s"/><text x="354" y="66" text-anchor="middle" class="t">Surgeon gate</text><text x="354" y="85" text-anchor="middle" class="s">4 affirmations</text>
+      <rect x="430" y="40" width="128" height="60" rx="10" class="stg" style="animation-delay:3.6s"/><text x="494" y="66" text-anchor="middle" class="t">Letter + QA</text><text x="494" y="85" text-anchor="middle" class="s">7 checks</text>
+      <rect x="570" y="40" width="128" height="60" rx="10" class="stg-h" style="animation-delay:4.8s"/><text x="634" y="66" text-anchor="middle" class="t">Review · sign</text><text x="634" y="85" text-anchor="middle" class="s">surgeon</text>
+      <rect x="710" y="40" width="128" height="60" rx="10" class="stg" style="animation-delay:6s"/><text x="774" y="66" text-anchor="middle" class="t">Submit</text><text x="774" y="85" text-anchor="middle" class="s">packet</text>
+      <rect x="850" y="40" width="128" height="60" rx="10" class="stg" style="animation-delay:7.2s"/><text x="914" y="66" text-anchor="middle" class="t">Payer</text><text x="914" y="85" text-anchor="middle" class="s">response</text>
+      <path d="M138,70 H144" class="e" marker-end="url(#a4)"/><path d="M278,70 H284" class="e" marker-end="url(#a4)"/><path d="M418,70 H424" class="e" marker-end="url(#a4)"/><path d="M558,70 H564" class="e" marker-end="url(#a4)"/><path d="M698,70 H704" class="e" marker-end="url(#a4)"/><path d="M838,70 H844" class="e" marker-end="url(#a4)"/>
+      <!-- decision chips -->
+      <g><line x1="74" y1="100" x2="74" y2="118" class="e ai"/>
+        <rect x="10" y="120" width="128" height="28" rx="8" class="ai"/><text x="74" y="139" text-anchor="middle" class="s">PA-01 payer · plan</text>
+        <rect x="10" y="154" width="128" height="28" rx="8" class="ai"/><text x="74" y="173" text-anchor="middle" class="s">PA-11 doc type</text>
+        <rect x="10" y="188" width="128" height="28" rx="8" class="ai"/><text x="74" y="207" text-anchor="middle" class="s">PA-10 gold card</text></g>
+      <g><line x1="214" y1="100" x2="214" y2="118" class="e ai"/>
+        <rect x="150" y="120" width="128" height="28" rx="8" class="ai"/><text x="214" y="139" text-anchor="middle" class="s">PA-02 criteria</text>
+        <rect x="150" y="154" width="128" height="28" rx="8" class="accent"/><text x="214" y="173" text-anchor="middle" class="s" style="fill:var(--ember)">PA-03 met/gap/void</text>
+        <rect x="150" y="188" width="128" height="28" rx="8" class="ai"/><text x="214" y="207" text-anchor="middle" class="s">PA-04 obtain void</text></g>
+      <g><rect x="290" y="120" width="128" height="28" rx="8" class="human"/><text x="354" y="139" text-anchor="middle" class="s">human-only</text></g>
+      <g><line x1="494" y1="100" x2="494" y2="118" class="e ai"/><rect x="430" y="120" width="128" height="28" rx="8" class="ai"/><text x="494" y="139" text-anchor="middle" class="s">PA-05 claim support</text></g>
+      <g><rect x="570" y="120" width="128" height="28" rx="8" class="human"/><text x="634" y="139" text-anchor="middle" class="s">human-only</text></g>
+      <g><line x1="774" y1="100" x2="774" y2="118" class="e ai"/><rect x="710" y="120" width="128" height="28" rx="8" class="ai"/><text x="774" y="139" text-anchor="middle" class="s">PA-08 likelihood</text></g>
+      <g><line x1="914" y1="100" x2="914" y2="118" class="e ai"/>
+        <rect x="850" y="120" width="128" height="28" rx="8" class="ai"/><text x="914" y="139" text-anchor="middle" class="s">PA-06 parse</text>
+        <rect x="850" y="154" width="128" height="28" rx="8" class="ai"/><text x="914" y="173" text-anchor="middle" class="s">PA-07 denial triage</text>
+        <rect x="850" y="188" width="128" height="28" rx="8" class="ai"/><text x="914" y="207" text-anchor="middle" class="s">PA-09 P2P prep</text></g>
+      <text x="10" y="258" class="lbl">decision proposes → person confirms via the existing command (evidence_assembly · reassessment · determination)</text>
+      <text x="10" y="280" class="lbl">set size &gt; 1 or below floor → classification_needs_review</text>
+    </svg>
+    <figcaption>Decision points attach to the workflow that already exists in <code>aso-host</code>. The gate and signing stay human-only; this is enforced three times today (gateway policy, the <code>AppServices</code> capability check and a Postgres trigger), and an agent acting for a surgeon gets none of the surgeon's authority.</figcaption>
+  </figure>
+
+  <h3>Decision catalog</h3>
+  <div class="explorer" x-data="{sel:'pa-03'}">
+    <div class="xlist" role="tablist" aria-label="Prior-auth use cases">
+      <button role="tab" hx-get="#pa-01" hx-target="#pa-pane" @click="sel='pa-01'" :aria-selected="(sel==='pa-01').toString()"><span class="id">PA-01</span><span class="nm">Payer, plan &amp; delegation</span></button>
+      <button role="tab" hx-get="#pa-11" hx-target="#pa-pane" @click="sel='pa-11'" :aria-selected="(sel==='pa-11').toString()"><span class="id">PA-11</span><span class="nm">Intake document type</span></button>
+      <button role="tab" hx-get="#pa-10" hx-target="#pa-pane" @click="sel='pa-10'" :aria-selected="(sel==='pa-10').toString()"><span class="id">PA-10</span><span class="nm">Gold card tracking</span></button>
+      <button role="tab" hx-get="#pa-02" hx-target="#pa-pane" @click="sel='pa-02'" :aria-selected="(sel==='pa-02').toString()"><span class="id">PA-02</span><span class="nm">Policy criteria decomposition</span></button>
+      <button role="tab" hx-get="#pa-03" hx-target="#pa-pane" @click="sel='pa-03'" :aria-selected="(sel==='pa-03').toString()"><span class="id">PA-03</span><span class="nm">Criterion evidence: met / gap / void</span></button>
+      <button role="tab" hx-get="#pa-04" hx-target="#pa-pane" @click="sel='pa-04'" :aria-selected="(sel==='pa-04').toString()"><span class="id">PA-04</span><span class="nm">Where to obtain a void</span></button>
+      <button role="tab" hx-get="#pa-05" hx-target="#pa-pane" @click="sel='pa-05'" :aria-selected="(sel==='pa-05').toString()"><span class="id">PA-05</span><span class="nm">Letter claim support</span></button>
+      <button role="tab" hx-get="#pa-08" hx-target="#pa-pane" @click="sel='pa-08'" :aria-selected="(sel==='pa-08').toString()"><span class="id">PA-08</span><span class="nm">First-pass likelihood</span></button>
+      <button role="tab" hx-get="#pa-06" hx-target="#pa-pane" @click="sel='pa-06'" :aria-selected="(sel==='pa-06').toString()"><span class="id">PA-06</span><span class="nm">Payer response parser</span></button>
+      <button role="tab" hx-get="#pa-07" hx-target="#pa-pane" @click="sel='pa-07'" :aria-selected="(sel==='pa-07').toString()"><span class="id">PA-07</span><span class="nm">Denial triage</span></button>
+      <button role="tab" hx-get="#pa-09" hx-target="#pa-pane" @click="sel='pa-09'" :aria-selected="(sel==='pa-09').toString()"><span class="id">PA-09</span><span class="nm">Peer-to-peer prep</span></button>
+    </div>
+    <div id="pa-pane" class="xpane" role="tabpanel" aria-live="polite" hx-get="#pa-03" hx-trigger="load"></div>
+  </div>
+  <div class="note"><p><b>CMS-0057-F.</b> Payers must decide within 72 hours (urgent) or 7 calendar days (standard) from 1 January 2026, and must meet the FHIR Prior Authorization API requirements (Da Vinci CRD, DTR and PAS) by 1 January 2027. The repo has a PAS document-class stub and nothing for CRD or DTR yet. Once payers expose DTR questionnaires, those become a structured criteria source for PA-02.</p></div>
+</section>
+
+<template id="frag-pa-01"><div classes="add swapin">
+  <h4>Payer, plan &amp; delegation selection</h4>
+  <div class="tags"><span class="tag mod">moderate</span><span class="tag">rules first</span></div>
+  <dl>
+    <dt>Spec</dt><dd>Deterministic lookup through <code>payer_plans</code>, <code>plan_delegation_rules</code> and <code>administering_entities</code> (which utilization-management vendor applies which policy). The Choice fallback <code>pa.plan.v1</code> runs only when the eligibility text is ambiguous.</dd>
+    <dt>Outcome</dt><dd>Proposes the plan and administering entity. The coordinator confirms, and the confirmation selects the policy version.</dd>
+    <dt>Labels</dt><dd>Coordinator corrections.</dd>
+  </dl></div></template>
+
+<template id="frag-pa-11"><div classes="add swapin">
+  <h4>Intake document type</h4>
+  <div class="tags"><span class="tag low">low risk</span><span class="tag">encoder</span></div>
+  <dl>
+    <dt>Spec</dt><dd><code>pa.doctype.v1</code>, a Choice over <code>mri_report · radiology_other · pt_notes · injection_procedure · office_note · op_note · imaging_order · prior_denial · other</code>, on page text.</dd>
+    <dt>Layers</dt><dd>A fine-tuned ModernBERT head (Laya zero-shot until labels exist). ~30 ms per page.</dd>
+    <dt>Outcome</dt><dd>Places pages on the evidence timeline. Low confidence goes to the coordinator's labeling queue.</dd>
+  </dl></div></template>
+
+<template id="frag-pa-10"><div classes="add swapin">
+  <h4>Gold card tracking · Agent 18</h4>
+  <div class="tags"><span class="tag low">low risk</span></div>
+  <dl>
+    <dt>Spec</dt><dd>A Noul on payer notices: "an active gold-card exemption covers this service for this payer". Plus a Score for renewal risk, from the practice's own approval trend.</dd>
+    <dt>Outcome</dt><dd>If the proposal is "exempt", the coordinator confirms before skipping prior auth. The renewal-risk Score feeds admin reporting (US-18).</dd>
+  </dl></div></template>
+
+<template id="frag-pa-02"><div classes="add swapin">
+  <h4>Policy criteria decomposition</h4>
+  <div class="tags"><span class="tag crit">liability</span><span class="tag">on-prem</span></div>
+  <dl>
+    <dt>Spec</dt><dd>llguidance-constrained extraction of payer policy text into atomic criteria (<code>{id, text, evidence_kind, lookback, count}</code>). Then a Noul per criterion: "faithful to the source clause".</dd>
+    <dt>Outcome</dt><dd>A draft <code>criteria_catalog</code> version. A person verifies it once per policy version before cases can select from it. This pairs with the <code>PolicyVersionCurrency</code> QA check.</dd>
+    <dt>Models</dt><dd>LitJev/Kev-27B on Qwen3.8 for extraction and the Noul. MedGemma is optional as an extractor, never as the decider.</dd>
+  </dl></div></template>
+
+<template id="frag-pa-03"><div classes="add swapin">
+  <h4>Criterion evidence: met / gap / void</h4>
+  <div class="tags"><span class="tag crit">safety-critical</span><span class="tag">on-prem</span><span class="tag">Agents 04 + 06</span></div>
+  <dl>
+    <dt>Trigger</dt><dd>For each selected criterion, whenever the evidence timeline changes.</dd>
+    <dt>Spec</dt><dd><code>pa.criterion.v1</code>, a Choice over <code>met · gap · void</code>. Each answer carries citations (document, page, date, hash) from <code>chunks</code> and <code>retrieval_log</code>.</dd>
+    <dt>Meaning</dt><dd><b>met</b>: the record satisfies the criterion. <b>gap</b>: the record exists but falls short, so the surgeon argues it. <b>void</b>: the record is absent, so the coordinator obtains it. The kernel never returns two states.</dd>
+    <dt>Layers</dt><dd>Encoder retrieval filter, then MedGemma 27B span extraction (human-reviewed), then the LitJev/Kev-27B head, then Granite Guardian's check that the citation supports the decision.</dd>
+    <dt>Outcome</dt><dd>A single-state set is a proposal the coordinator confirms through the <code>evidence_assembly</code> command. A multi-state set goes to <code>classification_needs_review</code>.</dd>
+    <dt>Calibration</dt><dd>Recall floors on <code>void</code> (so missing records get requested) and on <code>gap</code> (so the surgeon sees every weak point). Ground truth comes from <code>criterion_observations</code> and <code>determinations</code>.</dd>
+    <dt>Never</dt><dd>The kernel never writes, never denies, and never touches the surgeon gate.</dd>
+  </dl></div></template>
+
+<template id="frag-pa-04"><div classes="add swapin">
+  <h4>Where to obtain a void</h4>
+  <div class="tags"><span class="tag low">low risk</span></div>
+  <dl>
+    <dt>Why</dt><dd>From the session: much of the evidence "didn't come from you… it's in his chart", meaning the referring physician's.</dd>
+    <dt>Spec</dt><dd><code>pa.source.v1</code>, a Choice over <code>referring_pcp · pt_clinic · imaging_center · pain_management · patient · other</code>, based on the timeline and the missing criterion.</dd>
+    <dt>Outcome</dt><dd>Drafts a records request for the coordinator. When a FHIR connection exists for that source, it proposes the pull instead.</dd>
+  </dl></div></template>
+
+<template id="frag-pa-05"><div classes="add swapin">
+  <h4>Letter claim support</h4>
+  <div class="tags"><span class="tag crit">False Claims Act control</span></div>
+  <dl>
+    <dt>Spec</dt><dd>For each claim <code>{text, sourceId, sourceQuote}</code>, a Noul: "sourceQuote supports the claim text". Granite Guardian groundedness gives a second score.</dd>
+    <dt>Outcome</dt><dd>This adds an eighth, probabilistic check next to the seven deterministic QA checks in <code>clinical-docs/src/qa.rs</code>. It never replaces them. A low score blocks QA from passing with the claim highlighted.</dd>
+  </dl></div></template>
+
+<template id="frag-pa-08"><div classes="add swapin">
+  <h4>First-pass approval likelihood</h4>
+  <div class="tags"><span class="tag mod">data-gated</span></div>
+  <dl>
+    <dt>Rule</dt><dd>Until enough <code>criterion_observations</code> exist, show the criteria gaps, not a probability.</dd>
+    <dt>Spec</dt><dd>A Score over <code>likely · uncertain · unlikely</code>, calibrated against real determinations, with Wilson bounds displayed. Shared summaries keep the antitrust guard (≥10 cases, ≥2 practices).</dd>
+    <dt>KPI</dt><dd>The spec's first-pass approval rate: an 80% baseline and an 88–92% target.</dd>
+  </dl></div></template>
+
+<template id="frag-pa-06"><div classes="add swapin">
+  <h4>Payer response parser · Agent 12</h4>
+  <div class="tags"><span class="tag mod">moderate</span></div>
+  <dl>
+    <dt>Spec</dt><dd>A Choice over <code>approved · approved_modified · pended_more_info · denied_medical_necessity · denied_administrative · p2p_offered</code>, plus constrained extraction of the reference number, units and dates.</dd>
+    <dt>Outcome</dt><dd>This is the "confidence flag" the spec asks for. Below the floor, it goes to review. The coordinator records the acknowledgement.</dd>
+  </dl></div></template>
+
+<template id="frag-pa-07"><div classes="add swapin">
+  <h4>Denial triage · Agent 13</h4>
+  <div class="tags"><span class="tag crit">liability</span></div>
+  <dl>
+    <dt>Spec</dt><dd>A Choice over <code>correct_and_resubmit · clinical_appeal · peer_to_peer</code>, citing the denial reason and the criteria it touches.</dd>
+    <dt>Outcome</dt><dd>Proposes a path. Abstaining uses the existing <code>low-confidence-denial</code> fixture path (<code>classification_needs_review</code>). An appeal still needs a fresh affirmation made after the determination.</dd>
+  </dl></div></template>
+
+<template id="frag-pa-09"><div classes="add swapin">
+  <h4>Peer-to-peer prep</h4>
+  <div class="tags"><span class="tag low">low risk</span></div>
+  <dl>
+    <dt>Spec</dt><dd>A Score per criterion, <code>strong · contestable · weak</code>, given the evidence and the denial rationale.</dd>
+    <dt>Outcome</dt><dd>Orders the surgeon's prep sheet weakest first, with citations. Nothing is submitted.</dd>
+  </dl></div></template>
+<section class="block" id="skills">
+  <div class="sechead"><p class="eyebrow">10 · Distribution <span class="tag new">NEW</span></p><h2>Decision skills &amp; marketplace</h2><p class="lede">The skills follow the AgentSkills.io format, grouped into four plugins and published through one marketplace. The skills teach an agent how to author, calibrate and use decision specs. The bundled <code>.mcp.json</code> gives it the tools.</p></div>
+
+  <div class="tbl"><table>
+    <thead><tr><th>Skill (<code>name</code>)</th><th>Plugin</th><th>What it does</th><th>Tools it calls</th></tr></thead>
+    <tbody>
+      <tr><td><code>decision-spec-author</code></td><td>decide-foundation</td><td>Turns a described decision into a versioned DecisionSpec: options, primitive, recall floors, locality, tripwire pack</td><td><code>decide://specs</code>, <code>decide_choice</code> (dry run)</td></tr>
+      <tr><td><code>decision-calibrate</code></td><td>decide-foundation</td><td>Builds the labeled set from audit overrides, fits temperature and Mondrian conformal, and reports the automation rate the floors allow</td><td><code>decision_log_query</code>, <code>calibrate_fit</code></td></tr>
+      <tr><td><code>decision-eval-harness</code></td><td>decide-foundation</td><td>Replays Jev traffic, Kev frozen suites or a golden set against the backends, and compares accuracy, Brier, ECE and latency</td><td><code>decide_batch</code></td></tr>
+      <tr><td><code>guard-policy-author</code></td><td>decide-foundation</td><td>Writes Granite Guardian criteria and gpt-oss-safeguard policies, then tests them on examples</td><td><code>guard_check</code>, <code>sufficiency_check</code></td></tr>
+      <tr><td><code>decision-audit-review</code></td><td>decide-foundation</td><td>Explains a decision, finds drift, and prepares an audit packet for counsel or compliance</td><td><code>decision_explain</code>, <code>decision_log_query</code></td></tr>
+      <tr><td><code>route-intent-designer</code></td><td>uar-decision-routing</td><td>Designs a two-level route table for a UAR agent team and wires <code>ClassifierBackend::Decision</code></td><td><code>route_intent</code></td></tr>
+      <tr><td><code>model-route-tuner</code></td><td>uar-decision-routing</td><td>Adds task-type Choice specs that feed UAR's <code>ModelRouter</code></td><td><code>decide_choice</code></td></tr>
+      <tr><td><code>crisis-tripwire-pack</code></td><td>counselme-decisions</td><td>Maintains the clinician-owned tripwire pack and its regression suite. Can't be published without clinician sign-off</td><td><code>tripwire_scan</code></td></tr>
+      <tr><td><code>escalation-gate</code></td><td>counselme-decisions</td><td>Runs CM-03 on a twin draft and follows the outcome contract</td><td><code>tripwire_scan</code>, <code>sufficiency_check</code>, <code>decide_choice</code></td></tr>
+      <tr><td><code>session-commitments</code></td><td>counselme-decisions</td><td>Extracts CM-05 action items from a session transcript, with a confidence for each</td><td><code>decide_batch</code></td></tr>
+      <tr><td><code>twin-fidelity-check</code></td><td>counselme-decisions</td><td>Samples sent replies for the CM-12 drift report</td><td><code>guard_check</code></td></tr>
+      <tr><td><code>pa-criteria-decompose</code></td><td>prior-auth-decisions</td><td>Turns a payer policy into atomic criteria for human verification (PA-02)</td><td><code>decide_batch</code></td></tr>
+      <tr><td><code>pa-evidence-check</code></td><td>prior-auth-decisions</td><td>Proposes met/gap/void with citations (PA-03, PA-04)</td><td><code>decide_choice</code>, <code>guard_check</code></td></tr>
+      <tr><td><code>pa-denial-triage</code></td><td>prior-auth-decisions</td><td>Parses a payer response and proposes a denial path (PA-06, PA-07)</td><td><code>decide_choice</code></td></tr>
+    </tbody></table></div>
+
+  <h3>Repository layout</h3>
+<div class="tree"><span class="d">knowme-decisions/</span>                         <span class="c"># marketplace repo</span>
+├── <span class="d">.claude-plugin/</span>
+│   └── <span class="f">marketplace.json</span>
+└── <span class="d">plugins/</span>
+    ├── <span class="d">decide-foundation/</span>
+    │   ├── <span class="d">.claude-plugin/</span><span class="f">plugin.json</span>
+    │   ├── <span class="f">.mcp.json</span>                        <span class="c"># launches the knowme-decide sidecar</span>
+    │   ├── <span class="d">bin/</span>                             <span class="c"># optional per-platform binaries for non-Boss hosts</span>
+    │   └── <span class="d">skills/</span>
+    │       ├── <span class="d">decision-spec-author/</span><span class="f">SKILL.md</span>
+    │       ├── <span class="d">decision-calibrate/</span>{<span class="f">SKILL.md</span>, <span class="d">scripts/</span>, <span class="d">references/</span>CONFORMAL.md}
+    │       ├── <span class="d">decision-eval-harness/</span>…
+    │       ├── <span class="d">guard-policy-author/</span>…
+    │       └── <span class="d">decision-audit-review/</span>…
+    ├── <span class="d">uar-decision-routing/</span>…
+    ├── <span class="d">counselme-decisions/</span>
+    │   └── <span class="d">skills/</span>
+    │       ├── <span class="d">escalation-gate/</span>{<span class="f">SKILL.md</span>, <span class="d">references/</span>OUTCOMES.md, <span class="d">assets/</span>spec.json}
+    │       ├── <span class="d">crisis-tripwire-pack/</span>…
+    │       ├── <span class="d">session-commitments/</span>…
+    │       └── <span class="d">twin-fidelity-check/</span>…
+    └── <span class="d">prior-auth-decisions/</span>…</div>
+
+  <p class="filehead">plugins/counselme-decisions/skills/escalation-gate/SKILL.md</p>
+<pre><code><span class="c-c">---</span>
+<span class="c-t">name</span>: escalation-gate
+<span class="c-t">description</span>: Decide whether a counselor digital-twin draft reply can be sent to the patient, flagged, held for the counselor, or routed to crisis protocol. Use for every CounselMe twin draft before the patient sees it, or when asked to check, gate or escalate a between-session reply.
+<span class="c-t">license</span>: Proprietary. KnowMe, LLC
+<span class="c-t">compatibility</span>: Needs the knowme-decide MCP server (bundled in The Boss as @prometheus/decide, or via this plugin's .mcp.json). Local-only; never send patient text to a hosted model.
+<span class="c-t">metadata</span>:
+  <span class="c-t">spec</span>: <span class="c-s">"counselme.sufficiency.v3"</span>
+  <span class="c-t">safety</span>: <span class="c-s">"critical"</span>
+  <span class="c-t">owner</span>: <span class="c-s">"knowme"</span>
+<span class="c-t">allowed-tools</span>: mcp__knowme-decide__tripwire_scan mcp__knowme-decide__sufficiency_check mcp__knowme-decide__decide_choice
+<span class="c-c">---</span>
+
+# Escalation gate
+
+## Steps
+1. Call `tripwire_scan` with pack `counselme-crisis` on the patient message AND the draft.
+   Any hit → stop. Outcome is `crisis_protocol`. Do not call other tools.
+2. Call `sufficiency_check` with the question, the draft and the knowledge refs.
+3. Call `decide_choice` with spec `counselme.sufficiency.v3`, passing step 2 scores as state.
+4. Follow the returned `outcome`, never the top `value`:
+   - `act` → send the draft.
+   - `review` → do not send. Post summary + pointer to the counselor; tell the patient
+     when to expect a reply (see references/OUTCOMES.md for wording).
+   - `escalate` → crisis protocol: 988 and the counselor's safety plan.
+5. Record `audit_id` with the conversation turn.
+
+## Never
+- Never lower a recall floor or skip a step to raise the automation rate.
+- Never rewrite the draft to get it past the gate; hold it instead.
+- In restricted jurisdictions (see CM-04), treat any therapeutic content as `review`.</code></pre>
+
+  <div class="grid2">
+    <div>
+      <p class="filehead">.claude-plugin/marketplace.json</p>
+<pre><code>{
+  <span class="c-t">"name"</span>: <span class="c-s">"knowme-decisions"</span>,
+  <span class="c-t">"description"</span>: <span class="c-s">"Self-hosted decision models for KnowMe, UAR, CounselMe and prior-auth"</span>,
+  <span class="c-t">"owner"</span>: { <span class="c-t">"name"</span>: <span class="c-s">"KnowMe, LLC"</span> },
+  <span class="c-t">"plugins"</span>: [
+    { <span class="c-t">"name"</span>: <span class="c-s">"decide-foundation"</span>,
+      <span class="c-t">"source"</span>: <span class="c-s">"./plugins/decide-foundation"</span>,
+      <span class="c-t">"description"</span>: <span class="c-s">"Author, calibrate and audit decision specs"</span> },
+    { <span class="c-t">"name"</span>: <span class="c-s">"uar-decision-routing"</span>,
+      <span class="c-t">"source"</span>: <span class="c-s">"./plugins/uar-decision-routing"</span> },
+    { <span class="c-t">"name"</span>: <span class="c-s">"counselme-decisions"</span>,
+      <span class="c-t">"source"</span>: <span class="c-s">"./plugins/counselme-decisions"</span> },
+    { <span class="c-t">"name"</span>: <span class="c-s">"prior-auth-decisions"</span>,
+      <span class="c-t">"source"</span>: <span class="c-s">"./plugins/prior-auth-decisions"</span> }
+  ]
+}</code></pre>
+    </div>
+    <div>
+      <p class="filehead">plugins/decide-foundation/.mcp.json</p>
+<pre><code>{
+  <span class="c-t">"mcpServers"</span>: {
+    <span class="c-t">"knowme-decide"</span>: {
+      <span class="c-t">"command"</span>: <span class="c-s">"${CLAUDE_PLUGIN_ROOT}/bin/knowme-decide"</span>,
+      <span class="c-t">"args"</span>: [<span class="c-s">"mcp"</span>, <span class="c-s">"--stdio"</span>, <span class="c-s">"--profile"</span>, <span class="c-s">"desktop"</span>],
+      <span class="c-t">"env"</span>: { <span class="c-t">"KNOWME_DECIDE_LOCALITY"</span>: <span class="c-s">"device-only"</span> }
+    }
+  }
+}</code></pre>
+      <p class="sub" style="font-size:14px">Inside The Boss, the built-in <code>@prometheus/decide</code> preset takes the place of this file, so skills resolve to the bundled sidecar and don't need a second binary.</p>
+    </div>
+  </div>
+
+  <h3>How each host loads them</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Host</th><th>Today</th><th>Change needed</th></tr></thead>
+    <tbody>
+      <tr><td><b>The Boss</b></td><td><code>SkillService</code> mirrors SKILL.md folders into the SDK's <code>.claude/skills</code>. Local plugins load from <code>&lt;cwd&gt;/.claude/plugins/*/.claude-plugin/plugin.json</code>. Marketplace search covers claude-plugins.dev, skills.sh, clawhub.ai and GitHub</td><td>Nothing reads <code>marketplace.json</code> yet. Add a marketplace installer, and add <code>knowme-decisions</code> as a default source</td></tr>
+      <tr><td><b>UAR</b></td><td>SKILL.md skills through <code>runtime/skills/</code>, and the Prometheus skill pack through <code>pack_detection.rs</code> (the Claude plugin cache is one of its lookup paths)</td><td>Resolve plugin-cache installs of <code>knowme-decisions</code>. UAR leaves marketplaces to other hosts (<code>docs/uar-next.md</code>)</td></tr>
+      <tr><td><b>KnowMe</b></td><td><code>knowme:tool</code> vs <code>knowme:skill</code>, with global, agent-private and agent-exposed scopes; a marketplace is planned for later</td><td>Map the <code>counselme-decisions</code> skills to agent-private scope on the twin, and the foundation skills to global scope</td></tr>
+      <tr><td><b>Claude Code / Codex</b></td><td>Standard <code>claude plugin marketplace add</code></td><td>Ship per-platform binaries in <code>bin/</code>, or point <code>.mcp.json</code> at an installed sidecar</td></tr>
+    </tbody></table></div>
+</section>
+<section class="block" id="uses">
+  <div class="sechead"><p class="eyebrow">11 · Research</p><h2>The original seven uses</h2><p class="lede">These are the per-use recommendations from the research run, now mapped to crates and specs.</p></div>
+  <div class="tbl"><table>
+    <thead><tr><th>Use</th><th>Risk</th><th>Primary pick</th><th>Alternatives</th><th>Lands in</th></tr></thead>
+    <tbody>
+      <tr><td><b>1 · Intent / switch router</b></td><td><span class="tag low">low</span></td><td>Laya (Rust/candle) or Julia 1 zero-shot, two-level; then a fine-tuned ModernBERT</td><td>GLiClass (multi-label), Arch-Router (check license), Kev-4B for ambiguous cases</td><td><code>decide-encoder</code> → UAR <code>IntentClassifier</code></td></tr>
+      <tr><td><b>2 · Counseling escalation gate</b></td><td><span class="tag crit">critical</span></td><td>Tripwires, a fine-tuned small crisis classifier, Granite Guardian criteria and a Kev/LitJev head, with conformal floors</td><td>Qwen3Guard-Stream as a second crisis signal; gpt-oss-safeguard for async audit</td><td>CM-01, CM-03, CM-04</td></tr>
+      <tr><td><b>3 · Wearables + FHIR + transcripts</b></td><td><span class="tag mod">moderate</span></td><td>Deterministic features plus Kev Choice/Score</td><td>MedGemma 1.5 4B to summarize FHIR and labs on device</td><td>CM-08</td></tr>
+      <tr><td><b>4 · Accountability agent</b></td><td><span class="tag mod">moderate</span></td><td>llguidance extraction plus a Noul for each item</td><td>GLiNER spans; Granite groundedness</td><td>CM-05, CM-06, CM-07</td></tr>
+      <tr><td><b>5 · Prior authorization</b></td><td><span class="tag crit">critical</span></td><td>Rules, criteria decomposition, a Noul per criterion (LitJev/Kev-27B) and aggregation in code</td><td>MedGemma 27B for extraction only (license)</td><td>PA-01 to PA-11</td></tr>
+      <tr><td><b>6 · Sports / athletes</b></td><td><span class="tag mod">fairness</span></td><td>Julia or Laya for feedback; Kev Score for fit</td><td>Gradient boosting for NIL value</td><td>Future specs; never automate recruiting decisions about minors</td></tr>
+      <tr><td><b>7 · Verification / ideation</b></td><td><span class="tag low">low</span></td><td>Granite Guardian 4.1 8B as verifier</td><td>CLM-8B for ranking candidates</td><td><code>decide-guard</code>; UAR graph loops</td></tr>
+    </tbody></table></div>
+</section>
+
+<section class="block" id="jev">
+  <div class="sechead"><p class="eyebrow">12 · Decide</p><h2>Versus Jev</h2></div>
+  <div class="tbl"><table>
+    <thead><tr><th>Dimension</th><th>Jev (hosted)</th><th>knowme-decide (self-hosted)</th></tr></thead>
+    <tbody>
+      <tr><td><b>Latency</b></td><td>70–500 ms end to end (vendor), plus the network</td><td>Tripwire &lt;1 ms; encoder ~30 ms on GPU or M4, ~200 ms on a phone CPU; Kev-4B ~0.2–0.5 s; 27B on a GPU</td></tr>
+      <tr><td><b>Cost</b></td><td>$0.042 per 1M input tokens (possibly subsidized)</td><td>Hardware only; near-zero marginal cost on device</td></tr>
+      <tr><td><b>Calibration</b></td><td>RLCD, calibrated out of the box (vendor claim, unverified)</td><td>You fit it: temperature plus conformal on your own labels, versioned for each counselor and clinic</td></tr>
+      <tr><td><b>Accuracy</b></td><td>Leads on knowledge, policy and many-label tasks (MMLU 0.90 vs Kev-9B 0.74)</td><td>Matches Jev on few-option tasks; close the gap with fine-tuning and hierarchical specs</td></tr>
+      <tr><td><b>Privacy / HIPAA</b></td><td>PHI leaves your perimeter; no on-prem option or BAA information found</td><td>Data stays on the device or on your infrastructure, which is the architectural requirement</td></tr>
+      <tr><td><b>Compatibility</b></td><td>TypeSafe SDKs</td><td><code>decide-schema</code> speaks <code>/v1/systemone</code>, so you can A/B test against Jev on non-PHI traffic</td></tr>
+    </tbody></table></div>
+</section>
+
+<section class="block" id="safety">
+  <div class="sechead"><p class="eyebrow">13 · Decide</p><h2>Safety &amp; regulation</h2></div>
+  <div class="grid2">
+    <div class="card"><h4>Illinois HB 1806 <span class="tag crit">CounselMe</span></h4><p>Public Act 104-0054, effective 4 August 2025, bars AI from independent therapeutic decisions and from therapeutic communication with clients, with penalties of up to $10,000 per violation. The escalation gate doesn't cure this. Geofence Illinois, or limit the product there to supplementary support with consent (CM-04). Get counsel's opinion, and track similar laws in other states.</p></div>
+    <div class="card"><h4>FDA CDS guidance, Jan 2026 <span class="tag crit">both</span></h4><p>Non-device CDS supports a clinician "without replacing or directing" their judgment. Matching records to guidelines is a recognized pattern, and interpreting repeated physiologic measurements is likely a device function. Prior-auth stays transparent and proposal-only. CounselMe wellness signals stay wellness-framed (CM-08).</p></div>
+    <div class="card"><h4>MedGemma license <span class="tag mod">prior-auth</span></h4><p>The HAI-DEF Prohibited Use Policy bans automated decisions in healthcare and insurance. MedGemma is allowed as an extractor whose output a person reviews, and never as the model that decides met/gap/void.</p></div>
+    <div class="card"><h4>HIPAA, BAA and Texas <span class="tag mod">prior-auth</span></h4><p>Production PHI inference is disabled in the workbench today until there is a BAA provider. Self-hosting removes that dependency for decisions. The spec already tracks Texas SB 1188 and TRAIGA AI-disclosure reporting, so each decision's <code>audit_id</code> should feed those reports.</p></div>
+  </div>
+  <div class="note crit" style="margin-top:14px"><p><b>Not legal advice.</b> The Illinois statute, the FDA's device boundary and the MedGemma license each need counsel's reading for the specific product and jurisdictions.</p></div>
+</section>
+
+<section class="block" id="roadmap">
+  <div class="sechead"><p class="eyebrow">14 · Decide</p><h2>Roadmap</h2><p class="lede">Ship the infrastructure where the risk is low (The Boss, UAR routing), build labels where the risk is high (prior-auth, CounselMe), and only then turn on automated outcomes.</p></div>
+  <div class="phases">
+    <div class="phase"><div class="when"><b>Phase 0</b>2 weeks</div><ul><li>Stand up Kev-4B and <code>laya-rust</code> locally. Replay Jev traffic or TypeSafe's public evals to measure agreement and latency on the M-series Mac and a Windows CUDA box.</li><li>Scaffold the <code>knowme-decide</code> workspace: <code>decide-core</code>, <code>decide-schema</code>, <code>decide-tripwire</code>, <code>decide-calibrate</code>, <code>decide-mcp</code>.</li><li>Settle the rmcp (3.1 vs 3.4) and candle (0.7 vs 0.11) pins.</li></ul></div>
+    <div class="phase"><div class="when"><b>Phase 1</b>The Boss sidecar</div><ul><li>Add <code>knowme-decide</code> to the integration pins, <code>BUNDLED_TOOLS</code> and the <code>@prometheus/decide</code> preset (the <code>prometheus-005</code> change).</li><li>Build <code>DecideSidecarService</code> with READY:{port}, plus the operator panel.</li><li>Publish the <code>knowme-decisions</code> marketplace with <code>decide-foundation</code>, and add a marketplace.json reader to The Boss.</li></ul></div>
+    <div class="phase"><div class="when"><b>Phase 2</b>UAR routing</div><ul><li>Add <code>ClassifierBackend::Decision</code>, the <code>RouterNode</code> swap and the <code>ModelRouter</code> task type.</li><li>Write a new openspec change for ML guards and decision-model Cedar context, replacing the keyword heuristic.</li><li>Port LitJev to the candle-vllm fork with the DeltaNet state snapshot, and validate against Kev-27B on Kev's frozen suites.</li></ul></div>
+    <div class="phase"><div class="when"><b>Phase 3</b>Prior-auth shadow</div><ul><li>Build the <code>aso-decide</code> kernel and run PA-03, PA-06 and PA-07 in shadow mode. Proposals are logged but not shown, then compared with coordinator and surgeon actions.</li><li>Encode 3–5 spine policies (lumbar fusion first). Label 100+ chart and criteria pairs with the staff.</li><li>Fit conformal floors on void and gap, then show proposals.</li></ul></div>
+    <div class="phase"><div class="when"><b>Phase 4</b>CounselMe pilot</div><ul><li>Label 500–2,000 examples with the counselor (sufficient, escalate, crisis). Oversample crisis examples using synthetic data the clinician reviews.</li><li>Ship the tripwire pack and crisis classifier first. Run CM-03 with every draft held for the counselor until the measured automation rate at ≥0.95 recall is acceptable.</li><li>Legal review: Illinois, other states, HIPAA BAA for any GPU host.</li></ul></div>
+  </div>
+</section>
+
+<section class="block" id="caveats">
+  <div class="sechead"><p class="eyebrow">15 · Notes</p><h2>Caveats &amp; sources</h2></div>
+  <div class="prose">
+    <ul>
+      <li>Nearly every figure for the Jev-style open models is self-reported, days old, and measured against Jev reference values rather than a new head-to-head run. MedGemma 27B hardware needs are estimates. Guard-model leads come from the vendors.</li>
+      <li>Crisis-detection performance depends on fine-tuning and data, not on which model you pick. No model detects suicide risk until it has been validated on your population with clinician-labeled data.</li>
+      <li>The repo findings reflect a read of each codebase on 27 September 2026. The crate names, tool names and spec IDs in this report are proposals and don't exist yet.</li>
+      <li>The example numbers in the JSON result and the sequence diagram are illustrative.</li>
+    </ul>
+  </div>
+  <h3>Sources</h3>
+  <ol class="sources">
+    <li><a href="https://typesafe.ai/blog/introducing-system-one-models-and-jev">TypeSafe AI — Introducing System One Models &amp; Jev</a></li>
+    <li><a href="https://www.truefoundry.com/blog/typesafe-ai-jev">TrueFoundry — What System One models actually are</a></li>
+    <li><a href="https://www.marktechpost.com/2026/09/19/typesafe-ai-releases-jev/">MarkTechPost — TypeSafe AI releases Jev</a></li>
+    <li><a href="https://systemonemodels.org/examples/alternatives/">systemonemodels.org — Alternatives</a></li>
+    <li><a href="https://github.com/jaredpalmer/kev">Kev repository</a> · <a href="https://github.com/jaredpalmer/kev/blob/main/docs/model-cards/kev-27b.md">Kev-27B card</a> · <a href="https://github.com/jaredpalmer/kev/blob/main/docs/model-cards/kev-9b.md">Kev-9B card</a></li>
+    <li><a href="https://www.marktechpost.com/2026/09/26/supersonic-labs-releases-julia-1-a-144-3m-parameter-open-decision-model-that-runs-on-a-cpu/">Julia 1 release</a></li>
+    <li><a href="https://github.com/aovestdipaperino/laya-rust">laya-rust (candle port)</a></li>
+    <li><a href="https://huggingface.co/Contrastive-LM/CLM-v0.1-8B">CLM-8B model card</a></li>
+    <li><a href="https://github.com/fatwang2/awesome-jev">awesome-jev</a></li>
+    <li><a href="https://huggingface.co/Qwen/Qwen3Guard-Gen-8B">Qwen3Guard-Gen-8B</a> · <a href="https://qwen.ai/blog?id=qwen3guard">Qwen3Guard blog</a></li>
+    <li><a href="https://huggingface.co/ibm-granite/granite-guardian-4.1-8b">Granite Guardian 4.1 8B</a></li>
+    <li><a href="https://developers.openai.com/cookbook/articles/gpt-oss-safeguard-guide">gpt-oss-safeguard guide</a></li>
+    <li><a href="https://arxiv.org/pdf/2609.06263">Kalinich et al. 2026 (arXiv 2609.06263)</a></li>
+    <li><a href="https://arxiv.org/pdf/2603.04445">PsyCrisisBench (arXiv 2603.04445)</a></li>
+    <li><a href="https://huggingface.co/katanemo/Arch-Router-1.5B">Arch-Router-1.5B</a></li>
+    <li><a href="https://github.com/knowledgator/gliclass">GLiClass</a></li>
+    <li><a href="https://docs.rs/candle-semantic-router/latest/candle_semantic_router/">candle-semantic-router</a> · <a href="https://lib.rs/crates/candle-pipelines">candle-pipelines</a></li>
+    <li><a href="https://developers.google.com/health-ai-developer-foundations/medgemma/model-card-v1">MedGemma model card</a> · <a href="https://developers.google.com/health-ai-developer-foundations/prohibited-use-policy">HAI-DEF prohibited use policy</a></li>
+    <li><a href="https://github.com/guidance-ai/llguidance">llguidance</a></li>
+    <li><a href="https://proceedings.neurips.cc/paper_files/paper/2024/file/d02ff1aeaa5c268dc34790dd1ad21526-Paper-Conference.pdf">Conformal methods, NeurIPS 2024</a></li>
+    <li><a href="https://about.citiprogram.org/blog/clinical-decision-support-compliance-fdas-2026-expectations/">CITI — FDA 2026 CDS expectations</a></li>
+    <li><a href="https://arxiv.org/abs/2604.09937">Prior-auth benchmark (arXiv 2604.09937)</a> · <a href="https://arxiv.org/pdf/2605.16679">arXiv 2605.16679</a></li>
+    <li><a href="https://agentskills.io/specification">AgentSkills.io specification</a></li>
+    <li><a href="https://code.claude.com/docs/en/plugin-marketplaces">Claude Code — plugin marketplaces</a></li>
+    <li>Repos read on the owner's Mac: <code>prometheus/universal-agent-runtime</code>, <code>know-me/know-me-system</code> (brand: <code>docs/knowme-ui-ux-standard.md</code>), <code>prometheus/the-boss</code>, <code>TribeHealth/kevin/prior-auth</code></li>
+  </ol>
+</section>
+
+<footer>
+  <svg viewBox="0 0 100 130" aria-hidden="true"><rect x="0" y="0" width="20" height="124" rx="10" fill="currentColor"/><path d="M 16,62 C 26,52 44,32 62,18 C 72,10 80,8 84,14 C 86,18 82,24 76,28 C 60,40 40,56 28,66 C 22,70 18,68 16,64 Z" fill="currentColor"/><path d="M 16,62 C 26,72 44,92 62,106 C 72,114 80,116 84,110 C 86,106 82,100 76,96 C 60,84 40,68 28,58 C 22,54 18,56 16,60 Z" fill="currentColor"/><circle cx="18" cy="62" r="10" fill="var(--fg-faint)"/></svg>
+  <span>KnowMe, LLC · know-me.tools · AI that understands you.</span>
+  <span>HTMX 2.0.11 · Alpine 3.17.4 · class-tools</span>
+</footer>
+</main>
+</div>
+
+<script>
+/* local-fragments: an htmx extension that serves hx-get="#id" from <template id="frag-id">.
+   The markup is identical to a server-backed version: swap "#cm-03" for "/fragments/cm-03" and it works against a real endpoint. */
+htmx.defineExtension('local-fragments', {
+  onEvent: function (name, evt) {
+    if (name !== 'htmx:beforeRequest') return;
+    var cfg = evt.detail && evt.detail.requestConfig;
+    var path = cfg && cfg.path ? cfg.path.split('?')[0] : '';
+    if (path.charAt(0) !== '#') return;
+    evt.preventDefault();
+    var tpl = document.getElementById('frag-' + path.slice(1));
+    var target = evt.detail.target;
+    if (!tpl || !target) return;
+    if (typeof htmx.swap === 'function') {
+      htmx.swap(target, tpl.innerHTML, { swapStyle: 'innerHTML' });
+    } else {
+      target.innerHTML = tpl.innerHTML; htmx.process(target);
+    }
+  }
+});
+
+document.addEventListener('alpine:init', function () {
+  Alpine.data('scrollSpy', function () {
+    return {
+      wide: window.matchMedia('(min-width: 981px)').matches,
+      init: function () {
+        var self = this;
+        var mq = window.matchMedia('(min-width: 981px)');
+        var upd = function () { self.wide = mq.matches; };
+        if (mq.addEventListener) mq.addEventListener('change', upd);
+        var links = Array.prototype.slice.call(this.$el.querySelectorAll('.toc a'));
+        var map = {};
+        links.forEach(function (a) { map[a.getAttribute('href').slice(1)] = a; });
+        if (!('IntersectionObserver' in window)) return;
+        var io = new IntersectionObserver(function (entries) {
+          entries.forEach(function (en) {
+            if (en.isIntersecting && map[en.target.id]) {
+              links.forEach(function (l) { l.classList.remove('active'); });
+              map[en.target.id].classList.add('active');
+            }
+          });
+        }, { rootMargin: '-20% 0px -70% 0px' });
+        Object.keys(map).forEach(function (id) { var s = document.getElementById(id); if (s) io.observe(s); });
+      }
+    };
+  });
+
+  Alpine.data('cascade', function () {
+    var S = {
+      routine:   { nodes: ['in','trip','enc','guard','cal','act'], edges: ['in-trip','trip-enc','enc-guard','guard-cal','cal-bus','cal-act'],
+                   outcome: '<b>Act · send.</b> "Can we move Thursday\'s check-in?" The encoder picks <code>scheduling_admin</code> at p=0.97, which is above τ, so the LLM head is skipped. The guard finds no clinical content and the conformal set is <code>{send}</code>. Total ≈ 60 ms on device.' },
+      ambiguous: { nodes: ['in','trip','enc','llm','guard','cal','rev'], edges: ['in-trip','trip-enc','enc-llm','llm-guard','guard-cal','cal-bus','cal-rev'],
+                   outcome: '<b>Review · hold for clinician.</b> A sleep-aid interaction question. The encoder is unsure, so the LitJev head runs. Granite flags a possible new clinical directive. The set is <code>{send_and_flag, hold_for_clinician}</code>, so the reply is held and the counselor gets a summary and pointer.' },
+      crisis:    { nodes: ['in','trip','esc'], edges: ['in-trip','trip-esc'],
+                   outcome: '<b>Escalate · crisis protocol.</b> Explicit means-and-plan language matches a rule in the clinician-owned tripwire pack in under 1 ms. The patient sees 988 and the safety plan, and the counselor is alerted. The models still run afterwards, only to log the case.' },
+      pa:        { nodes: ['in','trip','enc','llm','guard','cal','rev'], edges: ['in-trip','trip-enc','enc-llm','llm-guard','guard-cal','cal-bus','cal-rev'],
+                   outcome: '<b>Review · proposal.</b> Prior-auth criterion "≥6 weeks of conservative care including PT". The encoder filters PT notes, the 27B head proposes <code>met</code> citing two pages, and the guard confirms the citation supports it. Clinical state is always Review: the coordinator confirms through <code>evidence_assembly</code>.' }
+    };
+    return {
+      active: 'ambiguous',
+      scenarios: [
+        { id: 'routine', label: 'Routine request' },
+        { id: 'ambiguous', label: 'Ambiguous medication question' },
+        { id: 'crisis', label: 'Crisis language' },
+        { id: 'pa', label: 'Prior-auth criterion' }
+      ],
+      current: function () { return S[this.active]; },
+      n: function (id) { return S[this.active].nodes.indexOf(id) > -1 ? 'on' : 'dim'; },
+      e: function (id) { return S[this.active].edges.indexOf(id) > -1 ? 'on flow' : 'dim'; }
+    };
+  });
+});
+</script>
+
+</body>
+</html>

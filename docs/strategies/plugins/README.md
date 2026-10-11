@@ -1,5 +1,32 @@
 # Plugin Strategy — A Capability-Centric Open Model
 
+> **AMENDMENT — 2026-08-04 (v1.4).** Amended by `uar-plugin-system-research-2026-08-04.md`
+> (this directory; canonical copy in `universal-agent-runtime/docs/plugins/`). Authoritative
+> deltas over this document wherever they conflict:
+>
+> - **Ownership split.** The plugin *contract* layer (WIT family `uar:plugin@0.2.0`,
+>   host interfaces seeded near-verbatim from `librefang:plugin@0.1.0`, capability-card
+>   schema, manifest+signing, lifecycle, shared sandbox host crate, and the runtime-generic
+>   recognized set renamed `uar:agent`/`uar:tool`/`uar:skill`/`uar:hook`/`uar:provider`/
+>   `uar:entity-schema`/`uar:settings`) is owned and published by the **Universal Agent
+>   Runtime**. This document remains authoritative for the **KnowMe product layer**:
+>   `knowme:*` product capabilities (`knowme:theme`, app-shell chrome, Hands binding),
+>   marketplace + entitlement VC issuance, trust pills, sharing/distribution UX, and
+>   settings-form product behavior. Governance follows the A2UI precedent: UAR owns the
+>   contract; KnowMe is the named reference implementation driving amendments.
+> - **Host profiles.** `headless` vs `full-ui` conformance profiles are first-class;
+>   capability cards declare `profile_required` and installers reject mechanically.
+> - **Card schema v2 additions:** `profile_required`, `combination_risk` (risky permission
+>   combinations surfaced at install), `namespace_proof` (did:web/DNS-TXT or transparency-log
+>   receipt — `did:key` alone does not prevent reverse-DNS squatting).
+> - **Settings schema:** JSON Schema **2020-12** is the single version (§11 stands; the
+>   companion plan's draft-7 references are superseded).
+> - **Security fixes now normative** (research doc SR-1…SR-12): signed advisory/revocation
+>   blocklist + auto-quarantine, host-stamped event provenance with emit-allowlist and rate
+>   caps, contributor reentrancy guard, generations/rollback, crash-loop circuit breaker,
+>   universal action I/O validation, and honest mobile execution budgets (iOS = Pulley
+>   interpretation; no `.cwasm` on iOS).
+
 **Scope:** the plugin system as a **wide-open capability vocabulary**: what a
 capability is, the recognized set we publish, how plugins declare (or invent)
 capabilities, A2UI component libraries as the cross-platform UI plane, headless

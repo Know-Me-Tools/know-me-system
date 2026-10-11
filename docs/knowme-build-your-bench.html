@@ -1,0 +1,1272 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KnowMe — Build Your Bench</title>
+<meta name="description" content="Technical field guide to designing personal agent teams and running them across UAR, The Boss, BossFang, OpenDesign, KnowMe and Claude Code, Claude Desktop, Codex, Kimi and MiniMax with shared memory." />
+<meta name="author" content="Travis James · KnowMe" />
+<meta name="theme-color" content="#0B0F14" />
+<meta property="og:type" content="article" />
+<meta property="og:site_name" content="KnowMe" />
+<meta property="og:locale" content="en_US" />
+<meta property="og:title" content="KnowMe — Build Your Bench" />
+<meta property="og:description" content="Technical field guide to designing personal agent teams and running them across UAR, The Boss, BossFang, OpenDesign, KnowMe, Claude Code, Claude Desktop, Codex, Kimi and MiniMax — with shared surreal-memory and Karpathy logs so you can switch tools without losing context." />
+<meta property="og:image" content="https://ipfs.prometheusags.ai/ipfs/QmPD83qGgYmkTCoahCJnCT5FkQCtideyLhxTk1zhpJjkF2" />
+<meta property="og:image:secure_url" content="https://ipfs.prometheusags.ai/ipfs/QmPD83qGgYmkTCoahCJnCT5FkQCtideyLhxTk1zhpJjkF2" />
+<meta property="og:image:type" content="image/png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="KnowMe technical field guide: Build your bench — hero section with table of contents." />
+<meta property="article:published_time" content="2026-09-24T00:00:00-05:00" />
+<meta property="article:author" content="Travis James" />
+<meta property="article:section" content="Engineering" />
+<meta property="article:tag" content="Agent teams" />
+<meta property="article:tag" content="UAR" />
+<meta property="article:tag" content="BossFang" />
+<meta property="article:tag" content="OpenDesign" />
+<meta property="article:tag" content="MCP" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="KnowMe — Build Your Bench" />
+<meta name="twitter:description" content="Technical field guide to designing personal agent teams and running them across UAR, The Boss, BossFang, OpenDesign, KnowMe, Claude Code, Claude Desktop, Codex, Kimi and MiniMax — with shared surreal-memory and Karpathy logs so you can switch tools without losing context." />
+<meta name="twitter:image" content="https://ipfs.prometheusags.ai/ipfs/QmPD83qGgYmkTCoahCJnCT5FkQCtideyLhxTk1zhpJjkF2" />
+<meta name="twitter:image:alt" content="KnowMe technical field guide: Build your bench — hero section with table of contents." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js" defer></script>
+<style>
+  /* ── KnowMe tokens · Flat 2.0: regions differ only by background ── */
+  :root, [data-theme="dark"] {
+    --bg:#0B0F14; --bg-2:#111620; --surface:#141B26; --card:#1C2535; --card-2:#222D40; --muted:#2A3548;
+    --fg:#E8EDF3; --fg-sub:#A7B0BC; --fg-faint:#8A93A3; --on-accent:#0B0F14;
+    --ember:#FF6A3D; --ember-soft:rgba(255,106,61,.14); --ember-tint:rgba(255,106,61,.07);
+    --cyan:#00C2DC;  --cyan-soft:rgba(0,194,220,.14);
+    --green:#22C55E; --green-soft:rgba(34,197,94,.14);
+    --amber:#F59E0B; --amber-soft:rgba(245,158,11,.16);
+    --red:#EF4444;   --red-soft:rgba(239,68,68,.14);
+    --line:#5B6577;
+  }
+  [data-theme="light"] {
+    --bg:#F5F6F8; --bg-2:#FFFFFF; --surface:#EBEEF2; --card:#FFFFFF; --card-2:#F4F6F9; --muted:#DDE2E9;
+    --fg:#0B0F14; --fg-sub:#414B5A; --fg-faint:#5B6472; --on-accent:#FFFFFF;
+    --ember:#D2461F; --ember-soft:rgba(210,70,31,.12); --ember-tint:rgba(210,70,31,.05);
+    --cyan:#0A7F9C;  --cyan-soft:rgba(10,127,156,.12);
+    --green:#15803D; --green-soft:rgba(21,128,61,.12);
+    --amber:#B45309; --amber-soft:rgba(180,83,9,.12);
+    --red:#B91C1C;   --red-soft:rgba(185,28,28,.10);
+    --line:#8A93A3;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior:smooth; scroll-padding-top:72px; }
+  @media (prefers-reduced-motion: reduce){ html{ scroll-behavior:auto; } }
+  body { font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--fg); line-height:1.62; font-size:16px; -webkit-font-smoothing:antialiased; }
+  a { color:var(--cyan); text-underline-offset:3px; }
+  a:focus-visible, button:focus-visible { outline:2px solid var(--ember); outline-offset:2px; border-radius:6px; }
+  code, .mono { font-family:'JetBrains Mono',ui-monospace,monospace; font-size:.86em; }
+  code { background:var(--muted); padding:1px 6px; border-radius:5px; color:var(--fg); overflow-wrap:anywhere; }
+
+  /* Top bar */
+  .topnav { position:sticky; top:0; z-index:50; background:var(--bg-2); padding:12px 16px; display:flex; align-items:center; gap:14px; }
+  .lockup { display:flex; align-items:center; gap:10px; color:var(--fg); text-decoration:none; }
+  .wordmark { font-family:'Space Grotesk',sans-serif; font-size:19px; font-weight:700; letter-spacing:-.025em; line-height:1; }
+  .wordmark .me { color:var(--ember); }
+  .doc-meta { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--fg-faint); letter-spacing:.06em; text-transform:uppercase; }
+  .spacer { flex:1; }
+  .btn { background:var(--muted); color:var(--fg); border:0; border-radius:999px; padding:7px 14px; font:500 13px 'Inter',sans-serif; cursor:pointer; min-height:36px; }
+  .btn:hover { background:var(--card-2); }
+  @media (max-width:640px){ .doc-meta{ display:none; } }
+
+  /* Layout */
+  .shell { display:grid; grid-template-columns:240px minmax(0,1fr); max-width:1280px; margin:0 auto; }
+  .toc { position:sticky; top:60px; align-self:start; height:calc(100vh - 60px); overflow:auto; padding:28px 12px 28px 20px; }
+  .toc p { font:600 10.5px 'JetBrains Mono',monospace; letter-spacing:.08em; color:var(--fg-faint); text-transform:uppercase; margin:0 0 10px 10px; }
+  .toc a { display:block; color:var(--fg-sub); text-decoration:none; font-size:13.5px; padding:6px 10px; border-radius:8px; }
+  .toc a:hover { background:var(--surface); color:var(--fg); }
+  .toc a .n { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--fg-faint); margin-right:8px; }
+  main { padding:0 16px 96px; min-width:0; }
+  @media (max-width:980px){ .shell{ grid-template-columns:1fr; } .toc{ display:none; } }
+  .wrap { max-width:920px; margin:0 auto; }
+
+  /* Hero */
+  .hero { background:var(--surface); border-radius:22px; padding:44px 36px 38px; margin:28px 0 12px; position:relative; overflow:hidden; }
+  .hero::after { content:""; position:absolute; right:-120px; top:-120px; width:360px; height:360px; border-radius:50%; background:var(--ember-tint); }
+  .eyebrow { font:600 11px 'JetBrains Mono',monospace; letter-spacing:.1em; color:var(--ember); text-transform:uppercase; }
+  h1 { font-family:'Space Grotesk',sans-serif; font-size:clamp(34px,6vw,58px); line-height:1.02; letter-spacing:-.035em; margin:14px 0 18px; max-width:15ch; position:relative; z-index:1; }
+  h1 .me { color:var(--ember); }
+  .lede { font-size:18.5px; color:var(--fg-sub); max-width:62ch; position:relative; z-index:1; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:24px; position:relative; z-index:1; }
+  .chip { font:500 12px 'JetBrains Mono',monospace; background:var(--card); color:var(--fg-sub); padding:6px 11px; border-radius:999px; }
+  .chip.ember { background:var(--ember-soft); color:var(--ember); }
+  .chip.cyan { background:var(--cyan-soft); color:var(--cyan); }
+  @media (max-width:640px){ .hero{ padding:30px 20px 26px; border-radius:18px; } .lede{ font-size:16.5px; } }
+
+  /* Sections */
+  section { padding:56px 0 8px; }
+  .sec-num { font:600 11px 'JetBrains Mono',monospace; letter-spacing:.1em; color:var(--ember); }
+  h2 { font-family:'Space Grotesk',sans-serif; font-size:clamp(26px,3.6vw,34px); letter-spacing:-.025em; line-height:1.12; margin:6px 0 16px; }
+  h3 { font-family:'Space Grotesk',sans-serif; font-size:20px; letter-spacing:-.015em; margin:30px 0 10px; }
+  p { margin:0 0 14px; color:var(--fg-sub); max-width:72ch; }
+  p strong, li strong { color:var(--fg); }
+  ul.clean { list-style:none; margin:0 0 16px; }
+  ul.clean li { position:relative; padding-left:20px; margin:0 0 8px; color:var(--fg-sub); max-width:72ch; }
+  ul.clean li::before { content:""; position:absolute; left:2px; top:.66em; width:7px; height:7px; border-radius:2px; background:var(--ember); }
+
+  /* Callouts */
+  .callout { background:var(--surface); border-radius:16px; padding:20px 22px; margin:20px 0; }
+  .callout.ember { background:var(--ember-tint); }
+  .callout.cyan { background:var(--cyan-soft); }
+  .callout .k { font:600 10.5px 'JetBrains Mono',monospace; letter-spacing:.09em; text-transform:uppercase; color:var(--ember); display:block; margin-bottom:6px; }
+  .callout.cyan .k { color:var(--cyan); }
+  .callout p:last-child { margin-bottom:0; }
+
+  /* Pull quote */
+  .pull { font-family:'Space Grotesk',sans-serif; font-size:clamp(20px,2.6vw,25px); line-height:1.3; letter-spacing:-.015em; color:var(--fg); padding:6px 0 6px 20px; margin:26px 0; position:relative; max-width:40ch; }
+  .pull::before { content:""; position:absolute; left:0; top:4px; bottom:4px; width:4px; border-radius:4px; background:var(--ember); }
+
+  /* Figures */
+  figure { background:var(--surface); border-radius:20px; padding:22px 18px 16px; margin:26px 0; }
+  .fig-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .fig-scroll svg { display:block; width:100%; min-width:720px; height:auto; }
+  figcaption { font-size:13px; color:var(--fg-faint); padding:12px 6px 0; }
+  figcaption b { color:var(--fg-sub); font-weight:600; }
+  .swipe-hint { display:none; font:500 11px 'JetBrains Mono',monospace; color:var(--fg-faint); padding:0 6px 8px; }
+  @media (max-width:760px){ .swipe-hint{ display:block; } }
+
+  /* SVG vocabulary */
+  svg text { font-family:'Inter',sans-serif; }
+  .f-bg{fill:var(--bg)} .f-surface{fill:var(--surface)} .f-card{fill:var(--card)} .f-card2{fill:var(--card-2)} .f-muted{fill:var(--muted)}
+  .f-ember{fill:var(--ember)} .f-ember-soft{fill:var(--ember-soft)} .f-cyan{fill:var(--cyan)} .f-cyan-soft{fill:var(--cyan-soft)}
+  .f-green{fill:var(--green)} .f-green-soft{fill:var(--green-soft)} .f-amber{fill:var(--amber)} .f-amber-soft{fill:var(--amber-soft)} .f-red-soft{fill:var(--red-soft)} .f-red{fill:var(--red)}
+  .t-fg{fill:var(--fg)} .t-sub{fill:var(--fg-sub)} .t-faint{fill:var(--fg-faint)} .t-ember{fill:var(--ember)} .t-cyan{fill:var(--cyan)} .t-green{fill:var(--green)} .t-amber{fill:var(--amber)} .t-red{fill:var(--red)} .t-on{fill:var(--on-accent)}
+  .t-title{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px}
+  .t-big{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:20px}
+  .t-body{font-size:12px}
+  .t-label{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em;font-weight:600}
+  .ln{stroke:var(--line);stroke-width:1.6;fill:none}
+  .ln-ember{stroke:var(--ember);stroke-width:2;fill:none}
+  .ln-cyan{stroke:var(--cyan);stroke-width:1.8;fill:none}
+  .ln-red{stroke:var(--red);stroke-width:1.6;fill:none}
+  .dash{stroke-dasharray:5 5}
+  .mk-line{fill:var(--line)} .mk-ember{fill:var(--ember)} .mk-cyan{fill:var(--cyan)} .mk-red{fill:var(--red)}
+
+  /* Tables (Flat 2.0: zebra backgrounds, no rules) */
+  .tbl { overflow-x:auto; margin:18px 0 22px; border-radius:16px; background:var(--surface); }
+  table { width:100%; border-collapse:collapse; font-size:14px; min-width:620px; }
+  th { text-align:left; font:600 10.5px 'JetBrains Mono',monospace; letter-spacing:.08em; text-transform:uppercase; color:var(--fg-faint); padding:14px 16px 10px; background:var(--surface); }
+  td { padding:12px 16px; vertical-align:top; color:var(--fg-sub); }
+  td:first-child { color:var(--fg); font-weight:600; }
+  tbody tr:nth-child(odd) td { background:var(--card); }
+  tbody tr:nth-child(even) td { background:var(--card-2); }
+  tbody tr:last-child td:first-child { border-bottom-left-radius:16px; }
+  tbody tr:last-child td:last-child { border-bottom-right-radius:16px; }
+
+  /* Badges */
+  .badge { display:inline-block; font:600 10px 'JetBrains Mono',monospace; letter-spacing:.06em; text-transform:uppercase; padding:3px 8px; border-radius:999px; white-space:nowrap; vertical-align:1px; }
+  .b-exists { background:var(--green-soft); color:var(--green); }
+  .b-spec { background:var(--cyan-soft); color:var(--cyan); }
+  .b-prop { background:var(--amber-soft); color:var(--amber); }
+  .b-gap { background:var(--red-soft); color:var(--red); }
+  .b-doc { background:var(--ember-soft); color:var(--ember); }
+
+  /* Card grid */
+  .grid { display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); margin:18px 0; }
+  .card { background:var(--surface); border-radius:16px; padding:18px 18px 16px; }
+  .card h4 { font-family:'Space Grotesk',sans-serif; font-size:16.5px; letter-spacing:-.01em; margin:4px 0 8px; }
+  .card p { font-size:14px; margin:0 0 8px; }
+  .card .k { font:600 10px 'JetBrains Mono',monospace; letter-spacing:.09em; color:var(--ember); text-transform:uppercase; }
+  .card.cy .k { color:var(--cyan); }
+
+  /* Team tabs (htmx hx-on driven) */
+  .tabs { display:flex; flex-wrap:wrap; gap:6px; margin:18px 0 0; }
+  .tab { background:var(--surface); color:var(--fg-sub); border:0; border-radius:999px; padding:8px 14px; font:500 13.5px 'Inter',sans-serif; cursor:pointer; min-height:40px; }
+  .tab[aria-selected="true"] { background:var(--ember); color:var(--on-accent); }
+  .panel { background:var(--surface); border-radius:18px; padding:22px; margin-top:12px; }
+  .panel[hidden] { display:none; }
+  .panel .cols { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-top:10px; }
+  .panel .col { background:var(--card); border-radius:12px; padding:14px 16px; }
+  .panel .col .k { font:600 10px 'JetBrains Mono',monospace; letter-spacing:.09em; color:var(--fg-faint); text-transform:uppercase; display:block; margin-bottom:6px; }
+  .panel .col p, .panel .col li { font-size:14px; }
+  .roles { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 4px; }
+  .role { background:var(--card); color:var(--fg); font-size:13px; padding:5px 10px; border-radius:8px; }
+
+  /* Steps */
+  ol.steps { list-style:none; counter-reset:s; margin:16px 0; }
+  ol.steps li { counter-increment:s; position:relative; padding:14px 16px 14px 58px; background:var(--surface); border-radius:14px; margin-bottom:8px; color:var(--fg-sub); }
+  ol.steps li::before { content:counter(s); position:absolute; left:16px; top:13px; width:28px; height:28px; border-radius:8px; background:var(--ember-soft); color:var(--ember); font:700 13px 'JetBrains Mono',monospace; display:grid; place-items:center; }
+  ol.steps li strong { color:var(--fg); }
+
+  footer { background:var(--bg-2); padding:36px 16px 48px; margin-top:40px; }
+  footer .wrap { color:var(--fg-faint); font-size:13px; }
+  footer p { color:var(--fg-faint); font-size:13px; }
+  .src li { margin-bottom:6px; font-size:13.5px; }
+
+  /* Code blocks */
+  pre.code { background:var(--bg-2); border-radius:14px; padding:16px 18px; margin:16px 0 22px; overflow-x:auto; font-family:'JetBrains Mono',ui-monospace,monospace; font-size:12.5px; line-height:1.6; color:var(--fg); }
+  pre.code code { background:none; padding:0; font-size:inherit; color:inherit; overflow-wrap:normal; }
+  pre.code .c { color:var(--fg-faint); }
+  pre.code .s { color:var(--cyan); }
+  .part { font:700 11px 'JetBrains Mono',monospace; letter-spacing:.12em; color:var(--fg-faint); text-transform:uppercase; margin:18px 10px 6px; display:block; }
+  .panel p { color:var(--fg-sub); }
+</style>
+</head>
+<body>
+
+<!-- Shared SVG markers -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk-line"/></marker>
+    <marker id="ah-e" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk-ember"/></marker>
+    <marker id="ah-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk-cyan"/></marker>
+    <marker id="ah-r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk-red"/></marker>
+  </defs>
+</svg>
+
+<nav class="topnav" aria-label="Document">
+  <a class="lockup" href="#top" aria-label="KnowMe — back to top">
+    <svg viewBox="0 0 200 200" width="28" height="28" aria-hidden="true">
+      <g transform="translate(50,38)">
+        <rect x="0" y="0" width="20" height="124" rx="10" fill="currentColor"/>
+        <path d="M16,62 C26,52 44,32 62,18 C72,10 80,8 84,14 C86,18 82,24 76,28 C60,40 40,56 28,66 C22,70 18,68 16,64 Z" fill="currentColor"/>
+        <path d="M16,62 C26,72 44,92 62,106 C72,114 80,116 84,110 C86,106 82,100 76,96 C60,84 40,68 28,58 C22,54 18,56 16,60 Z" fill="currentColor"/>
+        <circle cx="18" cy="62" r="10" fill="var(--ember)"/>
+      </g>
+    </svg>
+    <span class="wordmark">Know<span class="me">Me</span></span>
+  </a>
+  <span class="doc-meta">Build Your Bench · Technical Field Guide</span>
+  <span class="spacer"></span>
+  <button class="btn" id="themeBtn" type="button" aria-label="Toggle light or dark theme" hx-on:click="kmToggleTheme()">☀ Light</button>
+</nav>
+
+<div class="shell">
+  <aside class="toc" aria-label="Contents">
+    <p>Contents</p>
+    <span class="part">Part I · Thinking</span>
+    <a href="#optimize"><span class="n">01</span>Personal optimization</a>
+    <a href="#altitudes"><span class="n">02</span>Two altitudes</a>
+    <a href="#concepts"><span class="n">03</span>Seven concepts</a>
+    <a href="#ladder"><span class="n">04</span>Escalation ladder</a>
+    <span class="part">Part II · The stack</span>
+    <a href="#stack"><span class="n">05</span>Stack at a glance</a>
+    <a href="#uar"><span class="n">06</span>Universal Agent Runtime</a>
+    <a href="#boss"><span class="n">07</span>The Boss</a>
+    <a href="#creator"><span class="n">08</span>Agent-team-creator</a>
+    <a href="#knowme"><span class="n">09</span>KnowMe mobile</a>
+    <a href="#harnesses"><span class="n">10</span>Harness setup</a>
+    <span class="part">Part III · Context</span>
+    <a href="#context"><span class="n">11</span>True context sharing</a>
+    <span class="part">Part IV · Design</span>
+    <a href="#opendesign"><span class="n">12</span>OpenDesign engine</a>
+    <span class="part">Part V · Always-on</span>
+    <a href="#bossfang"><span class="n">13</span>BossFang orchestration</a>
+    <a href="#people"><span class="n">14</span>Agents as colleagues</a>
+    <a href="#week"><span class="n">15</span>A week on the bench</a>
+    <span class="part">Part VI · Reference</span>
+    <a href="#status"><span class="n">16</span>What's real today</a>
+    <a href="#checklist"><span class="n">17</span>Setup checklist</a>
+    <a href="#sources"><span class="n">—</span>Sources</a>
+  </aside>
+
+  <main id="top">
+    <div class="wrap">
+
+      <header class="hero">
+        <span class="eyebrow">KnowMe · Technical field guide · 24 Sep 2026</span>
+        <h1>Build your <span class="me">bench.</span></h1>
+        <p class="lede">A practitioner's guide to designing agent teams around <em>your</em> constraints — attention, context and trust — and running them across the Universal Agent Runtime, The Boss, BossFang, OpenDesign, the KnowMe app and five desktop harnesses, with one shared memory so you can switch tools without losing the thread.</p>
+        <div class="chips">
+          <span class="chip ember">Companion to KBD-ARCH-001 Rev 2</span>
+          <span class="chip">Source-inspected 24 Sep 2026</span>
+          <span class="chip cyan">UAR 1.0.0 · BossFang c719a4d · OpenDesign 0.23.1</span>
+          <span class="chip">No code or config changed</span>
+        </div>
+      </header>
+
+      <div class="callout">
+        <span class="k">How to read this guide</span>
+        <p><strong>Part I</strong> is the thinking model: how to decide what becomes a team, a role, a skill or a single task. <strong>Part II</strong> is every way to drive each component. <strong>Part III</strong> makes context portable across tools. <strong>Part IV</strong> puts OpenDesign under the same bench for brand, marketing, web and mobile design. <strong>Part V</strong> hands the whole thing to BossFang for schedules, channels and always-on behaviour. Status badges mark what is <span class="badge b-exists">verified in source</span>, <span class="badge b-spec">documented / specified</span>, <span class="badge b-prop">proposed here</span> or <span class="badge b-gap">not built yet</span>.</p>
+      </div>
+
+      <!-- ═════════ PART I ═════════ -->
+      <section id="optimize">
+        <span class="sec-num">PART I · 01 · PERSONAL OPTIMIZATION</span>
+        <h2>Design teams around your bottleneck, not around an org chart.</h2>
+        <p>Enterprise team design starts from headcount and reporting lines. A personal bench starts from the three scarce things a single operator actually has:</p>
+        <div class="grid">
+          <div class="card"><span class="k">Scarce resource 1</span><h4>Your attention</h4><p>Every approval, clarification and review costs you minutes. Optimize for <strong>fewer, better-packaged decisions</strong>: batch approvals into the KnowMe inbox and morning brief; let standing grants cover routine effects.</p></div>
+          <div class="card"><span class="k">Scarce resource 2</span><h4>Context continuity</h4><p>Your work is spread across Claude Code, Codex, Kimi, MiniMax, The Boss, OpenDesign and your phone. Optimize for <strong>resumability</strong>: durable state and shared memory so any tool can pick up where another stopped.</p></div>
+          <div class="card"><span class="k">Scarce resource 3</span><h4>Trust budget</h4><p>You can only verify so much. Optimize for <strong>independent evidence</strong>: a maker never grades its own work; high-impact effects wait for fresh authority.</p></div>
+        </div>
+        <p>Every design decision below is scored against those three. A team that saves you an hour of typing but costs you two hours of reconciling contradictory outputs is a net loss. The KBD rule applies unchanged: <strong>use a single agent for a small, coherent task; add agents only when isolation, specialization, independent evaluation or real parallelism pays for the coordination.</strong></p>
+      </section>
+
+      <section id="altitudes">
+        <span class="sec-num">PART I · 02 · TWO ALTITUDES</span>
+        <h2>High-level: standing teams and cadences. Low-level: one bounded assignment.</h2>
+        <p>Think at two altitudes and never mix them in one prompt.</p>
+
+        <figure>
+          <div class="swipe-hint">← swipe diagram →</div>
+          <div class="fig-scroll">
+          <svg viewBox="0 0 960 430" role="img" aria-labelledby="a1t a1d">
+            <title id="a1t">Two altitudes of team construction</title>
+            <desc id="a1d">High altitude defines outcomes, standing teams, roles, cadences and authority. Low altitude defines a single assignment: brief, scope, ownership, skills, model, budget, evidence and stop condition. The two meet at the task board.</desc>
+            <rect x="20" y="20" width="920" height="170" rx="18" class="f-ember-soft"/>
+            <text x="44" y="50" class="t-label t-ember">HIGH ALTITUDE · CHANGES MONTHLY</text>
+            <text x="44" y="74" class="t-title t-fg">Your bench: who exists, what they own, when they run</text>
+            <g>
+              <rect x="44" y="92" width="160" height="78" rx="12" class="f-card"/><text x="60" y="118" class="t-body t-fg">Outcomes</text><text x="60" y="138" class="t-body t-sub">KnowMe objectives</text><text x="60" y="156" class="t-body t-sub">& engagements</text>
+              <rect x="220" y="92" width="160" height="78" rx="12" class="f-card"/><text x="236" y="118" class="t-body t-fg">Standing teams</text><text x="236" y="138" class="t-body t-sub">team.json manifests</text><text x="236" y="156" class="t-body t-sub">roles · owns · deps</text>
+              <rect x="396" y="92" width="160" height="78" rx="12" class="f-card"/><text x="412" y="118" class="t-body t-fg">Model policy</text><text x="412" y="138" class="t-body t-sub">hard · medium · low</text><text x="412" y="156" class="t-body t-sub">ceilings per role</text>
+              <rect x="572" y="92" width="160" height="78" rx="12" class="f-card"/><text x="588" y="118" class="t-body t-fg">Cadences</text><text x="588" y="138" class="t-body t-sub">BossFang cron,</text><text x="588" y="156" class="t-body t-sub">triggers, workflows</text>
+              <rect x="748" y="92" width="170" height="78" rx="12" class="f-card"/><text x="764" y="118" class="t-body t-fg">Authority</text><text x="764" y="138" class="t-body t-sub">grants · approvals ·</text><text x="764" y="156" class="t-body t-sub">channel policies</text>
+            </g>
+            <line x1="480" y1="190" x2="480" y2="228" class="ln-ember" marker-end="url(#ah-e)"/>
+            <text x="494" y="215" class="t-label t-ember">TASK BOARD (KBD · team ledger)</text>
+            <rect x="20" y="232" width="920" height="180" rx="18" class="f-cyan-soft"/>
+            <text x="44" y="262" class="t-label t-cyan">LOW ALTITUDE · CHANGES PER TASK</text>
+            <text x="44" y="286" class="t-title t-fg">One assignment: small, explicit, verifiable</text>
+            <g>
+              <rect x="44" y="304" width="104" height="88" rx="10" class="f-card"/><text x="96" y="344" text-anchor="middle" class="t-body t-fg">Brief</text><text x="96" y="362" text-anchor="middle" class="t-body t-sub">goal + why</text>
+              <rect x="158" y="304" width="104" height="88" rx="10" class="f-card"/><text x="210" y="344" text-anchor="middle" class="t-body t-fg">Scope</text><text x="210" y="362" text-anchor="middle" class="t-body t-sub">owns paths</text>
+              <rect x="272" y="304" width="104" height="88" rx="10" class="f-card"/><text x="324" y="344" text-anchor="middle" class="t-body t-fg">Inputs</text><text x="324" y="362" text-anchor="middle" class="t-body t-sub">revision-bound</text>
+              <rect x="386" y="304" width="104" height="88" rx="10" class="f-card"/><text x="438" y="344" text-anchor="middle" class="t-body t-fg">Skills</text><text x="438" y="362" text-anchor="middle" class="t-body t-sub">only what's needed</text>
+              <rect x="500" y="304" width="104" height="88" rx="10" class="f-card"/><text x="552" y="344" text-anchor="middle" class="t-body t-fg">Model</text><text x="552" y="362" text-anchor="middle" class="t-body t-sub">concrete ID</text>
+              <rect x="614" y="304" width="104" height="88" rx="10" class="f-card"/><text x="666" y="344" text-anchor="middle" class="t-body t-fg">Budget</text><text x="666" y="362" text-anchor="middle" class="t-body t-sub">attempts · $ · time</text>
+              <rect x="728" y="304" width="96" height="88" rx="10" class="f-card"/><text x="776" y="344" text-anchor="middle" class="t-body t-fg">Evidence</text><text x="776" y="362" text-anchor="middle" class="t-body t-sub">to return</text>
+              <rect x="834" y="304" width="84" height="88" rx="10" class="f-ember"/><text x="876" y="344" text-anchor="middle" class="t-body t-on">Stop</text><text x="876" y="362" text-anchor="middle" class="t-body t-on">condition</text>
+            </g>
+          </svg>
+          </div>
+          <figcaption><b>Figure 1.</b> The bench (high altitude) is configuration you revisit monthly. Assignments (low altitude) are disposable. A prompt that tries to redefine the team while doing a task is how scope and authority drift.</figcaption>
+        </figure>
+
+        <h3>High-level questions (answer once, revisit monthly)</h3>
+        <ol class="steps">
+          <li><strong>Which outcomes recur?</strong> Anything you do more than twice a month is a candidate for a standing role or a scheduled workflow. One-offs stay single-agent.</li>
+          <li><strong>Where do you lose context today?</strong> Tool switches, overnight gaps, phone vs desk. Those seams decide where shared memory and handoff packets are mandatory.</li>
+          <li><strong>Which judgments must be independent?</strong> Code review, factual claims in marketing, security, accessibility, financial numbers. Each gets a separate evaluator role — preferably a different model family.</li>
+          <li><strong>Which effects are routine vs high-impact?</strong> Routine (open an issue, draft a post, update docs) gets a standing grant. High-impact (publish, merge to main, spend, message customers) waits for you in KnowMe.</li>
+          <li><strong>What runs without you?</strong> Observers and cadences go to BossFang. Everything else is on-demand from a harness.</li>
+        </ol>
+
+        <h3>Low-level questions (answer per assignment)</h3>
+        <p>An assignment is complete only when it carries every field the KBD definition contract lists. Use this as the literal brief template you paste into any harness or send as UAR run input:</p>
+<pre class="code"><code><span class="c"># assignment.yaml — portable brief; adapt field names to the target runtime</span>
+assignment_id: <span class="s">km-site/change-12/task-3</span>
+role: <span class="s">web-ui-implementer</span>          <span class="c"># accountability boundary, not a process</span>
+goal: <span class="s">"Implement the pricing section from DESIGN.md tokens"</span>
+why: <span class="s">"Launch page must convert Pro tier; see objective OBJ-7"</span>
+input_revision: <span class="s">184</span>                 <span class="c"># KBD runtime revision / git SHA you started from</span>
+owns: [<span class="s">"site/src/sections/pricing/**"</span>]   <span class="c"># disjoint write ownership</span>
+reads: [<span class="s">"design-systems/knowme/DESIGN.md"</span>, <span class="s">"openspec/changes/pricing/**"</span>]
+skills: [<span class="s">"frontend-design"</span>, <span class="s">"scaffold-react-vite"</span>]  <span class="c"># task-driven, not job-title-driven</span>
+model_policy: { tier: <span class="s">medium</span>, model: <span class="s">"&lt;concrete id from models-select&gt;"</span> }
+budget: { attempts: <span class="s">3</span>, wall_clock_min: <span class="s">40</span>, max_usd: <span class="s">2.00</span> }
+external_actions: <span class="s">none</span>              <span class="c"># proposal | scoped change | external action</span>
+return:
+  - <span class="s">changed paths + digest</span>
+  - <span class="s">screenshots at 390/1024/1440, both themes</span>
+  - <span class="s">unresolved questions</span>
+stop_when: <span class="s">"acceptance criteria in tasks.md §3 pass OR budget exhausted → report BLOCKED"</span>
+reviewer: <span class="s">a11y-reviewer (fresh context, different model)</span></code></pre>
+      </section>
+
+      <section id="concepts">
+        <span class="sec-num">PART I · 03 · SEVEN CONCEPTS</span>
+        <h2>Role, skill, tool, harness, definition, instance, task — and where each lives in this stack.</h2>
+        <p>Most multi-agent confusion comes from collapsing these. The table maps each one to the concrete artifact in your repos.</p>
+        <div class="tbl"><table>
+          <thead><tr><th>Concept</th><th>Meaning</th><th>Concrete artifact in this stack</th></tr></thead>
+          <tbody>
+            <tr><td>Role</td><td>Responsibility, outputs, decision rights</td><td><code>team.json → roles[]</code> (agent-team-creator); <code>## Identity</code> in UAR-AGENT-MD</td></tr>
+            <tr><td>Skill</td><td>Reusable procedure + resources</td><td><code>SKILL.md</code> folders in <code>~/.agents/skills</code>, <code>~/.claude/skills</code>, UAR <code>~/.uar/skills</code>, OpenDesign <code>skills/</code>, BossFang <code>skills</code></td></tr>
+            <tr><td>Tool / connector</td><td>Mechanism that reads or changes a system</td><td>MCP servers (surreal-memory, open-design, github…), UAR native tools, BossFang <code>channel_send</code></td></tr>
+            <tr><td>Harness / runtime</td><td>Model/tool loop, permissions, lifecycle</td><td>Claude Code, Codex, Kimi Code, MiniMax Code, UAR, BossFang kernel, The Boss runtime drivers</td></tr>
+            <tr><td>Agent definition</td><td>Versioned role + skills + policy</td><td><code>.claude/agents/*.md</code>, <code>.codex/agents/*.toml</code>, <code>*.agent.md</code> (UAR), <code>agent.toml</code> / <code>HAND.toml</code> (BossFang)</td></tr>
+            <tr><td>Agent instance</td><td>An authorized identity with scope and state</td><td>UAR AgentStore record; BossFang agent with stable UUID and <code>.identity/</code>; KnowMe per-install <code>did:key</code> (specified)</td></tr>
+            <tr><td>Task / turn</td><td>One bounded execution</td><td>UAR <code>POST /api/uar/runs</code>; KBD task; team-ledger task; BossFang cron <code>agent_turn</code></td></tr>
+          </tbody>
+        </table></div>
+        <div class="callout ember">
+          <span class="k">The rule that prevents most failures</span>
+          <p>Definitions are portable; <strong>identity, credentials and grants are not</strong>. Exporting a team to Codex or BossFang copies the definition. Each target mints its own instance with its own permissions — the manifest's <code>owns</code> field is a coordination agreement, never a filesystem permission.</p>
+        </div>
+      </section>
+
+      <section id="ladder">
+        <span class="sec-num">PART I · 04 · THE ESCALATION LADDER</span>
+        <h2>Climb only as far as the work demands.</h2>
+        <figure>
+          <div class="swipe-hint">← swipe diagram →</div>
+          <div class="fig-scroll">
+          <svg viewBox="0 0 960 330" role="img" aria-labelledby="a2t a2d">
+            <title id="a2t">Escalation ladder</title>
+            <desc id="a2d">Five rungs from a single agent to a scheduled resident team, each with its trigger and its cost.</desc>
+            <rect x="20"  y="230" width="170" height="80" rx="12" class="f-card"/>
+            <rect x="205" y="185" width="170" height="125" rx="12" class="f-card"/>
+            <rect x="390" y="140" width="170" height="170" rx="12" class="f-card"/>
+            <rect x="575" y="95"  width="170" height="215" rx="12" class="f-card"/>
+            <rect x="760" y="40"  width="180" height="270" rx="12" class="f-ember-soft"/>
+            <text x="36" y="254" class="t-label t-faint">RUNG 1</text><text x="36" y="276" class="t-title t-fg">One agent</text><text x="36" y="296" class="t-body t-sub">coherent, small task</text>
+            <text x="221" y="209" class="t-label t-faint">RUNG 2</text><text x="221" y="231" class="t-title t-fg">Agent + skill</text><text x="221" y="251" class="t-body t-sub">repeatable procedure</text><text x="221" y="269" class="t-body t-sub">e.g. refine-ui,</text><text x="221" y="287" class="t-body t-sub">brand-extract</text>
+            <text x="406" y="164" class="t-label t-faint">RUNG 3</text><text x="406" y="186" class="t-title t-fg">+ Evaluator</text><text x="406" y="206" class="t-body t-sub">fresh context,</text><text x="406" y="224" class="t-body t-sub">different model</text><text x="406" y="252" class="t-body t-cyan">trigger: judgment</text><text x="406" y="270" class="t-body t-cyan">must be independent</text>
+            <text x="591" y="119" class="t-label t-faint">RUNG 4</text><text x="591" y="141" class="t-title t-fg">Team</text><text x="591" y="161" class="t-body t-sub">lead + specialists</text><text x="591" y="179" class="t-body t-sub">+ verifier, ≤ 4 active</text><text x="591" y="207" class="t-body t-cyan">trigger: separable</text><text x="591" y="225" class="t-body t-cyan">parallel work or</text><text x="591" y="243" class="t-body t-cyan">separate authority</text>
+            <text x="776" y="64" class="t-label t-ember">RUNG 5</text><text x="776" y="86" class="t-title t-fg">Resident / scheduled</text><text x="776" y="106" class="t-body t-sub">BossFang Hands, cron,</text><text x="776" y="124" class="t-body t-sub">triggers, channels</text><text x="776" y="152" class="t-body t-cyan">trigger: recurring</text><text x="776" y="170" class="t-body t-cyan">or event-driven work</text><text x="776" y="198" class="t-body t-red">cost: standing grants,</text><text x="776" y="216" class="t-body t-red">observability, budgets,</text><text x="776" y="234" class="t-body t-red">kill switch required</text>
+            <path d="M40,212 L920,24" class="ln-ember dash" marker-end="url(#ah-e)"/>
+          </svg>
+          </div>
+          <figcaption><b>Figure 2.</b> Each rung adds coordination cost. The Boss's own development team defaults to <em>lead + one specialist + verifier, max four active</em> — a good personal default.</figcaption>
+        </figure>
+
+        <h3>Maker ≠ evaluator, bounded loops, and the determinism boundary</h3>
+        <ul class="clean">
+          <li><strong>Maker and evaluator are separate assignments.</strong> The evaluator receives goal, constraints, exact artifact revision and evidence, and returns findings or PASS / CONTINUE / BLOCK — never a hidden repair. A repair is a new executor assignment followed by review of the new revision. In this stack: <code>adversarial-review</code> (judge ≠ producer via liter-llm <code>kbd-judge</code>/<code>kbd-critic</code>) and <code>kbd-goal-check</code>.</li>
+          <li><strong>Every loop has a stop condition</strong>: acceptance condition, attempt/time/cost limits, blocker behaviour and a pause path. BossFang enforces this at the scheduler level with <code>Loop{max_iterations, until}</code>, <code>[autonomous] max_iterations</code> and <code>[budget]</code>.</li>
+          <li><strong>Agents propose; deterministic host logic admits.</strong> A model may say "this change is complete." The KBD runtime, UAR's governance gate or BossFang's approval queue decides whether that transition is valid for the current revision.</li>
+          <li><strong>External actions are separate transactions.</strong> A journal entry does not atomically include a GitHub issue, a post or a deployment. Use action identity, bounded retries, receipts and reconciliation; record uncertain outcomes as uncertain.</li>
+        </ul>
+      </section>
+      <!-- ═════════ PART II ═════════ -->
+      <section id="stack">
+        <span class="sec-num">PART II · 05 · THE STACK AT A GLANCE</span>
+        <h2>Eight surfaces, one shared substrate.</h2>
+        <p>Every tool below is a <em>surface</em> — a place you or a scheduler starts work. They agree on four shared things: the skill format, the MCP tool plane, the KBD durable state, and the surreal-memory + Karpathy knowledge layer.</p>
+
+        <figure>
+          <div class="swipe-hint">← swipe diagram →</div>
+          <div class="fig-scroll">
+          <svg viewBox="0 0 960 560" role="img" aria-labelledby="s1t s1d">
+            <title id="s1t">Stack map</title>
+            <desc id="s1d">Top row: interactive surfaces — Claude Code, Claude Desktop, Codex desktop, Kimi, MiniMax Code, The Boss, OpenDesign and KnowMe mobile. Middle: runtimes UAR and BossFang. Bottom: shared substrate — skills, MCP tool plane, KBD state, surreal-memory and Karpathy logs.</desc>
+            <text x="20" y="24" class="t-label t-faint">INTERACTIVE SURFACES · WHERE YOU START WORK</text>
+            <g class="t-body">
+              <rect x="20"  y="36" width="108" height="64" rx="12" class="f-card"/><text x="74" y="64" text-anchor="middle" class="t-fg">Claude Code</text><text x="74" y="82" text-anchor="middle" class="t-sub">CLI · subagents</text>
+              <rect x="136" y="36" width="108" height="64" rx="12" class="f-card"/><text x="190" y="64" text-anchor="middle" class="t-fg">Claude</text><text x="190" y="82" text-anchor="middle" class="t-sub">Desktop · MCP</text>
+              <rect x="252" y="36" width="108" height="64" rx="12" class="f-card"/><text x="306" y="64" text-anchor="middle" class="t-fg">Codex</text><text x="306" y="82" text-anchor="middle" class="t-sub">desktop · CLI</text>
+              <rect x="368" y="36" width="108" height="64" rx="12" class="f-card"/><text x="422" y="64" text-anchor="middle" class="t-fg">Kimi</text><text x="422" y="82" text-anchor="middle" class="t-sub">desktop · code</text>
+              <rect x="484" y="36" width="108" height="64" rx="12" class="f-card"/><text x="538" y="64" text-anchor="middle" class="t-fg">MiniMax</text><text x="538" y="82" text-anchor="middle" class="t-sub">Code · mcode</text>
+              <rect x="600" y="36" width="108" height="64" rx="12" class="f-ember-soft"/><text x="654" y="64" text-anchor="middle" class="t-fg">The Boss</text><text x="654" y="82" text-anchor="middle" class="t-sub">agent studio</text>
+              <rect x="716" y="36" width="108" height="64" rx="12" class="f-card"/><text x="770" y="64" text-anchor="middle" class="t-fg">OpenDesign</text><text x="770" y="82" text-anchor="middle" class="t-sub">design engine</text>
+              <rect x="832" y="36" width="108" height="64" rx="12" class="f-ember"/><text x="886" y="64" text-anchor="middle" class="t-on">KnowMe</text><text x="886" y="82" text-anchor="middle" class="t-on">mobile · you</text>
+            </g>
+            <!-- runtimes -->
+            <text x="20" y="150" class="t-label t-faint">RUNTIMES · WHERE AGENTS EXECUTE WITHOUT A HARNESS</text>
+            <rect x="20" y="162" width="440" height="150" rx="16" class="f-ember-soft"/>
+            <text x="40" y="190" class="t-label t-ember">UAR · :1906</text>
+            <text x="40" y="214" class="t-title t-fg">Universal Agent Runtime</text>
+            <text x="40" y="238" class="t-body t-sub">runs · AG-UI/A2UI SSE · OpenAI &amp; Anthropic APIs</text>
+            <text x="40" y="256" class="t-body t-sub">A2A JSON-RPC + gRPC :50051 · ACP · MCP /mcp/uar</text>
+            <text x="40" y="274" class="t-body t-sub">UAR-AGENT-MD compiler · subagents · actors · Cedar</text>
+            <text x="40" y="292" class="t-body t-sub">embedded kernel in KnowMe mobile</text>
+            <rect x="500" y="162" width="440" height="150" rx="16" class="f-cyan-soft"/>
+            <text x="520" y="190" class="t-label t-cyan">BOSSFANG · :4545</text>
+            <text x="520" y="214" class="t-title t-fg">LibreFang agent OS (fork)</text>
+            <text x="520" y="238" class="t-body t-sub">cron · event triggers · DAG workflows · Hands</text>
+            <text x="520" y="256" class="t-body t-sub">27 channel sidecars · per-agent identity &amp; accounts</text>
+            <text x="520" y="274" class="t-body t-sub">approvals · budgets · Merkle audit · A2A · MCP</text>
+            <text x="520" y="292" class="t-body t-sub">UAR driver + UAR-AGENT-MD loader</text>
+            <line x1="460" y1="237" x2="500" y2="237" class="ln-cyan" marker-start="url(#ah-c)" marker-end="url(#ah-c)"/>
+            <!-- arrows from surfaces -->
+            <path d="M654,100 L654,130 L300,130 L300,158" class="ln" marker-end="url(#ah)"/>
+            <path d="M886,100 L886,140 L420,140 L420,158" class="ln-ember" marker-end="url(#ah-e)"/>
+            <path d="M770,100 L770,158" class="ln dash"/>
+            <!-- substrate -->
+            <text x="20" y="350" class="t-label t-faint">SHARED SUBSTRATE · WHAT MAKES SWITCHING POSSIBLE</text>
+            <g class="t-body">
+              <rect x="20"  y="362" width="176" height="176" rx="14" class="f-card"/>
+              <text x="36" y="388" class="t-label t-ember">SKILLS</text><text x="36" y="410" class="t-fg">SKILL.md folders</text><text x="36" y="430" class="t-sub">~/.agents/skills</text><text x="36" y="448" class="t-sub">~/.claude/skills</text><text x="36" y="466" class="t-sub">~/.uar/skills</text><text x="36" y="484" class="t-sub">OpenDesign skills/</text><text x="36" y="502" class="t-sub">BossFang skills</text>
+              <rect x="206" y="362" width="176" height="176" rx="14" class="f-card"/>
+              <text x="222" y="388" class="t-label t-ember">MCP PLANE</text><text x="222" y="410" class="t-fg">Same servers, every</text><text x="222" y="428" class="t-fg">client</text><text x="222" y="452" class="t-sub">surreal-memory</text><text x="222" y="470" class="t-sub">open-design</text><text x="222" y="488" class="t-sub">github · tavily · …</text><text x="222" y="506" class="t-sub">UAR /mcp/uar</text>
+              <rect x="392" y="362" width="176" height="176" rx="14" class="f-card"/>
+              <text x="408" y="388" class="t-label t-ember">KBD STATE</text><text x="408" y="410" class="t-fg">.kbd-orchestrator/</text><text x="408" y="434" class="t-sub">events.jsonl (authority)</text><text x="408" y="452" class="t-sub">waypoint · position</text><text x="408" y="470" class="t-sub">handoffs/*.json</text><text x="408" y="488" class="t-sub">+ team ledger</text><text x="408" y="506" class="t-sub">.agent-team/state.json</text>
+              <rect x="578" y="362" width="176" height="176" rx="14" class="f-cyan-soft"/>
+              <text x="594" y="388" class="t-label t-cyan">SURREAL-MEMORY</text><text x="594" y="410" class="t-fg">127.0.0.1:23001</text><text x="594" y="434" class="t-sub">/mcp/http · /mcp/sse</text><text x="594" y="452" class="t-sub">memory_* · kg_*</text><text x="594" y="470" class="t-sub">task_stream_*</text><text x="594" y="488" class="t-sub">SurrealDB 3.2.4</text><text x="594" y="506" class="t-sub">on :28000</text>
+              <rect x="764" y="362" width="176" height="176" rx="14" class="f-card"/>
+              <text x="780" y="388" class="t-label t-ember">KARPATHY LOGS</text><text x="780" y="410" class="t-fg">.prometheus/</text><text x="780" y="434" class="t-sub">session-log.md</text><text x="780" y="452" class="t-sub">progress receipts</text><text x="780" y="470" class="t-sub">knowledge/wiki</text><text x="780" y="488" class="t-sub">decisions · gotchas</text><text x="780" y="506" class="t-sub">pk OKF bundles</text>
+            </g>
+            <line x1="240" y1="312" x2="240" y2="356" class="ln" marker-end="url(#ah)"/>
+            <line x1="720" y1="312" x2="720" y2="356" class="ln" marker-end="url(#ah)"/>
+          </svg>
+          </div>
+          <figcaption><b>Figure 3.</b> Surfaces come and go; the substrate is what persists. OpenDesign's dashed link is intentional: it runs its own daemon (:7456) and is reached through MCP rather than as a runtime.</figcaption>
+        </figure>
+
+        <div class="tbl"><table>
+          <thead><tr><th>Surface</th><th>Best at</th><th>Use it for</th><th>Don't use it for</th></tr></thead>
+          <tbody>
+            <tr><td>Claude Code</td><td>Deep repo work, native subagents, hooks, plugins</td><td>Lead/orchestrator for coding teams; KBD lifecycle; Karpathy hooks fire here</td><td>Always-on schedules</td></tr>
+            <tr><td>Claude Desktop</td><td>Conversational research, docs, MCP-heavy work across apps</td><td>Strategy, briefs, reviewing OpenDesign output, memory curation</td><td>Multi-file code edits</td></tr>
+            <tr><td>Codex desktop / CLI</td><td>Native agent roles (<code>.codex/agents/*.toml</code>), strong executor/reviewer</td><td>Independent reviewer to a Claude-built change; parallel implementer</td><td>Being the same model family as its maker</td></tr>
+            <tr><td>Kimi (desktop + Kimi Code)</td><td>Long context, ACP runtime, low-cost model tier</td><td>Bulk analysis, research synthesis, second-opinion critic</td><td>Per-role model pinning (not supported in role frontmatter)</td></tr>
+            <tr><td>MiniMax Code (<code>mcode</code>)</td><td>Cheap capable worker; user-scope agents</td><td>Mechanical edits, test authoring, critic role</td><td>Selecting a custom agent in <code>mcode exec</code> (no selector)</td></tr>
+            <tr><td>The Boss</td><td>One desktop hub: agents (claude-code / pi / dsh), code-tool launcher, MCP, skills, schedules, IM channels</td><td>Your daily cockpit on the desk; managing services and skills</td><td>Talking to UAR today (adapter planned)</td></tr>
+            <tr><td>OpenDesign</td><td>Brand kits, design systems, decks, web/mobile prototypes, media</td><td>All visual output — driven via its MCP server from any harness</td><td>Code outside design artifacts</td></tr>
+            <tr><td>KnowMe mobile</td><td>Personal context, approvals, capture on the go</td><td>Morning brief, approval inbox, voice/notes intake</td><td>Heavy execution</td></tr>
+          </tbody>
+        </table></div>
+      </section>
+
+      <!-- UAR -->
+      <section id="uar">
+        <span class="sec-num">PART II · 06 · UNIVERSAL AGENT RUNTIME</span>
+        <h2>Every way to drive UAR.</h2>
+        <p>UAR is a single Rust/Axum process (default <code>:1906</code>) with a React console. The packaged build uses <code>--features server-full</code>; KnowMe links it as a library with <code>embedded-mobile</code>. JWT is required by default; mint keys at <code>/api/uar/auth/keys</code>.</p>
+<pre class="code"><code><span class="c"># local server (repo root)</span>
+cp .env.example .env &amp;&amp; pnpm install --frozen-lockfile &amp;&amp; pnpm build
+cargo run --release --no-default-features --features server-full --bin universal-agent-runtime -- -c ~/.uar/config.yaml
+
+<span class="c"># or the Electron/desktop sidecar: binds 127.0.0.1:0, prints READY:{port}, exits on stdin EOF</span>
+uar-sidecar
+
+<span class="c"># compile an agent definition to a signed descriptor</span>
+universal-agent-runtime compile agents/brand-steward.agent.md --out build/brand-steward.json</code></pre>
+
+        <div class="tbl"><table>
+          <thead><tr><th>Interface</th><th>Endpoint / entry</th><th>When to use it</th></tr></thead>
+          <tbody>
+            <tr><td>Native runs</td><td><code>POST /api/uar/runs</code> → <code>GET /api/uar/runs/{id}/stream</code> (AG-UI SSE); <code>/tool-approval</code>, <code>/cancel</code>, <code>/resume</code>, <code>/checkpoints</code></td><td>Primary path for governed agent execution with approvals and resumable checkpoints</td></tr>
+            <tr><td>Chat completion (AG-UI)</td><td><code>POST /api/chat/completion</code> with <code>stream_mode: "agui_spec"</code></td><td>UI clients rendering <code>RUN_STARTED</code> … <code>TOOL_CALL_*</code> … <code>RUN_FINISHED</code></td></tr>
+            <tr><td>OpenAI / Anthropic compatible</td><td><code>/v1/chat/completions</code>, <code>/v1/messages</code>, <code>/v1/models</code></td><td>Zero-code wiring: point BossFang <code>[provider_urls]</code>, OpenDesign BYOK, or any harness gateway at UAR</td></tr>
+            <tr><td>A2UI</td><td><code>/api/uar/a2ui/schemas</code>, <code>/api/uar/runs/{id}/a2ui/*</code></td><td>Agent-generated UI surfaces (React/Lit/Svelte renderers; Flutter in KnowMe)</td></tr>
+            <tr><td>A2A</td><td><code>POST /a2a/agents/{id}</code> (<code>message/send</code>, <code>tasks/get</code>, <code>tasks/cancel</code>), <code>/.well-known/agent.json</code>, gRPC <code>:50051</code></td><td>Agent-to-agent calls from BossFang or other runtimes</td></tr>
+            <tr><td>ACP</td><td>JSON-RPC at <code>/acp</code> (<code>acp.enabled: true</code>)</td><td>Editor clients (Zed, JetBrains) speaking Agent Client Protocol</td></tr>
+            <tr><td>MCP server</td><td><code>/mcp/uar</code>: <code>uar_list_agents</code>, <code>uar_create_run</code>, <code>uar_get_run_status</code>, <code>uar_list_skills</code>, <code>uar_compile_spec</code></td><td>Let Claude Code / Codex / Kimi dispatch work <em>into</em> UAR agents as tools</td></tr>
+            <tr><td>MCP memory</td><td><code>/mcp/memory</code> (in-process surreal-memory suite)</td><td>Same tool names as the standalone memory server</td></tr>
+            <tr><td>MCP client</td><td><code>mcp.json</code> → <code>mcpServers</code>; admin <code>/api/uar/mcp/servers</code></td><td>Give UAR agents GitHub, Tavily, OpenDesign, surreal-memory…</td></tr>
+            <tr><td>Compiler</td><td><code>/api/uar/compiler/compile-and-register</code>, conversational <code>/sessions</code></td><td>Author an agent in Markdown and register it in one step</td></tr>
+            <tr><td>Actors</td><td><code>/api/uar/actors</code> (spawn, message, collaborate)</td><td>Resident collaborators with serialized mailboxes</td></tr>
+            <tr><td>SDKs</td><td>Rust (<code>http-client</code> / <code>embedded</code> / <code>embedded-mobile</code>), Python, TS <code>@prometheus-ags/universal-agent-runtime-sdk</code></td><td>Your own scripts, KnowMe, BossFang bridges</td></tr>
+            <tr><td>Embedded</td><td><code>EmbeddedRuntime::builder()</code> — no socket</td><td>KnowMe mobile; tests</td></tr>
+          </tbody>
+        </table></div>
+
+        <h3>Defining a UAR agent (UAR-AGENT-MD)</h3>
+        <p>RFC-0001 requires fifteen sections; the compiler (8 stages, <code>s01_frontmatter</code> → <code>s08_emit</code>) is deterministic and fails closed. Real templates live in <code>templates/*.agent.md</code>. A trimmed specialist:</p>
+<pre class="code"><code># Agent: brand-steward
+
+## Metadata
+```yaml
+id: km.brand-steward
+version: 1.0.0
+runtime: uar
+schema: uar-agent-md/1.1
+tags: [design, brand]
+```
+## Identity
+```yaml
+type: specialist
+namespace: knowme.design
+role: "Guardian of the KnowMe design system"
+persona: "Direct, evidence-first; cites DESIGN.md sections"
+```
+## Skills
+```yaml
+- id: brand-extract
+- id: refine-ui
+```
+## MCP Servers
+```yaml
+- id: open-design        # stdio: od mcp
+- id: surreal-memory     # http://127.0.0.1:23001/mcp/http
+```
+## Memory Model
+```yaml
+isolation: agent          # scope: team:knowme-design for shared notes
+```
+## Governance
+```cedar
+forbid(principal, action == Action::"execute_tool", resource)
+  when { resource.name == "delete_project" };
+```
+## Budgets &amp; Constraints
+```yaml
+max_tokens_per_run: 120000
+max_usd_per_day: 3.00
+```
+## Execution Model
+```yaml
+mode: supervised
+timeout_s: 900
+```
+<span class="c">… plus UI (A2UI), Capabilities, Tools, Knowledge Base, A2A Contracts, Observability, Deployment Profiles</span></code></pre>
+        <div class="callout">
+          <span class="k">Status caveats from source inspection</span>
+          <p><span class="badge b-gap">gap</span> Inline Cedar is emitted by the compiler but no runtime consumer installs it; skill version/required/config collapse to preferred IDs during conversion; <code>policies/default.cedar</code> is permit-all. Treat authored governance as <em>documentation</em> until those are closed, and enforce with deployment-level Cedar files and approvals. <span class="badge b-gap">gap</span> UAR has no scheduler — recurring runs belong to BossFang.</p>
+        </div>
+
+        <h3>Multi-agent inside one UAR run</h3>
+        <p>The parent turn gets native tools: <code>spawn_agent</code> (artifact ID, delegated prompt, history <code>full</code> | <code>last_turns</code>), <code>send_agent_message</code>, <code>wait_agents</code> (≤ 60 s per wait), <code>list_agents</code>, <code>interrupt_agent</code>. Children run with <em>intersected</em> permissions and root-shared budgets — a child can never regain what the parent lost. Use this for supervisor/worker patterns inside a single request; use BossFang workflows or the team ledger for anything that must survive a restart.</p>
+
+        <h3>Skills and memory in UAR</h3>
+        <ul class="clean">
+          <li>Skills load from <code>$UAR_BUILTIN_SKILLS_DIR</code>, <code>~/.uar/skills</code> (WASM, WIT <code>uar:skill@0.1.0</code>) and — importantly — the standard <strong><code>~/.agents/skills</code></strong> directory, scanned at startup. Install the Prometheus pack there once and UAR, Codex and Claude Code all see it.</li>
+          <li>Memory is opt-in (<code>memory.enabled: true</code>). Point it at the <em>shared</em> surreal-memory instead of an embedded DB so harness sessions and UAR agents read the same graph: <code>UAR_MEMORY__SURREAL_ENDPOINT</code>, or keep the in-process store and have clients use <code>UAR_MEMORY_MCP_URL=http://127.0.0.1:1906/mcp/memory</code>. Pick one authority per scope.</li>
+        </ul>
+      </section>
+
+      <!-- THE BOSS -->
+      <section id="boss">
+        <span class="sec-num">PART II · 07 · THE BOSS</span>
+        <h2>Your desktop hub: agents, code tools, MCP, skills and services in one app.</h2>
+        <p>The Boss (<code>tools.know-me.the-boss</code>, v2.1.3, Electron) is the Cherry Studio fork that hosts your daily work. What it does today, from source:</p>
+        <div class="grid">
+          <div class="card"><span class="k">Agents</span><h4>Three runtime drivers</h4><p><code>claude-code</code> (Claude Agent SDK, forwards subagent text), <code>pi</code> and <code>dsh</code> (DeepSeek Harness). Per-agent <code>permission_mode</code>, <code>scheduler_type</code> cron/interval/one-time, heartbeat, skills, MCP servers, knowledge bases and IM channels.</p></div>
+          <div class="card"><span class="k">Code tools</span><h4>Launch any harness</h4><p>Settings → Code launches Claude Code, Codex, Kimi Code, MiniMax Code, OpenCode, DeepSeek Harness, Gemini CLI, Copilot CLI and more in your terminal — routed through the Boss API gateway or the CLI's own login.</p></div>
+          <div class="card"><span class="k">API gateway</span><h4>127.0.0.1:23333</h4><p>OpenAI, Anthropic and Gemini wire protocols plus streamable-HTTP MCP. One set of provider keys for every harness you launch.</p></div>
+          <div class="card cy"><span class="k">Prometheus services</span><h4>Managed memory stack</h4><p>Settings → Prometheus runs SurrealDB (:28000), surreal-memory (:23001) and liter-llm (:4000) via Docker, installs the skill pack, and exposes a doctor. "Surreal Memory (managed)" is added as an MCP server when enabled.</p></div>
+          <div class="card cy"><span class="k">Skills</span><h4>Mirrors into harness dirs</h4><p>Skills live in <code>{userData}/Data/Skills</code>, mirror into the Claude agents path, and discover <code>.claude/skills</code> and <code>.agents/skills</code>. The <code>prometheus-skills-mini</code> submodule ships 22 skills.</p></div>
+          <div class="card cy"><span class="k">Channels &amp; schedules</span><h4>Telegram · Slack · Discord · …</h4><p>Agents can be bound to IM channels and run on schedules (Settings → Scheduled Tasks). Good for personal reminders; use BossFang for governed, multi-agent cadences.</p></div>
+        </div>
+        <div class="callout">
+          <span class="k">Honest boundary</span>
+          <p><span class="badge b-gap">not built</span> The Boss does not yet talk to UAR or BossFang (the adapter is "planned until demonstrated in source"), and has no AG-UI/A2UI rendering, Cedar or task graph. Until then, reach UAR from The Boss through MCP (<code>/mcp/uar</code>) or by adding UAR's <code>/v1</code> endpoint as a provider.</p>
+        </div>
+      </section>
+
+      <!-- AGENT TEAM CREATOR -->
+      <section id="creator">
+        <span class="sec-num">PART II · 08 · AGENT-TEAM-CREATOR SKILLS</span>
+        <h2>One portable team manifest, eight native exports.</h2>
+        <p>The four-skill family — <code>agent-team-creator</code>, <code>agent-team-manage</code>, <code>agent-team-handoff</code>, <code>agent-team-models</code> — lives on the <code>codex/agent-team-creator</code> branch of <code>prometheus-skills-mini</code> (worktree <code>.worktrees/agent-team-creator</code>) <span class="badge b-spec">not yet on main</span>. It needs only Node 22+: no daemon, no dependencies. It already produced The Boss's own ten-role <code>boss-core</code> team, which is the best worked example to copy.</p>
+
+        <figure>
+          <div class="swipe-hint">← swipe diagram →</div>
+          <div class="fig-scroll">
+          <svg viewBox="0 0 960 330" role="img" aria-labelledby="c1t c1d">
+            <title id="c1t">agent-team-creator pipeline</title>
+            <desc id="c1d">Intake goes to guide, which proposes roles and asks for ownership. validate and init create local state. models-select binds concrete model IDs. export writes native proposals for eight targets plus BossFang. manage, handoff and memory commands operate on the state afterwards.</desc>
+            <g class="t-body">
+              <rect x="20" y="40" width="130" height="80" rx="12" class="f-card"/><text x="36" y="64" class="t-label t-faint">INTAKE</text><text x="36" y="86" class="t-fg">intake.json</text><text x="36" y="104" class="t-sub">outcome · areas</text>
+              <rect x="170" y="40" width="130" height="80" rx="12" class="f-card"/><text x="186" y="64" class="t-label t-ember">GUIDE</text><text x="186" y="86" class="t-fg">proposedRoles</text><text x="186" y="104" class="t-sub">+ ownership Qs</text>
+              <rect x="320" y="40" width="130" height="80" rx="12" class="f-card"/><text x="336" y="64" class="t-label t-ember">VALIDATE · INIT</text><text x="336" y="86" class="t-fg">state.json</text><text x="336" y="104" class="t-sub">revisioned</text>
+              <rect x="470" y="40" width="130" height="80" rx="12" class="f-card"/><text x="486" y="64" class="t-label t-ember">MODELS</text><text x="486" y="86" class="t-fg">discover/select</text><text x="486" y="104" class="t-sub">concrete IDs</text>
+              <rect x="620" y="40" width="130" height="80" rx="12" class="f-ember"/><text x="636" y="64" class="t-label t-on">EXPORT</text><text x="636" y="86" class="t-on">new proposal dir</text><text x="636" y="104" class="t-on">+ receipts</text>
+              <rect x="770" y="20" width="170" height="290" rx="14" class="f-bg"/>
+              <text x="786" y="44" class="t-label t-faint">NATIVE TARGETS</text>
+              <text x="786" y="70" class="t-fg">claude</text><text x="850" y="70" class="t-sub">.claude/agents</text>
+              <text x="786" y="96" class="t-fg">codex</text><text x="850" y="96" class="t-sub">.codex/agents</text>
+              <text x="786" y="122" class="t-fg">kimi</text><text x="850" y="122" class="t-sub">.kimi-code/agents</text>
+              <text x="786" y="148" class="t-fg">minimax</text><text x="850" y="148" class="t-sub">~/.minimax/agents</text>
+              <text x="786" y="174" class="t-fg">opencode</text><text x="850" y="174" class="t-sub">.opencode/agents</text>
+              <text x="786" y="200" class="t-fg">copilot</text><text x="850" y="200" class="t-sub">.github/agents</text>
+              <text x="786" y="226" class="t-fg">deepseek</text><text x="850" y="226" class="t-sub">.dsh/profiles</text>
+              <text x="786" y="252" class="t-fg">uar</text><text x="850" y="252" class="t-sub">AgentArtifact JSON</text>
+              <text x="786" y="278" class="t-fg">bossfang</text><text x="850" y="278" class="t-sub">agent.toml · HAND</text>
+            </g>
+            <line x1="150" y1="80" x2="166" y2="80" class="ln" marker-end="url(#ah)"/>
+            <line x1="300" y1="80" x2="316" y2="80" class="ln" marker-end="url(#ah)"/>
+            <line x1="450" y1="80" x2="466" y2="80" class="ln" marker-end="url(#ah)"/>
+            <line x1="600" y1="80" x2="616" y2="80" class="ln" marker-end="url(#ah)"/>
+            <line x1="750" y1="80" x2="766" y2="80" class="ln-ember" marker-end="url(#ah-e)"/>
+            <rect x="20" y="170" width="730" height="140" rx="14" class="f-surface"/>
+            <text x="40" y="196" class="t-label t-cyan">AFTER EXPORT · OPERATE ON THE SAME STATE</text>
+            <g class="t-body">
+              <rect x="40" y="210" width="220" height="84" rx="10" class="f-card"/><text x="56" y="234" class="t-fg">agent-team-manage</text><text x="56" y="254" class="t-sub">task add/start/block/complete</text><text x="56" y="272" class="t-sub">complete-kbd · team-update</text>
+              <rect x="276" y="210" width="220" height="84" rx="10" class="f-card"/><text x="292" y="234" class="t-fg">agent-team-handoff</text><text x="292" y="254" class="t-sub">handoff-create → packet</text><text x="292" y="272" class="t-sub">handoff-accept (dest harness)</text>
+              <rect x="512" y="210" width="220" height="84" rx="10" class="f-card"/><text x="528" y="234" class="t-fg">memory-queue · publish</text><text x="528" y="254" class="t-sub">outbox → surreal-memory</text><text x="528" y="272" class="t-sub">REST, scoped, receipted</text>
+            </g>
+          </svg>
+          </div>
+          <figcaption><b>Figure 4.</b> Export never overwrites and never installs, registers or launches anything. You review the proposal directory, then apply it to the harness you chose.</figcaption>
+        </figure>
+
+<pre class="code"><code><span class="c"># 1 · describe the work in plain terms</span>
+cat &gt; intake.json &lt;&lt;'EOF'
+{ "id": "km-launch", "outcome": "Ship the KnowMe Pro launch site and campaign",
+  "complexity": "complex", "areas": ["design","code","docs","marketing"],
+  "deliverables": ["Landing site","Brand kit","Launch deck","Social set"],
+  "budget": "balanced", "review": true, "harness": "claude", "scope": "project" }
+EOF
+ATC=~/.agents/skills/agent-team-creator/scripts/cli.mjs
+node $ATC guide --input intake.json            <span class="c"># → proposedRoles + ownership questions</span>
+
+<span class="c"># 2 · answer ownership, save the team, create state</span>
+node $ATC validate --input team-request.json   <span class="c"># {"team": {...}, "state": ".agent-team/state.json"}</span>
+node $ATC init     --input team-request.json
+
+<span class="c"># 3 · bind real models (liter-llm gateway, UAR or BossFang discovery)</span>
+node $ATC models-discover --input discovery.json
+node $ATC models-select   --input selection.json
+
+<span class="c"># 4 · export per harness to NEW directories, review, then apply</span>
+for t in claude codex kimi minimax uar bossfang; do
+  echo "{\"state\":\".agent-team/state.json\",\"target\":\"$t\",\"out\":\".agent-team/exports/$t\"}" &gt; x.json
+  node $ATC export --input x.json
+done</code></pre>
+
+        <h3>What a good role entry looks like</h3>
+        <p>Copy the shape of <code>the-boss/.agent-team/boss-core/team.json</code>: a shared preamble (read project rules, restore KBD position, never invent evidence, don't message people without authorization), a role-specific paragraph, explicit skill entrypoints, <code>owns</code> globs, inputs/outputs, <code>dependsOn</code>, a <code>modelPolicy.tier</code> and per-harness <code>native</code> overrides (e.g. <code>codex.model_reasoning_effort</code>, <code>claude.model: opus</code>, <code>opencode.mode: primary</code>).</p>
+        <div class="tbl"><table>
+          <thead><tr><th>Target</th><th>Export lands</th><th>Known limits (from the skill's native contracts)</th></tr></thead>
+          <tbody>
+            <tr><td>Claude Code</td><td><code>.claude/agents/&lt;role&gt;.md</code> or plugin + <code>marketplace.json</code></td><td>Subagents, not experimental agent-teams; plugin agents ignore hooks/mcpServers/permissionMode</td></tr>
+            <tr><td>Codex</td><td><code>.codex/agents/&lt;role&gt;.toml</code> (+ <code>.codex/config.toml</code>)</td><td>Needs <code>name</code>, <code>description</code>, <code>developer_instructions</code>; no plugin agents field</td></tr>
+            <tr><td>Kimi Code</td><td><code>.kimi-code/agents/&lt;role&gt;.md</code> or <code>kimi.plugin.json</code></td><td>Role model frontmatter ignored — choose model at invocation</td></tr>
+            <tr><td>MiniMax Code</td><td><code>$MINIMAX_DATA_DIR/agents/&lt;role&gt;/agent.md</code> (default <code>~/.minimax</code>)</td><td>User-scope, not project; <code>mcode exec</code> has no agent selector</td></tr>
+            <tr><td>UAR</td><td><code>uar/agents/&lt;role&gt;.json</code> AgentArtifact for <code>POST /api/agents</code></td><td>No persistent team API; runs via <code>POST /api/uar/runs</code></td></tr>
+            <tr><td>BossFang</td><td>per-agent <code>agent.toml</code> + <code>workflow.json</code>, <em>or</em> one multi-agent <code>HAND.toml</code></td><td>Choose one path; activation is separate and may start schedules</td></tr>
+          </tbody>
+        </table></div>
+      </section>
+
+      <!-- KNOWME -->
+      <section id="knowme">
+        <span class="sec-num">PART II · 09 · KNOWME MOBILE</span>
+        <h2>The personal end of the bench: context in, decisions out.</h2>
+        <p>KnowMe ships one Rust core to Flutter (iOS/Android), Tauri desktop and web. UAR is the runtime authority, linked in-process with <code>embedded-mobile</code>; KnowMe's on-device model is one provider behind it. That gives you a real agent runtime in your pocket — with honest limits on background execution.</p>
+        <div class="grid">
+          <div class="card"><span class="k">Capture</span><h4>Intent and context</h4><p>Voice, notes, images and documents become memories and objectives. This is where <em>why</em> gets recorded — the field most agent briefs are missing.</p></div>
+          <div class="card"><span class="k">Decide</span><h4>Approvals inbox &amp; brief</h4><p>Batched approvals and the morning brief are the high-altitude interface to every team. <span class="badge b-spec">specified</span> (GOAL-001: agents propose; completion is a human act).</p></div>
+          <div class="card"><span class="k">Delegate</span><h4>Hands &amp; plugins</h4><p>Per-instance agent identity (<code>did:key</code>), org-over-personal Cedar layering, dual identity (you = subject, agent = actor). <span class="badge b-spec">specified</span>; Hands crate is a skeleton.</p></div>
+          <div class="card cy"><span class="k">Sync</span><h4>OFP peer mesh</h4><p>Phone ↔ desktop ↔ BossFang instance over the OFP wire protocol, so the same agents and memories follow you. <span class="badge b-spec">skeleton crate</span></p></div>
+        </div>
+        <p><strong>Personal-optimization rule:</strong> KnowMe holds <em>your</em> memory. Business agents receive a scoped slice via a representation grant, never your whole history. When a desktop team needs personal context (tone, preferences, priorities), it reads the explicitly shared scope in surreal-memory — not your phone's private store.</p>
+      </section>
+      <!-- HARNESS SETUP -->
+      <section id="harnesses">
+        <span class="sec-num">PART II · 10 · HARNESS SETUP</span>
+        <h2>Wire every harness to the same four things.</h2>
+        <p>Each harness needs exactly four connections: <strong>(1)</strong> the shared skills, <strong>(2)</strong> the surreal-memory MCP endpoint, <strong>(3)</strong> the OpenDesign MCP server, and <strong>(4)</strong> the team's native agent files. The snippets below match what is already configured on your Mac where noted.</p>
+
+        <div class="tabs" role="tablist" aria-label="Harness setup">
+          <button class="tab" role="tab" id="h-cc" aria-controls="hp-cc" aria-selected="true" hx-on:click="kmTab(this)">Claude Code</button>
+          <button class="tab" role="tab" id="h-cd" aria-controls="hp-cd" aria-selected="false" tabindex="-1" hx-on:click="kmTab(this)">Claude Desktop</button>
+          <button class="tab" role="tab" id="h-cx" aria-controls="hp-cx" aria-selected="false" tabindex="-1" hx-on:click="kmTab(this)">Codex</button>
+          <button class="tab" role="tab" id="h-km" aria-controls="hp-km" aria-selected="false" tabindex="-1" hx-on:click="kmTab(this)">Kimi</button>
+          <button class="tab" role="tab" id="h-mm" aria-controls="hp-mm" aria-selected="false" tabindex="-1" hx-on:click="kmTab(this)">MiniMax</button>
+          <button class="tab" role="tab" id="h-bs" aria-controls="hp-bs" aria-selected="false" tabindex="-1" hx-on:click="kmTab(this)">The Boss</button>
+        </div>
+
+        <div class="panel" role="tabpanel" id="hp-cc" aria-labelledby="h-cc">
+          <p><strong>Role on the bench:</strong> lead / orchestrator for coding teams, KBD lifecycle owner. It is the only harness where the Prometheus hooks (SessionStart KBD control, TaskCompleted receipt, PreCompact) fire automatically.</p>
+<pre class="code"><code><span class="c"># skills + hooks: install the pack as a plugin (or copy skills)</span>
+/plugin marketplace add ~/Projects/prometheus/prometheus-skills-mini
+node ~/Projects/prometheus/prometheus-skills-mini/scripts/doctor.mjs --fix copy-skills   <span class="c"># → ~/.claude/skills, ~/.agents/skills</span>
+
+<span class="c"># shared memory (already present in ~/.claude.json as "surreal-memory")</span>
+claude mcp add --scope user --transport http surreal-memory http://127.0.0.1:23001/mcp/http
+
+<span class="c"># OpenDesign</span>
+od mcp install claude-code        <span class="c"># or: claude mcp add --scope user open-design -- od mcp</span>
+
+<span class="c"># UAR as tools (optional): dispatch work into UAR agents</span>
+claude mcp add --scope user --transport http uar http://127.0.0.1:1906/mcp/uar --header "Authorization: Bearer $UAR_TOKEN"
+
+<span class="c"># team: apply the claude export into the repo</span>
+cp -R .agent-team/exports/claude/.claude/agents/* .claude/agents/</code></pre>
+        </div>
+        <div class="panel" role="tabpanel" id="hp-cd" aria-labelledby="h-cd" hidden>
+          <p><strong>Role:</strong> strategist, researcher and reviewer across apps; ideal for briefs, PRDs and reviewing OpenDesign output conversationally. No repo-level subagents — use it as a single strong agent with tools. Your config already lists <code>surreal-memory</code>, <code>open-design</code> and <code>codex</code> (Codex as an MCP server — a cheap way to get an independent second model inside Claude Desktop).</p>
+<pre class="code"><code>// ~/Library/Application Support/Claude/claude_desktop_config.json
+{ "mcpServers": {
+  "surreal-memory": { "command": "npx", "args": ["-y","mcp-remote@latest","http://127.0.0.1:23001/mcp/http"] },
+  "open-design":   { "command": "/Applications/Open Design.app/Contents/Frameworks/Open Design Helper.app/Contents/MacOS/Open Design Helper",
+                     "args": ["/Applications/Open Design.app/Contents/Resources/app/prebundled/daemon/daemon-cli.mjs","mcp"] },
+  "codex":         { "command": "codex", "args": ["mcp-server"] }
+} }</code></pre>
+          <p>Skills: upload the same SKILL.md folders under Settings → Capabilities → Skills, or rely on the MCP tools. Start each session with the <em>switch-in</em> ritual from Part III.</p>
+        </div>
+        <div class="panel" role="tabpanel" id="hp-cx" aria-labelledby="h-cx" hidden>
+          <p><strong>Role:</strong> independent reviewer or parallel implementer; also a capable coordinator — Codex has native agent roles. Desktop app and CLI share <code>~/.codex/config.toml</code>, which already has <code>surreal-memory</code>, <code>github</code>, <code>liter-llm</code> and <code>prometheus-knowledge</code>.</p>
+<pre class="code"><code># ~/.codex/config.toml (excerpt — matches your current file)
+[mcp_servers.surreal-memory]
+url = "http://localhost:23001/mcp/http"
+startup_timeout_sec = 60.0
+tool_timeout_sec = 180.0
+
+# add OpenDesign
+#   od mcp install codex        → codex mcp add open-design -- od mcp
+
+# project roles from the team export
+#   .codex/agents/km-web-ui.toml   name / description / developer_instructions / model
+[agents]
+max_threads = 4</code></pre>
+          <p>Skills: Codex reads the plugin package <code>dist/plugins/codex/prometheus-skills-mini</code> via <code>.agents/plugins/marketplace.json</code>, plus <code>~/.agents/skills</code>. Hooks do not exist here — call <code>karpathy-progress-memory</code> explicitly at boundaries.</p>
+        </div>
+        <div class="panel" role="tabpanel" id="hp-km" aria-labelledby="h-km" hidden>
+          <p><strong>Role:</strong> long-context analyst and low-cost critic. Kimi Desktop (<code>Kimi.app</code>) is conversational; <strong>Kimi Code</strong> is the agentic harness with custom agents and ACP (OpenDesign can drive it as a runtime).</p>
+<pre class="code"><code># MCP for Kimi Code (~/.kimi-code/mcp.json — currently only context7)
+kimi mcp add --transport http surreal-memory http://127.0.0.1:23001/mcp/http
+kimi mcp add --transport stdio open-design -- od mcp
+
+# project agents from the export
+.kimi-code/agents/km-research-analyst.md      # model frontmatter is ignored —
+                                              # pick model per invocation / global</code></pre>
+          <p>Skills: copy or symlink the pack into Kimi Code's <code>skills</code> directory (<code>~/.kimi-code/skills</code>), or rely on <code>AGENTS.md</code> pointing at <code>~/.agents/skills/&lt;name&gt;/SKILL.md</code> explicitly — the Boss team prompts do exactly this ("Read skills at explicit paths if discovery omits them").</p>
+        </div>
+        <div class="panel" role="tabpanel" id="hp-mm" aria-labelledby="h-mm" hidden>
+          <p><strong>Role:</strong> cheap, capable worker (tests, mechanical edits) and critic model. <code>MiniMax Code.app</code> and the <code>mcode</code> CLI share <code>~/.minimax</code> (it already has <code>agents/</code>, <code>mcp/</code>, <code>skills/</code>, <code>memory/</code>).</p>
+<pre class="code"><code># agents are USER scope, not project scope
+~/.minimax/agents/km-test-author/agent.md      # from the minimax export
+# MCP: register surreal-memory and open-design in the app's MCP settings
+#      (stored under ~/.minimax/mcp); verify with the app before relying on it
+# skills: copy pack folders into ~/.minimax/skills</code></pre>
+          <p><span class="badge b-gap">limit</span> <code>mcode exec</code> cannot select a custom agent, so for headless dispatch pass the role prompt in the task text.</p>
+        </div>
+        <div class="panel" role="tabpanel" id="hp-bs" aria-labelledby="h-bs" hidden>
+          <p><strong>Role:</strong> the desk cockpit. Turn on Settings → Prometheus → services (managed Docker) so surreal-memory, SurrealDB and liter-llm run under one supervisor; enable "Surreal Memory (managed)" in MCP; install skills from Settings → Skills. Add OpenDesign under Settings → MCP → Add (stdio, <code>od mcp</code>).</p>
+          <p>Create Boss agents for personal recurring work (<code>scheduler_type: cron</code>) and bind a Telegram/Slack channel for reminders. For anything that must be governed, audited or multi-agent, schedule it in BossFang instead.</p>
+        </div>
+
+        <div class="callout ember">
+          <span class="k">One memory endpoint, everywhere</span>
+          <p>Use <strong><code>http://127.0.0.1:23001/mcp/http</code></strong> (streamable HTTP; SSE at <code>/mcp/sse</code>) for every client, served by the Boss-managed stack or <code>node scripts/services.mjs up</code> in the skills pack. If UAR runs with its own in-process memory at <code>/mcp/memory</code>, point it at the same SurrealDB (<code>UAR_MEMORY__SURREAL_ENDPOINT</code>) — otherwise you have two memories that silently diverge.</p>
+        </div>
+      </section>
+
+      <!-- ═════════ PART III ═════════ -->
+      <section id="context">
+        <span class="sec-num">PART III · 11 · TRUE CONTEXT SHARING</span>
+        <h2>Five layers, each with one job — and none of them is "paste the chat".</h2>
+        <p>Context sharing fails when one layer is asked to do another's job: chat history as state, memory as authority, a skill as a permission. Keep them separate:</p>
+
+        <figure>
+          <div class="swipe-hint">← swipe diagram →</div>
+          <div class="fig-scroll">
+          <svg viewBox="0 0 960 400" role="img" aria-labelledby="x1t x1d">
+            <title id="x1t">Five layers of shared context</title>
+            <desc id="x1d">Layer 1 instructions, layer 2 skills, layer 3 durable state in KBD and the team ledger, layer 4 semantic memory in surreal-memory, layer 5 Karpathy logs and knowledge bundles. Handoff packets cut across all five.</desc>
+            <g class="t-body">
+              <rect x="20" y="20"  width="700" height="62" rx="12" class="f-card"/>
+              <text x="40" y="46" class="t-label t-ember">L1 · INSTRUCTIONS</text><text x="220" y="46" class="t-fg">CLAUDE.md = AGENTS.md, .claude/rules, .cursor/rules</text><text x="220" y="66" class="t-sub">How we work here. Generated by rules/build.mjs; identical for every harness.</text>
+              <rect x="20" y="92"  width="700" height="62" rx="12" class="f-card"/>
+              <text x="40" y="118" class="t-label t-ember">L2 · SKILLS</text><text x="220" y="118" class="t-fg">~/.agents/skills (canonical) mirrored to each harness</text><text x="220" y="138" class="t-sub">How to do a kind of task. Pinned by version/digest; never a permission.</text>
+              <rect x="20" y="164" width="700" height="62" rx="12" class="f-ember-soft"/>
+              <text x="40" y="190" class="t-label t-ember">L3 · DURABLE STATE</text><text x="220" y="190" class="t-fg">.kbd-orchestrator/runtime/events.jsonl + .agent-team/state.json</text><text x="220" y="210" class="t-sub">Where we are. The authority. Revisioned; one writer; files, so every tool reads it.</text>
+              <rect x="20" y="236" width="700" height="62" rx="12" class="f-cyan-soft"/>
+              <text x="40" y="262" class="t-label t-cyan">L4 · SEMANTIC MEMORY</text><text x="220" y="262" class="t-fg">surreal-memory :23001 — memory_*, kg_*, task_stream_*</text><text x="220" y="282" class="t-sub">What we know. Searchable facts, entities, decisions. Scopes are filters, not security.</text>
+              <rect x="20" y="308" width="700" height="62" rx="12" class="f-card"/>
+              <text x="40" y="334" class="t-label t-ember">L5 · KARPATHY LOG</text><text x="220" y="334" class="t-fg">.prometheus/session-log.md, receipts, knowledge/wiki, pk bundles</text><text x="220" y="354" class="t-sub">What happened and what we learned. Append-only; written at real boundaries only.</text>
+            </g>
+            <rect x="760" y="20" width="180" height="350" rx="16" class="f-ember"/>
+            <text x="850" y="60" text-anchor="middle" class="t-label t-on">HANDOFF PACKET</text>
+            <text x="850" y="96" text-anchor="middle" class="t-body t-on">cuts across all five</text>
+            <text x="850" y="140" text-anchor="middle" class="t-body t-on">task + revision</text>
+            <text x="850" y="162" text-anchor="middle" class="t-body t-on">git HEAD · branch</text>
+            <text x="850" y="184" text-anchor="middle" class="t-body t-on">dirty status</text>
+            <text x="850" y="206" text-anchor="middle" class="t-body t-on">evidence refs</text>
+            <text x="850" y="228" text-anchor="middle" class="t-body t-on">memory refs</text>
+            <text x="850" y="250" text-anchor="middle" class="t-body t-on">remaining work</text>
+            <text x="850" y="272" text-anchor="middle" class="t-body t-on">fresh-context prompt</text>
+            <text x="850" y="320" text-anchor="middle" class="t-label t-on">handoff-create /</text>
+            <text x="850" y="338" text-anchor="middle" class="t-label t-on">handoff-accept</text>
+            <line x1="720" y1="195" x2="756" y2="195" class="ln-ember" marker-start="url(#ah-e)"/>
+          </svg>
+          </div>
+          <figcaption><b>Figure 5.</b> L3 is authoritative; L4 and L5 are searchable mirrors. When they disagree, L3 wins and the mirror is reconciled.</figcaption>
+        </figure>
+
+        <h3>The switching protocol</h3>
+        <p>This is the ritual that lets you walk away from Claude Code, open Codex (or Kimi, or your phone), and continue without re-explaining.</p>
+        <ol class="steps">
+          <li><strong>Switch-out (source harness).</strong> Finish or checkpoint the current task. Run <code>karpathy-progress-memory</code> at the boundary (Claude Code does this via hooks; elsewhere call <code>node scripts/record-progress.mjs --project-root "$PWD" --boundary task</code>). Then <code>agent-team-handoff</code> → <code>handoff-create</code> with source owner, expected task revision and destination harness.</li>
+          <li><strong>Publish memory.</strong> <code>memory-queue</code> the decisions and facts worth recalling (scope <code>team:&lt;id&gt;</code> or <code>project:&lt;id&gt;</code>), commit state, then <code>memory-publish</code>. Unavailable service → it stays queued; nothing is lost.</li>
+          <li><strong>Stop the source.</strong> A state transfer does not stop the old process. Pause or close it so two harnesses never edit the same files.</li>
+          <li><strong>Switch-in (destination).</strong> Open the repo. The harness loads L1 (AGENTS.md) and L2 (skills). Ask it to run <code>kbd-status</code> (reads the waypoint and confirms the runtime revision) and <code>kbd-memory-recall</code> (surreal-memory → <code>prior-context.md</code>).</li>
+          <li><strong>Accept.</strong> Read the packet as task data, verify its evidence against the current revision, then <code>handoff-accept</code> with the destination role/harness. Only acceptance transfers ownership; a stale packet is reconciled, never replayed.</li>
+        </ol>
+
+<pre class="code"><code><span class="c"># paste as the first message in any harness (switch-in prompt)</span>
+Restore context before doing anything:
+1. Read AGENTS.md and .agent-team/&lt;team&gt;/README.md.
+2. Run kbd-status; report phase, change, task and runtime revision.
+3. Run kbd-memory-recall for this project; summarize prior-context.md in 5 bullets.
+4. Open the newest handoff packet in .agent-team/state.json; verify its git HEAD
+   and evidence against the working tree. Report mismatches; do not proceed on stale state.
+5. Accept the handoff as role &lt;role&gt; on harness &lt;harness&gt;, then continue the task.</code></pre>
+
+        <h3>Memory hygiene for a personal bench</h3>
+        <div class="tbl"><table>
+          <thead><tr><th>Scope</th><th>Contains</th><th>Who reads</th><th>Who writes</th></tr></thead>
+          <tbody>
+            <tr><td><code>user:travis</code></td><td>Preferences, tone, priorities you chose to share</td><td>All roles (read-only)</td><td>You, via KnowMe or explicit request</td></tr>
+            <tr><td><code>project:&lt;repo&gt;</code></td><td>Architecture decisions, gotchas, KBD lifecycle events</td><td>Any agent in that repo</td><td>KBD hooks, Karpathy boundaries, reviewers</td></tr>
+            <tr><td><code>team:&lt;id&gt;</code></td><td>Handoffs, open questions, task-linked findings</td><td>Team members</td><td>agent-team-* <code>memory-publish</code></td></tr>
+            <tr><td><code>brand:knowme</code></td><td>Approved claims, voice, DESIGN.md decisions</td><td>Design + marketing roles</td><td>Brand steward only</td></tr>
+            <tr><td><code>agent:&lt;id&gt;</code></td><td>Private working notes of a resident agent</td><td>That agent</td><td>That agent</td></tr>
+          </tbody>
+        </table></div>
+        <p><span class="badge b-gap">caution</span> The verified surreal-memory REST constructor defaults stored scope to <em>global</em>; <code>agent_id</code>/<code>user_id</code> are retrieval filters, not access control. Keep genuinely private material in KnowMe, not the shared server. Surreal-memory deduplicates by similarity, not request keys — reconcile before retrying an uncertain publish.</p>
+      </section>
+      <!-- ═════════ PART IV ═════════ -->
+      <section id="opendesign">
+        <span class="sec-num">PART IV · 12 · OPENDESIGN AS THE DESIGN ENGINE</span>
+        <h2>One design daemon, reachable from every agent through MCP.</h2>
+        <p>OpenDesign (<code>open-design</code> 0.23.1, Apache-2.0; installed as <code>Open Design.app</code>) is a local-first design product: a daemon on <code>127.0.0.1:7456</code> with a Next.js UI, 151 design-system packages, ~114 design templates, ~163 skills, 277 official plugins and a <code>craft/</code> rulebook. It can run its own agent (spawning Claude, Codex, Kimi and 20+ others) <em>or</em> be driven by your agents through MCP. For a shared bench, prefer the second: your team roles stay the same, and OpenDesign becomes a tool plane.</p>
+
+        <h3>The two MCP servers</h3>
+        <div class="tbl"><table>
+          <thead><tr><th>Server</th><th>Start</th><th>Tools</th></tr></thead>
+          <tbody>
+            <tr><td><code>open-design</code></td><td><code>od mcp [--daemon-url http://127.0.0.1:7456]</code> (stdio; proxies the running daemon)</td><td>Projects: <code>list_projects</code>, <code>create_project</code>, <code>get_project</code>, <code>delete_project</code>, <code>get_active_context</code>. Files: <code>get_artifact</code>, <code>get_file</code>, <code>list_files</code>, <code>search_files</code>, <code>write_file</code>, <code>delete_file</code>, <code>create_artifact</code>. Briefs: <code>collect_brief</code>, <code>confirm_brief</code>. Engine: <code>list_skills</code>, <code>list_plugins</code>, <code>list_agents</code>, <code>start_run</code>, <code>get_run</code>, <code>cancel_run</code>. Resources: <code>od://design-systems/&lt;id&gt;/DESIGN.md</code>, <code>od://skills/&lt;id&gt;/SKILL.md</code>, <code>od://focus/active</code></td></tr>
+            <tr><td><code>open-design-live-artifacts</code></td><td><code>od mcp live-artifacts</code> (auto-attached to agents OD spawns)</td><td><code>live_artifacts_create|list|update|refresh</code>, <code>connectors_list</code>, <code>connectors_execute</code> — refreshable dashboards backed by read-only connectors</td></tr>
+          </tbody>
+        </table></div>
+<pre class="code"><code><span class="c"># register the main server with every client in one pass</span>
+for a in claude-code claude-desktop codex kimi cursor opencode; do od mcp install $a --print; done   <span class="c"># review, then drop --print</span>
+<span class="c"># macOS gotcha: /usr/bin/od (octal dump) can shadow OpenDesign's od — use the absolute
+# helper path from Settings → MCP server, as your Claude Desktop config already does.</span></code></pre>
+
+        <figure>
+          <div class="swipe-hint">← swipe diagram →</div>
+          <div class="fig-scroll">
+          <svg viewBox="0 0 960 420" role="img" aria-labelledby="o1t o1d">
+            <title id="o1t">Brand-first design pipeline</title>
+            <desc id="o1d">A brand kit and DESIGN.md are established once. Every downstream design job — website, mobile app, deck, social, email, video — reads the same design system through MCP. Reviewers check accessibility and claims before export or deploy.</desc>
+            <rect x="20" y="30" width="200" height="150" rx="14" class="f-ember"/>
+            <text x="38" y="58" class="t-label t-on">ONCE · BRAND STEWARD</text>
+            <text x="38" y="84" class="t-title t-on">Brand kit</text>
+            <text x="38" y="108" class="t-body t-on">od brand create &lt;url&gt;</text>
+            <text x="38" y="126" class="t-body t-on">skill brand-extract</text>
+            <text x="38" y="150" class="t-body t-on">→ design-systems/</text>
+            <text x="38" y="168" class="t-body t-on">knowme/DESIGN.md</text>
+            <line x1="220" y1="105" x2="266" y2="105" class="ln-ember" marker-end="url(#ah-e)"/>
+            <rect x="270" y="30" width="200" height="150" rx="14" class="f-card"/>
+            <text x="288" y="58" class="t-label t-ember">SOURCE OF TRUTH</text>
+            <text x="288" y="84" class="t-title t-fg">DESIGN.md + tokens</text>
+            <text x="288" y="108" class="t-body t-sub">tokens.css · tailwind-v4.css</text>
+            <text x="288" y="126" class="t-body t-sub">components.html</text>
+            <text x="288" y="150" class="t-body t-sub">mirrored to KnowMe</text>
+            <text x="288" y="168" class="t-body t-sub">hybrid-design-tokens</text>
+            <line x1="470" y1="105" x2="516" y2="105" class="ln" marker-end="url(#ah)"/>
+            <rect x="520" y="10" width="420" height="200" rx="16" class="f-bg"/>
+            <text x="538" y="34" class="t-label t-faint">DOWNSTREAM JOBS · start_run(skill, designSystem)</text>
+            <g class="t-body">
+              <rect x="538" y="48" width="126" height="68" rx="10" class="f-card"/><text x="552" y="72" class="t-fg">Website</text><text x="552" y="90" class="t-sub">saas-landing</text><text x="552" y="106" class="t-sub">pricing-page</text>
+              <rect x="674" y="48" width="126" height="68" rx="10" class="f-card"/><text x="688" y="72" class="t-fg">Mobile app</text><text x="688" y="90" class="t-sub">mobile-app</text><text x="688" y="106" class="t-sub">onboarding</text>
+              <rect x="810" y="48" width="116" height="68" rx="10" class="f-card"/><text x="824" y="72" class="t-fg">Deck</text><text x="824" y="90" class="t-sub">html-ppt-*</text><text x="824" y="106" class="t-sub">→ pptx/pdf</text>
+              <rect x="538" y="126" width="126" height="68" rx="10" class="f-card"/><text x="552" y="150" class="t-fg">Social</text><text x="552" y="168" class="t-sub">social-carousel</text><text x="552" y="184" class="t-sub">ad-creative</text>
+              <rect x="674" y="126" width="126" height="68" rx="10" class="f-card"/><text x="688" y="150" class="t-fg">Email</text><text x="688" y="168" class="t-sub">email-marketing</text><text x="688" y="184" class="t-sub">copywriting</text>
+              <rect x="810" y="126" width="116" height="68" rx="10" class="f-card"/><text x="824" y="150" class="t-fg">Motion</text><text x="824" y="168" class="t-sub">hyperframes</text><text x="824" y="184" class="t-sub">→ mp4</text>
+            </g>
+            <line x1="730" y1="210" x2="730" y2="246" class="ln" marker-end="url(#ah)"/>
+            <rect x="520" y="250" width="420" height="80" rx="14" class="f-cyan-soft"/>
+            <text x="538" y="276" class="t-label t-cyan">INDEPENDENT REVIEW · FRESH CONTEXT</text>
+            <text x="538" y="298" class="t-body t-fg">a11y reviewer (craft/accessibility-baseline) · claims reviewer</text>
+            <text x="538" y="316" class="t-body t-fg">brand steward diff vs DESIGN.md · od lint (anti-slop)</text>
+            <line x1="730" y1="330" x2="730" y2="360" class="ln" marker-end="url(#ah)"/>
+            <rect x="520" y="364" width="200" height="46" rx="12" class="f-card"/><text x="620" y="392" text-anchor="middle" class="t-body t-fg">od export html|pdf|pptx</text>
+            <rect x="740" y="364" width="200" height="46" rx="12" class="f-ember"/><text x="840" y="392" text-anchor="middle" class="t-body t-on">You approve publish</text>
+            <rect x="20" y="230" width="450" height="180" rx="14" class="f-surface"/>
+            <text x="40" y="256" class="t-label t-faint">WHO DRIVES IT</text>
+            <text x="40" y="282" class="t-body t-fg">Claude Code / Codex / Kimi → MCP tools directly</text>
+            <text x="40" y="304" class="t-body t-fg">Claude Desktop → briefs, critique, iteration</text>
+            <text x="40" y="326" class="t-body t-fg">UAR agents → open-design in mcp.json</text>
+            <text x="40" y="348" class="t-body t-fg">BossFang → [[mcp_servers]] + weekly cron</text>
+            <text x="40" y="370" class="t-body t-fg">KnowMe → approve / comment on previews</text>
+            <text x="40" y="394" class="t-body t-sub">All read the same DESIGN.md via od:// resources</text>
+          </svg>
+          </div>
+          <figcaption><b>Figure 6.</b> Brand once, render everywhere. The brand steward is the only role allowed to change DESIGN.md; every other design role consumes it.</figcaption>
+        </figure>
+
+        <h3>Mapping the design and marketing team onto OpenDesign</h3>
+        <div class="tbl"><table>
+          <thead><tr><th>Role</th><th>OpenDesign assets</th><th>MCP calls</th><th>Owns / boundary</th></tr></thead>
+          <tbody>
+            <tr><td>Brand steward</td><td><code>brand-extract</code>, <code>brand-guidelines</code>, <code>brandkit</code>, <code>design-md</code>; <code>od brand create|finalize</code></td><td><code>create_project</code>, <code>write_file</code> (DESIGN.md), <code>get_artifact</code></td><td>Sole writer of <code>design-systems/knowme/**</code>; mirrors tokens to KnowMe via <code>hybrid-design-tokens</code></td></tr>
+            <tr><td>Web designer</td><td>templates <code>saas-landing</code>, <code>pricing-page</code>, <code>docs-page</code>; plugins <code>od-nextjs-export</code>, <code>od-react-export</code></td><td><code>start_run</code> → <code>get_run</code> (<code>previewUrl</code>) → <code>get_artifact</code></td><td>Prototype + export; code implementation is a separate dev-team task</td></tr>
+            <tr><td>Mobile designer</td><td><code>mobile-app</code>, <code>mobile-onboarding</code>, <code>wireframe-mobile-flow</code>; skills <code>flutter-animating-apps</code>, <code>swiftui-design</code></td><td><code>start_run</code>, <code>get_artifact</code></td><td>Flows + specs handed to KnowMe's <code>reference-ui-fidelity</code> skill as the acceptance oracle</td></tr>
+            <tr><td>Campaign / content</td><td><code>social-carousel</code>, <code>email-marketing</code>, <code>ad-creative</code>, <code>copywriting</code>; prompt-templates image/video</td><td><code>start_run</code>, <code>live_artifacts_create</code> for campaign dashboards</td><td>Drafts only; publishing is a BossFang workflow step with approval</td></tr>
+            <tr><td>Deck builder</td><td>~50 <code>html-ppt-*</code> templates, <code>kami-deck</code>, <code>pptx</code> skill</td><td><code>start_run</code>; CLI <code>od export --format pptx</code></td><td>Uses DESIGN.md; numbers come from finance/analyst roles, not invented</td></tr>
+            <tr><td>A11y &amp; claims reviewer</td><td><code>craft/accessibility-baseline</code>, <code>design-review</code>, <code>od lint</code></td><td><code>get_artifact</code>, <code>search_files</code> (read-only)</td><td>Findings only, to its own output path; never edits the design</td></tr>
+          </tbody>
+        </table></div>
+<pre class="code"><code><span class="c"># the call sequence any harness uses for a launch landing page</span>
+open-design.create_project { name: "km-pro-launch", designSystem: "knowme", skill: "saas-landing" }
+open-design.collect_brief  { project: "km-pro-launch" }      <span class="c"># interactive brief card (MCP App UI)</span>
+open-design.start_run      { project: "km-pro-launch", prompt: "&lt;brief from KnowMe objective OBJ-7&gt;",
+                             skill: "saas-landing", extraSkills: ["copywriting"] }
+open-design.get_run        { runId }                           <span class="c"># poll → previewUrl, agentMessage</span>
+open-design.get_artifact   { project: "km-pro-launch", include: "auto" }   <span class="c"># entry + siblings for review</span>
+surreal-memory.memory_add  { content: "Launch hero variant B approved; reason …", scope: "brand:knowme" }</code></pre>
+        <div class="callout">
+          <span class="k">Choosing who runs the design loop</span>
+          <p><strong>OpenDesign's own agent</strong> (<code>start_run</code>) is best for rendering-heavy work: it injects DESIGN.md, the skill and <code>craft/</code> rules, and streams a sandboxed preview. <strong>Your harness agent</strong> is best for orchestration, cross-checking claims, and moving results into code or channels. The usual split: harness agent writes the brief and reviews; OpenDesign renders.</p>
+        </div>
+      </section>
+
+      <!-- ═════════ PART V ═════════ -->
+      <section id="bossfang">
+        <span class="sec-num">PART V · 13 · BOSSFANG ORCHESTRATION</span>
+        <h2>Schedules, triggers, workflows and channels — the always-on half of the bench.</h2>
+        <p>BossFang (your LibreFang fork; CLI <code>bossfang</code>, dashboard <code>http://127.0.0.1:4545</code>, config <code>~/.librefang/config.toml</code>) is the only component here with a real scheduler, an event trigger engine, a DAG workflow engine, human-approval gates, budgets and a tamper-evident audit log. That makes it the conductor. UAR does the thinking where you want UAR's governance and A2UI; BossFang decides <em>when</em> and <em>where the result goes</em>.</p>
+
+        <h3>Three ways BossFang uses UAR</h3>
+        <div class="tbl"><table>
+          <thead><tr><th>Path</th><th>Config</th><th>Trade-off</th></tr></thead>
+          <tbody>
+            <tr><td>UAR as LLM provider</td><td><code>[provider_urls]</code> → <code>http://127.0.0.1:1906/v1</code>, or <code>provider = "uar"</code> in a manifest (feature <code>uar-driver</code>)</td><td>Simplest; routes models through UAR/liter-llm, but BossFang's own loop runs the agent</td></tr>
+            <tr><td>UAR-AGENT-MD agents</td><td>Drop <code>*.uar.md</code> / <code>*.agent.json</code> and load via <code>/api/agents/uar</code> (<code>librefang-uar-spec</code> translates to <code>AgentManifest</code>)</td><td>One definition for both runtimes; translation is lossy for UAR-only fields</td></tr>
+            <tr><td>Delegate to UAR via A2A</td><td><code>[a2a] external_agents</code> → UAR <code>/a2a/agents/{id}</code> or gRPC :50051</td><td>UAR owns the turn (governance, subagents, A2UI); BossFang owns schedule, routing, delivery. <strong>Preferred for governed work.</strong></td></tr>
+          </tbody>
+        </table></div>
+        <p><span class="badge b-gap">open issue</span> BossFang does not spawn or supervise UAR; run UAR as its own service (native installer or <code>uar-sidecar</code>) and point BossFang at it.</p>
+
+        <h3>Scheduling primitives</h3>
+<pre class="code"><code><span class="c"># recurring turn delivered to a channel</span>
+bossfang cron create cmo-assistant "0 8 * * 1-5" \
+  "Summarize yesterday's campaign metrics vs targets; flag anomalies" --name weekday-marketing-brief
+<span class="c">#   CronSchedule: at | every (60–86400 s) | cron {expr, tz}
+#   CronAction:   agent_turn {message, model, timeout, pre_check_script}   ← pre-check can return {"wakeAgent": false} to skip the LLM call
+#   CronDelivery: channel {channel, to} | last_channel | webhook</span>
+
+<span class="c"># event-driven: wake a reviewer whenever a task is posted with a design label</span>
+bossfang trigger create a11y-reviewer '{"ContentMatch":{"pattern":"label:design"}}' \
+  --prompt "Review {{event}} against craft/accessibility-baseline" --max-fires 20 --cooldown 300
+<span class="c"># pattern JSON is illustrative; list real variants with `bossfang trigger --help` / triggers.rs</span></code></pre>
+
+        <h3>A weekly launch workflow (DAG with an approval gate)</h3>
+<pre class="code"><code>// workflow.json → bossfang workflow create workflow.json
+{ "name": "weekly-content-drop",
+  "steps": [
+    { "name": "research",  "agent": "market-researcher", "prompt_template": "Top 5 signals this week for {{input}}", "output_var": "signals" },
+    { "name": "brief",     "agent": "campaign-lead",     "prompt_template": "Brief from {{signals}}", "depends_on": ["research"], "output_var": "brief" },
+    { "name": "design",    "agent": "brand-designer",    "prompt_template": "Use open-design start_run: social-carousel for {{brief}}", "depends_on": ["brief"], "output_var": "assets" },
+    { "name": "copy",      "agent": "positioning-writer","prompt_template": "Captions + email for {{brief}}", "depends_on": ["brief"], "output_var": "copy" },
+    { "name": "review",    "agent": "claims-reviewer",   "prompt_template": "Check {{assets}} {{copy}} vs brand:knowme", "depends_on": ["design","copy"],
+      "mode": { "Gate": { "field": "verdict", "op": "eq", "value": "PASS" } } },
+    { "name": "approve",   "agent": "campaign-lead",     "mode": "Approval", "depends_on": ["review"] },
+    { "name": "publish",   "agent": "channel-publisher", "prompt_template": "Post {{assets}} with {{copy}}", "depends_on": ["approve"], "error_mode": "Fail" }
+  ] }
+<span class="c"># schedule it: POST /api/workflows/{id}/run from a cron-driven webhook, or give the lead agent a
+# workflow-run tool and a Monday cron. Field shapes above are illustrative — validate against
+# crates/librefang-kernel/src/workflow.rs or GET /api/workflow-templates before relying on them.</span></code></pre>
+
+        <figure>
+          <div class="swipe-hint">← swipe diagram →</div>
+          <div class="fig-scroll">
+          <svg viewBox="0 0 960 360" role="img" aria-labelledby="b1t b1d">
+            <title id="b1t">BossFang as conductor</title>
+            <desc id="b1d">Triggers — cron, events, webhooks, inbox files and channel messages — enter BossFang. The router and workflow engine dispatch to BossFang agents or, via A2A, to UAR agents that use MCP tools including OpenDesign and surreal-memory. Approvals route to you in KnowMe or a channel. Results are delivered to channels and recorded in the audit log and memory.</desc>
+            <rect x="20" y="30" width="170" height="300" rx="14" class="f-bg"/>
+            <text x="36" y="54" class="t-label t-faint">TRIGGERS</text>
+            <g class="t-body">
+              <rect x="34" y="68" width="142" height="40" rx="8" class="f-card"/><text x="48" y="93" class="t-fg">cron / every / at</text>
+              <rect x="34" y="116" width="142" height="40" rx="8" class="f-card"/><text x="48" y="141" class="t-fg">event triggers</text>
+              <rect x="34" y="164" width="142" height="40" rx="8" class="f-card"/><text x="48" y="189" class="t-fg">webhooks</text>
+              <rect x="34" y="212" width="142" height="40" rx="8" class="f-card"/><text x="48" y="237" class="t-fg">inbox files</text>
+              <rect x="34" y="260" width="142" height="40" rx="8" class="f-card"/><text x="48" y="285" class="t-fg">channel messages</text>
+            </g>
+            <line x1="190" y1="180" x2="226" y2="180" class="ln" marker-end="url(#ah)"/>
+            <rect x="230" y="60" width="240" height="240" rx="16" class="f-cyan-soft"/>
+            <text x="250" y="88" class="t-label t-cyan">BOSSFANG KERNEL</text>
+            <text x="250" y="116" class="t-body t-fg">router (bindings → defaults)</text>
+            <text x="250" y="138" class="t-body t-fg">workflow DAG · gates · loops</text>
+            <text x="250" y="160" class="t-body t-fg">Hands (multi-agent bundles)</text>
+            <text x="250" y="182" class="t-body t-fg">approvals · budgets · RBAC</text>
+            <text x="250" y="204" class="t-body t-fg">Merkle audit log</text>
+            <text x="250" y="226" class="t-body t-fg">memory · knowledge graph</text>
+            <text x="250" y="258" class="t-body t-sub">cron_lane / subagent_lane</text>
+            <text x="250" y="276" class="t-body t-sub">concurrency limits</text>
+            <line x1="470" y1="130" x2="516" y2="110" class="ln" marker-end="url(#ah)"/>
+            <line x1="470" y1="200" x2="516" y2="220" class="ln-ember" marker-end="url(#ah-e)"/>
+            <rect x="520" y="60" width="200" height="90" rx="14" class="f-card"/>
+            <text x="536" y="86" class="t-label t-faint">BOSSFANG AGENTS</text>
+            <text x="536" y="110" class="t-body t-fg">agent.toml + .identity/</text>
+            <text x="536" y="130" class="t-body t-sub">routine turns, channel work</text>
+            <rect x="520" y="170" width="200" height="110" rx="14" class="f-ember-soft"/>
+            <text x="536" y="196" class="t-label t-ember">UAR AGENTS · A2A</text>
+            <text x="536" y="220" class="t-body t-fg">governed turns, subagents</text>
+            <text x="536" y="240" class="t-body t-sub">MCP: open-design,</text>
+            <text x="536" y="258" class="t-body t-sub">surreal-memory, github</text>
+            <line x1="720" y1="105" x2="756" y2="140" class="ln" marker-end="url(#ah)"/>
+            <line x1="720" y1="225" x2="756" y2="190" class="ln" marker-end="url(#ah)"/>
+            <rect x="760" y="30" width="180" height="120" rx="14" class="f-ember"/>
+            <text x="776" y="56" class="t-label t-on">APPROVAL</text>
+            <text x="776" y="80" class="t-body t-on">KnowMe inbox or</text>
+            <text x="776" y="98" class="t-body t-on">channel (TOTP for</text>
+            <text x="776" y="116" class="t-body t-on">sensitive tools)</text>
+            <rect x="760" y="170" width="180" height="160" rx="14" class="f-card"/>
+            <text x="776" y="196" class="t-label t-faint">DELIVERY</text>
+            <text x="776" y="220" class="t-body t-fg">channel_send</text>
+            <text x="776" y="240" class="t-body t-sub">Slack · Telegram · email</text>
+            <text x="776" y="258" class="t-body t-sub">Discord · Matrix · …</text>
+            <text x="776" y="286" class="t-body t-fg">memory + audit</text>
+            <text x="776" y="306" class="t-body t-sub">receipt per effect</text>
+          </svg>
+          </div>
+          <figcaption><b>Figure 7.</b> BossFang owns <em>when</em> and <em>where</em>; UAR (or a BossFang agent) owns the turn; you own anything irreversible.</figcaption>
+        </figure>
+      </section>
+
+      <section id="people">
+        <span class="sec-num">PART V · 14 · AGENTS THAT BEHAVE LIKE COLLEAGUES</span>
+        <h2>Identity, accounts, manners and memory — with disclosure built in.</h2>
+        <p>What makes an agent feel like a real teammate is not a clever persona prompt. It is <strong>continuity</strong> (same identity tomorrow), <strong>presence</strong> (its own account in the channels you use), <strong>manners</strong> (knows when not to speak) and <strong>memory</strong> (remembers the thread). BossFang has a concrete mechanism for each:</p>
+        <div class="tbl"><table>
+          <thead><tr><th>Quality</th><th>BossFang mechanism</th><th>Configure</th></tr></thead>
+          <tbody>
+            <tr><td>Stable identity</td><td>UUID persists across respawns (<code>agent_identities.toml</code>); workspace <code>.identity/</code> with <code>SOUL.md</code>, <code>IDENTITY.md</code>, <code>USER.md</code>, <code>MEMORY.md</code>, <code>HEARTBEAT.md</code> injected every turn</td><td><code>generate_identity_files = true</code>; edit files by hand, they are preserved</td></tr>
+            <tr><td>Its own account</td><td>Multiple instances of one adapter, secrets prefixed per instance (<code>MAYA__SLACK_BOT_TOKEN</code>)</td><td><code>[[sidecar_channels]] name = "slack-maya"</code> + <code>[[bindings]]</code> to the agent</td></tr>
+            <tr><td>Manners</td><td><code>channel_overrides</code>: <code>group_policy = "mention_only"</code>, <code>reply_precheck</code> (LLM classifier decides whether to answer), <code>message_debounce_ms</code>, <code>typing_mode</code>, thread ownership, per-user rate limits</td><td>Per agent, per channel</td></tr>
+            <tr><td>Initiative</td><td><code>schedule = Periodic{cron}</code> / <code>Proactive{conditions}</code> / <code>Continuous</code>; <code>[autonomous] quiet_hours</code>, <code>heartbeat_channel</code></td><td>Agent manifest</td></tr>
+            <tr><td>Memory</td><td><code>[proactive_memory] auto_memorize/auto_retrieve</code>, knowledge graph, <code>memory_wiki</code> (Obsidian-compatible)</td><td>Point at shared SurrealDB for cross-tool recall</td></tr>
+            <tr><td>Accountability</td><td>Audit chain, per-agent budgets, <code>[approval] channel_rules</code>, TOTP second factor</td><td><code>bossfang security verify</code></td></tr>
+          </tbody>
+        </table></div>
+<pre class="code"><code># ~/.librefang/config.toml — "Maya", the campaign lead, in your Slack
+[[sidecar_channels]]
+name = "slack-maya"
+command = "python3"
+args = ["-m", "librefang.sidecar.adapters.slack"]
+channel_type = "slack"
+[sidecar_channels.env]
+SLACK_APP_TOKEN = "vault:MAYA_SLACK_APP_TOKEN"
+SLACK_BOT_TOKEN = "vault:MAYA_SLACK_BOT_TOKEN"
+
+[[bindings]]
+agent = "campaign-lead"
+[bindings.match_rule]
+channel = "slack-maya"
+
+# agents/campaign-lead/agent.toml (excerpt)
+name = "campaign-lead"
+schedule = { Periodic = { cron = "0 9 * * 1" } }
+channels = ["slack-maya"]
+mcp_servers = ["open-design", "surreal-memory"]
+[capabilities]
+agent_message = ["brand-designer", "positioning-writer", "claims-reviewer"]
+[autonomous]
+quiet_hours = "20:00-07:00"
+max_iterations = 12
+[channel_overrides.slack-maya]
+group_policy = "mention_only"
+reply_precheck = true
+message_debounce_ms = 4000</code></pre>
+        <div class="callout ember">
+          <span class="k">Colleague-like, never deceptive</span>
+          <p>Give agents names and consistent personalities, but <strong>disclose that they are AI agents</strong> in their profile, their first message in a channel, and anywhere they talk to people outside your bench. Keep them at Level 3 (disclosed representative) or Level 4 (delegated actor under a revocable grant) from the Company-of-One brief. Posting to an external audience, contacting customers, spending money and merging code stay behind approvals — a persona is not a credential.</p>
+        </div>
+      </section>
+
+      <section id="week">
+        <span class="sec-num">PART V · 15 · A WEEK ON THE BENCH</span>
+        <h2>What runs when, where, and who touches it.</h2>
+        <div class="tbl"><table>
+          <thead><tr><th>When</th><th>What</th><th>Runs on</th><th>You</th></tr></thead>
+          <tbody>
+            <tr><td>Weekdays 07:00</td><td>Morning brief: overnight results, pending approvals, unknown-outcome effects, expiring grants</td><td>BossFang cron → UAR agent → KnowMe</td><td>Approve / defer on phone</td></tr>
+            <tr><td>Continuous</td><td>Customer-feedback observer: dedupe, redact, create issues under standing grant</td><td>BossFang trigger + Slack/email sidecars</td><td>None (routine)</td></tr>
+            <tr><td>On demand</td><td>Coding change: lead + implementer + verifier</td><td>Claude Code lead, Codex reviewer, MiniMax tests</td><td>Approve merge</td></tr>
+            <tr><td>On demand</td><td>Design: landing, deck, mobile flow</td><td>Any harness → OpenDesign MCP</td><td>Approve publish</td></tr>
+            <tr><td>Mondays 09:00</td><td><code>weekly-content-drop</code> workflow</td><td>BossFang workflow, UAR via A2A, OpenDesign</td><td>One approval gate</td></tr>
+            <tr><td>Fridays 16:00</td><td>Reflection: KBD reflect, Karpathy lessons, memory compress</td><td>BossFang cron → Claude Code headless or UAR</td><td>Read 5 bullets</td></tr>
+            <tr><td>Monthly</td><td>Bench review: roles, model policy, budgets, grants</td><td>You + agent-team-manage + BossFang budget report</td><td>Decide</td></tr>
+          </tbody>
+        </table></div>
+      </section>
+      <!-- ═════════ PART VI ═════════ -->
+      <section id="status">
+        <span class="sec-num">PART VI · 16 · WHAT'S REAL TODAY</span>
+        <h2>Build on what exists; plan around what doesn't.</h2>
+        <div class="tbl"><table>
+          <thead><tr><th>Capability</th><th>Status</th><th>Implication</th></tr></thead>
+          <tbody>
+            <tr><td>UAR runs, AG-UI, A2A, ACP, MCP server/client, compiler, subagent tools, actors</td><td><span class="badge b-exists">source</span></td><td>Safe to build on; JWT on by default</td></tr>
+            <tr><td>UAR scheduler / cron</td><td><span class="badge b-gap">absent</span></td><td>All cadences go through BossFang</td></tr>
+            <tr><td>UAR Cedar from agent docs; skill contract fidelity</td><td><span class="badge b-gap">gap</span></td><td>Enforce with deployment policies + approvals</td></tr>
+            <tr><td>BossFang cron, triggers, workflows, approvals, budgets, audit, 27 channel sidecars</td><td><span class="badge b-exists">source</span></td><td>The conductor for everything recurring</td></tr>
+            <tr><td>BossFang ↔ UAR (driver, UAR-AGENT-MD loader, A2A)</td><td><span class="badge b-exists">source</span> <span class="badge b-gap">no supervision</span></td><td>Run UAR as its own service</td></tr>
+            <tr><td>The Boss: agents, code-tool launcher, MCP, skills, schedules, managed memory stack</td><td><span class="badge b-exists">source</span></td><td>Daily desk cockpit</td></tr>
+            <tr><td>The Boss ↔ UAR adapter, AG-UI/A2UI rendering</td><td><span class="badge b-gap">planned</span></td><td>Use MCP <code>/mcp/uar</code> meanwhile</td></tr>
+            <tr><td>agent-team-creator family (8 native exports + BossFang)</td><td><span class="badge b-spec">branch</span></td><td>Merge <code>codex/agent-team-creator</code> to use from the installed pack</td></tr>
+            <tr><td>OpenDesign MCP servers, design systems, brand kits, exports</td><td><span class="badge b-exists">source</span></td><td>Shared design plane for all harnesses</td></tr>
+            <tr><td>surreal-memory shared endpoint; KBD memory mirror; Karpathy receipts</td><td><span class="badge b-exists">source</span></td><td>Works now; hooks auto-fire only in Claude Code</td></tr>
+            <tr><td>Reflection write-back outbox; three-tier Karpathy sharing (personal/team repos)</td><td><span class="badge b-spec">design only</span></td><td>Publish manually via <code>memory-publish</code></td></tr>
+            <tr><td>KnowMe approvals inbox, Hands, OFP sync, per-install DIDs</td><td><span class="badge b-spec">specified / skeleton</span></td><td>Use BossFang approvals + a channel until built</td></tr>
+          </tbody>
+        </table></div>
+      </section>
+
+      <section id="checklist">
+        <span class="sec-num">PART VI · 17 · SETUP CHECKLIST</span>
+        <h2>From zero to a working bench, in order.</h2>
+        <ol class="steps">
+          <li><strong>Shared services.</strong> The Boss → Settings → Prometheus → start managed services (SurrealDB :28000, surreal-memory :23001, liter-llm :4000), or <code>node scripts/services.mjs up</code> in prometheus-skills-mini. Check <code>curl 127.0.0.1:23001/health</code>.</li>
+          <li><strong>Skills once, everywhere.</strong> <code>node scripts/doctor.mjs --fix copy-skills</code> → <code>~/.agents/skills</code> + <code>~/.claude/skills</code>; install the Claude and Codex plugin packages; copy into <code>~/.kimi-code/skills</code> and <code>~/.minimax/skills</code>. Merge the agent-team-creator branch first.</li>
+          <li><strong>MCP everywhere.</strong> Register <code>surreal-memory</code> (<code>/mcp/http</code>) and <code>open-design</code> (<code>od mcp install &lt;client&gt;</code>) in Claude Code, Claude Desktop, Codex, Kimi Code, MiniMax, The Boss, UAR <code>mcp.json</code> and BossFang <code>[[mcp_servers]]</code>.</li>
+          <li><strong>UAR.</strong> Run the service with <code>server-full</code>; mint an API key; set <code>memory</code> to the shared SurrealDB; add deployment Cedar policies and tool-approval rules; register your first agents via <code>compile-and-register</code>.</li>
+          <li><strong>Brand.</strong> In OpenDesign, <code>od brand create https://know-me.tools</code> → finalize → <code>design-systems/knowme/DESIGN.md</code>. Record the brand steward as its only writer.</li>
+          <li><strong>Teams.</strong> For each standing team, run <code>agent-team-creator guide → init → models-select → export</code>; apply the Claude/Codex/Kimi/MiniMax exports to the repo or user scope; register UAR artifacts; choose BossFang agent+workflow <em>or</em> Hand deployment.</li>
+          <li><strong>BossFang.</strong> <code>bossfang init</code>; add <code>[provider_urls]</code>/<code>[a2a]</code> pointing at UAR; add channel sidecars with per-agent accounts; set <code>[budget]</code>, <code>[approval]</code>, <code>[audit]</code>; create cron jobs and triggers; test each workflow with <code>dry-run</code>.</li>
+          <li><strong>Switching ritual.</strong> Save the switch-in prompt as a skill or slash command in each harness; practise one full Claude Code → Codex → phone handoff before relying on it.</li>
+          <li><strong>Kill switches.</strong> Know how to stop everything: <code>bossfang hand pause</code>, <code>cron disable</code>, <code>stop</code>; UAR run cancel; revoke API keys. Test them.</li>
+        </ol>
+      </section>
+
+      <section id="sources">
+        <span class="sec-num">SOURCES</span>
+        <h2>Where this comes from</h2>
+        <p>Read-only source inspection on 24 Sep 2026. No builds were run and no configuration was changed. Command and config shapes marked illustrative must be validated against the installed versions.</p>
+        <ul class="clean src">
+          <li>KBD-ARCH-001 Rev 2, <a href="https://ipfs.prometheusags.ai/ipfs/bafybeid3o2mdohulkxegntjrdi2ewwj5mz7jerw3b42y6qzclnakh5kvcm/kbd-multi-agent-roles-skills.html">Multi-Agent Development, KBD Process Loops, and Specialist Roles</a></li>
+          <li>Companion: <a href="https://ipfs.prometheusags.ai/ipfs/QmXYz3ygLDaFznNBXh5mCvBfwsNpYSJbiXgECSBMC9EtW1">KnowMe — The Company of One</a></li>
+          <li>UAR: <code>README.md</code>, <code>src/server.rs</code>, <code>src/config.rs</code>, <code>src/uar/{api,compiler,runtime,governance,memory}</code>, <code>docs/agents/AGENTS_SPEC_RFC.md</code>, <code>docs/librefang-integration.md</code>, <code>templates/*.agent.md</code>, <code>mcp.json</code></li>
+          <li>The Boss: <code>package.json</code>, <code>src/shared/data/api/schemas/agents.ts</code>, <code>src/main/ai/runtime</code>, <code>src/main/services/prometheus/workspaceMcp.ts</code>, <code>.agent-team/boss-core/*</code>, <code>openspec/changes/*</code></li>
+          <li>prometheus-skills-mini: <code>skill-system.json</code>, <code>hooks/hooks.json</code>, <code>lib/karpathy</code>, <code>docker/compose.yaml</code>; branch <code>codex/agent-team-creator</code> → <code>skills/agent-team-*/</code> and <code>references/{manifest,native-harnesses,models-memory,task-handoff}.md</code></li>
+          <li>OpenDesign: <code>apps/daemon/src/mcp.ts</code>, <code>mcp-live-artifacts-server.ts</code>, <code>mcp-agent-install.ts</code>, <code>runtimes/defs/</code>, <code>design-systems/</code>, <code>design-templates/</code>, <code>skills/</code>, <code>plugins/_official</code>, <code>QUICKSTART.md</code></li>
+          <li>BossFang/LibreFang: <code>crates/librefang-cli/src/cli.rs</code>, <code>librefang-types/src/{agent,scheduler}.rs</code>, <code>librefang-kernel/src/{workflow,triggers}.rs</code>, <code>librefang-channels/src/router.rs</code>, <code>librefang-uar-spec</code>, <code>librefang.toml.example</code>, <code>docs/architecture/uar-*.md</code></li>
+          <li>KnowMe: <code>README.md</code>, <code>docs/strategies/plugins/README.md</code>, <code>docs/pags-spec-km-goal-001.md</code></li>
+          <li>Local harness configs (names only, secrets not read): <code>~/.codex/config.toml</code>, <code>~/.claude.json</code>, Claude Desktop config, <code>~/.kimi-code/mcp.json</code>, <code>~/.minimax/</code></li>
+        </ul>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<footer>
+  <div class="wrap">
+    <p><span class="wordmark" style="font-size:15px">Know<span class="me">Me</span></span> &nbsp;·&nbsp; Build Your Bench · Technical field guide · 24 September 2026</p>
+    <p>Companion to KBD-ARCH-001 Rev 2 and "The Company of One". Source-inspected; no implementation or configuration was changed.</p>
+  </div>
+</footer>
+
+<script>
+  function kmApplyTheme(t){
+    document.documentElement.setAttribute('data-theme', t);
+    var b = document.getElementById('themeBtn');
+    if (b) b.textContent = t === 'dark' ? '\u2600 Light' : '\u263E Dark';
+  }
+  function kmToggleTheme(){
+    var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    kmApplyTheme(next);
+    try { localStorage.setItem('km-theme', next); } catch(e) {}
+  }
+  function kmTab(btn){
+    var tabs = btn.parentElement.querySelectorAll('[role="tab"]');
+    tabs.forEach(function(t){
+      var on = t === btn;
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      t.tabIndex = on ? 0 : -1;
+      var p = document.getElementById(t.getAttribute('aria-controls'));
+      if (p) p.hidden = !on;
+    });
+  }
+  (function(){
+    var saved = null;
+    try { saved = localStorage.getItem('km-theme'); } catch(e) {}
+    if (!saved && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) saved = 'light';
+    kmApplyTheme(saved || 'dark');
+    document.querySelectorAll('[role="tablist"]').forEach(function(list){
+      list.addEventListener('keydown', function(e){
+        var tabs = Array.prototype.slice.call(list.querySelectorAll('[role="tab"]'));
+        var i = tabs.indexOf(document.activeElement);
+        if (i < 0) return;
+        var n = e.key === 'ArrowRight' ? (i+1)%tabs.length : e.key === 'ArrowLeft' ? (i-1+tabs.length)%tabs.length : -1;
+        if (n >= 0){ e.preventDefault(); tabs[n].focus(); kmTab(tabs[n]); }
+      });
+    });
+    window.addEventListener('load', function(){
+      if (window.htmx) return;
+      var tb = document.getElementById('themeBtn');
+      if (tb) tb.addEventListener('click', kmToggleTheme);
+      document.querySelectorAll('[role="tab"]').forEach(function(t){ t.addEventListener('click', function(){ kmTab(t); }); });
+    });
+  })();
+</script>
+</body>
+</html>
