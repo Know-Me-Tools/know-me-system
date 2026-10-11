@@ -51,5 +51,5 @@ peer-crdt = ["frf"]
 frf-sdk-rust = { git = "ssh://git@github.com/Prometheus-AGS/flint-realtime-fabric", rev = "8966d6b1fef002a663d98f762955b2d273f8c07d", default-features = false, features = ["shape-facade"], optional = true }
 
 [dev-dependencies]
-jsonwebtoken.workspace = true
+jsonwebtoken = { workspace = true, features = ["rust_crypto"] }
 serde_json.workspace   = true

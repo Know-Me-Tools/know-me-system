@@ -1,45 +1,40 @@
 {
+  "schemaVersion": "2",
+  "generatedBy": "kbd-runtime",
+  "sourceRevision": 2,
   "phase": "on-device-qwen35",
+  "phaseId": "on-device-qwen35",
   "parentPhase": null,
-  "childPhases": [],
-  "childPointer": null,
-  "assessment_complete": true,
-  "plan_complete": true,
-  "execute_complete": false,
-  "reflect_complete": false,
-  "implementation_total": 4,
-  "implementation_completed": 0,
-  "changes_total": 4,
+  "last_updated": "2026-07-29T01:05:45.593758Z",
+  "last_updated_by": "kbd-runtime",
+  "changes_total": 0,
   "changes_completed": 0,
+  "implementation_total": 0,
+  "implementation_completed": 0,
   "completion": {
     "primaryCounter": "implementation",
     "implementation": {
       "completed": 0,
-      "total": 4,
+      "total": 0,
       "status": "PENDING"
     },
     "evidence": {
-      "status": "NOT_TRACKED",
+      "status": "PENDING",
       "summary": null,
       "blockers": []
     },
     "certification": {
-      "status": "NOT_TRACKED",
+      "status": "PENDING",
       "summary": null,
       "blockers": []
     },
     "publication": {
-      "status": "NOT_TRACKED",
+      "status": "PENDING",
       "summary": null,
       "blockers": []
     }
   },
-  "completed_changes": [],
-  "active_change": "qwen35-model-runtime",
-  "blocked_changes": [],
-  "sourceTool": "unknown",
-  "createdBy": "kbd-new-phase",
-  "updatedAt": "2026-07-18T20:23:58Z",
-  "last_updated_by": "codex",
-  "last_updated": "2026-07-18T20:23:58Z"
+  "changes": [],
+  "children": {},
+  "migrationStatus": "legacy-read-only"
 }

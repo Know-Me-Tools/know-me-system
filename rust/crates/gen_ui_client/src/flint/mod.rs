@@ -8,7 +8,7 @@
 //! `@flint/react`) per the TJ-ARCH-MOB-001 layer contract.
 pub mod token;
 
-pub use token::{AuthState as FlintAuthState, Claims, Role, Token};
+pub use token::{AuthState as FlintAuthState, Role, Token, UntrustedTokenHints};
 
 #[cfg(not(target_arch = "wasm32"))]
 pub mod forge;

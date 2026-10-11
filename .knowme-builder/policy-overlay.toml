@@ -1,0 +1,34 @@
+# KnowMe production policy overlay.
+
+[runtime]
+agentAuthority = "uar"
+embeddedMobile = true
+serviceDesktopWeb = true
+rawMcpApplicationAccess = false
+unknownUarEvents = "persist-inspectable"
+
+[identity]
+authorizationType = "verified-session"
+untrustedTokenHints = "display-only"
+clientAdministration = false
+clientServiceRole = false
+
+[toolGovernance]
+requireServerTrust = true
+requireJsonSchema = true
+requireEffectClassification = true
+requirePolicyDecision = true
+requireIdempotencyId = true
+requireCancellation = true
+annotationsAreAuthorization = false
+
+[release]
+requireAndroidPhysicalDevice = true
+requireIosPhysicalDevice = true
+bindEvidenceToDigests = [
+  "application",
+  "builder",
+  "uar",
+  "model",
+  "artifact",
+]

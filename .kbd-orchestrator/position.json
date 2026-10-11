@@ -1,39 +1,59 @@
 {
   "schemaVersion": "1",
-  "updatedAt": "2026-07-21T04:18:28Z",
+  "generatedBy": "kbd-runtime",
+  "sourceRevision": 2,
+  "updatedAt": "2026-07-29T01:05:45.593758Z",
   "cursor": [
     "model-runtime-per-device",
     "embedded-uar-offline-agents",
-    "embed-uar-mobile-offline"
+    "implementation_ready",
+    "embed-uar-mobile-offline",
+    "S1-S6 all complete and verified. UAR: 1cd130b (admin services + SDK + pack_sync), 9b894ef (skill_exec gate), 884b338/31bae45/765ec21 (web_fetch hardening + toggle + extraction). KnowMe: b2aae10 (control_plane serves real skills/knowledge/MCP). 3.2 remains PARTIAL: tools and memories have no embedded admin surface, and A2UI registry/actions FFI is absent."
   ],
   "root": {
     "type": "phase",
-    "id": "model-runtime-per-device",
-    "status": "active-parent",
+    "id": "26c9321f-5963-489e-8bdc-3c5c17281651",
+    "status": "ready",
     "progress": {
-      "done": 4,
-      "total": 5
+      "done": 0,
+      "total": 0
     },
     "children": [
       {
         "type": "phase",
         "id": "embedded-uar-offline-agents",
-        "status": "implementation_ready",
+        "canonicalId": "embedded-uar-offline-agents",
+        "status": "PENDING",
         "progress": {
           "done": 0,
-          "total": 1
+          "total": 0
         },
-        "children": [
-          {
-            "type": "change",
-            "id": "embed-uar-mobile-offline",
-            "status": "PENDING",
-            "progress": {
-              "done": 0,
-              "total": 0
-            }
-          }
-        ]
+        "children": [],
+        "annotations": []
+      },
+      {
+        "type": "phase",
+        "id": "model-runtime-per-device",
+        "canonicalId": "model-runtime-per-device",
+        "status": "PENDING",
+        "progress": {
+          "done": 0,
+          "total": 0
+        },
+        "children": [],
+        "annotations": []
+      },
+      {
+        "type": "phase",
+        "id": "on-device-qwen35",
+        "canonicalId": "on-device-qwen35",
+        "status": "PENDING",
+        "progress": {
+          "done": 0,
+          "total": 0
+        },
+        "children": [],
+        "annotations": []
       }
     ],
     "annotations": []

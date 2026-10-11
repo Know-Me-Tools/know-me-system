@@ -118,6 +118,10 @@ impl McpServerHandle {
     }
 
     /// Invoke a tool via `tools/call`.
+    ///
+    /// This seam is compiled only for the UAR/agent runtime. Application-facing
+    /// crates intentionally receive no raw execution API.
+    #[cfg(feature = "runtime-internal")]
     pub async fn call_tool(
         &self,
         name: &str,

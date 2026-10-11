@@ -1,0 +1,121 @@
+name: builder-conformance
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  instruction-plane:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Verify Builder adoption and payload parity
+        run: |
+          test -f .knowme-builder/project.toml
+          test -f skills-lock.json
+          test "$(node -p "require('./skills-lock.json').skills.length")" -eq 29
+          for root in .claude .codex .opencode .kimi-code .kimi .agents; do
+            test "$(find "$root/skills" -mindepth 1 -maxdepth 2 -name SKILL.md | wc -l | tr -d ' ')" -ge 29
+            test -f "$root/skills/agent-runtime-security/SKILL.md"
+          done
+          grep -q 'profile = "sovereign-hybrid"' .knowme-builder/project.toml
+          grep -q 'agentAuthority = "uar"' .knowme-builder/policy-overlay.toml
+
+  desktop:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: desktop/pnpm-lock.yaml
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with:
+          version: 11.11.0
+      - name: Test and build desktop projection
+        working-directory: desktop
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm test
+          pnpm build
+      - name: Enforce desktop permission boundary
+        run: |
+          ! grep -q 'shell:default' desktop/src-tauri/capabilities/default.json
+          ! grep -q 'shell:default' desktop/src-tauri/gen/schemas/capabilities.json
+          node scripts/generate-command-contract.mjs
+          git diff --exit-code -- \
+            rust/crates/tauri-plugin-gen-ui/guest-js/src/command_contract.generated.ts \
+            mobile/lib/bridge/command_contract.generated.dart
+
+  rust-boundaries:
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Authenticate private submodules
+        env:
+          TOKEN: ${{ secrets.KNOWME_SUBMODULE_TOKEN }}
+        run: |
+          test -n "$TOKEN"
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "git@github.com:"
+          git submodule update --init --recursive
+      - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c
+        with:
+          toolchain: "1.97.1"
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
+        with:
+          workspaces: rust
+      - name: Identity and protocol boundary tests
+        working-directory: rust
+        run: cargo test -p gen_ui_client
+      - name: Tauri command registration and runtime-only MCP seam
+        working-directory: rust
+        run: |
+          cargo check -p tauri-plugin-gen-ui
+          cargo check -p gen_ui_mcp --no-default-features
+
+  flutter:
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Authenticate private submodules
+        env:
+          TOKEN: ${{ secrets.KNOWME_SUBMODULE_TOKEN }}
+        run: |
+          test -n "$TOKEN"
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "git@github.com:"
+          git submodule update --init --recursive
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          channel: beta
+          cache: true
+      - name: Analyze and test mobile projection
+        working-directory: mobile
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test
+
+  release-evidence:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Validate certification evidence policy
+        run: |
+          node -e "const r=require('./docs/certification/2026-07-28-android-offline-s1-s6.json'); if(!r.offline?.enforced || !r.device?.android) process.exit(1)"
+          if [[ "${GITHUB_REF}" == "refs/tags/v2.0.0" ]]; then
+            test -f docs/certification/ios-release.json
+            node -e "const fs=require('fs'); for(const f of ['docs/certification/2026-07-28-android-offline-s1-s6.json','docs/certification/ios-release.json']) { const r=JSON.parse(fs.readFileSync(f)); for(const k of ['application','builder','uar','model','artifact']) if(!r.digests?.[k]) throw new Error(f+' missing '+k+' digest') }"
+          else
+            echo "Alpha/beta evidence accepted; stable remains blocked on iOS plus digest-bound Android recertification."
+          fi
