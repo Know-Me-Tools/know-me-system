@@ -2,9 +2,11 @@
 
 Complete architecture and functional specification covering containers, home/dashboard/composer/suggestions, A2UI mini applications, optional private dots, native Flutter, Rust FFI, portable component plugins, context/model routing and LiveKit human/agent realtime voice/video.
 
+**Current edition 1.2 published:** [Read KnowMe Praxis](https://ipfs.prometheusags.ai/ipns/k51qzi5uqu5dl4048r1wozopco1c2b0vzfx0kj3rbs0g9rhadfjs8msvi4ll3t/index.html) · [Immutable edition](https://ipfs.prometheusags.ai/ipfs/bafybeidsh26hagvmfxm45a4q45lehcoi2mktmrnj33fwontaqboqkuxbe4/index.html) · [Publication evidence](PUBLICATION-1.2.md). Corrected contrast, keyboard focus and complete static canonical/social metadata; all technical content is retained.
+
 **Edition 1.0 published and verified:** [Read KnowMe Praxis](https://ipfs.prometheusags.ai/ipfs/bafybeib5kuf3t4wqiadyefm36466qhd6d6q4o42ddclky53vhnuvqpocym/index.html).
 
-**Edition 1.1 published:** [Read the WebMCP revision](https://ipfs.prometheusags.ai/ipfs/bafybeibmabyqe2f4jsvtpmjnugsxuwm3v2v3zzbd4nn6gqcaeuad4ovjei/index.html). It adds first-class proposed WebMCP requirements across ten existing chapters, fourteen supplemental coverage entries, G17 browser conformance fixtures and screenshot/social image metadata. A subsequent audit identified missing canonical/og:url identity and contrast/focus defects; edition 1.2 is being prepared to correct them. Root verified the public preview image and index against the tested candidate. See [PUBLICATION-1.1.md](PUBLICATION-1.1.md) and `publication-receipt-1.1.json` for evidence and verification limits; the local pre-upload manifest verified all 147 files, while optional bulk public verification was blocked by network policy mid-check and was not retried. `candidate-manifest.json` remains the prepared artifact's byte manifest, not a pin-state claim.
+**Edition 1.1 published:** [Read the WebMCP revision](https://ipfs.prometheusags.ai/ipfs/bafybeibmabyqe2f4jsvtpmjnugsxuwm3v2v3zzbd4nn6gqcaeuad4ovjei/index.html). It adds first-class proposed WebMCP requirements across ten existing chapters, fourteen supplemental coverage entries, G17 browser conformance fixtures and screenshot/social image metadata. A subsequent audit identified missing canonical/og:url identity and contrast/focus defects; edition 1.2 corrects them. Root verified the public preview image and index against the tested candidate. See [PUBLICATION-1.1.md](PUBLICATION-1.1.md) and `publication-receipt-1.1.json` for evidence and verification limits; the local pre-upload manifest verified all 147 files, while optional bulk public verification was blocked by network policy mid-check and was not retried. `candidate-manifest.json` remains the prepared artifact's byte manifest, not a pin-state claim.
 
 This is a documentation checkpoint, not an application release or certification of proposed capabilities. Code-observed findings, retained source requirements and proposed integration contracts are distinguished in the document.
 
@@ -19,7 +21,7 @@ This is a documentation checkpoint, not an application release or certification 
 
 The public technical-record scope was explicitly approved on 20 October 2026 before publication. Credentials, private voice/personality substrate, unapproved raw source snapshots, unrelated application changes and redundant archives are excluded.
 
-## Build the current candidate
+## Build the document locally
 
 Use Python 3.11 or newer and a local checkout of [htmx-doc-forge](https://github.com/Prometheus-AGS/htmx-doc-forge) at commit `42336a3eee61261ab3b3cd896fa41dfd9bc23aa7`. Its existing Python dependencies must be installed. No new dependency is added to the KnowMe application.
 
@@ -31,7 +33,7 @@ The command writes ignored `dist/` outputs, enforces the pinned forge commit and
 
 ## Publication and resume
 
-Editions 1.0 and 1.1 are published at distinct immutable CIDs. Do not republish merely to resume work. Edition 1.1 used exactly two explicitly approved authenticated uploads, image first; both requested pinning. No independent remote pin/list inspection was performed. No credential file or automatic publishing hook is included here.
+Editions 1.0, 1.1 and 1.2 are published at distinct immutable CIDs. Edition 1.2 also resolves through the document-specific stable IPNS URL; see `PUBLICATION-1.2.md` for the four-operation receipt and measured verification limits. Do not republish merely to resume work. Edition 1.1 used exactly two explicitly approved authenticated uploads, image first; both requested pinning. No independent remote pin/list inspection was performed. No credential file or automatic publishing hook is included here.
 
 ## Standing authoring preference
 
@@ -39,12 +41,12 @@ User instruction, 20 October 2026: every new HTMX or HTML document should includ
 
 This branch only adds `docs/knowme-praxis`. It does not change the application, the active UAR work, deployment settings or the original source repository's untracked files. No merge or deployment is part of the checkpoint. All local rendering and publishing processes had exited before handoff.
 
-## Edition 1.2 — tested release candidate
+## Edition 1.2 — published and verified within documented scope
 
-The isolated correction worktree starts from `e57624fc8539e5ebd09dde79b96943cbdbc83467`. Technical content, 811 source sections and the WebMCP additions are preserved. `dist/knowme-praxis/` is the prepared 1.2 package; it is **not published**. `site/` remains the asset/input tree, not the release upload directory.
+The isolated correction worktree starts from `e57624fc8539e5ebd09dde79b96943cbdbc83467`. Technical content, 811 source sections and the WebMCP additions are preserved. `dist/knowme-praxis/` contains the exact 1.2 package published by the parent. `site/` remains the asset/input tree, not the release upload directory.
 
-For unpublished accessibility QA, use `build.py --forge-root /path/to/htmx-doc-forge --draft`. A release build requires `PUBLIC_CANONICAL_URL` and `PUBLIC_OG_IMAGE_URL` supplied after the parent's approved identity/image operations. The old social JSON is historical and is no longer used by the build. The build never creates a key, uploads, resolves credentials or changes a server. `checks-1.2/` contains measured contrast, axe and keyboard evidence plus new screenshots. See `PREPARED-1.2.md` for limitations and the proposed publication sequence.
+For unpublished accessibility QA, use `build.py --forge-root /path/to/htmx-doc-forge --draft`. A release build requires `PUBLIC_CANONICAL_URL` and `PUBLIC_OG_IMAGE_URL` supplied after the parent's approved identity/image operations. The old social JSON is historical and is no longer used by the build. The build never creates a key, uploads, resolves credentials or changes a server. `checks-1.2/` contains measured contrast, axe and keyboard evidence plus new screenshots. See `PREPARED-1.2.md` for historical preparation evidence and `PUBLICATION-1.2.md` for the completed publication and verification limits.
 
-The canonical now uses the document-specific key successfully created by the parent. `checks-1.2/release-metadata.json` contains the exact canonical and predicted image URL/importer settings. Public image verification and name publication remain parent-owned. To reproduce the final metadata, set `PUBLIC_CANONICAL_URL` and `PUBLIC_OG_IMAGE_URL` to those JSON fields and omit `--draft`. The release rebuild changed only index metadata; body content and all other 157 files are unchanged. Four additional rendered screenshots are byte-identical to the earlier tested views.
+The canonical now uses the document-specific key successfully created by the parent. `checks-1.2/release-metadata.json` contains the exact canonical and locally predicted image URL/importer settings. The parent confirmed that the returned image CID matched, verified the public image, published the name, and verified stable resolution. To reproduce the final metadata, set `PUBLIC_CANONICAL_URL` and `PUBLIC_OG_IMAGE_URL` to those JSON fields and omit `--draft`. The release rebuild changed only index metadata; body content and all other 157 files are unchanged. Four additional rendered screenshots are byte-identical to the earlier tested views.
 
-Full axe evidence is retained losslessly as `checks-1.2/accessibility.json.gz`; `summary.json` preserves measured results and limitations. Screenshots are retained once in `site/screenshots/revision-1.2-*.png`. The Library transfer manifest is `release-transfer-1.2.json`; its ZIP hash and 158 file hashes identify the prepared package, not a public-availability claim.
+Full axe evidence is retained losslessly as `checks-1.2/accessibility.json.gz`; `summary.json` preserves measured results and limitations. Screenshots are retained once in `site/screenshots/revision-1.2-*.png`. The Library transfer manifest is `release-transfer-1.2.json`; its ZIP hash and 158 file hashes identify the published package. Public verification is attributed and scoped separately in `publication-receipt-1.2.json`; no bulk public asset crawl was performed.

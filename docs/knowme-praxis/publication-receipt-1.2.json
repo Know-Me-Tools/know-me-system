@@ -1,0 +1,96 @@
+{
+  "document": "KnowMe Praxis",
+  "edition": "1.2",
+  "publication_date": "2026-10-20",
+  "artifact_commit": "148b685ebf197c329a0a97b2ff5c360b2c99091b",
+  "evidence_source": "Parent publication task report supplied to documentation task on 2026-10-20; public checks below were performed by parent, not repeated by receipt author; no credentials forwarded.",
+  "rpc": "https://rpc.prometheusags.ai",
+  "cid": "bafybeidsh26hagvmfxm45a4q45lehcoi2mktmrnj33fwontaqboqkuxbe4",
+  "immutable_url": "https://ipfs.prometheusags.ai/ipfs/bafybeidsh26hagvmfxm45a4q45lehcoi2mktmrnj33fwontaqboqkuxbe4/index.html",
+  "stable_url": "https://ipfs.prometheusags.ai/ipns/k51qzi5uqu5dl4048r1wozopco1c2b0vzfx0kj3rbs0g9rhadfjs8msvi4ll3t/index.html",
+  "authenticated_operations": {
+    "count": 4,
+    "order": [
+      "document-specific IPNS key generation",
+      "corrected preview image add",
+      "158-file document package add",
+      "document-specific IPNS name publish"
+    ],
+    "authorization": "Parent reports explicit user approval of these four operations at 12:11",
+    "child_rpc_operations": 0,
+    "credentials_saved_or_forwarded": false
+  },
+  "ipns": {
+    "key_name": "knowme-praxis-document-20261020",
+    "public_id": "k51qzi5uqu5dl4048r1wozopco1c2b0vzfx0kj3rbs0g9rhadfjs8msvi4ll3t",
+    "namepublish_response": {
+      "Name": "k51qzi5uqu5dl4048r1wozopco1c2b0vzfx0kj3rbs0g9rhadfjs8msvi4ll3t",
+      "Value": "/ipfs/bafybeidsh26hagvmfxm45a4q45lehcoi2mktmrnj33fwontaqboqkuxbe4"
+    },
+    "public_get": {
+      "status": 200,
+      "mime": "text/html",
+      "exact_index_hash_verified_by_parent": true,
+      "static_canonical_og_url_image_verified_by_parent": true
+    }
+  },
+  "pin_evidence": {
+    "both_add_requests_pin_true": true,
+    "authenticated_pin_list_performed": false,
+    "independent_remote_pin_inspection": false
+  },
+  "image": {
+    "cid": "bafkreify5f2332n33x6s4suxxteqhw6lj6zgqanvh4ji4cqtb5qgoqr3lu",
+    "url": "https://ipfs.prometheusags.ai/ipfs/bafkreify5f2332n33x6s4suxxteqhw6lj6zgqanvh4ji4cqtb5qgoqr3lu",
+    "sha256": "b8e975bde9bbddfd2e4a97bcc903dbcb4fb26801b53f128e0a130f6067423b5d",
+    "bytes": 272805,
+    "mime": "image/png",
+    "width": 2400,
+    "height": 1260,
+    "returned_cid_matches_local_prediction": true,
+    "public_bytes_mime_dimensions_verified_by_parent": true,
+    "importer_query": "cid-version=1&hash=sha2-256&raw-leaves=true&chunker=size-1048576&wrap-with-directory=false&trickle=false&inline=false&preserve-mode=false&preserve-mtime=false&pin=true"
+  },
+  "page": {
+    "file_count": 158,
+    "index_sha256": "e5e051482624ad71423d1dc0015161032f224fcba901f57850e91183b7ba9a0f",
+    "public_immutable_index_hash_verified_by_parent": true,
+    "public_praxis_css_sha256": "3944a77f7973dd2d65f282565157df469bb352a15348c62af8fd8ea816e3d027",
+    "public_praxis_css_hash_verified_by_parent": true,
+    "all_158_local_manifest_files_verified": true,
+    "bulk_public_crawl_performed": false,
+    "full_public_asset_verification": false,
+    "manifest": "release-transfer-1.2.json",
+    "document_importer_query": "cid-version=1&hash=sha2-256&raw-leaves=true&chunker=size-262144&wrap-with-directory=true&trickle=false&inline=false&preserve-mode=false&preserve-mtime=false&pin=true",
+    "published_bytes_modified_by_receipt_update": false
+  },
+  "accessibility": {
+    "report": "checks-1.2/summary.json",
+    "full_report": "checks-1.2/accessibility.json.gz",
+    "scope": "Headless Chromium: all 811 retained sections expanded at 1440px and390px in light/dark; representative source record, home and coverage pages; 12 page/theme cases total.",
+    "axe_violations": 0,
+    "computed_text_contrast_failures": 0,
+    "unfocusable_scroll_regions": 0,
+    "retained_text_contrast_light": 16.6,
+    "retained_text_contrast_dark": 14.58,
+    "keyboard_scrolling_and_summary_focus_checks_passed": true,
+    "additional_metadata_only_release_render_views": 4,
+    "release_screenshots_byte_identical_to_tested_draft": true,
+    "screen_reader_user_testing_performed": false,
+    "native_device_testing_performed": false,
+    "full_wcag_conformance_claim": false,
+    "limits": "Axe incomplete evaluations are preserved in the full report; automated checks and visual inspection are not full conformance certification."
+  },
+  "technical_preservation": {
+    "chapters_unchanged": 17,
+    "retained_source_sections": 811,
+    "technical_files_byte_identical_to_1_1": 50,
+    "webmcp_additions_preserved": true
+  },
+  "zip": {
+    "file_name": "knowme-praxis-1.2-canonical-release.zip",
+    "bytes": 6480234,
+    "sha256": "28b705b2bb6dfbdd4c70e23d1dd0b7b4d83d5f4fb8961475912f2c02d4315a88",
+    "layout": "158 public site files at archive root; no wrapper directory"
+  }
+}
