@@ -2,7 +2,7 @@
 
 Complete architecture and functional specification covering containers, home/dashboard/composer/suggestions, A2UI mini applications, optional private dots, native Flutter, Rust FFI, portable component plugins, context/model routing and LiveKit human/agent realtime voice/video.
 
-**Current edition 1.2 published:** [Read KnowMe Praxis](https://ipfs.prometheusags.ai/ipns/k51qzi5uqu5dl4048r1wozopco1c2b0vzfx0kj3rbs0g9rhadfjs8msvi4ll3t/index.html) · [Immutable edition](https://ipfs.prometheusags.ai/ipfs/bafybeidsh26hagvmfxm45a4q45lehcoi2mktmrnj33fwontaqboqkuxbe4/index.html) · [Publication evidence](PUBLICATION-1.2.md). Corrected contrast, keyboard focus and complete static canonical/social metadata; all technical content is retained.
+**Current edition 1.2 published:** [Share page](https://ipfs.prometheusags.ai/ipns/k51qzi5uqu5dl4048r1wozopco1c2b0vzfx0kj3rbs0g9rhadfjs8msvi4ll3t/index.html) · [Complete specification](https://ipfs.prometheusags.ai/ipns/k51qzi5uqu5dl4048r1wozopco1c2b0vzfx0kj3rbs0g9rhadfjs8msvi4ll3t/specification.html) · [Immutable package](https://ipfs.prometheusags.ai/ipfs/bafybeianggntnigojmuqpsn2bskslb3mob5lkbaagd3wcgtfjokgv2dazi/index.html) · [Publication evidence](PREVIEW-DELIVERY.md). The compact share page carries early static preview metadata; the complete specification is retained byte-for-byte at `specification.html`.
 
 **Edition 1.0 published and verified:** [Read KnowMe Praxis](https://ipfs.prometheusags.ai/ipfs/bafybeib5kuf3t4wqiadyefm36466qhd6d6q4o42ddclky53vhnuvqpocym/index.html).
 
@@ -33,7 +33,7 @@ The command writes ignored `dist/` outputs, enforces the pinned forge commit and
 
 ## Publication and resume
 
-Editions 1.0, 1.1 and 1.2 are published at distinct immutable CIDs. Edition 1.2 also resolves through the document-specific stable IPNS URL; see `PUBLICATION-1.2.md` for the four-operation receipt and measured verification limits. Do not republish merely to resume work. Edition 1.1 used exactly two explicitly approved authenticated uploads, image first; both requested pinning. No independent remote pin/list inspection was performed. No credential file or automatic publishing hook is included here.
+Editions 1.0, 1.1 and 1.2 are published at distinct immutable CIDs. Edition 1.2 also resolves through the document-specific stable IPNS URL. Its preview-delivery correction was published with two additional explicitly approved operations, retaining the original full specification and image; see `PREVIEW-DELIVERY.md` and `publication-receipt-preview-delivery.json`. `PUBLICATION-1.2.md` retains the earlier four-operation receipt. Do not republish merely to resume work. Edition 1.1 used exactly two explicitly approved authenticated uploads, image first; both requested pinning. No independent remote pin/list inspection was performed. No credential file or automatic publishing hook is included here.
 
 ## Standing authoring preference
 
@@ -50,3 +50,7 @@ For unpublished accessibility QA, use `build.py --forge-root /path/to/htmx-doc-f
 The canonical now uses the document-specific key successfully created by the parent. `checks-1.2/release-metadata.json` contains the exact canonical and locally predicted image URL/importer settings. The parent confirmed that the returned image CID matched, verified the public image, published the name, and verified stable resolution. To reproduce the final metadata, set `PUBLIC_CANONICAL_URL` and `PUBLIC_OG_IMAGE_URL` to those JSON fields and omit `--draft`. The release rebuild changed only index metadata; body content and all other 157 files are unchanged. Four additional rendered screenshots are byte-identical to the earlier tested views.
 
 Full axe evidence is retained losslessly as `checks-1.2/accessibility.json.gz`; `summary.json` preserves measured results and limitations. Screenshots are retained once in `site/screenshots/revision-1.2-*.png`. The Library transfer manifest is `release-transfer-1.2.json`; its ZIP hash and 158 file hashes identify the published package. Public verification is attributed and scoped separately in `publication-receipt-1.2.json`; no bulk public asset crawl was performed.
+
+## Reproduce the current preview-delivery package
+
+First reproduce the exact 158-file edition 1.2 package with the existing release build and verified canonical/image inputs. Then run `python3 docs/knowme-praxis/build_share_preview.py`. The builder checks every base-file hash against the historical transfer manifest and writes `dist/knowme-praxis-share/`: the 159-file current publication. It adds the compact share page, retains the original index unchanged as `specification.html`, and changes only specification hrefs in supporting pages. The historical `dist/knowme-praxis/` package remains unchanged. The external `preview-delivery-manifest.json` identifies the publication bytes. New sources and measured checks are in `source/share-index.html`, `source/verify_share_preview.py` and `checks-preview-delivery/`. No actual iMessage rendering, real-device or screen-reader test is claimed.

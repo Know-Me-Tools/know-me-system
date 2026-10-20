@@ -1,0 +1,104 @@
+{
+  "document": "KnowMe Praxis",
+  "edition": "1.2 preview-delivery correction",
+  "publication_date": "2026-10-20",
+  "evidence_source": "Parent publication task report received 2026-10-20. Public publication checks attributed below were performed by parent; receipt author made no additional IPFS calls or credential accesses.",
+  "authorization": {
+    "user_message_id": "Sentinel_cea2a343a4e08191b55afdc994307e6d",
+    "user_message": "Approved!  Get it done!",
+    "approved_authenticated_operation_count": 2,
+    "operations": [
+      "document package add",
+      "update existing document-specific IPNS name"
+    ],
+    "parent_reported_completed_count": 2,
+    "additional_child_ipfs_calls": 0
+  },
+  "cid": "bafybeianggntnigojmuqpsn2bskslb3mob5lkbaagd3wcgtfjokgv2dazi",
+  "immutable_url": "https://ipfs.prometheusags.ai/ipfs/bafybeianggntnigojmuqpsn2bskslb3mob5lkbaagd3wcgtfjokgv2dazi/index.html",
+  "stable_url": "https://ipfs.prometheusags.ai/ipns/k51qzi5uqu5dl4048r1wozopco1c2b0vzfx0kj3rbs0g9rhadfjs8msvi4ll3t/index.html",
+  "ipns": {
+    "public_id": "k51qzi5uqu5dl4048r1wozopco1c2b0vzfx0kj3rbs0g9rhadfjs8msvi4ll3t",
+    "new_value": "/ipfs/bafybeianggntnigojmuqpsn2bskslb3mob5lkbaagd3wcgtfjokgv2dazi",
+    "parent_verified_public_resolution": true
+  },
+  "package": {
+    "file_count": 159,
+    "manifest": "preview-delivery-manifest.json",
+    "all_159_hashes_independently_verified_by_parent_before_add": true,
+    "zip": {
+      "name": "knowme-praxis-preview-delivery-candidate.zip",
+      "bytes": 6484084,
+      "sha256": "a024ca5ba6d053995cbbbefc85d06c7d1348b0d273536a6e7b1bead6183ab3e6",
+      "layout": "159 public files at archive root; upload extracted files, not ZIP bytes"
+    },
+    "child_verified_all_159_package_files_unchanged_while_recording_receipt": true
+  },
+  "public_verification_by_parent": {
+    "immutable_index": {
+      "status": 200,
+      "mime": "text/html",
+      "bytes": 10878,
+      "sha256": "b4f31d193db863dcb6508661f0e7e6a73ff25c5964587450b128319be4eec903",
+      "matches_local_bytes": true
+    },
+    "stable_index": {
+      "status": 200,
+      "mime": "text/html",
+      "bytes": 10878,
+      "sha256": "b4f31d193db863dcb6508661f0e7e6a73ff25c5964587450b128319be4eec903",
+      "matches_local_bytes": true
+    },
+    "specification": {
+      "status": 200,
+      "mime": "text/html",
+      "bytes": 1345601,
+      "sha256": "e5e051482624ad71423d1dc0015161032f224fcba901f57850e91183b7ba9a0f",
+      "byte_identical_to_prior_published_index": true
+    },
+    "existing_image": {
+      "status": 200,
+      "mime": "image/png",
+      "bytes": 272805,
+      "url": "https://ipfs.prometheusags.ai/ipfs/bafkreify5f2332n33x6s4suxxteqhw6lj6zgqanvh4ji4cqtb5qgoqr3lu",
+      "sha256": "b8e975bde9bbddfd2e4a97bcc903dbcb4fb26801b53f128e0a130f6067423b5d",
+      "matches_verified_image": true,
+      "regenerated_or_reuploaded": false
+    },
+    "first_8192_bytes": {
+      "request_range": "bytes=0-8191",
+      "status": 206,
+      "exact_image_metadata_present": true
+    },
+    "bulk_public_asset_crawl": false
+  },
+  "pin_verification": {
+    "independent_authenticated_pin_inspection_performed": false,
+    "independent_pin_state_claim": false
+  },
+  "content_preservation": {
+    "full_specification_byte_identical": true,
+    "chapters": 17,
+    "source_mappings": 811,
+    "technical_source_records": 45,
+    "support_pages_changed_only_in_relative_hrefs": 47,
+    "accessibility_fixes_and_webmcp_additions_retained": true
+  },
+  "local_verification": {
+    "report": "checks-preview-delivery/verification.json",
+    "four_views": "1440px and 390px, each in light and dark",
+    "zero_axe_violations": true,
+    "zero_computed_contrast_failures": true,
+    "zero_page_horizontal_overflow": true,
+    "keyboard_and_javascript_disabled_navigation_passed": true,
+    "local_links_checked": 3700,
+    "broken_links": 0,
+    "required_metadata_within_first_8192_bytes": true,
+    "actual_imessage_rendering_tested": false,
+    "native_device_testing_performed": false,
+    "screen_reader_user_testing_performed": false,
+    "full_wcag_conformance_claim": false
+  },
+  "historical_publication_receipt": "publication-receipt-1.2.json",
+  "historical_preparation_manifest_status": "preview-delivery-manifest.json records pre-upload candidate state; this external receipt establishes completed publication without modifying historical metadata or published package bytes."
+}

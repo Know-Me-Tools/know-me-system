@@ -1,0 +1,146 @@
+{
+  "status": "unpublished candidate; actual iMessage rendering not tested",
+  "landing_bytes": 10878,
+  "metadata_offsets_bytes": {
+    "og:title": 236,
+    "og:type": 144,
+    "og:description": 287,
+    "og:site_name": 188,
+    "og:url": 1062,
+    "og:image": 1351,
+    "og:image:secure_url": 1483,
+    "og:image:type": 1626,
+    "og:image:width": 1678,
+    "og:image:height": 1726,
+    "og:image:alt": 1775,
+    "twitter:card": 709,
+    "twitter:title": 766,
+    "twitter:description": 818,
+    "twitter:url": 1202,
+    "twitter:image": 1917,
+    "twitter:image:alt": 2050
+  },
+  "all_required_metadata_in_first_8192_bytes": true,
+  "canonical": "https://ipfs.prometheusags.ai/ipns/k51qzi5uqu5dl4048r1wozopco1c2b0vzfx0kj3rbs0g9rhadfjs8msvi4ll3t/index.html",
+  "preview_image_url": "https://ipfs.prometheusags.ai/ipfs/bafkreify5f2332n33x6s4suxxteqhw6lj6zgqanvh4ji4cqtb5qgoqr3lu",
+  "local_links_checked": 3700,
+  "broken_links": [],
+  "specification_byte_identical": true,
+  "specification_sha256": "e5e051482624ad71423d1dc0015161032f224fcba901f57850e91183b7ba9a0f",
+  "chapters": 17,
+  "source_mappings": 811,
+  "support_pages_with_navigation_only_changes": 47,
+  "views": [
+    {
+      "width": 1440,
+      "theme": "light",
+      "status": 200,
+      "redirects": false,
+      "contrast_failures": 0,
+      "minimum_measured_text_ratio": 5.7262591342782105,
+      "horizontal_overflow": false,
+      "keyboard_skip_and_primary_link_passed": true,
+      "focus": {
+        "visible": true,
+        "outline": "solid",
+        "width": 3
+      },
+      "image_loaded": true,
+      "page_errors": [],
+      "axe": {
+        "version": "4.14.0",
+        "violations": [],
+        "incomplete": []
+      }
+    },
+    {
+      "width": 1440,
+      "theme": "dark",
+      "status": 200,
+      "redirects": false,
+      "contrast_failures": 0,
+      "minimum_measured_text_ratio": 7.267618391388714,
+      "horizontal_overflow": false,
+      "keyboard_skip_and_primary_link_passed": true,
+      "focus": {
+        "visible": true,
+        "outline": "solid",
+        "width": 3
+      },
+      "image_loaded": true,
+      "page_errors": [],
+      "axe": {
+        "version": "4.14.0",
+        "violations": [],
+        "incomplete": []
+      }
+    },
+    {
+      "width": 390,
+      "theme": "light",
+      "status": 200,
+      "redirects": false,
+      "contrast_failures": 0,
+      "minimum_measured_text_ratio": 5.7262591342782105,
+      "horizontal_overflow": false,
+      "keyboard_skip_and_primary_link_passed": true,
+      "focus": {
+        "visible": true,
+        "outline": "solid",
+        "width": 3
+      },
+      "image_loaded": true,
+      "page_errors": [],
+      "axe": {
+        "version": "4.14.0",
+        "violations": [],
+        "incomplete": []
+      }
+    },
+    {
+      "width": 390,
+      "theme": "dark",
+      "status": 200,
+      "redirects": false,
+      "contrast_failures": 0,
+      "minimum_measured_text_ratio": 7.267618391388714,
+      "horizontal_overflow": false,
+      "keyboard_skip_and_primary_link_passed": true,
+      "focus": {
+        "visible": true,
+        "outline": "solid",
+        "width": 3
+      },
+      "image_loaded": true,
+      "page_errors": [],
+      "axe": {
+        "version": "4.14.0",
+        "violations": [],
+        "incomplete": []
+      }
+    }
+  ],
+  "axe_sha256": "20c09fe157a8a34a30e241aaa1fcdade657734f08ab379ecfbeb7d45cc46e878",
+  "javascript_disabled_navigation_passed": true,
+  "pass": true,
+  "limitations": "Headless browser and computed/axe checks only. No actual iMessage preview, native-device or screen-reader user testing. Axe incomplete results retained. Public image fetched separately; browser render intercepted to those exact verified local bytes. No candidate publication occurred.",
+  "fresh_public_image_verification": {
+    "url": "https://ipfs.prometheusags.ai/ipfs/bafkreify5f2332n33x6s4suxxteqhw6lj6zgqanvh4ji4cqtb5qgoqr3lu",
+    "status": 200,
+    "mime": "image/png",
+    "bytes": 272805,
+    "sha256": "b8e975bde9bbddfd2e4a97bcc903dbcb4fb26801b53f128e0a130f6067423b5d",
+    "dimensions": [
+      2400,
+      1260
+    ],
+    "byte_identical_to_local": true
+  },
+  "apple_reference": {
+    "url": "https://developer.apple.com/documentation/technotes/tn3156-create-rich-previews-for-messages",
+    "main_resource_limit_bytes": 1000000,
+    "associated_resources_limit": "10 MB",
+    "note": "Apple describes these as guidelines subject to change; actual Messages rendering has not been verified."
+  },
+  "metadata_latest_byte_offset": 2050
+}
