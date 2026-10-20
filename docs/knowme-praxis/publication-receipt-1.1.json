@@ -1,0 +1,59 @@
+{
+  "document": "KnowMe Praxis",
+  "edition": "1.1",
+  "publication_date": "2026-10-20",
+  "artifact_commit": "5ba6ef7ccf6db6505fa7c90aaae91f75074dbca5",
+  "evidence_source": "Root publication task report supplied to documentation task on 2026-10-20; no credentials forwarded",
+  "rpc": "https://rpc.prometheusags.ai",
+  "cid": "bafybeibmabyqe2f4jsvtpmjnugsxuwm3v2v3zzbd4nn6gqcaeuad4ovjei",
+  "url": "https://ipfs.prometheusags.ai/ipfs/bafybeibmabyqe2f4jsvtpmjnugsxuwm3v2v3zzbd4nn6gqcaeuad4ovjei/index.html",
+  "uploads": {
+    "count": 2,
+    "order": [
+      "standalone preview image",
+      "147-file page package"
+    ],
+    "authorization": "Explicit per-action approval obtained by root",
+    "pin_requested_for_both": true,
+    "credentials_saved_or_forwarded": false
+  },
+  "pin_evidence": {
+    "add_requests_pin_true": true,
+    "authenticated_pin_list_performed": false,
+    "independent_remote_pin_inspection": false,
+    "note": "pin=true was supplied to both add calls; no separate authenticated pin/list call was authorized or made."
+  },
+  "image": {
+    "cid": "bafybeic6mr557ji36o53xo5bc6uw7jpxckzcdqo4kjzis3zimwjchem6bq",
+    "url": "https://ipfs.prometheusags.ai/ipfs/bafybeic6mr557ji36o53xo5bc6uw7jpxckzcdqo4kjzis3zimwjchem6bq",
+    "mime": "image/png",
+    "width": 2400,
+    "height": 1260,
+    "bytes": 272489,
+    "sha256": "049f8af0b4cb8d6aa48472ded99a8a818dd8b0110ae18e2d1c8cd6acba7f6a57",
+    "public_bytes_mime_dimensions_hash_verified_by_root": true,
+    "expected_cid_matched": true,
+    "importer": {
+      "cid_version": 1,
+      "raw_leaves": true,
+      "chunker": "size-262144",
+      "wrap_with_directory": false,
+      "hash": "sha2-256",
+      "layout": "balanced"
+    }
+  },
+  "page": {
+    "file_count": 147,
+    "index_sha256": "47d8f144ffd4edbf75ee585cd3c10ae206be2edcd26517e13597365240bd30ef",
+    "public_index_hash_matches_candidate_verified_by_root": true,
+    "og_twitter_image_matches_published_image_verified_by_root": true,
+    "full_public_file_verification": "pending independent root verification at time of receipt creation",
+    "manifest": "candidate-manifest.json",
+    "manifest_sha256": "ba22c09691b349dc29176c56db60cd8b28aac8fa6dcd2df7ff3e754bb38e7af9"
+  },
+  "canonical": {
+    "strategy": "Immutable edition URL recorded externally; published HTML intentionally omits canonical, og:url and twitter:url. No self-reference claimed.",
+    "html_changed_after_upload": false
+  },
+  "historical_edition_1_0_receipt": "publication-receipt.json"
+}
