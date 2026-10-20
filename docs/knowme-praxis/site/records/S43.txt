@@ -1,0 +1,73 @@
+## ADDED Requirements
+
+### Requirement: Reproducible workspace image
+The project SHALL build one `linux/amd64` image containing the compiled Axum BFF
+and the matching React distribution from the same source revision.
+
+#### Scenario: Image is built
+- **WHEN** the workspace image build completes
+- **THEN** the image starts the Axum binary and serves the compiled SPA
+- **AND** the recorded source SHA and image digest identify the exact build
+
+#### Scenario: Runtime architecture is inspected
+- **WHEN** the image manifest is inspected
+- **THEN** it contains `linux/amd64`, matching the observed AKS nodes
+
+### Requirement: Runtime is non-root and secret-free
+The final image MUST run as a non-root user and MUST NOT contain `.env` files,
+private keys, tokens, cookies, database passwords, or model credentials.
+
+#### Scenario: Image metadata and layers are inspected
+- **WHEN** image configuration and layers are scanned
+- **THEN** the configured user is non-root
+- **AND** no forbidden secret material or source `.env` file is present
+
+#### Scenario: Secret is required at runtime
+- **WHEN** a required credential is absent
+- **THEN** the process fails closed with the missing configuration key name
+- **AND** the credential value is never logged
+
+### Requirement: Kubernetes-compatible health contract
+The BFF SHALL expose distinct startup/liveness and readiness behavior.
+
+#### Scenario: Process is alive but required configuration is invalid
+- **WHEN** the event loop is running and required configuration cannot be loaded
+- **THEN** liveness remains successful
+- **AND** readiness fails with a non-secret reason
+
+#### Scenario: Optional UAR is unavailable
+- **WHEN** the protected POC uses the document-agent adapter and UAR is unavailable
+- **THEN** workspace readiness remains successful
+- **AND** the UAR conformance status reports unavailable separately
+
+### Requirement: Profiled local runtime
+`docker-compose.yml` SHALL provide a core protected-POC profile and an additive UAR
+conformance profile with health-based dependency ordering.
+
+#### Scenario: Core profile starts
+- **WHEN** an operator starts the core profile with valid local configuration
+- **THEN** the workspace reaches readiness using the existing document-agent path
+- **AND** UAR is not required
+
+#### Scenario: UAR profile starts
+- **WHEN** an operator enables the UAR profile
+- **THEN** UAR is built or pulled from the pinned source contract
+- **AND** its health endpoint becomes ready before conformance calls run
+- **AND** the protected BFF adapter is unchanged
+
+### Requirement: Workspace Kubernetes backend is renderable before edge attachment
+The project SHALL provide one workspace Deployment/Service component with a stable
+namespace, Service name, port, selector, probes, resource bounds, non-root security
+context, and Secret name/key references. This change MUST NOT apply the component
+to the cluster.
+
+#### Scenario: Workspace component is rendered
+- **WHEN** the component is built and server-side dry-run
+- **THEN** the Service selector matches the Deployment pod labels
+- **AND** the Service targetPort matches the BFF container port
+- **AND** no Secret value or generated signing identity is rendered
+
+#### Scenario: Edge release references the workspace
+- **WHEN** the shared edge and umbrella release are composed later
+- **THEN** they reference this stable Service contract
+- **AND** the first live apply remains owned by the `sansaba-release` workflow

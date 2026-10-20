@@ -1,0 +1,663 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>S26 · README.md</title><link rel="stylesheet" href="../records.css"><body><main><a href="../index.html">KnowMe Praxis</a><h1>S26 · README.md</h1><p>Complete technical source record. Historical names and requirements remain visible for audit. Revised clauses and explicit corrections govern their application.</p><p><a href="S26.txt">Download complete technical text</a></p><article id="S26-001" class="source-clause"><h4>S26-001 · Local Model Acquisition &amp; Management Strategy</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h1>Local Model Acquisition &amp; Management Strategy</h1>
+<p><strong>Scope:</strong> how KnowMe selects, downloads, verifies, and activates on-device models across
+web, desktop (macOS/Windows/Linux), and mobile (iOS/Android) — including first-run
+onboarding, per-environment hardware detection, distribution (Hugging Face vs. a
+KnowMe-controlled origin), and post-download validation.</p>
+<p><strong>Status:</strong> v1.2 strategy, 2026-07-18 (v1.1 added §10 per-machine picks and §11 embeddings; v1.2 adds §12 Model Library UX). Companion to <code>docs/knowme-functional-spec.html</code>
+(§04 Models tile, §10 Tiers) and <code>docs/knowme-builder-extensibility-spec.md</code> (§7
+packaging). Implements against <code>rust/crates/gen_ui_inference</code> (llama-cpp-2 +
+reqwest/sha2, mistral.rs optional) and the <code>versions.toml</code> <code>[inference]</code> matrix
+(desktop/mobile = llama-cpp-2, web = WebLLM).</p>
+<hr/></article><article id="S26-002" class="source-clause"><h4>S26-002 · 1. Principles</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>1. Principles</h2>
+<ol>
+<li><strong>The catalog is signed data, not code</strong> (§4). Models, quants, sizes, hashes,
+   licenses, and hardware requirements ship as a versioned manifest the app fetches and
+   verifies — never as constants in the binary.</li>
+<li><strong>Recommend, never force.</strong> Detection produces a <em>recommendation</em> with a visible
+   reason ("8 GB unified memory → Gemma-3n-2B-Q4"); the library stays open (sideload,
+   override). This is the "library, not a menu" stance from the moodboard.</li>
+<li><strong>The first token is the onboarding goal.</strong> Everything in §2 is ordered so the user
+   reaches a working first generation as fast as their connection allows, with honest
+   progress and a working app while they wait.</li>
+<li><strong>Trust is structural</strong>: SHA-256 on every artifact, signed manifests, and a
+   load-and-generate smoke test before a model is marked Active (§7). llama.cpp does
+   not verify integrity at load time — there is an open upstream request for exactly
+   this (<a href="https://github.com/ggml-org/llama.cpp/issues/15250">ggml-org/llama.cpp#15250</a>)
+   — so verification is <strong>our</strong> job, in the acquisition layer.</li>
+<li><strong>One state machine, three transports.</strong> Discovery → fit-check → consent → fetch →
+   verify → activate is identical everywhere; only the fetch adapter differs per tier.</li>
+</ol></article><article id="S26-003" class="source-clause"><h4>S26-003 · 2. Onboarding (first run)</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>2. Onboarding (first run)</h2>
+<p>The Engine Card is the destination: green dot, model name, live tok/s. First run is the
+path to lighting it up.</p>
+<p><strong>Step 0 — instant utility.</strong> The app must be usable before any model lands: UI opens,
+settings work, and (web/desktop) a "connect to a BossFang instance or cloud provider"
+escape hatch exists so a user on hotel Wi-Fi isn't staring at a progress bar. If a peer
+instance is reachable, offer remote inference <em>now</em> while the local model downloads in
+the background.</p>
+<p><strong>Step 1 — probe (silent, &lt;1 s).</strong> Run the <code>DeviceProfile</code> probe (§3). No consent
+needed; nothing leaves the device. Cache in settings; re-probe on hardware change
+(eGPU, RAM upgrade, browser update enabling WebGPU).</p>
+<p><strong>Step 2 — recommend (one card, one number).</strong> Show a single recommended model with
+size, why it was chosen, and what it costs: "Gemma-3n-2B-Q4 · 1.5 GB download ·
+runs ~47 tok/s on this Mac." Secondary link: "choose a different model" opens the full
+library with fits / tight / won't-fit badges. License display happens here (§5.4):
+permissive licenses (Apache-2.0/MIT) get a link; restricted-license models get an
+explicit acceptance step <em>before</em> download.</p>
+<p><strong>Step 3 — consent to the download, with the right defaults per tier.</strong>
+- Desktop: start immediately on click; show resumable progress in the Engine Card slot.
+- Mobile: disclose size prominently; default <strong>Wi-Fi only</strong> (user can override to
+  cellular); warn on low storage or low battery; the download survives app suspension
+  (§6.3).
+- Web: check <code>navigator.storage.estimate()</code> against the artifact size first; request
+  <code>navigator.storage.persist()</code>; if the browser lacks WebGPU or refuses persistence,
+  say so plainly and offer the smaller/CPU-lane model or a remote instance instead.</p>
+<p><strong>Step 4 — verify + activate (§7), then benchmark.</strong> The first activation runs the
+30-second micro-benchmark; its measured tok/s becomes the Engine Card number and is
+stored in the device profile. If decode lands under the usability floor (~8–10 tok/s),
+offer the next model down <em>with the measurement as the reason</em>.</p>
+<p><strong>Step 5 — background upsell, never a blocker.</strong> Larger models the hardware can carry
+("this machine could run Gemma-4-3B — 2.1 GB") appear as a dismissible suggestion in
+the Models tile, never as onboarding friction.</p>
+<p><strong>Re-onboarding paths</strong> reuse the same flow: new device via OFP (peer already has the
+GGUF → LAN fetch, §5.3), restored backup (models are excluded from backups → re-offer),
+storage eviction (web/mobile → detect at load, §7, re-offer).</p></article><article id="S26-004" class="source-clause"><h4>S26-004 · 3. Environment detection</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>3. Environment detection</h2>
+<p>One Rust implementation in <code>gen_ui_inference</code> (<code>DeviceProfile</code> prober + fit-checker),
+reached over FFI/IPC from every UI; a TS mirror (or <code>gen_ui_wasm</code> export) for web.</p></article><article id="S26-005" class="source-clause"><h4>S26-005 · 3.1 What we probe, per platform</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>3.1 What we probe, per platform</h3>
+<table>
+<thead>
+<tr>
+<th>Platform</th>
+<th>Budget that matters</th>
+<th>Probe</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>macOS (Apple Silicon)</td>
+<td><strong>Unified memory</strong> — one pool for weights + KV + app</td>
+<td><code>sysctl hw.memsize</code>; Metal <code>recommendedMaxWorkingSetSize</code> as the honest ceiling; always Metal backend</td>
+</tr>
+<tr>
+<td>macOS (Intel, legacy)</td>
+<td>System RAM, CPU SIMD</td>
+<td>AVX2 check; CPU lane only; recommend smallest tier</td>
+</tr>
+<tr>
+<td>Windows / Linux + dGPU</td>
+<td><strong>VRAM</strong>, not system RAM</td>
+<td>wgpu/Vulkan adapter enumeration (name, VRAM, driver); NVML for NVIDIA detail; backend order CUDA → Vulkan → CPU</td>
+</tr>
+<tr>
+<td>Windows / Linux iGPU/CPU</td>
+<td>System RAM + SIMD</td>
+<td>total RAM; AVX2/AVX-512 flags; core count → thread config; iGPU shared-memory counts as <em>system</em> RAM, don't double-count</td>
+</tr>
+<tr>
+<td>iOS</td>
+<td><strong>Jetsam limit</strong>, not physical RAM</td>
+<td>device model → RAM tier; budget ≈ 50–60 % of physical RAM (less on ≤4 GB devices); Metal always present</td>
+</tr>
+<tr>
+<td>Android</td>
+<td>Heterogeneous everything</td>
+<td><code>ActivityManager.memoryClass</code>/total RAM; Vulkan availability + version; thermal headroom API; be pessimistic by default</td>
+</tr>
+<tr>
+<td>Web</td>
+<td>WebGPU adapter limits + storage quota</td>
+<td><code>navigator.gpu.requestAdapter()</code> (presence + <code>maxBufferSize</code>, <code>maxStorageBufferBindingSize</code>); <code>navigator.deviceMemory</code> (coarse, capped at 8 — treat as a floor, not a truth); <code>storage.estimate()</code> for disk</td>
+</tr>
+</tbody>
+</table></article><article id="S26-006" class="source-clause"><h4>S26-006 · 3.2 The fit test</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>3.2 The fit test</h3>
+<pre><code>fits :=  weights(quant)
+       + kv_cache(ctx_len, n_layers, kv_quant)
+       + compute_buffers
+       + headroom            &lt;  budget
+</code></pre>
+<ul>
+<li><code>budget</code> = VRAM on discrete GPUs; <strong>60–70 % of unified/system RAM</strong> elsewhere (the
+  app, SurrealDB, and the OS live in the same pool — on iOS use the jetsam-derived
+  figure).</li>
+<li>Choose quant by budget: Q4_K_M default; Q8_0 when abundant; when constrained, <strong>drop a
+  model size tier before dropping below Q4</strong> — harsh quants degrade quality faster than
+  smaller models do.</li>
+<li>Context length is part of the equation: the same model "fits" at 4k and doesn't at
+  32k. The recommendation pins a default ctx per device tier and says so.</li>
+</ul></article><article id="S26-007" class="source-clause"><h4>S26-007 · 3.3 Heuristics propose, benchmarks decide</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>3.3 Heuristics propose, benchmarks decide</h3>
+<p>Static detection selects the candidate; the first-activation micro-benchmark
+(short prefill + ~64-token decode, measured separately) is the source of truth for the
+Engine Card and for downgrade/upgrade suggestions. Store <code>{model, quant, backend,
+prefill_tps, decode_tps, measured_at}</code> in the device profile. Never show a user a
+guessed tok/s when a measured one exists.</p></article><article id="S26-008" class="source-clause"><h4>S26-008 · 4. The catalog</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><div class="source-note"><strong>Explicit amendments:</strong><ul><li>Key control does not establish reverse-DNS namespace ownership; separate registry proof is required.</li></ul></div><h2>4. The catalog</h2>
+<p>A signed JSON manifest (same Ed25519/<code>did:key:</code> discipline as the plugin system,
+FUNC-SPEC §08), fetched from the KnowMe origin with an ETag, cached for offline use.</p>
+<p>Per model entry:</p>
+<pre><code class="language-jsonc">{
+  "id": "gemma-3n-2b",
+  "family": "gemma", "params_b": 2.0,
+  "license": { "spdx": "Apache-2.0", "acceptance_required": false, "url": "…" },
+  "capabilities": ["chat", "vision"],
+  "artifacts": [
+    {
+      "kind": "gguf", "quant": "Q4_K_M", "bytes": 1520000000,
+      "sha256": "…",
+      "sources": [
+        { "type": "knowme",  "url": "https://models.know-me.tools/gemma-3n-2b/q4_k_m.gguf" },
+        { "type": "ipfs",    "cid": "bafy…" },
+        { "type": "hf",      "repo": "google/gemma-3n-2b-gguf", "file": "…", "gated": false }
+      ]
+    },
+    { "kind": "webllm", "quant": "q4f16_1", "shards": [ { "url": "…", "bytes": 0, "sha256": "…" } ],
+      "model_lib": "https://models.know-me.tools/webllm/gemma-3n-2b-q4f16_1-webgpu.wasm" }
+  ],
+  "requirements": {
+    "min_budget_bytes": { "gguf-Q4_K_M": 2400000000 },
+    "backends": ["metal", "cuda", "vulkan", "cpu"],
+    "default_ctx": 8192
+  }
+}
+</code></pre>
+<p>Notes: WebLLM entries carry the <strong>shard list + model_lib</strong> (WebLLM's <code>appConfig</code> takes
+custom <code>model</code> URLs and caches artifacts via the Cache API, or IndexedDB via
+<code>appConfig.cacheBackend</code> — see the <a href="https://webllm.mlc.ai/docs/user/advanced_usage.html">WebLLM advanced-usage docs</a>
+and <a href="https://github.com/mlc-ai/web-llm/blob/main/src/config.ts">config.ts</a>); GGUF
+entries list multiple sources in preference order (§5.3).</p></article><article id="S26-009" class="source-clause"><h4>S26-009 · 5. Distribution: Hugging Face vs. a KnowMe-controlled origin</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>5. Distribution: Hugging Face vs. a KnowMe-controlled origin</h2></article><article id="S26-010" class="source-clause"><h4>S26-010 · 5.1 The decision</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>5.1 The decision</h3>
+<p><strong>Primary: a KnowMe-controlled origin. Hugging Face as fallback. HF tokens only for
+genuinely gated models the user brings their own account for.</strong></p>
+<p>The licensing landscape makes this clean for the entire curated catalog: Qwen and
+Mistral ship Apache-2.0, Phi ships MIT, and Gemma 4 moved to Apache-2.0 in 2026
+(<a href="https://venturebeat.com/technology/google-releases-gemma-4-under-apache-2-0-and-that-license-change-may-matter">VentureBeat</a>,
+<a href="https://www.mindstudio.ai/blog/gemma-4-apache-2-license-commercial-use">MindStudio</a>);
+earlier Gemma generations use the <a href="https://ai.google.dev/gemma/terms">Gemma Terms of Use</a>,
+which permit redistribution with pass-through of the use restrictions — which is
+exactly how Ollama serves Gemma from its own registry today
+(<a href="https://ollama.com/library/gemma4:26b-a4b-it-q4_K_M/blobs/7339fa418c9a">ollama.com license blob</a>).
+So we can legally mirror everything in the default catalog and control our own
+availability, latency, and versioning.</p>
+<p>Why not HF as primary: HF's gated-model access is granted <strong>to individual users, never
+to organizations</strong> — a shared org token cannot download gated repos on users' behalf
+(<a href="https://huggingface.co/docs/hub/en/models-gated">HF gated-models docs</a>) — and
+resolve-URL semantics, rate limits, and repo layout changes are all outside our
+control. HF remains a <em>listed fallback source</em> for permissive models (anonymous
+<code>resolve/main/&lt;file&gt;</code> URLs work ungated —
+<a href="https://huggingface.co/docs/hub/models-downloading">HF downloading docs</a>) and the
+<em>only</em> path for gated models, where the flow is: user pastes their own HF token
+(stored in OS keychain via Tauri secure storage; per-user, per HF policy —
+<a href="https://huggingface.co/docs/hub/security-tokens">HF token docs</a>).</p></article><article id="S26-011" class="source-clause"><h4>S26-011 · 5.2 The KnowMe origin, concretely</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>5.2 The KnowMe origin, concretely</h3>
+<ul>
+<li><strong>Storage/CDN:</strong> Cloudflare R2 behind a custom domain (<code>models.know-me.tools</code>) —
+  zero egress fees make multi-GB artifacts economically sane
+  (<a href="https://developers.cloudflare.com/r2/">R2 overview</a>), and a custom-domain public
+  bucket with CDN caching is the recommended pattern for large public artifacts
+  (<a href="https://stackharbor.com/en/knowledge-base/cf-r2-buckets-access-patterns/">R2 access patterns</a>,
+  <a href="https://community.cloudflare.com/t/general-advice-concerning-public-r2-buckets-vs-pre-signed-urls/718993">community guidance</a>).</li>
+<li><strong>Auth model:</strong> <em>no authentication for free-catalog artifacts.</em> Integrity comes from
+  the signed manifest + SHA-256, not from access control; anonymous download is a
+  feature (no account required — FUNC-SPEC §09 "no central account"). Range requests
+  work natively, which resumable downloads (§6) depend on.</li>
+<li><strong>Pro-tier licensed models</strong> (the Qwen-35B-class artifacts) are the one place owned
+  auth earns its keep: a license key (issued at purchase, stored in keychain) is
+  exchanged at a tiny token service for a <strong>short-lived presigned URL</strong>
+  (<a href="https://developers.cloudflare.com/r2/api/s3/presigned-urls/">R2 presigned URLs</a>)
+  or passed to a Cloudflare Worker gate in front of the private bucket
+  (<a href="https://blog.dankying.com/en/posts/20250429-how-to-build-an-image-service-using-cloudflare-workers/">Worker-gated R2 pattern</a>).
+  Keys authorize <em>download</em>, not <em>inference</em> — once fetched and verified, the model
+  runs offline forever, preserving the sovereignty guarantee.</li>
+<li><strong>Layout: content-addressed, Ollama-style.</strong> Store blobs under
+  <code>/blobs/sha256/&lt;digest&gt;</code> with catalog manifests pointing at digests — the OCI-like
+  blob/manifest split Ollama uses is the proven shape for model distribution
+  (<a href="https://medium.com/@dewasheesh.rana/inside-ollamas-model-storage-understanding-blobs-and-manifests-06f1620dd0b2">Ollama storage internals</a>,
+  <a href="https://deepwiki.com/ollama/ollama/4.2-model-registry-and-layers">DeepWiki: registry &amp; layers</a>).
+  This makes the same blobs trivially publishable to IPFS (same digests → CIDs) and to
+  an OCI registry later, aligning with the <code>.pxt</code> distribution story in the
+  extensibility spec.</li>
+</ul></article><article id="S26-012" class="source-clause"><h4>S26-012 · 5.3 Source preference order (per artifact, walked by the fetcher)</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>5.3 Source preference order (per artifact, walked by the fetcher)</h3>
+<ol>
+<li><strong>LAN/OFP peer</strong> that already holds the digest (BossFang instance) — free, fast,
+   sovereign;</li>
+<li><strong>KnowMe origin</strong> (R2/CDN);</li>
+<li><strong>IPFS gateway</strong> (own gateway first, public fallback) — same digest;</li>
+<li><strong>Hugging Face</strong> resolve URL (anonymous, or user token if gated).</li>
+</ol>
+<p>Every source yields bytes that must hash to the same SHA-256; a source that fails
+verification is skipped and reported, never trusted.</p></article><article id="S26-013" class="source-clause"><h4>S26-013 · 5.4 License UX</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>5.4 License UX</h3>
+<p><code>acceptance_required: false</code> (Apache/MIT): show the license link, no click-through.
+<code>acceptance_required: true</code> (Gemma-Terms-class, Pro licensed models): record
+<code>{model, license_version, timestamp}</code> locally on acceptance, gate the download on it,
+and pass the terms through in the UI — that pass-through is what the Gemma terms
+require of redistributors.</p></article><article id="S26-014" class="source-clause"><h4>S26-014 · 6. Download management per tier</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>6. Download management per tier</h2></article><article id="S26-015" class="source-clause"><h4>S26-015 · 6.1 Shared semantics (all tiers)</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>6.1 Shared semantics (all tiers)</h3>
+<p>Persistent <code>DownloadTask</code> records in SurrealDB: <code>{model, artifact, source, bytes_total,
+bytes_done, state}</code> with states <code>queued → fetching → verifying → smoke-testing → ready
+| failed(reason)</code>. Preflight checks disk space (artifact + 10 % slack). Fetch to
+<code>&lt;digest&gt;.part</code>, atomic rename into the content-addressed store on verification.
+Progress streams to the UI over Tauri channels / FFI streams / JS events. Pause,
+resume, and cancel are user-visible verbs.</p></article><article id="S26-016" class="source-clause"><h4>S26-016 · 6.2 Desktop (Tauri) — the reference implementation</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>6.2 Desktop (Tauri) — the reference implementation</h3>
+<p>Rust in <code>gen_ui_inference</code> (reqwest is already wired): HTTP Range resumption, 3–4
+parallel range segments for large files, streaming SHA-256 (sha2 already a dep),
+bandwidth cap setting, retry with exponential backoff + resume from <code>bytes_done</code>.
+Store under <code>&lt;app-data&gt;/models/blobs/sha256/&lt;digest&gt;</code>; a <code>models/registry.json</code> maps
+human names → digests (mirroring §5.2's layout locally, which is what makes peer-serving
+trivial for BossFang).</p></article><article id="S26-017" class="source-clause"><h4>S26-017 · 6.3 Mobile — use the OS transfer service, not reqwest</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>6.3 Mobile — use the OS transfer service, not reqwest</h3>
+<p>A foreground Rust download dies on suspension. Use
+<a href="https://developer.apple.com/documentation/Foundation/downloading-files-in-the-background"><code>URLSession</code> background sessions</a>
+on iOS (survives suspension and app termination; OS-managed retry; delegate wakes the
+app on completion — mind the gotchas: background sessions are discretionary under Low
+Power Mode/poor connectivity, per <a href="https://developer.apple.com/forums/thread/699462">Apple's forums guidance</a>
+and <a href="https://www.appxiom.com/blogs/urlsession-background-download-not-working-ios/">field notes</a>)
+and <code>WorkManager</code>-scheduled <code>DownloadManager</code> on Android (constraint-aware: unmetered
+network, storage, battery). The FRB bridge only observes: platform code reports
+progress/completion; Rust verifies the hash and finalizes. Defaults: Wi-Fi-only
+(overridable), no auto-start on cellular, <code>isExcludedFromBackup = true</code> on iOS (models
+must not inflate iCloud backups), never bundle weights in the app binary.</p></article><article id="S26-018" class="source-clause"><h4>S26-018 · 6.4 Web — delegate to WebLLM, manage the edges</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>6.4 Web — delegate to WebLLM, manage the edges</h3>
+<p>WebLLM fetches shards and caches via the Cache API (or IndexedDB via
+<code>appConfig.cacheBackend</code>) (<a href="https://webllm.mlc.ai/docs/user/advanced_usage.html">docs</a>).
+KnowMe's <code>appConfig</code> points <code>model</code> URLs at the KnowMe origin (§5.2) rather than HF.
+Around it: <code>storage.estimate()</code> preflight; <code>storage.persist()</code> request with honest
+messaging when denied; eviction detection at engine init (cache miss → re-offer);
+WebGPU absence → offer the wllama/WASM-CPU lane for small models or a remote instance
+(the dual-lane pattern in
+<a href="https://github.com/krtarunsingh/webgpu-webllm-app">webgpu-webllm-app</a>). Safari today
+means "small models or remote" — say it, don't fake it.</p></article><article id="S26-019" class="source-clause"><h4>S26-019 · 7. Post-download validation</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>7. Post-download validation</h2>
+<p>Marking a model <strong>Ready</strong> requires all five gates, in order:</p>
+<ol>
+<li><strong>Hash gate</strong> — streaming SHA-256 equals the manifest digest (web: per-shard).</li>
+<li><strong>Format gate</strong> — parse the GGUF header/metadata (magic, version, tensor count,
+   arch) <em>without</em> full load; catches truncation and wrong-file errors cheaply. GGUF
+   corruption and version drift are the top field failure classes
+   (<a href="https://ritridata.com/ai-tool-recovery/gguf-corruption-llama-cpp-compatibility-model-versioning">corruption guide</a>,
+   <a href="https://markaicode.com/errors/llamacpp-model-load-failed-fix/">load-failure taxonomy</a>).</li>
+<li><strong>Load gate</strong> — actually instantiate on the selected backend with the profile's
+   ctx/offload settings; catches OOM-at-load, backend/driver issues, unsupported
+   quant-arch combos. On failure, retry once on the CPU lane to distinguish "bad file"
+   from "bad backend" and report accordingly.</li>
+<li><strong>Smoke gate</strong> — one short deterministic generation (fixed prompt, temp 0, ~16
+   tokens): asserts non-empty, valid UTF-8, no NaN/garbage repetition. Not a quality
+   eval — a "the tensors are sane" check. (This is the layer llama.cpp itself doesn't
+   provide — <a href="https://github.com/ggml-org/llama.cpp/issues/15250">#15250</a>.)</li>
+<li><strong>Benchmark gate (first activation)</strong> — the §3.3 micro-benchmark; records measured
+   tok/s; triggers the downgrade suggestion below the usability floor.</li>
+</ol>
+<p>Re-validation: gates 1–2 re-run whenever the file's mtime/size changed or after storage
+eviction events; a <code>Ready</code> model that fails gate 3 at any later launch is demoted to
+<code>needs-repair</code> with a one-click re-download (blobs are content-addressed, so repair
+means "fetch the digest again", not "figure out what broke").</p></article><article id="S26-020" class="source-clause"><h4>S26-020 · 8. Failure modes and their answers</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>8. Failure modes and their answers</h2>
+<table>
+<thead>
+<tr>
+<th>Failure</th>
+<th>Answer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Interrupted download</td>
+<td>Range-resume from <code>bytes_done</code> (desktop/web); OS-managed resume (mobile)</td>
+</tr>
+<tr>
+<td>Hash mismatch</td>
+<td>Delete <code>.part</code>, try next source in §5.3 order, surface which source failed</td>
+</tr>
+<tr>
+<td>Disk full mid-download</td>
+<td>Preflight prevents most; on hit, pause + prompt, never corrupt the store</td>
+</tr>
+<tr>
+<td>OOM at load</td>
+<td>CPU-lane retry to classify; recommend smaller quant/model with the measurement shown</td>
+</tr>
+<tr>
+<td>Browser evicted cache</td>
+<td>Detect at init, re-offer download, remind about <code>persist()</code></td>
+</tr>
+<tr>
+<td>iOS purged model / restored backup</td>
+<td>Backup-excluded by design; gate 2 catches it; one-click re-fetch</td>
+</tr>
+<tr>
+<td>Catalog origin down</td>
+<td>Cached signed catalog still valid; IPFS + HF sources still listed per artifact</td>
+</tr>
+<tr>
+<td>Gated model, no token</td>
+<td>Clear UX: link to HF request-access page, paste-token field, keychain storage</td>
+</tr>
+</tbody>
+</table></article><article id="S26-021" class="source-clause"><h4>S26-021 · 9. Implementation map (this repo)</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>9. Implementation map (this repo)</h2>
+<ul>
+<li><code>rust/crates/gen_ui_inference</code>: <code>DeviceProfile</code> prober + fit-checker; <code>ModelAcquisition</code>
+  trait with <code>DesktopFetcher</code> (Range/parallel/SHA-256), validation gates 2–5 (gate 4
+  behind <code>InferenceProvider</code>).</li>
+<li>New thin platform adapters: iOS background-session observer (Swift, via FRB),
+  Android WorkManager observer (Kotlin), WebLLM <code>appConfig</code> builder + storage guards
+  (TS, in <code>packages/gen-ui-react</code> or the web shell).</li>
+<li><code>desktop/src/features/models</code> + <code>mobile/lib/features/models</code>: onboarding card (§2),
+  fits/tight/won't-fit badges from the fit-checker, measured-tok/s display.</li>
+<li>Catalog signing + serving: R2 bucket + Worker gate for Pro artifacts; blob layout per
+  §5.2; publish job that pins the same digests to IPFS.</li>
+<li><code>knowme_ofp</code>: "peer-has-digest" query + LAN fetch (§5.3 source 1) — additive to the
+  M2 sync milestone.</li>
+</ul></article><article id="S26-022" class="source-clause"><h4>S26-022 · 10. Reference picks by machine (July 2026)</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>10. Reference picks by machine (July 2026)</h2>
+<p>Concrete catalog seeds for the situations we care about. Sizes are Q4_K_M GGUF unless
+noted; tok/s are decode-phase, <em>indicative</em> — the §7 benchmark gate always decides
+(figures from <a href="https://llmcheck.net/benchmarks">llmcheck.net Apple-Silicon benchmarks</a>,
+<a href="https://modelfit.io/guides/best-llm-for-iphone/">modelfit iPhone guide</a>,
+<a href="https://klymentiev.com/blog/best-local-llm">klymentiev hardware guide</a>, and the
+<a href="https://www.promptquorum.com/power-local-llm/best-local-models-tool-calling-2026">PromptQuorum tool-calling benchmark</a>).
+RAM figures below are GB. Two rules of thumb frame every row:</p>
+<ul>
+<li><strong>Tool calling has a size floor.</strong> Multi-step agentic tool use gets reliable at
+  ~14B+ dense or ~30B-A3B MoE (≥93 % well-formed calls); 7–8B is fine for single-shot
+  structured calls; below 7B, models emit malformed calls on multi-step chains — a 95 %
+  per-call rate compounds to ~66 % over 8 steps. Sub-4B models are for
+  triage/classification and drafting, with <strong>grammar-constrained JSON</strong>
+  (llama.cpp <a href="https://github.com/ggml-org/llama.cpp/blob/master/docs/function-calling.md">function-calling support</a>
+  handles Qwen/Hermes-style templates and can force valid JSON) as the mitigation.
+  Consequence for KnowMe: on small-tier devices, Hands should run <em>fewer, simpler</em>
+  tool steps locally and route complex chains to a BossFang peer.</li>
+<li><strong>MoE is the CPU/unified-memory cheat code.</strong> Qwen3-30B-A3B (30B total / 3B active)
+  gives ~14B-class quality at small-model decode cost wherever <em>memory</em> is abundant and
+  <em>compute</em> is not (Intel CPU boxes, 32 GB+ Macs).</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Machine</th>
+<th>Daily driver (why)</th>
+<th>Agent/Hands tier</th>
+<th>Vision</th>
+<th>Indicative speed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>MacBook Pro M1 2021, 16 GB</strong></td>
+<td>Qwen3 8B (~5.0 GB) — best quality that leaves headroom for app+DB; Qwen3 4B (~2.5 GB) when multitasking</td>
+<td>Single-shot tools OK (8B); multi-step → peer</td>
+<td>Gemma 3 4B-IT (~3 GB, 128k ctx, vision)</td>
+<td>4B ≈ 50 t/s · 8B ≈ 35–40 t/s</td>
+</tr>
+<tr>
+<td><strong>M1 Pro/Max 2021, 32 GB</strong></td>
+<td>Qwen3 14B (~9 GB) — first tier where local multi-step tool calling is respectable</td>
+<td>Qwen3-30B-A3B (~18 GB) fits, memory-bandwidth-friendly (3B active)</td>
+<td>Gemma 3 12B (~7.6 GB)</td>
+<td>14B ≈ 25–30 t/s · 30B-A3B ≈ 30–40 t/s (Max)</td>
+</tr>
+<tr>
+<td><strong>M1 Max 2021, 64 GB</strong></td>
+<td>Qwen3-30B-A3B comfortable + room for KV/ctx</td>
+<td>Gemma 4 27B (~16 GB, ~95 % tool-call rate) or Qwen3 32B (~93 %); Llama 3.3 70B Q4 (~40 GB) possible but ~7–9 t/s — quality ceiling, not a daily driver</td>
+<td>Gemma 3 27B</td>
+<td>27–32B dense ≈ 12–18 t/s</td>
+</tr>
+<tr>
+<td><strong>Mac mini M4, 16 GB</strong></td>
+<td>Qwen3 4B — M4 makes small models feel instant; Qwen3 8B (~5 GB) for quality</td>
+<td>8B single-shot; multi-step → peer</td>
+<td>Gemma 3 4B</td>
+<td>4B ≈ 80–118 t/s · 8B ≈ 60–80 t/s</td>
+</tr>
+<tr>
+<td><strong>Mac mini M4, 32 GB</strong></td>
+<td>Qwen3 14B (~9 GB)</td>
+<td><strong>Qwen3-30B-A3B (~18 GB) — the recommended always-on BossFang/Hands node config</strong></td>
+<td>Gemma 3 12B</td>
+<td>14B ≈ 35–40 t/s · 30B-A3B ≈ 40+ t/s</td>
+</tr>
+<tr>
+<td><strong>Mac Intel desktop, 96 GB, no GPU</strong></td>
+<td><strong>Qwen3-30B-A3B</strong> — the MoE showcase: 96 GB swallows the 18 GB file; only 3B active params per token keeps CPU decode usable (~10–15 t/s AVX2); Phi-4-mini 3.8B (~2.3 GB) as the snappy lane (~15–20 t/s)</td>
+<td>30B-A3B (good calls, slow chains — cap steps)</td>
+<td>Skip local vision; route to peer</td>
+<td>Dense 8B ≈ 8–12 t/s — prefer the MoE</td>
+</tr>
+<tr>
+<td><strong>Standard Windows laptop, no GPU (8–16 GB)</strong></td>
+<td>Qwen3 4B or Phi-4-mini 3.8B (~2.3–2.5 GB), ctx capped 4–8k; Gemma 3n E2B where its per-layer-embedding footprint helps</td>
+<td>Triage/single-tool only, grammar-constrained; chains → peer/cloud</td>
+<td>Gemma 3 4B if 16 GB</td>
+<td>≈ 8–15 t/s CPU (AVX2)</td>
+</tr>
+<tr>
+<td><strong>Linux, 32 GB RAM, RTX 4070 Ti 12 GB</strong></td>
+<td>Qwen3 14B (~9 GB) fully offloaded — the 12 GB-VRAM sweet spot</td>
+<td>Qwen3-Coder-30B-A3B with MoE expert-offload to system RAM (llama.cpp <code>--n-cpu-moe</code>): ~96 % on code-shaped tool work at ~20–30 t/s</td>
+<td>Gemma 3 12B (~7.6 GB, fits VRAM)</td>
+<td>14B ≈ 45–60 t/s CUDA · 12B ≈ 40–50 t/s</td>
+</tr>
+<tr>
+<td><strong>Chrome (WebLLM lane), any of the above</strong></td>
+<td>Qwen3 1.7B q4f16 (~1.1 GB) as the universal default; Qwen3 4B (~2.5 GB) on machines with a real GPU and granted persistent storage</td>
+<td>Structured single calls only (grammar via WebLLM JSON mode); Hands don't run in the browser tier</td>
+<td>—</td>
+<td>dGPU ≈ 25–40 t/s · iGPU ≈ 8–20 t/s</td>
+</tr>
+<tr>
+<td><strong>iPhone 17 (8 GB — the 128/256/512 GB storage tiers don't change RAM, only how many models fit on disk)</strong></td>
+<td>Gemma 4 E2B (~25 t/s) or Qwen3.5 2B — both under ~4 GB resident, inside the jetsam budget (§3.1); 4B-class Q4 works but at 8–15 t/s and thermal cost</td>
+<td>Single-tool max; Hands execute on peers, phone renders results</td>
+<td>Gemma 4 E2B (multimodal)</td>
+<td>2B ≈ 20–25 t/s · 4B ≈ 8–15 t/s</td>
+</tr>
+<tr>
+<td><strong>iPhone 17 Pro (12 GB)</strong></td>
+<td>Gemma 4 E4B (~30 t/s measured); Qwen3.5 4B for text-heavy</td>
+<td>Single-shot tools locally; short chains viable but battery/thermal-gated</td>
+<td>Gemma 4 E4B</td>
+<td>≈ 30 t/s</td>
+</tr>
+<tr>
+<td><strong>Galaxy S24 (8 GB; Ultra 12 GB)</strong></td>
+<td>Qwen3 1.7B / Qwen3.5 2B Q4; Gemma 3n E2B (its PLE design targets exactly this class)</td>
+<td>Triage/single-tool, grammar-constrained</td>
+<td>Gemma 3n E2B</td>
+<td>≈ 10–18 t/s (NEON; Vulkan on Adreno where stable)</td>
+</tr>
+<tr>
+<td><strong>Galaxy S26 (12 GB+)</strong></td>
+<td>Gemma 4 E4B or Qwen3.5 4B</td>
+<td>Single-shot tools locally</td>
+<td>Gemma 4 E4B</td>
+<td>≈ 15–25 t/s</td>
+</tr>
+<tr>
+<td><strong>Standard Android (6–8 GB midrange)</strong></td>
+<td>Qwen3 0.6B–1.7B Q4 (0.4–1.1 GB) — summarize/draft/triage lane; be honest that this tier is an <em>assistant</em>, not an agent</td>
+<td>None locally — always peer/cloud</td>
+<td>—</td>
+<td>≈ 5–12 t/s CPU</td>
+</tr>
+</tbody>
+</table>
+<p>Catalog implications: the matrix reduces to a small artifact set — Qwen3
+{0.6B, 1.7B, 4B, 8B, 14B, 30B-A3B, Coder-30B-A3B}, Qwen3.5 {2B, 4B}, Gemma 3
+{4B, 12B, 27B} + Gemma 3n/4 {E2B, E4B}, Phi-4-mini, and (Pro tier) Gemma 4 27B /
+Qwen3 32B-class — all Apache-2.0/Gemma-terms redistributable through the §5 origin.
+Every row is a <em>default</em>, surfaced with its reason string in the §2 recommendation card.</p></article><article id="S26-023" class="source-clause"><h4>S26-023 · 11. Embedding models for RAG (all tiers)</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>11. Embedding models for RAG (all tiers)</h2>
+<p>The memory/RAG layer (SurrealDB graph + sqlite-vec on mobile, PGlite/pgvector on
+web/desktop, Postgres+pgvector on flint-forge) needs embeddings everywhere the LLM
+runs — and unlike chat models, <strong>the embedding model must be consistent per index</strong>:
+vectors from different models (or different truncation dims) don't compare. The catalog
+therefore stamps <code>{embedding_model_id, dim}</code> into every index/KB it creates, and OFP
+sync treats a mismatch as a re-embed job, not a merge.</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Size</th>
+<th>Dims</th>
+<th>Why / where</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>EmbeddingGemma-300M</strong> — the default everywhere</td>
+<td>~300 MB (Q8; &lt;200 MB quantized)</td>
+<td>768, Matryoshka-truncatable to 512/256/128</td>
+<td>100+ languages, 2k ctx, built for on-device; runs on every tier including midrange Android and the browser (ONNX/transformers.js). Truncate to 256 on mobile (sqlite-vec size/speed), keep 768 on desktop/server — same model, so re-embedding on upgrade is optional, but <em>dims must match within one index</em></td>
+</tr>
+<tr>
+<td><strong>Qwen3-Embedding-0.6B</strong> — quality upgrade</td>
+<td>~600 MB</td>
+<td>flexible 32–1024 (MRL)</td>
+<td>Instruction-aware (task prefixes buy 1–5 %), 100+ languages; the desktop/BossFang default when quality beats footprint</td>
+</tr>
+<tr>
+<td><strong>BGE-M3</strong> — server-side heavy hitter</td>
+<td>~1.2 GB (fp16)</td>
+<td>dense + sparse + multi-vector</td>
+<td>8k ctx, hybrid retrieval; runs on flint-forge/BossFang (optionally in-DB via Flint Ember), not on devices</td>
+</tr>
+<tr>
+<td><strong>Nomic Embed Text v2 (MoE)</strong></td>
+<td>475M total / 305M active</td>
+<td>768 → 256</td>
+<td>Alternative default if MoE efficiency matters; ~100 languages</td>
+</tr>
+<tr>
+<td>Reranker: <strong>Qwen3-Reranker-0.6B</strong> (or bge-reranker-v2)</td>
+<td>~600 MB</td>
+<td>—</td>
+<td>Optional second stage on desktop/server only; skip on mobile</td>
+</tr>
+</tbody>
+</table>
+<p>Tiering that falls out: <strong>phones and web</strong> embed with EmbeddingGemma@256 locally (queries
+always embeddable offline); <strong>desktop</strong> embeds with Qwen3-Embedding-0.6B@768 or
+EmbeddingGemma@768; <strong>BossFang/flint-forge</strong> can maintain a BGE-M3 hybrid index for the
+heavy corpus and serve it to devices via the read path — devices keep a local
+EmbeddingGemma index over their own hot subset. Embedding artifacts flow through the
+same §5 origin, §6 downloader, and §7 gates (smoke test: embed a fixed sentence, assert
+dim + finite norm + cosine-similarity sanity against a stored reference vector).
+Sources: <a href="https://www.bentoml.com/blog/a-guide-to-open-source-embedding-models">BentoML open-source embedding guide</a>,
+<a href="https://milvus.io/blog/choose-embedding-model-rag-2026.md">Milvus 2026 comparison</a>,
+<a href="https://www.morphllm.com/ollama-embedding-models">Ollama embedding benchmark</a>.</p></article><article id="S26-024" class="source-clause"><h4>S26-024 · 12. The Model Library UX — choose anything, recommend the best</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>12. The Model Library UX — choose anything, recommend the best</h2>
+<p>The §10 picks are <em>defaults</em>, not walls. The product stance (moodboard Screen 08:
+"a library, not an offering") is that the user may run <strong>any</strong> model they can name —
+curated, community, or sideloaded — and the UI's job is to make the consequences
+legible before the download, not to gatekeep. This section specifies that surface.</p></article><article id="S26-025" class="source-clause"><h4>S26-025 · 12.1 Two shelves, one treatment</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>12.1 Two shelves, one treatment</h3>
+<ul>
+<li><strong>Curated shelf</strong> — the signed KnowMe catalog (§4/§5): the small artifact set from
+  §10, each entry carrying verified hashes, license metadata, and requirement blocks.
+  Trust pill: green <code>curated</code> (same visual grammar as the plugin installer's
+  <code>Ed25519 verified</code> pill — one trust language across the app).</li>
+<li><strong>Open shelf</strong> — live search of the Hugging Face GGUF universe (LM Studio's Discover
+  pattern: query HF directly, list every quant "sized for your machine" —
+  <a href="https://codersera.com/blog/lm-studio-complete-guide-2026/">LM Studio guide</a>). We
+  read the GGUF metadata HF exposes per file (arch, params, quant) <em>remotely</em>, so the
+  fit-check (§3.2) runs <strong>before</strong> any bytes move. Trust pill: amber <code>community</code>
+  (unverified hash source; we compute and pin the SHA-256 ourselves on first fetch),
+  plus the gated-model token flow from §5.1 when applicable.</li>
+<li><strong>Sideload</strong> — drop a <code>.gguf</code> anywhere (drag onto the Models tile, or the watched
+  models folder): registered through the same gates (§7), badge <code>sideloaded</code>, no
+  network at all. This is the sovereignty proof point and it must never feel
+  second-class.</li>
+</ul>
+<p>Every shelf renders the same <code>model-row</code> component from the moodboard (status dot ·
+name · size · backend/speed pill · action), extended with two new pill classes:
+<strong>fit</strong> and <strong>trust</strong>. No separate "advanced" browser — one library, filterable.</p></article><article id="S26-026" class="source-clause"><h4>S26-026 · 12.2 Fit badges — the traffic light, with reasons</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h3>12.2 Fit badges — the traffic light, with reasons</h3>
+<p>Computed per artifact × this device's <code>DeviceProfile</code>, in the moodboard's existing
+color vocabulary (green/amber/red pills, ember for active):</p>
+<table>
+<thead>
+<tr>
+<th>Badge</th>
+<th>Meaning</th>
+<th>Row behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>recommended</code> (ember)</td>
+<td>Top pick for a declared use (§12.3) on this hardware</td>
+<td>Sorted first; reason string shown inline</td>
+</tr>
+<tr>
+<td><code>fits</code> (green)</td>
+<td>Passes §3.2 with headroom</td>
+<td>One-click download</td>
+</tr>
+<tr>
+<td><code>tight</code> (amber)</td>
+<td>Fits only with reduced ctx / partial offload / swap risk (LM Studio's yellow-badge case: "spills to swap, which murders throughput")</td>
+<td>Download allowed; the <em>mitigation is stated</em>: "runs at ctx 4k" / "CPU-offloads 12 layers, est. ~9 t/s"</td>
+</tr>
+<tr>
+<td><code>won't fit</code> (red)</td>
+<td>Fails even minimal config</td>
+<td>Not hidden, not disabled: explicit override with a double-confirm ("needs ~21 GB; this device budgets 10.5 GB — it will not load") — the user owns the machine</td>
+</tr>
+</tbody>
+</table>
+<p>Numbers beat adjectives everywhere: each badge expands (tap/hover) to the actual
+arithmetic — weights + KV(ctx) + buffers vs. budget — in the cyan annotation style the
+moodboard uses for design-intent callouts.</p></article><article id="S26-027" class="source-clause"><h4>S26-027 · 12.3 Recommendation chips — per use, with visible reasons</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>12.3 Recommendation chips — per use, with visible reasons</h3>
+<p>Recommendations are <em>per task</em>, not global — small chips on the library header filter
+and re-rank: <strong>Daily driver · Agents/Hands · Vision · Coding · Embeddings</strong>. Selecting
+"Agents/Hands" surfaces the §10 tool-calling floor as UX: models under the reliability
+floor for this device get a one-line caution ("under ~7B, multi-step tool calls become
+unreliable — fine for chat and drafting"), and the recommended agent-tier model for
+this hardware wears the ember pill. Every <code>recommended</code> pill carries its reason string
+("best quality within your 16 GB unified-memory budget at ≥30 t/s") — the
+recommendation is an argument, never an oracle.</p></article><article id="S26-028" class="source-clause"><h4>S26-028 · 12.4 Estimated vs. measured performance</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>12.4 Estimated vs. measured performance</h3>
+<p>For any model we haven't run here — including every open-shelf model — show
+<strong>estimated</strong> decode speed with an explicit tilde ("est. ~25 t/s"), derived from the
+device's measured memory bandwidth (calibrated once by the §7 benchmark gate on a known
+model; decode is bandwidth-bound, so <code>est ≈ bandwidth / bytes-per-token(active params ×
+quant)</code>). After first activation, the measured number replaces the estimate everywhere
+(Engine Card, model row, recommendation reasons) and the row is marked <code>measured</code>.
+Never display a guess in the same typography as a measurement.</p></article><article id="S26-029" class="source-clause"><h4>S26-029 · 12.5 Per-model configuration, defaults from the profile</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>12.5 Per-model configuration, defaults from the profile</h3>
+<p>Each model row opens a detail sheet (engine-card layout: stats grid, license, source,
+hash, run history): ctx length, GPU offload, KV quant, threads — all defaulted by the
+fit-checker, all overridable, with the fit badge <strong>recomputed live</strong> as the user drags
+ctx up ("32k ctx moves this model to <em>tight</em>"). Overrides persist per model per device
+(device-scoped settings, per the extensibility spec's settings model). Where an MLX or
+alternative-format build exists for the platform (Apple Silicon), prefer it in the
+default artifact choice and say why — mirroring LM Studio's format preference cue.</p></article><article id="S26-030" class="source-clause"><h4>S26-030 · 12.6 What we deliberately do differently from the other tools</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>12.6 What we deliberately do differently from the other tools</h3>
+<p>LM Studio's compatibility badges and HF-direct search are the right patterns and we
+adopt them; Ollama's one-command simplicity maps to our curated one-click defaults.
+Where we diverge: (1) <strong>reasons everywhere</strong> — no unexplained "should work"; every
+badge expands to arithmetic, every recommendation to an argument; (2) <strong>one trust
+grammar</strong> — model pills and plugin pills use the same verified/community/unsigned
+visual language; (3) <strong>remote models in the same library</strong> — BossFang-hosted models sit
+in the same list with the cyan <code>remote</code> pill (moodboard Screen 08), so "choose any
+model" includes <em>models your other machines can serve</em>; recommendations may legitimately
+conclude "run this one on your Mac Pro instead" — that's a recommendation, not a
+failure; (4) <strong>task-scoped recommendation chips</strong> rather than a single global ranking.</p>
+<ul>
+<li>Hugging Face: <a href="https://huggingface.co/docs/hub/en/models-gated">gated models</a> ·
+  <a href="https://huggingface.co/docs/hub/models-downloading">downloading</a> ·
+  <a href="https://huggingface.co/docs/hub/security-tokens">access tokens</a></li>
+<li>WebLLM/MLC: <a href="https://webllm.mlc.ai/docs/user/advanced_usage.html">advanced usage &amp; caching</a> ·
+  <a href="https://llm.mlc.ai/docs/deploy/webllm.html">JS SDK</a> ·
+  <a href="https://github.com/mlc-ai/web-llm/blob/main/src/config.ts">config.ts (AppConfig/ModelRecord)</a> ·
+  <a href="https://github.com/krtarunsingh/webgpu-webllm-app">WebGPU + WASM fallback pattern</a></li>
+<li>Apple: <a href="https://developer.apple.com/documentation/Foundation/downloading-files-in-the-background">Downloading files in the background</a> ·
+  <a href="https://developer.apple.com/forums/thread/699462">background download caveats (forums)</a> ·
+  <a href="https://www.appxiom.com/blogs/urlsession-background-download-not-working-ios/">field guide to background URLSession</a></li>
+<li>Ollama distribution internals: <a href="https://medium.com/@dewasheesh.rana/inside-ollamas-model-storage-understanding-blobs-and-manifests-06f1620dd0b2">blobs &amp; manifests</a> ·
+  <a href="https://deepwiki.com/ollama/ollama/4.2-model-registry-and-layers">registry &amp; layers</a> ·
+  <a href="https://deepwiki.com/ollama/ollama/2.4-storage-and-blob-transfer">storage &amp; blob transfer</a></li>
+<li>Cloudflare R2: <a href="https://developers.cloudflare.com/r2/">overview (zero egress)</a> ·
+  <a href="https://developers.cloudflare.com/r2/api/s3/presigned-urls/">presigned URLs</a> ·
+  <a href="https://stackharbor.com/en/knowledge-base/cf-r2-buckets-access-patterns/">public vs private access patterns</a> ·
+  <a href="https://community.cloudflare.com/t/general-advice-concerning-public-r2-buckets-vs-pre-signed-urls/718993">community: public bucket vs presigned</a> ·
+  <a href="https://blog.dankying.com/en/posts/20250429-how-to-build-an-image-service-using-cloudflare-workers/">Worker-gated R2</a></li>
+<li>Licensing: <a href="https://ai.google.dev/gemma/terms">Gemma Terms of Use</a> ·
+  <a href="https://venturebeat.com/technology/google-releases-gemma-4-under-apache-2-0-and-that-license-change-may-matter">Gemma 4 → Apache 2.0 (VentureBeat)</a> ·
+  <a href="https://www.mindstudio.ai/blog/gemma-4-apache-2-license-commercial-use">license analysis (MindStudio)</a> ·
+  <a href="https://ollama.com/library/gemma4:26b-a4b-it-q4_K_M/blobs/7339fa418c9a">Ollama-served Gemma license blob</a></li>
+<li>Integrity/validation: <a href="https://github.com/ggml-org/llama.cpp/issues/15250">llama.cpp #15250 (no built-in verification)</a> ·
+  <a href="https://ritridata.com/ai-tool-recovery/gguf-corruption-llama-cpp-compatibility-model-versioning">GGUF corruption &amp; compatibility</a> ·
+  <a href="https://markaicode.com/errors/llamacpp-model-load-failed-fix/">load-failure taxonomy</a></li>
+<li>Model selection &amp; performance (§10): <a href="https://llmcheck.net/benchmarks">Apple-Silicon tok/s benchmarks</a> ·
+  <a href="https://klymentiev.com/blog/best-local-llm">hardware-tier model guide</a> ·
+  <a href="https://modelfit.io/guides/best-llm-for-iphone/">iPhone on-device LLM guide</a> ·
+  <a href="https://www.promptquorum.com/power-local-llm/best-local-models-tool-calling-2026">tool-calling benchmark 2026</a> ·
+  <a href="https://github.com/ggml-org/llama.cpp/blob/master/docs/function-calling.md">llama.cpp function-calling docs</a> ·
+  <a href="https://unsloth.ai/docs/basics/tool-calling-guide-for-local-llms">Unsloth tool-calling guide</a> ·
+  <a href="https://localaimaster.com/blog/small-language-models-guide-2026">SLM rankings 2026</a></li>
+<li>Embeddings (§11): <a href="https://www.bentoml.com/blog/a-guide-to-open-source-embedding-models">BentoML open-source embedding models</a> ·
+  <a href="https://milvus.io/blog/choose-embedding-model-rag-2026.md">Milvus embedding comparison 2026</a> ·
+  <a href="https://www.morphllm.com/ollama-embedding-models">Ollama embedding benchmark</a></li>
+</ul></article></main></body></html>

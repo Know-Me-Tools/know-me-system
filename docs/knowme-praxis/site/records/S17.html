@@ -1,0 +1,185 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>S17 · pags-spec-km-goal-001.md</title><link rel="stylesheet" href="../records.css"><body><main><a href="../index.html">KnowMe Praxis</a><h1>S17 · pags-spec-km-goal-001.md</h1><p>Complete technical source record. Historical names and requirements remain visible for audit. Revised clauses and explicit corrections govern their application.</p><p><a href="S17.txt">Download complete technical text</a></p><article id="S17-001" class="source-clause"><h4>S17-001 · PAGS-SPEC-KM-GOAL-001 — Agentic Goal Management</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h1>PAGS-SPEC-KM-GOAL-001 — Agentic Goal Management</h1>
+<p><strong>Status:</strong> Draft (rev 0.1)
+<strong>Date:</strong> 2026-08-03
+<strong>Owner:</strong> Travis James
+<strong>Depends on:</strong> PAGS-SPEC-KM-CRM-001 (<code>prometheus-container</code> substrate)
+<strong>Consumers:</strong> Morning Brief agent, KnowMe plugin marketplace</p>
+<hr/></article><article id="S17-002" class="source-clause"><h4>S17-002 · 1. Position</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h2>1. Position</h2>
+<p>Task managers fail for the same reason CRMs fail: they store items, not state. An item has a checkbox. A commitment has an owner, a source, a deadline, a blocking edge, a staleness clock, and a provenance record of whether anyone actually verified it moved.</p>
+<p>This spec instantiates <code>ContainerKind::Objective</code> on the same substrate defined in PAGS-SPEC-KM-CRM-001. If D-CRM-02 resolves against the merge, this becomes a parallel crate and the gate/clock/provenance code duplicates. That duplication is the cost of answering D-CRM-02 late.</p>
+<p><strong>Design constraint that separates this from every AI todo app:</strong> the agent never marks anything complete. It proposes, cites evidence, and labels confidence. Completion is a human act at the trusted host layer. An agent that can close its own commitments is an agent that reports success.</p>
+<hr/></article><article id="S17-003" class="source-clause"><h4>S17-003 · 2. Entity model</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h2>2. Entity model</h2>
+<p>Four levels, each a container or a child of one.</p>
+<pre><code>Objective       (quarter horizon, ContainerKind::Objective)
+  └── KeyResult (measurable, has target + current + source)
+        └── Commitment (owed by someone, to someone, by a date)
+              └── Step   (atomic, agent-executable or human-only)
+</code></pre>
+<pre><code class="language-rust">pub struct ObjectivePayload {
+    pub horizon: Horizon,            // Quarter | Month | Week
+    pub entity: BusinessEntity,      // travisjames.ai | KnowMe | PrometheusAgs | TribeHealth
+    pub thesis: String,              // why this matters — one sentence, required
+    pub key_results: Vec&lt;KeyResult&gt;,
+    pub blocked_by: Vec&lt;BlockRef&gt;,   // containers OR decisions
+}
+
+pub struct Commitment {
+    pub id: CommitmentId,
+    pub statement: String,
+    pub owed_by: Party,
+    pub owed_to: Party,
+    pub due: Option&lt;Date&gt;,
+    pub source: CommitmentSource,    // Fireflies | Email | Manual | Brief
+    pub source_ref: String,          // meeting id, message id — always resolvable
+    pub evidence: Vec&lt;EvidenceRef&gt;,  // commits, files, sent messages
+    pub slip_count: u8,              // increments each brief it rolls unactioned
+}
+</code></pre>
+<p><code>slip_count</code> is the field that does the work. Three consecutive slips is not a scheduling problem; it is a signal that the commitment is either misscoped or not actually wanted. The brief says so plainly at slip 3 and stops re-listing it at slip 5, moving it to a <code>Deferred</code> set with a note. Nagging past that point trains you to ignore the section.</p>
+<hr/></article><article id="S17-004" class="source-clause"><h4>S17-004 · 3. Decision items</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h2>3. Decision items</h2>
+<p>A first-class type, because your standing failure mode is decisions that rot silently rather than tasks that go undone.</p>
+<pre><code class="language-rust">pub struct Decision {
+    pub id: DecisionId,
+    pub question: String,
+    pub options: Vec&lt;DecisionOption&gt;,   // each with named consequence
+    pub blocks: Vec&lt;ContainerId&gt;,       // what cannot proceed
+    pub opened: Date,
+    pub cost_of_delay: CostOfDelay,     // Compounding | Fixed | Optionality
+    pub decider: Did,
+}
+</code></pre>
+<p>Current instances that seed the file on day one:</p>
+<table>
+<thead>
+<tr>
+<th>Decision</th>
+<th>Blocks</th>
+<th>Cost of delay</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SmsPort / flint-notify-ports crate placement</td>
+<td>FRF, KnowMe web search D-01</td>
+<td>Compounding — both settle under one rule or diverge</td>
+</tr>
+<tr>
+<td>Shell-vs-critical-path sequencing (SSR)</td>
+<td>Phase 3 M1</td>
+<td>Compounding — conflated with agent-scope risk, never cleanly resolved</td>
+</tr>
+<tr>
+<td>SurrealDB 3.2 on-device benchmark gate</td>
+<td>KnowMe mobile store decision</td>
+<td>Fixed</td>
+</tr>
+<tr>
+<td>librefang open-core boundary</td>
+<td>W2 dispatch work</td>
+<td>Compounding — deadline already accelerated</td>
+</tr>
+<tr>
+<td>D-CRM-02 (container merge)</td>
+<td>Both this spec and CRM</td>
+<td>Compounding</td>
+</tr>
+</tbody>
+</table>
+<p><code>cost_of_delay: Compounding</code> items surface in every brief with days-open. Fixed items surface weekly. The distinction prevents the section becoming noise.</p>
+<hr/></article><article id="S17-005" class="source-clause"><h4>S17-005 · 4. Agent role — proposal only</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h2>4. Agent role — proposal only</h2>
+<pre><code class="language-rust">pub enum AgentAction {
+    ProposeCommitment { extracted_from: SourceRef, confidence: Confidence },
+    ProposeEvidence   { commitment: CommitmentId, evidence: EvidenceRef },
+    ProposeSlip       { commitment: CommitmentId, reason: String },
+    FlagStale         { decision: DecisionId, days_open: u16 },
+}
+</code></pre>
+<p>No <code>CompleteCommitment</code>. No <code>CloseObjective</code>. The <code>knowme-goal-kernel</code> crate has no dependency on the write actuator — enforced at Cargo level, same inversion as the CRM substrate.</p>
+<p><strong>Extraction sources</strong>, in confidence order:
+1. Git commits and PR merges → <code>Verified</code> evidence
+2. Sent email / calendar completion → <code>Verified</code>
+3. Fireflies transcript extraction → <code>SelfReported</code> (someone said they'd do it; nobody checked)
+4. Agent inference from context → <code>Inferred</code>, always labeled, never auto-applied</p>
+<p>The brief renders provenance inline. "Milestone 1 complete (self-reported, no commit evidence)" is a different sentence from "Milestone 1 complete" and the difference is the entire point.</p>
+<hr/></article><article id="S17-006" class="source-clause"><h4>S17-006 · 5. v0 wire format</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h2>5. v0 wire format</h2>
+<p><code>~/prometheus-brief/goals.yaml</code> — hand-maintained until the plugin ships, identical schema after.</p>
+<pre><code class="language-yaml">version: 0
+generated_by: manual
+objectives:
+  - id: obj-knowme-ship
+    horizon: quarter
+    entity: knowme
+    thesis: KnowMe reaching paid tiers converts brand authority into recurring revenue
+    blocked_by: [dec-f04]
+    key_results:
+      - id: kr-1
+        statement: F-04 spine operational across all three entities
+        target: 1
+        current: 0
+        source: manual
+    commitments:
+      - id: com-1
+        statement: Wire llguidance into mobile composite features
+        owed_by: travis
+        owed_to: self
+        due: 2026-08-14
+        source: manual
+        slip_count: 0
+        evidence: []
+decisions:
+  - id: dec-notify-port
+    question: SmsPort and notify port placement — FRF or new flint-notify-ports crate
+    blocks: [obj-frf, obj-knowme-ship]
+    opened: 2026-07-20
+    cost_of_delay: compounding
+</code></pre>
+<hr/></article><article id="S17-007" class="source-clause"><h4>S17-007 · 6. Plugin surface</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h2>6. Plugin surface</h2>
+<p>Plugin id: <code>knowme-goal</code>. Same stack, same F-04 dependency, same tier logic as <code>knowme-crm</code>.</p>
+<p>One capability unique to this plugin: <strong>horizon rollup.</strong> Weekly commitments roll to monthly key results roll to quarterly objectives, and the rollup is computed, not asserted. If no commitment this week advanced any key result, the objective shows zero movement regardless of how busy the week felt. That is the single most useful thing the system can tell you and no commercial tool does it.</p>
+<hr/></article><article id="S17-008" class="source-clause"><h4>S17-008 · 7. Estimate</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h2>7. Estimate</h2>
+<p>Standard applied: 11.3x agent velocity, implementation only, human gates uncompressed.</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Agent-build</th>
+<th>Human-gated</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Objective</code> payload on shared substrate</td>
+<td>~0.75 agent-days</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Decision type + staleness clock</td>
+<td>~0.5 agent-days</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Extraction adapters (git, Fireflies, mail)</td>
+<td>~1.25 agent-days</td>
+<td>—</td>
+</tr>
+<tr>
+<td>v0 YAML reader (brief-side)</td>
+<td>~0.25 agent-days</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>knowme-goal</code> plugin UI + rollup</td>
+<td>~2 agent-days</td>
+<td>Blocked on F-04</td>
+</tr>
+<tr>
+<td>Seeding real objectives</td>
+<td>—</td>
+<td>1 session, ~2 hours</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Elapsed calendar time is dominated by F-04 and by your decision latency on D-CRM-02, not by build.</strong> Agent-build for everything except the plugin UI is under a week. Both plugin UIs sit behind the same commercial blocker.</p>
+<hr/></article><article id="S17-009" class="source-clause"><h4>S17-009 · 8. Interim operating cost</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h2>8. Interim operating cost</h2>
+<p>Until both plugins ship, <code>pipeline.yaml</code> and <code>goals.yaml</code> are hand-maintained. Realistic cost: 60–90 minutes per week, front-loaded on Monday. If that cost is not paid, the brief degrades to calendar-and-email summarization, which is worth having but is not a chief of staff.</p>
+<p>Name the failure honestly: the most likely outcome is that the YAML files go stale in week three and the brief quietly becomes a news digest. The mitigation is that the brief itself writes back to <code>memory.md</code> and flags file staleness — if <code>pipeline.yaml</code> has not been modified in 10 days, that becomes a Blocked Decisions item about whether this system is actually wanted.</p></article></main></body></html>

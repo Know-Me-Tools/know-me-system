@@ -1,0 +1,201 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>S24 · README.md</title><link rel="stylesheet" href="../records.css"><body><main><a href="../index.html">KnowMe Praxis</a><h1>S24 · README.md</h1><p>Complete technical source record. Historical names and requirements remain visible for audit. Revised clauses and explicit corrections govern their application.</p><p><a href="S24.txt">Download complete technical text</a></p><article id="S24-001" class="source-clause"><h4>S24-001 · Skill Support Strategy — Tools, Skills, Scopes, and the Agent Convergence</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h1>Skill Support Strategy — Tools, Skills, Scopes, and the Agent Convergence</h1>
+<p><strong>Scope:</strong> how skills work in the capability-centric plugin model — the tool/skill
+distinction, the three skill scopes (global, agent-private, agent-exposed), MCP
+interop in both directions, governance and settings for skills, and the long-run
+convergence between skills and agents.</p>
+<p><strong>Status:</strong> v1.1 strategy, 2026-07-19 (v1.1 adds §8: grounding in the vendored UAR
+skill model). Child of
+<code>docs/strategies/plugins/README.md</code> (capabilities, governance/identity §9, settings
+substrate §11) and <code>docs/strategies/agents/README.md</code> (pipeline, placements).
+Grounded in what exists: UAR's skill registry (<code>gen_ui_agent::tools</code>, <code>gen_ui_mcp</code>),
+the prometheus-skill-pack (95+ instruction-package skills), and Flint Kiln's
+<code>flint-skill</code> authoring SDK.</p>
+<hr/></article><article id="S24-002" class="source-clause"><h4>S24-002 · 1. Tools vs. skills — the distinction that keeps the system legible</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>1. Tools vs. skills — the distinction that keeps the system legible</h2>
+<p>Both are capabilities; both therefore arrive as plugins. The split:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th><code>knowme:tool</code></th>
+<th><code>knowme:skill</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>What it is</td>
+<td>A single callable: name, description, JSON-Schema input/output, annotations — <strong>MCP-tool-shaped by construction</strong></td>
+<td>A <strong>packaged practice</strong>: one or more tools + instructions (prompt material) + policy defaults + settings + optional eval fixtures</td>
+</tr>
+<tr>
+<td>Analogy</td>
+<td>An MCP server tool</td>
+<td>A prometheus-skill-pack skill / Claude skill folder</td>
+</tr>
+<tr>
+<td>State &amp; autonomy</td>
+<td>None — a stateless contract</td>
+<td>None — still no autonomy; the <em>instructions</em> shape how agents use the tools</td>
+</tr>
+<tr>
+<td>Where it registers</td>
+<td>UAR tool registry</td>
+<td>UAR skill registry; its tools register beneath it</td>
+</tr>
+<tr>
+<td>Spec authority</td>
+<td>Its schemas</td>
+<td>Its card + instruction docs (embeddable → routable)</td>
+</tr>
+</tbody>
+</table>
+<p>The distinction that stays permanent even as skills and agents converge (§5):
+<strong>skills never have identity, lifecycle, or schedule.</strong> An agent <em>is someone</em>
+(a DID principal, per plugins doc §9); a skill is <em>something known how to do</em>.</p>
+<p>Why both exist: tools are what the runtime can verify (schemas, Cedar checks per
+invocation); skills are what makes tools <em>usable well</em> (instructions, sequencing,
+guardrails). The skill-pack repos prove the second layer carries most of the value;
+the tool layer is what makes it enforceable.</p></article><article id="S24-003" class="source-clause"><h4>S24-003 · 2. The three scopes</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>2. The three scopes</h2>
+<p>Declared on the skill's capability card; enforced by UAR at registration and by Cedar
+at invocation:</p>
+<ul>
+<li><strong><code>global</code></strong> — registered into the container's UAR registry; any agent may request
+  it, subject to the standard per-agent, per-skill grants (FUNC-SPEC §06 first-use
+  consent). This is today's model, unchanged.</li>
+<li><strong><code>agent-private</code></strong> — bound to one agent instance (or bundled inside the same plugin
+  as its agent capability); invisible to the registry browsing UI of other agents;
+  Cedar denies any other principal structurally, not just by default. Use: an agent's
+  internal helper verbs that would be meaningless or dangerous as shared surface.</li>
+<li><strong><code>agent-exposed</code></strong> — the interesting one: an <strong>agent publishes a skill interface
+  that other agents (and users) invoke as if it were a tool</strong>. The call is
+  synchronous-looking at the caller; behind it, the exposing agent runs an A2A task
+  (agents doc §4.1) under <strong>its own identity</strong> — the caller's audit entry records
+  <code>(user, calling-agent → exposed-skill → serving-agent)</code>. This is agent-as-tool,
+  and it composes: pipelines of agents without a new orchestration primitive.</li>
+</ul>
+<p>Scope is part of governance review: installing a plugin whose skill is
+<code>agent-exposed</code> shows <em>who may call it</em> (which principals, from which placements)
+exactly like any other permission.</p></article><article id="S24-004" class="source-clause"><h4>S24-004 · 3. MCP interop — both directions, at the edge</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>3. MCP interop — both directions, at the edge</h2>
+<ul>
+<li><strong>Inbound (MCP server → skill):</strong> an MCP server registers as a <code>knowme:tool</code> set
+  under a thin generated skill card (this is <code>gen_ui_mcp</code> today, re-described). The
+  wrapper card supplies what MCP lacks for our system: scope, governance block,
+  settings schema, embeddable description for routing.</li>
+<li><strong>Outbound (skill → MCP):</strong> any <code>global</code> or <code>agent-exposed</code> skill can be served to
+  external harnesses (Claude Code, other agent systems) as MCP tools by the
+  sidecar/BossFang — the container becomes an MCP server whose tool list is the
+  user's governed skill registry, with Cedar and the dual-identity audit (plugins doc
+  §9) still in the path. KnowMe's skills become usable <em>from</em> the user's other AI
+  tools without any of them bypassing governance.</li>
+<li>MCP remains the interop boundary, not the internal model: internally everything is
+  capability cards, because MCP tool specs alone carry no scope, governance, or
+  settings semantics.</li>
+</ul></article><article id="S24-005" class="source-clause"><h4>S24-005 · 4. Skills get the full plugin treatment</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>4. Skills get the full plugin treatment</h2>
+<p>Because skills are capabilities (plugins doc §2–§3), they inherit without exception:</p>
+<ul>
+<li><strong>Settings</strong> — schema on the card, stored in the generic substrate (plugins doc
+  §11), scopes device/user/tenant/agent; settings UI generated as A2UI forms; a
+  skill's per-agent configuration ("which mailbox may Inbox Triage's <code>email-imap</code>
+  read for <em>this</em> Hand") lives at the <code>agent</code> scope key.</li>
+<li><strong>Governance</strong> — Cedar templates + budgets in the card's governance block; every
+  invocation carries the <code>(user, agent)</code> pair; grants are per-agent, per-skill,
+  revocable from the Skills tab (unchanged from FUNC-SPEC §06, now generalized).</li>
+<li><strong>Discovery/routing</strong> — instructions and descriptions are embedded into the local
+  capability index; the router can propose skills mid-conversation ("this looks like
+  a <code>pdf-extract</code> task") with the same provenance/budget discipline as hooks.</li>
+<li><strong>Sharing</strong> — skill definitions travel over OFP/export/<code>.pxt</code>; grants never do
+  (plugins doc §10). Team instances publish org skill sets with org policy layered
+  restrictively over personal.</li>
+<li><strong>Versioning/rollback</strong> — card semver + the Skills tab's version history
+  (FUNC-SPEC §04 tile 6), now backed by content-addressed plugin versions.</li>
+</ul></article><article id="S24-006" class="source-clause"><h4>S24-006 · 5. The convergence (and its limit)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>5. The convergence (and its limit)</h2>
+<p>The prediction in the requirements is right: skills and agents drift toward each
+other. The model makes the convergence <em>mechanical</em> rather than confusing:</p>
+<ul>
+<li>an <strong>agent exposed as a skill</strong> (§2, <code>agent-exposed</code>) is callable like a tool;</li>
+<li>a <strong>skill "promoted" to an agent</strong> is just a new agent whose instructions are the
+  skill's instructions and whose toolset is the skill's tools — a wizard affordance
+  ("Create a Hand from this skill"), not a new concept;</li>
+<li>a declarative Hand is, squinting, <em>a skill plus identity, schedule, and policy</em> —
+  which is exactly the residue that never converges. <strong>Identity, lifecycle, schedule,
+  autonomy: agent. Stateless know-how: skill.</strong> The system supports every hybrid via
+  composition of the two, so neither concept needs to blur.</li>
+</ul></article><article id="S24-007" class="source-clause"><h4>S24-007 · 6. Open questions</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>6. Open questions</h2>
+<ol>
+<li><strong>Skill eval fixtures</strong> — cards may carry eval/golden fixtures (the skill-pack's
+   BDD habit); should the container run them at install (slow, honest) or on first
+   grant (lazy)? Default: first grant, in <code>utility.fast</code>-priced background.</li>
+<li><strong><code>agent-exposed</code> reentrancy</strong> — agent A calls B's exposed skill which calls A?
+   Default: cycle detection with depth cap (3) in UAR; audit flags cycles.</li>
+<li><strong>Instruction size vs. context budget</strong> — large skill instruction sets compete for
+   context; default: instructions are RAG'd (embedded, retrieved per relevance) above
+   a size threshold rather than inlined. Confirm threshold policy.</li>
+<li><strong>Naming</strong> — "skill" is used by both this system and the AI-harness world
+   (prometheus-skill-pack authors <em>development</em> skills for coding agents). The
+   KnowMe Builder skills that <em>author</em> <code>.pxt</code> skills are themselves harness skills —
+   document the two senses once, prominently, and never mix them in UI copy.</li>
+</ol></article><article id="S24-008" class="source-clause"><h4>S24-008 · 7. Implementation map (this repo)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>7. Implementation map (this repo)</h2>
+<ul>
+<li><code>gen_ui_agent::tools</code> + <code>gen_ui_mcp</code>: scope field + Cedar structural checks for
+  <code>agent-private</code>; <code>agent-exposed</code> bridge (skill call → A2A task on the serving
+  agent, identity-switched, audited as a pair-chain).</li>
+<li>Sidecar/BossFang: outbound MCP server surface over the governed registry (§3).</li>
+<li><code>knowme_plugin_host</code>: <code>knowme:tool</code> / <code>knowme:skill</code> card parsing; instruction
+  embedding into the capability index on install.</li>
+<li>Skills tab (desktop <code>features/skills</code> blueprint, mobile counterpart): scope
+  badges, per-agent grant matrix (already specced), exposed-skill caller lists,
+  version history.</li>
+<li>KnowMe Builder harness skills: <code>pxt-new-skill</code>, <code>pxt-skill-evals</code>,
+  <code>pxt-expose-agent-as-skill</code> join the W7 list in the extensibility spec.</li>
+</ul></article><article id="S24-009" class="source-clause"><h4>S24-009 · 8. UAR grounding (2026-07-19): the skill model that actually ships</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>8. UAR grounding (2026-07-19): the skill model that actually ships</h2>
+<p>The vendored UAR submodule (<code>rust/vendor/universal-agent-runtime</code> v1.0.0) provides
+the runtime skill model this strategy maps onto. Two sources, two roles:</p>
+<ol>
+<li><strong>The runtime model (Rust):</strong> <code>src/uar/domain/skills.rs</code> — <code>Skill</code>,
+   <code>SkillManifest</code>, <code>SkillKind</code>, <code>SkillOrigin</code>, <code>SkillExecutionConfig</code>,
+   <code>SkillModelRouting</code>, <code>SkillTriggers</code>, <code>SkillConstraints</code>, plus <code>SkillMatch</code>
+   (<code>src/uar/domain/matching.rs</code>) for routing. Skills hot-reload from disk
+   (<code>notify</code> watcher), import over REST (<code>src/uar/api/skills.rs</code>), compile out of
+   UAR-AGENT-MD skill sections (<code>src/uar/compiler/compiler_skill.rs</code>), and execute
+   WASM only behind the opt-in <code>wasm-runtime</code> feature. Skill <em>activations</em> surface
+   on the AG-UI stream as <code>CUSTOM uar.skill.activated</code> events — KnowMe already
+   normalizes those into <code>StreamEvent::SkillActivation</code> → <code>ContentBlock::Skill</code>
+   (<code>gen_ui_protocol</code>; physically certified on Android for the embedded
+   <code>knowme_diagnostics</code> MCP namespace — see the six-gates roadmap in
+   <code>docs/strategies/local-models/</code>).</li>
+<li><strong>The content corpus (not a dependency):</strong> <code>crates/prometheus-skill-system</code>
+   inside the submodule is a <em>content repository</em> — categorized <code>skills/</code>,
+   <code>agents/*.md</code>, <code>hooks/</code>, <code>marketplace/</code>, <code>policies/</code> — not a Rust crate (no
+   <code>Cargo.toml</code>, excluded from UAR's workspace). Treat it as seed/publishable
+   content for the marketplace and the capability index, never as a path
+   dependency.</li>
+</ol>
+<p>The §2 scope model maps without distortion:</p>
+<table>
+<thead>
+<tr>
+<th>Scope (§2)</th>
+<th>UAR realization</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>global</code></td>
+<td>Registered in the container's skill registry (the <code>SkillManifest</code> set); per-agent grants stay Cedar-side</td>
+</tr>
+<tr>
+<td><code>agent-private</code></td>
+<td>The agent artifact's own skill section (<code>SkillsSection</code>/<code>SkillRef</code> in the compiler IR) — structurally invisible to other agents</td>
+</tr>
+<tr>
+<td><code>agent-exposed</code></td>
+<td>An <code>AgentSkill</code> on the serving agent's A2A <code>AgentCard</code>; the caller sees a tool, the serving agent runs an A2A task under its own identity (§2's pair-chain audit unchanged)</td>
+</tr>
+</tbody>
+</table>
+<p>Execution-plan note: on Android, real AgentSkill certification is Release C of
+<code>docs/strategies/local-models/android-agentskills-process-future-roadmap.md</code>
+(Phase 3 of <code>docs/strategies/uar-knowme-runtime-integration.md</code>); the
+diagnostics-skill path already proves the event/block/UI contract. MCP interop
+(§3) is unchanged — MCP tools register beneath skill cards exactly as UAR's
+native/MCP unification (schema validation, Cedar, approval, audit) already does
+server-side.</p></article></main></body></html>

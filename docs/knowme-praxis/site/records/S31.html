@@ -1,0 +1,233 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>S31 · architecture.html</title><link rel="stylesheet" href="../records.css"><body><main><a href="../index.html">KnowMe Praxis</a><h1>S31 · architecture.html</h1><p>Complete technical source record. Historical names and requirements remain visible for audit. Revised clauses and explicit corrections govern their application.</p><p><a href="S31.txt">Download complete technical text</a></p><article id="S31-001" class="source-clause"><h4>S31-001 · Preamble</h4><p class="source-note">Governing revision: <a href="../index.html#dots">DOT-01–10</a> · source requirement, not release evidence.</p><pre class="retained-text">PART II · 03
+</pre></article><article id="S31-002" class="source-clause"><h4>S31-002 · System architecture</h4><p class="source-note">Governing revision: <a href="../index.html#dots">DOT-01–10</a> · source requirement, not release evidence.</p><pre class="retained-text">System architecture
+The coach is a BossFang-hosted service with three narrow interfaces: a read-only observation plane over KBD and receipts, a proposal and decision plane to the owner, and a steering plane that reaches executors only through UAR. Nothing in it holds a key, accepts a phase, or runs a competing coding loop.
+OWNER SURFACES
+KnowMe desktop
+KnowMe mobile
+BossFang workbench
+Slack
+LiveKit
+BOSSFANG · librefang fork · coach host
+Coach service
+contract · triggers · inspect · propose · close
+librefang-hands (Hand: operator-coach)
+librefang-memory-wiki (beliefs, provenance)
+kernel-metering
+budget · quota
+runtime-audit
+BLAKE3 chain
+channels
+knowme:channel
+kernel-router
+RBAC · routing
+runtime-mcp
+read-only tools
+uar-spec
+AgentManifest
+UNIVERSAL AGENT RUNTIME 1.0 · qualified action boundary
+governance
+Cedar · approvals
+orchestrator
+RunManager · drivers
+tools · mcp_server
+rmcp 2.2 · WASM
+a2ui
+AG-UI events
+uar-sidecar
+key · signed events
+knowme:harness adapters: Kimi Code · OpenCode · Claude Code · Codex (sandboxed; Vault-injected credentials)
+KBD · deterministic authority
+.kbd-orchestrator/
+project.json · constraints.md · phases/*
+current-waypoint · position · receipts (new)
+counters · transitions · exact predicates
+model judgment never overrides a failed guard
+EXECUTORS · on the operator&#x27;s own plan
+Kimi via OpenCode
+proxy-mode plan
+Claude Code · Codex
+observe-mode plan
+UAR native agents · local Qwen on owned node
+Stage 2–3 of OM-005; PHI lanes live here
+SHARED PLANES
+Flint-gate
+operator + device creds
+signs receipts and events
+Apache Iggy 0.9
+Assignment threads
+triggers · receipts · MLS lanes
+surreal-memory
+coach beliefs, per project
+source-linked · exportable
+Plan Pool Control Plane
+ledger · windows · alerts
+telemetry, never traffic
+Know Decision
+know-me-decision · Qwen 27B
+bounded classification
+Model gateway
+Mac Studio → Runpod → plan
+coach runs metered here
+Trust boundary
+keys never leave the device
+coach never holds a key
+no central proxy of model calls
+OAuth plan tokens: gated off
+decisions · AG-UI interrupts
+steer: one bounded A2A task
+observe (read-only)
+sandboxed run
+candidate evidence
+receipts · UsageEvents
+Three coach arrows, each with one direction: observe KBD (read-only), propose to the owner (decision plane), steer through UAR (one bounded A2A task). Evidence arrives only as receipts signed by the uar-sidecar; the coach never reads the executor&#x27;s transcript as truth.
+</pre></article><article id="S31-003" class="source-clause"><h4>S31-003 · Component responsibilities</h4><p class="source-note">Governing revision: <a href="../index.html#dots">DOT-01–10</a> · source requirement, not release evidence.</p><pre class="retained-text">Component responsibilities
+Component
+Where it lives today
+Role for the Private Dot
+Coach service
+New: a BossFang Hand (
+librefang-hands
+), with its workflow in
+librefang-kernel
+Owns the coaching contract, trigger evaluation, inspection, proposals, reconciliation and the terminal packet. Stateless between runs except for the project memory
+Coach memory
+librefang-memory-wiki
+(provenance frontmatter) over
+surreal-memory
+(SurrealDB 3.2.1, SurrealKV)
+Every belief carries a source: contract clause, receipt id, or owner decision. Freshness stamps. One partition per project. Export is a directory of markdown plus a SurrealQL dump
+Observation adapters
+librefang-runtime-mcp
+as client of a new
+kbd-mcp
+server;
+librefang-channels
+Iggy consumer
+Read-only tools:
+kbd.contract.get
+,
+kbd.receipts.list
+,
+kbd.counters.get
+,
+repo.diff
+,
+ci.status
+. No tool with side effects is mounted on the coach&#x27;s MCP session
+UAR
+rust/vendor/universal-agent-runtime
+1.0.0:
+uar/governance
+(Cedar),
+uar/orchestrator
+,
+uar/tools
+,
+uar/a2ui
+,
+uar-sidecar
+binary
+The only path by which the coach reaches an executor. A steering proposal becomes an A2A task submitted under the owner&#x27;s identity; Cedar policy checks the coach&#x27;s grant; the run manager enforces the stop condition
+Harness adapters
+knowme:harness
+capability plugins (bossfang strategy §4);
+librefang-subprocess
+,
+librefang-runtime-sandbox-docker
+Spawn Kimi Code, OpenCode, Claude Code or Codex in a sandbox; translate I/O into A2A tasks and ContentBlocks; credentials injected from Flint Vault at spawn
+KBD
+.kbd-orchestrator/
+in each repo:
+project.json
+,
+constraints.md
+,
+phases/
+,
+current-waypoint
+,
+position
+Canonical project, run, phase, adopted contract revision, counters and dispositions. Gains a
+receipts/
+ledger and a
+kbd-mcp
+read surface. Deterministic predicates only
+Receipts
+New: emitted by
+uar-sidecar
+on every check, chained with BLAKE3 via
+librefang-runtime-audit
+Candidate-bound evidence: commit SHA, artifact digest, check name, deterministic result, signer DID, previous hash. Historical receipts are flagged, never silently reused
+Identity
+Flint-gate (Kratos-backed JWTs; DID/VC for cross-system agents)
+The coach acts as the owner&#x27;s delegate with an RFC 8693
+act
+claim. Every proposal, steering task and UsageEvent is signed by the owner&#x27;s device key
+Transport
+Apache Iggy 0.9.0 (Rust client 0.11), MLS via OpenMLS 0.9.1 for classified lanes
+Assignment thread topics carry executor reports, receipts, trigger events and proposals. Append-only and replayable; the coach restarts by replaying from its last committed offset
+Cost
+librefang-kernel-metering
+; Plan Pool Control Plane ledger
+Coach model calls, retrieval and human review time are UsageEvents against the Assignment with
+actor: coach
+. Separate budget from the executor so intervention yield is attributable
+Decision model
+know-me-decision
+(production decision-model layer; Rust LitJev port on Qwen3.8-27B)
+Bounded semantic classification for Phase Exit: does this receipt satisfy this clause? Abstains on contradiction. Never a verdict, always an input the deterministic gate consumes
+</pre></article><article id="S31-004" class="source-clause"><h4>S31-004 · Deployment placements</h4><p class="source-note">Governing revision: <a href="../index.html#dots">DOT-01–10</a> · source requirement, not release evidence.</p><pre class="retained-text">Deployment placements
+DESKTOP · sidecar
+BossFang sidecar
+coach Hand · channels off
+uar-sidecar
+key in keychain · signed events
+KBD in the repo
+.kbd-orchestrator/
+Executor CLI
+operator present · flat plan
+Stage 1 of OM-005
+ALWAYS-ON NODE
+BossFang peer
+coach runs unattended
+UAR server-full
+Cedar · A2A gRPC · telemetry
+Local Qwen 27B
+candle-vllm · metered, not a plan
+Headscale / Tailscale
+per-operator ACLs · no public endpoint
+Stage 2–3 · PHI lanes · unattended coaching
+MOBILE · KnowMe app
+Embedded UAR kernel
+embedded-mobile · gen_ui_ffi
+Personal dot (local)
+intent · commitments · CounselMe
+Packet viewer
+AG-UI ContentBlocks · decisions
+Qwen3-4B MLX · LiteRT-LM
+on-device inference
+never hosts a work-lane coach or key
+Placement follows the Operator Model: the work-lane coach runs where the operator&#x27;s key and ledger are. The phone shows packets and takes decisions; its own dot is a personal one.
+</pre></article><article id="S31-005" class="source-clause"><h4>S31-005 · Architecture decisions</h4><p class="source-note">Governing revision: <a href="../index.html#dots">DOT-01–10</a> · source requirement, not release evidence.</p><pre class="retained-text">Architecture decisions
+ADR-PD-01 · The coach is a Hand, not a crate.
+It is a curated capability package in
+librefang-hands
+with a workflow definition, so it gets kernel metering, RBAC, pause/resume and the audit chain for free. New code goes into adapters (
+kbd-mcp
+, receipt emitter, Iggy topics), not into a parallel runtime.
+ADR-PD-02 · KBD gains receipts and a read surface, nothing else.
+A
+receipts/
+ledger (append-only, BLAKE3-chained) and a stdio MCP server exposing read-only predicates. Phase transitions stay where they are. No KBD call takes model output as an argument.
+ADR-PD-03 · Steering is an A2A task through UAR, never a shell.
+The coach cannot spawn a harness. It submits a task with the owner&#x27;s
+act
+claim; UAR&#x27;s governance checks the grant; the harness adapter runs it sandboxed; the result is a receipt. A2A v1.0 states map the disposition (Blocked → INPUT_REQUIRED or AUTH_REQUIRED).
+ADR-PD-04 · The coach&#x27;s model is separate from the executor&#x27;s and metered separately.
+Cross-model review is cheap insurance against shared blind spots. Coach inference runs through the Promethity model gateway on metered API or owned inference, never on an operator&#x27;s flat plan when unattended.
+ADR-PD-05 ·
+librefang-runtime-oauth
+is gated off for work lanes.
+Routing ChatGPT or Copilot subscription OAuth tokens through the agent OS is the pattern Anthropic blocks server-side (since 9 Jan 2026) and bills as extra usage (since 4 Apr 2026). The one-person-one-plan rule needs the sidecar, not borrowed sessions.
+ADR-PD-06 · Observation is event-driven over Iggy, with bounded polling as fallback.
+Continuous rereading without a new question is not supervision. A trigger is an event; the coach wakes on it.</pre></article></main></body></html>

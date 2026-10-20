@@ -1,0 +1,203 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>S41 · workspace-pane-layout.md</title><link rel="stylesheet" href="../records.css"><body><main><a href="../index.html">KnowMe Praxis</a><h1>S41 · workspace-pane-layout.md</h1><p>Complete technical source record. Historical names and requirements remain visible for audit. Revised clauses and explicit corrections govern their application.</p><p><a href="S41.txt">Download complete technical text</a></p><article id="S41-001" class="source-clause"><h4>S41-001 · Workspace pane layout</h4><p class="source-note">Governing revision: <a href="../index.html#workspace">WS-01–07</a> · source requirement, not release evidence.</p><h1>Workspace pane layout</h1>
+<p><strong>Status:</strong> design brief for an implementing agent, 5 October 2026.
+<strong>Scope:</strong> layout and bridge changes only. No data, API, route or business-logic changes.</p>
+<p><strong>Reference to match:</strong>
+- <code>workspace-pane/ssr-workspace-pane.html</code>: the target layout. It runs from the file system.
+- <code>workspace-pane/ssr-workspace-pane-widths.html</code>: the same screens at 375, 560 and 920px side by side.</p></article><article id="S41-002" class="source-clause"><h4>S41-002 · 1. Why</h4><p class="source-note">Governing revision: <a href="../index.html#workspace">WS-01–07</a> · source requirement, not release evidence.</p><h2>1. Why</h2>
+<p>The San Saba Workspace hosts this app as its system mini app. It sits in an iframe in the right-hand canvas, next to the deal conversation, at <code>workspace-ssr.prometheusags.ai</code>.</p>
+<p>Today the app assumes a full browser window:
+- a two-row header with the logo, user and sign-out;
+- a desktop menu bar and a 13-button toolbar;
+- record pages laid out as three or four card columns;
+- tables up to 20 columns wide.</p>
+<p>In a 560px pane, almost half the height is chrome and every list scrolls sideways.</p>
+<p><strong>Decision:</strong> adapt the app to the pane rather than giving it a separate full-screen space. Two reasons:
+- <strong>The pane width is the iframe's viewport.</strong> Inside the iframe, the app's breakpoints already respond to the pane, not the monitor.
+- <strong>The narrow layout is phone work the app needs anyway.</strong> Mobile handling already exists, and finishing it serves both.</p>
+<p>Some work really needs the full width: the all-fields list view and clipboard import. For those, the pane asks the workspace for its full-width mode instead of building a second layout (§4.6).</p></article><article id="S41-003" class="source-clause"><h4>S41-003 · 2. The space the workspace provides</h4><p class="source-note">Governing revision: <a href="../index.html#workspace">WS-01–07</a> · source requirement, not release evidence.</p><h2>2. The space the workspace provides</h2>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Width</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Docked (default)</td>
+<td>560px. 500px on screens up to 1280px. Never under 480px.</td>
+<td>Beside the deal conversation</td>
+</tr>
+<tr>
+<td>Expanded</td>
+<td>about 760–980px</td>
+<td>The user widens the canvas</td>
+</tr>
+<tr>
+<td>Full width ("focus")</td>
+<td>The workspace width minus its navigator and rail</td>
+<td>The user, or the app via <code>layout.intent</code>, asks for it</td>
+</tr>
+<tr>
+<td>Phone sheet</td>
+<td>Full screen, between the workspace top bar and its bottom bar</td>
+<td>Phones and tablets up to 820px. Touch targets are 44px.</td>
+</tr>
+</tbody>
+</table>
+<p>The workspace draws a one-line strip above the iframe ("Following D-0149 · same sign-in"). The app must not draw its own outer border or page background gradient when embedded.</p></article><article id="S41-004" class="source-clause"><h4>S41-004 · 3. What already exists (verified in code)</h4><p class="source-note">Governing revision: <a href="../index.html#workspace">WS-01–07</a> · source requirement, not release evidence.</p><h2>3. What already exists (verified in code)</h2>
+<ul>
+<li><strong>Bridge:</strong> <code>src/lib/mini-app-bridge.ts</code> and <code>src/components/providers/mini-app-bridge-provider.tsx</code>.</li>
+<li>Channel <code>sansaba.mini-app-bridge</code> v1, mini app id <code>letter-agreement</code>.</li>
+<li>Parent origin pinned to <code>https://workspace-ssr.prometheusags.ai</code>.</li>
+<li>Strict envelope and key parsing, with no credentials or caller identity allowed.</li>
+<li>Host messages: <code>host.handshake</code>, <code>entity.apply</code> (re-dispatched as the window event <code>sansaba:entity-apply</code>) and <code>navigation.apply</code>.</li>
+<li>Guest messages: <code>guest.handshake</code> and <code>auth.state</code>.</li>
+<li><strong>Limitation:</strong> <code>navigation.apply</code> accepts only <code>/</code> and <code>/admin/letter-agreements</code>.</li>
+<li><code>entity.intent</code> and <code>navigation.intent</code> are declared as capabilities but never sent.</li>
+<li><strong>Frame policy:</strong> <code>next.config.ts</code> sets <code>frame-ancestors 'self' https://workspace-ssr.prometheusags.ai</code>. It is correct as is.</li>
+<li><strong>Mobile handling:</strong></li>
+<li><code>src/hooks/use-mobile.ts</code> treats under 768px as mobile.</li>
+<li><code>AdminShell</code> (<code>src/components/admin/admin-shell.tsx</code>) folds the menu bar behind a <strong>Menu</strong> button below <code>lg</code> (1024px) and stacks the header below <code>sm</code>.</li>
+<li>Record editors use <code>grid-cols-1 md:grid-cols-2 xl:grid-cols-3</code>, in <code>AcquisitionEditorTabs.tsx</code>.</li>
+<li><code>SectionAnchorNav.tsx</code> exists.</li>
+<li><strong>Tailwind 4</strong> is in use, so container queries (<code>@container</code>, <code>@sm:</code> …) are available without a plugin. <code>ui/card.tsx</code> and <code>ui/field.tsx</code> already use them.</li>
+<li><strong>Tables:</strong> <code>components/tables/shared-data-table</code> wraps tables in <code>overflow-x-auto</code>. There is no card substitute.</li>
+</ul></article><article id="S41-005" class="source-clause"><h4>S41-005 · 4. Changes, in order</h4><p class="source-note">Governing revision: <a href="../index.html#workspace">WS-01–07</a> · source requirement, not release evidence.</p><h2>4. Changes, in order</h2>
+<p>Each step is independent and can be merged on its own.</p></article><article id="S41-006" class="source-clause"><h4>S41-006 · 4.1 Embedded mode</h4><p class="source-note">Governing revision: <a href="../index.html#workspace">WS-01–07</a> · source requirement, not release evidence.</p><h3>4.1 Embedded mode</h3>
+<p>Add <code>useEmbedMode()</code> in <code>src/hooks/use-embed-mode.ts</code>. It is true when <code>window.self !== window.top</code>, and it becomes certain once <code>host.handshake</code> arrives. Set <code>data-embedded="true"</code> on <code>&lt;html&gt;</code>.</p>
+<p>In <code>AdminShell</code>, when embedded:
+- <strong>Remove:</strong> the logo row, <code>DocsButton</code>, <code>InboxBell</code>, <code>FeedbackButton</code>, <code>ThemeToggle</code>, the user chip, <strong>Sign Out</strong>, <code>AdminShellNavigation</code> and the toolbar strip. The workspace owns identity, theme, notifications and navigation. <code>auth.state</code> keeps reporting sign-outs.
+- <strong>Keep:</strong> <code>SseStatusBanner</code>, <code>DirtyNavigationProvider</code> behaviour, <code>FeedbackSidebar</code> and <code>DocsSheet</code>. Guide and Feedback open from the overflow menu.
+- <strong>Use as the only chrome:</strong> the page's own record bar (§4.2).</p>
+<p>When not embedded on a phone, keep a one-line header: the SR mark, the app name and a <strong>Menu</strong> button that opens the same overflow sheet. The reference shows this as <code>chrome=own</code>.</p></article><article id="S41-007" class="source-clause"><h4>S41-007 · 4.2 Record bar and overflow sheet</h4><p class="source-note">Governing revision: <a href="../index.html#workspace">WS-01–07</a> · source requirement, not release evidence.</p><h3>4.2 Record bar and overflow sheet</h3>
+<p>Every page gets one sticky bar:
+- a Back button to the list;
+- the record type and number;
+- a status chip (Active, Converted, Due date, Paid);
+- <strong>Save</strong>, the only primary button, disabled until the form is dirty;
+- <strong>⋯</strong>, which opens the overflow sheet.</p>
+<p>A context line under the bar shows the seller, the county and a link to the related letter agreement or acquisition.</p>
+<p>The overflow sheet is built from the existing <code>adminMenus</code> and <code>adminToolbarActions</code> in <code>src/lib/admin-navigation.ts</code>, and calls the same <code>handleMenuAction</code> and <code>handleToolbarClick</code> paths. It has the groups File, Display, Edit (with Print and Refresh), Reports &amp; documents, View, Tools and Help. Do not duplicate handlers.</p>
+<p>Below a 440px container, drop the record-type word, keep the number, and make Save icon-only. ⌘/Ctrl-S still saves.</p></article><article id="S41-008" class="source-clause"><h4>S41-008 · 4.3 Record editors</h4><p class="source-note">Governing revision: <a href="../index.html#workspace">WS-01–07</a> · source requirement, not release evidence.</p><h3>4.3 Record editors</h3>
+<p>This covers the letter-agreement editor, <code>AcquisitionEditorTabs</code> and its sections.</p>
+<ul>
+<li><strong>Section grid:</strong> make the information tab's grid a container query capped at <strong>two</strong> columns. Use one column under 640px and two from 640px. Three narrow columns in a 920px pane produce unreadable 280px cards, so do not use them.</li>
+<li><strong>Collapsible sections:</strong> each section becomes a collapsible card with a one-line summary when closed, for example "Wren Creek Minerals LLC · Midland, TX" or "$86,500.00 · due 10/17/2026". Seller information and Title &amp; property start closed. The payment and agreement sections start open.</li>
+<li><strong>Section chips:</strong> under the tabs, show a horizontal row of section chips (Seller · Payment · Title · Status · Buyers · Property · Generate). Reuse <code>SectionAnchorNav</code>. Hide it when the pane is 900px or wider.</li>
+<li><strong>Field layout follows the card's width</strong>, not the window's:</li>
+<li>label above the field below a 440px card;</li>
+<li>a 132px label column beside the field at 440px and wider;</li>
+<li>paired fields (Buyer eff. date / Due date …) side by side from a 300px card, always with labels above.</li>
+<li><strong>Tabs</strong> scroll sideways (<code>overflow-x-auto</code>, no wrap). Counts show beside each tab: Notes 1, Documents 3, Curative 1, Liens 0.</li>
+<li><strong>Property units</strong> become one card per unit: name, county, interest type, operator, net acres and decimal, with book/page as a chip, red when missing. Totals show as two chips (Gross, Net).</li>
+<li><strong>Status history</strong> becomes a timeline list (date, status, user initials) with the add-status control under it.</li>
+<li><strong>Buyers &amp; invoicing</strong> shows the allocation bar, then one card per buyer (share, invoice number, status), then Create invoices and Buyer detail.</li>
+</ul></article><article id="S41-009" class="source-clause"><h4>S41-009 · 4.4 Lists and tables</h4><p class="source-note">Governing revision: <a href="../index.html#workspace">WS-01–07</a> · source requirement, not release evidence.</p><h3>4.4 Lists and tables</h3>
+<p>In <code>shared-data-table</code>:
+- <strong>Under a 720px container,</strong> render a card per row:
+  - the first identifying column as the title (seller);
+  - amount and status on the right;
+  - a second line with the next three fields of the active <strong>View</strong>, for example LA ID · county · effective date.
+- <strong>From 720px,</strong> keep the table.
+- <strong>Above the list,</strong> show a search box, a Filters button (opens a sheet), the active filter and view as chips, and <strong>Use full width</strong> (§4.6).</p></article><article id="S41-010" class="source-clause"><h4>S41-010 · 4.5 Dialogs and sheets</h4><p class="source-note">Governing revision: <a href="../index.html#workspace">WS-01–07</a> · source requirement, not release evidence.</p><h3>4.5 Dialogs and sheets</h3>
+<p>Under a 640px container, dialogs open as bottom sheets with a sticky header and close button. This covers the buyer search, unit editor, add lien and requirement, copy, upload and save-before-leaving dialogs. The DOCX document viewer opens full screen. When <code>layout.apply</code> says <code>touch: true</code>, or <code>pointer: coarse</code> matches, controls become 44px tall.</p></article><article id="S41-011" class="source-clause"><h4>S41-011 · 4.6 Bridge additions</h4><p class="source-note">Governing revision: <a href="../index.html#workspace">WS-01–07</a> · source requirement, not release evidence.</p><h3>4.6 Bridge additions</h3>
+<p>All of these go in <code>mini-app-bridge.ts</code>, keeping the parser's strict key checks, and in the provider.</p>
+<ol>
+<li><strong><code>navigation.apply</code> deep links.</strong> Replace the two-value check with an allow-list of patterns:
+   - <code>/admin/letter-agreements</code> and <code>/admin/letter-agreements/:id/edit</code>;
+   - <code>/admin/acquisitions</code> and <code>/admin/acquisitions/:id/edit</code>;
+   - <code>/reports</code> and <code>/admin/documents/search</code>;
+   - <code>:id</code> must be digits.</li>
+</ol>
+<p>Navigate through the app router (<code>router.push</code>) so <code>DirtyNavigationProvider</code> still asks before discarding unsaved edits.</p>
+<p>The workspace sends this whenever the user opens another deal.
+2. <strong><code>entity.apply</code> into editors.</strong> Editors listen for <code>sansaba:entity-apply</code>. When the event's <code>entityType</code> and <code>entityId</code> match the open record:
+   - write the fields into the form;
+   - mark the form dirty;
+   - outline each changed field and add "Filled in from the workspace" under it.</p>
+<p><strong>Never save automatically.</strong> A person reviews and saves.</p>
+<p>Field keys follow the form's field names. Unit fields use <code>unit:&lt;index&gt;:&lt;field&gt;</code>.</p>
+<p>The workspace uses this when a person confirms values there, such as an effective date or a recording book and page found by the pre-generation check.
+3. <strong>Send <code>entity.intent</code></strong> (guest to host) with <code>{ entityType, entityId }</code> whenever an editor opens a record and after each save. The workspace uses it to show which record the pane is on and to warn when it is not the current deal's record.
+4. <strong>New <code>layout.apply</code></strong> (host to guest): <code>{ mode: "docked" | "expanded" | "focus" | "sheet", touch: boolean }</code>. It is only a density hint. Layout still comes from container queries.
+5. <strong>New <code>layout.intent</code></strong> (guest to host): <code>{ mode: "focus" | "docked" }</code>. It is sent by <strong>Use full width</strong>. The host decides; the guest never resizes itself.</p>
+<p>Add <code>layout.apply</code> to <code>MiniAppCapability</code> and <code>SUPPORTED_MINI_APP_CAPABILITIES</code>. Reject unknown modes.</p>
+<p>The workspace side of all five is implemented in the design prototype at <code>deal-workspace.html</code> (<code>mrmMount</code>, <code>mrmFollow</code>, <code>sendLayout</code>, <code>mrmApplyConfirmed</code> and the <code>message</code> listener).</p></article><article id="S41-012" class="source-clause"><h4>S41-012 · 5. Do not change</h4><p class="source-note">Governing revision: <a href="../index.html#workspace">WS-01–07</a> · source requirement, not release evidence.</p><h2>5. Do not change</h2>
+<ul>
+<li>Routes, data shapes, Prisma models, API calls, validation or calculations. This is layout plus bridge only.</li>
+<li>Build and deploy files: <code>.github/workflows/</code>, Dockerfile, <code>k8s/</code> and <code>next.config.ts</code> headers. The frame policy is already right (<code>AGENTS.md</code>).</li>
+<li>Desktop behaviour when the app is opened directly in a wide browser window. The menu bar and toolbar stay there.</li>
+</ul></article><article id="S41-013" class="source-clause"><h4>S41-013 · 6. Acceptance</h4><p class="source-note">Governing revision: <a href="../index.html#acceptance">G01–16</a> · source requirement, not release evidence.</p><h2>6. Acceptance</h2>
+<p>Check at 375px (<code>chrome=own</code>, touch), 560px and 920px (embedded):</p>
+<ul>
+<li>[ ] No horizontal page scroll. Tables only appear from 720px.</li>
+<li>[ ] Save is visible without scrolling on every record page and is the only primary button in view.</li>
+<li>[ ] Every action from the desktop menu bar and toolbar is reachable from the overflow sheet.</li>
+<li>[ ] In embedded mode there is no logo row, menu bar, toolbar, user chip or Sign Out.</li>
+<li>[ ] Every section on the acquisition information tab is reachable in one tap from the section chips under 900px.</li>
+<li>[ ] <code>navigation.apply</code> to <code>/admin/acquisitions/9412/edit</code> opens that record. With unsaved edits, the save-before-leaving prompt appears first.</li>
+<li>[ ] <code>entity.apply</code> fills the effective date, marks it, marks the form dirty and does <strong>not</strong> save.</li>
+<li>[ ] <strong>Use full width</strong> sends <code>layout.intent { mode: "focus" }</code>. It does nothing when not embedded.</li>
+<li>[ ] Touch targets are at least 44px in sheet mode.</li>
+</ul>
+<p><strong>Testing:</strong>
+- Unit tests for the new parser branches go next to <code>src/lib/mini-app-bridge.test.ts</code>.
+- BDD UI scenarios at the three viewport sizes go under <code>tests/features/ui</code>.
+- Run both locally. <strong>Do not add any test step to CI</strong> (<code>AGENTS.md</code>).</p></article><article id="S41-014" class="source-clause"><h4>S41-014 · 7. Mapping: desktop element to pane element</h4><p class="source-note">Governing revision: <a href="../index.html#workspace">WS-01–07</a> · source requirement, not release evidence.</p><h2>7. Mapping: desktop element to pane element</h2>
+<table>
+<thead>
+<tr>
+<th>Desktop today</th>
+<th>Pane / phone</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Header: SR mark, "Mineral Rights Manager", Guide, Inbox, Feedback, theme, user, Sign Out</td>
+<td>Removed when embedded (workspace owns them). Standalone phone: a one-line header with Menu.</td>
+</tr>
+<tr>
+<td>Menu bar: File · Edit · Report · Documents · View · Tools</td>
+<td>⋯ overflow sheet, grouped the same way</td>
+</tr>
+<tr>
+<td>Toolbar: New, Save, Print, Copy, Delete, List, Edit, Filters, Views, Last ×3, Refresh</td>
+<td>Save in the record bar. Everything else is in the overflow sheet.</td>
+</tr>
+<tr>
+<td>"Edit Letter Agreement #4016" heading + Import + Save</td>
+<td>Record bar. Import goes in the overflow sheet's File group.</td>
+</tr>
+<tr>
+<td>Three or four card columns</td>
+<td>Collapsible sections, one column under 640px and two above</td>
+</tr>
+<tr>
+<td>Label-left forms</td>
+<td>Label above under a 440px card</td>
+</tr>
+<tr>
+<td>Property Setup / Property Information sub-tabs</td>
+<td>One card per unit with totals chips</td>
+</tr>
+<tr>
+<td>Status history table</td>
+<td>Timeline list</td>
+</tr>
+<tr>
+<td>20-column list table</td>
+<td>Cards under 720px, table above. Use full width for all fields.</td>
+</tr>
+<tr>
+<td>Modal dialogs</td>
+<td>Bottom sheets under 640px</td>
+</tr>
+</tbody>
+</table></article><article id="S41-015" class="source-clause"><h4>S41-015 · 8. Open questions</h4><p class="source-note">Governing revision: <a href="../index.html#workspace">WS-01–07</a> · source requirement, not release evidence.</p><h2>8. Open questions</h2>
+<ul>
+<li>Whether <strong>Import</strong> (clipboard spreadsheet import) should only be offered in full-width mode. The paste-capture dialog is wide.</li>
+<li>Whether the 30-day due date counts calendar days or banking days. The letter agreement form has <strong>Banking days</strong>, but the deal brief says LA + 30. This is unchanged here, but the workspace shows the due date as well.</li>
+<li>Whether <code>layout.intent</code> may also request <code>expanded</code>.</li>
+</ul></article></main></body></html>

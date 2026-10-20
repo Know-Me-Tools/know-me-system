@@ -1,0 +1,232 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>S16 · pags-spec-km-crm-001.md</title><link rel="stylesheet" href="../records.css"><body><main><a href="../index.html">KnowMe Praxis</a><h1>S16 · pags-spec-km-crm-001.md</h1><p>Complete technical source record. Historical names and requirements remain visible for audit. Revised clauses and explicit corrections govern their application.</p><p><a href="S16.txt">Download complete technical text</a></p><article id="S16-001" class="source-clause"><h4>S16-001 · PAGS-SPEC-KM-CRM-001 — Engagement &amp; Relationship Model</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h1>PAGS-SPEC-KM-CRM-001 — Engagement &amp; Relationship Model</h1>
+<p><strong>Status:</strong> Draft (rev 0.1)
+<strong>Date:</strong> 2026-08-03
+<strong>Owner:</strong> Travis James
+<strong>Consumers:</strong> Prometheus AGS (enterprise motion), KnowMe plugin marketplace, Morning Brief agent
+<strong>Companion:</strong> PAGS-SPEC-KM-GOAL-001</p>
+<hr/></article><article id="S16-002" class="source-clause"><h4>S16-002 · 1. Position</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h2>1. Position</h2>
+<p>This is not a CRM. A CRM is a database of contacts with a status field bolted on. This is a <strong>state machine over engagements</strong>, where relationship records are edges rather than the primary entity.</p>
+<p>The abstraction already exists in your estate: the San Saba <strong>deal container</strong> — ranked #1 of 44 candidate features — a digital replacement for the physical file folder and checklist, modeled as an active state machine rather than a passive record. That container is not San-Saba-specific. It is the general primitive.</p>
+<p><strong>Core claim:</strong> the CRM and the goal management system are the same state machine with different entity types. Building them as two systems duplicates the gate engine, the provenance model, the staleness clock, and the approval path. Build one substrate, instantiate twice.</p>
+<p>If that claim is wrong, the place it breaks is entity lifecycle: engagements have external counterparties and legal artifacts; objectives do not. That difference is handled by typed payloads on a shared container, not by a second engine. Named here so it can be argued rather than assumed.</p>
+<hr/></article><article id="S16-003" class="source-clause"><h4>S16-003 · 2. Shared substrate: `prometheus-container`</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h2>2. Shared substrate: <code>prometheus-container</code></h2>
+<p>A new Rust crate. Single responsibility: typed, gated, provenance-carrying state machines.</p>
+<pre><code>prometheus-container/
+├── src/
+│   ├── container.rs      // Container&lt;T&gt; — the primitive
+│   ├── gate.rs           // Gate definitions, entry/exit predicates
+│   ├── checklist.rs      // Required artifacts + completion state
+│   ├── provenance.rs     // Source attribution, verified vs. self-reported
+│   ├── clock.rs          // Staleness, dwell time, SLA breach
+│   └── ports/
+│       ├── store.rs      // ContainerStorePort
+│       ├── notify.rs     // ContainerEventPort
+│       └── policy.rs     // ContainerPolicyPort (Cedar PDP)
+</code></pre></article><article id="S16-004" class="source-clause"><h4>S16-004 · 2.1 Container primitive</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h3>2.1 Container primitive</h3>
+<pre><code class="language-rust">pub struct Container&lt;T: ContainerPayload&gt; {
+    pub id: ContainerId,
+    pub kind: ContainerKind,        // Engagement | Objective | ...
+    pub payload: T,
+    pub stage: StageId,
+    pub stage_entered_at: DateTime&lt;Utc&gt;,
+    pub checklist: Vec&lt;ChecklistItem&gt;,
+    pub gates: Vec&lt;Gate&gt;,
+    pub edges: Vec&lt;Edge&gt;,           // typed relations to other containers/parties
+    pub provenance: Provenance,
+    pub owner: Did,                 // did:prometheus: | did:uar:
+}
+</code></pre>
+<p>Invariants, enforced at compile time where possible:</p>
+<ul>
+<li><strong>Single-writer discipline.</strong> One writer per container. Agents propose <code>ContainerProposal</code>; only the trusted host layer applies. The agent kernel crate does not depend on the store actuator — capability inversion at the Cargo level, not runtime policy.</li>
+<li><strong>Stage transitions are gated, never assigned.</strong> No <code>set_stage()</code>. Only <code>attempt_transition(to, evidence) -&gt; Result&lt;Applied, GateFailure&gt;</code>.</li>
+<li><strong>Provenance is mandatory.</strong> Every field carries whether it was <code>Verified</code>, <code>SelfReported</code>, or <code>Inferred</code>, with source DID. This is what lets the Morning Brief label claims honestly instead of laundering an agent's guess into a fact.</li>
+</ul></article><article id="S16-005" class="source-clause"><h4>S16-005 · 2.2 Gates</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h3>2.2 Gates</h3>
+<p>A gate is an entry predicate plus a required-artifact set plus an approver.</p>
+<pre><code class="language-rust">pub struct Gate {
+    pub id: GateId,
+    pub from: StageId,
+    pub to: StageId,
+    pub requires: Vec&lt;ChecklistItemId&gt;,
+    pub approver: ApproverRule,     // Human(Did) | Policy(CedarPolicyId) | Auto
+    pub reversible: bool,
+}
+</code></pre>
+<p>Cedar owns the threshold for <code>Auto</code>. Users may only tighten. Auto applies to reversible transitions only — same rule already standing in the governance model.</p>
+<hr/></article><article id="S16-006" class="source-clause"><h4>S16-006 · 3. Engagement instantiation</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h2>3. Engagement instantiation</h2>
+<p><code>ContainerKind::Engagement</code> with payload:</p>
+<pre><code class="language-rust">pub struct EngagementPayload {
+    pub account: AccountRef,
+    pub entity: BusinessEntity,      // PrometheusAgs | KnowMe | TribeHealth
+    pub motion: Motion,              // Insight | FusionPoc | Subscription | Retainer
+    pub value: Option&lt;Money&gt;,
+    pub contract_ref: Option&lt;DocumentRef&gt;,
+    pub milestones: Vec&lt;Milestone&gt;,
+    pub last_touch: Option&lt;Touch&gt;,
+    pub next_gate: Option&lt;GateId&gt;,
+}
+</code></pre></article><article id="S16-007" class="source-clause"><h4>S16-007 · 3.1 Default stage machine (Prometheus AGS motion)</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h3>3.1 Default stage machine (Prometheus AGS motion)</h3>
+<pre><code>Identified → Qualified → Insight Assessment → Fusion POC → Subscription → Renewal
+                  ↓            ↓                   ↓
+               Dormant      Dormant             Dormant
+</code></pre>
+<p>Stages map to the existing motion rather than generic Salesforce stages. Each stage carries a <strong>dwell SLA</strong>; breach surfaces in the brief's Engagements &amp; Gates section without anyone remembering to check.</p></article><article id="S16-008" class="source-clause"><h4>S16-008 · 3.2 Relationship edges</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h3>3.2 Relationship edges</h3>
+<p>People are not rows in a contacts table. They are <code>Party</code> nodes joined to engagements by typed edges carrying <strong>authority</strong>, which is the field that actually matters and that every commercial CRM gets wrong:</p>
+<pre><code class="language-rust">pub enum PartyRole {
+    Principal,        // final decision-maker  (Hal @ San Saba)
+    TechnicalLead,
+    Advisory,         // raises risk, does not decide  (Randy)
+    Operator,
+    Gatekeeper,
+    Influencer,
+}
+</code></pre>
+<p>Encoding authority explicitly prevents the failure mode you already named: inverting the hierarchy, treating advisory input as a decision. The container refuses a gate transition whose <code>approver</code> resolves to a non-<code>Principal</code> party.</p>
+<hr/></article><article id="S16-009" class="source-clause"><h4>S16-009 · 4. v0 wire format — flat files</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h2>4. v0 wire format — flat files</h2>
+<p>Ships <strong>before</strong> any plugin work. The Morning Brief reads this on day one; the plugin later emits the identical schema so the agent's read path never changes.</p>
+<p><code>~/prometheus-brief/pipeline.yaml</code></p>
+<pre><code class="language-yaml">version: 0
+generated_by: manual          # later: knowme-crm-plugin
+engagements:
+  - id: eng-ssr-p3
+    account: San Saba Royalty
+    entity: prometheus-ags
+    motion: fusion-poc
+    stage: fusion-poc
+    stage_entered: 2026-07-14
+    dwell_sla_days: 45
+    value_usd: 40000
+    contract_ref: PAGS-SOW-SSR-003
+    parties:
+      - name: Hal
+        role: principal
+      - name: Randy Jesberg
+        role: advisory
+    milestones:
+      - id: m1
+        title: Fabric install
+        status: in_progress
+        due: 2026-08-15
+        provenance: self_reported
+    next_gate: m1-acceptance
+    last_touch: 2026-07-28
+    open_risks:
+      - buyer-conveyance generation defect
+      - hard validation failure on legacy records lacking required dates
+</code></pre>
+<p>Rules the brief enforces against this file:</p>
+<ul>
+<li><code>stage_entered</code> older than <code>dwell_sla_days</code> → surfaces as stalled.</li>
+<li><code>last_touch</code> older than 30 days on any <code>principal</code> party → surfaces as a relationship gap.</li>
+<li>Any milestone marked <code>self_reported</code> and past <code>due</code> → surfaces with the provenance label attached. Never promoted to done.</li>
+</ul>
+<hr/></article><article id="S16-010" class="source-clause"><h4>S16-010 · 5. KnowMe plugin surface</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h2>5. KnowMe plugin surface</h2>
+<p>Plugin id: <code>knowme-crm</code>. Depends on <code>prometheus-container</code>, not on the KnowMe app shell.</p>
+<ul>
+<li><strong>Storage:</strong> SurrealDB 3.x (RocksDB local, hybrid-cloud sync per the standing constraint).</li>
+<li><strong>UI:</strong> React 19 / TSX in the Tauri desktop shell; Flutter view on mobile through <code>gen_ui_core</code>.</li>
+<li><strong>Auth/entitlement:</strong> blocked on F-04 (Kratos + Flint Gate + entitlements + Stripe + license spine). <strong>This is a hard dependency.</strong> The plugin cannot be sold before F-04 exists.</li>
+<li><strong>Agent access:</strong> read-only through <code>ContainerStorePort::read</code>. Write proposals route through the Tauri host approval gate.</li>
+</ul></article><article id="S16-011" class="source-clause"><h4>S16-011 · 5.1 Tier placement</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h3>5.1 Tier placement</h3>
+<table>
+<thead>
+<tr>
+<th>Tier</th>
+<th>CRM capability</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Free</td>
+<td>Flat-file import/export only, no sync</td>
+</tr>
+<tr>
+<td>$20</td>
+<td>Local container store, single device, manual gates</td>
+</tr>
+<tr>
+<td>$200</td>
+<td>Sync, policy-driven auto-gates, agent proposals, multi-entity</td>
+</tr>
+</tbody>
+</table>
+<p>Risk to name: the $200 sovereignty premium is still unproven against incumbents selling frontier capability at the same price. A CRM plugin does not by itself validate that premium — it broadens the surface a buyer is evaluating, which cuts both ways.</p>
+<hr/></article><article id="S16-012" class="source-clause"><h4>S16-012 · 6. Estimate</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h2>6. Estimate</h2>
+<p>Per standing estimation standard: PMPO/agent velocity at 11.3x compression, implementation only, human gates uncompressed, agent-build and calendar reported separately.</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Agent-build</th>
+<th>Human-gated</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>prometheus-container</code> crate</td>
+<td>~1.5 agent-days</td>
+<td>—</td>
+<td>Gate engine, provenance, clock</td>
+</tr>
+<tr>
+<td>Engagement payload + stage machine</td>
+<td>~0.75 agent-days</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td>v0 YAML reader (brief-side)</td>
+<td>~0.25 agent-days</td>
+<td>—</td>
+<td>Ships first, unblocks the brief</td>
+</tr>
+<tr>
+<td><code>knowme-crm</code> plugin UI</td>
+<td>~2 agent-days</td>
+<td>—</td>
+<td>Blocked on F-04</td>
+</tr>
+<tr>
+<td>F-04 dependency</td>
+<td>not estimated here</td>
+<td>—</td>
+<td>First revenue-blocking item estate-wide</td>
+</tr>
+<tr>
+<td>Schema review / your approval</td>
+<td>—</td>
+<td>1–2 sessions</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Critical path is F-04, not the container work.</strong> The container crate can land in under a week of agent-build; the plugin cannot ship commercially at all until entitlements exist. Building the plugin UI before F-04 produces an asset that cannot be sold.</p>
+<hr/></article><article id="S16-013" class="source-clause"><h4>S16-013 · 7. Open decisions</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h2>7. Open decisions</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Decision</th>
+<th>Blocking</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>D-CRM-01</td>
+<td>Does <code>prometheus-container</code> live in the Prometheus Fabric repo or KnowMe? Consequence: whether Prometheus AGS client deployments can use it without a KnowMe dependency.</td>
+<td>Crate scaffolding</td>
+</tr>
+<tr>
+<td>D-CRM-02</td>
+<td>Merge or separate — is the goal system a second <code>ContainerKind</code> or a separate crate? Spec assumes merge.</td>
+<td>Both specs</td>
+</tr>
+<tr>
+<td>D-CRM-03</td>
+<td>Does the SSR deal container implementation become the reference instantiation, or stay bespoke?</td>
+<td>SSR Phase 3 scope</td>
+</tr>
+</tbody>
+</table>
+<p>D-CRM-02 is the one that gets expensive if deferred. Answer it before either crate is scaffolded.</p></article></main></body></html>

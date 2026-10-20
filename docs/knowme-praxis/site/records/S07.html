@@ -1,0 +1,868 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>S07 · knowme-context-fabric-spec.md</title><link rel="stylesheet" href="../records.css"><body><main><a href="../index.html">KnowMe Praxis</a><h1>S07 · knowme-context-fabric-spec.md</h1><p>Complete technical source record. Historical names and requirements remain visible for audit. Revised clauses and explicit corrections govern their application.</p><p><a href="S07.txt">Download complete technical text</a></p><article id="S07-001" class="source-clause"><h4>S07-001 · PAGS-SPEC-KM-CTX-001 — KnowMe Context Fabric</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h1>PAGS-SPEC-KM-CTX-001 — KnowMe Context Fabric</h1>
+<p><strong>Cross-platform context builder, capability model, and budget abstraction for the KnowApp harness</strong></p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Document ID</td>
+<td>PAGS-SPEC-KM-CTX-001</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Draft for review — no code authorized until phase gates approved</td>
+</tr>
+<tr>
+<td>Date</td>
+<td>2026-07-18</td>
+</tr>
+<tr>
+<td>Author</td>
+<td>Claude (session work product for Travis James, Prometheus AGS / KnowMe LLC)</td>
+</tr>
+<tr>
+<td>Applies to</td>
+<td><code>know-me-system</code> (rust workspace, Flutter mobile, Tauri desktop, web, Axum cloud)</td>
+</tr>
+<tr>
+<td>Supersedes</td>
+<td>Ad-hoc per-call-site context assembly in <code>gen_ui_agent::chat</code></td>
+</tr>
+<tr>
+<td>Related</td>
+<td>TJ-ARCH-MOB-001, FUNC-SPEC v1.0, cherry-studio fork <code>contextStrategy.ts</code></td>
+</tr>
+</tbody>
+</table>
+<hr/></article><article id="S07-002" class="source-clause"><h4>S07-002 · 1. Executive summary</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>1. Executive summary</h2>
+<p>KnowMe's promise — "it knows the user" — is delivered through three inputs
+(memories, dropped-note RAG, tools) fed to models whose real capacity varies by
+two orders of magnitude across deployment targets: a Q4_K_M Qwen3.5-4B on a
+Galaxy S25 Ultra is not a cloud frontier model, and pretending otherwise
+produces an app that works in demos and fails in pockets. Today, context
+assembly is implicit and scattered: <code>gen_ui_agent::chat</code> builds message lists
+ad hoc, <code>gen_ui_db_graph</code> retrieves without budget awareness, tool schemas are
+injected wholesale, and nothing enforces the token arithmetic that on-device
+models require.</p>
+<p>This specification defines <strong>one context fabric</strong>: a <code>gen_ui_context</code> crate in
+the shared Rust core that owns (a) a three-layer <strong>capabilities model</strong>
+(device / model / runtime) resolved into an <strong>EffectiveBudgetPlan</strong>, (b) a
+deterministic <strong>ContextBuilder pipeline</strong> that fills that plan in a fixed
+order, (c) the four <strong>context-management strategies</strong> from the Cherry Studio
+fork, ported natively (sliding window, truncate-middle, progressive
+summarization, hierarchical memory) plus the agent pre-compact trigger, (d) a
+<strong>chunking subsystem</strong> for dropped documents, and (e) a <strong>retrieval/re-ranking
+pipeline</strong> (existing RRF → MMR diversity → recency decay → placement policy).
+Every surface — Flutter mobile, Tauri desktop, web/WASM, Axum cloud — consumes
+the same crate through the same trait seams already used for
+<code>InferenceProvider</code>; platforms differ only in the capability profile they
+load, never in pipeline logic.</p>
+<p>The design thesis is the same as the rest of the Fabric: <strong>architectural
+correctness over feature count</strong>. The model plans nothing about its own
+context; the harness owns budgets, ordering, truncation, and escalation as
+deterministic Rust. This is not a stylistic preference — the research base
+(§3) shows small on-device models measurably cannot self-manage tool memory,
+long contexts, or multi-step state, and that structured subsystems recover
+most of the gap.</p></article><article id="S07-003" class="source-clause"><h4>S07-003 · 2. Scope, goals, non-goals</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>2. Scope, goals, non-goals</h2>
+<p><strong>Goals</strong></p>
+<ol>
+<li>A single capability + budget abstraction controlling: system prompt size,
+   history window, memory injection count/tokens, knowledge-base retrieval
+   count/tokens, tool shortlist size, tool-schema tokens, output reserve,
+   thinking reserve, re-ranking configuration — on every platform.</li>
+<li>Port the four fork strategies as first-class Rust implementations with the
+   fork's layered override model (global → assistant/agent → topic/session).</li>
+<li>Chunking for dropped notes/documents with provenance, integrated with the
+   existing <code>gen_ui_db_graph</code> ingest path without breaking atomic short notes.</li>
+<li>Deterministic, testable assembly: same inputs + same profile ⇒ same prompt,
+   byte-for-byte, on every platform.</li>
+<li>Telemetry parity with the fork (<code>tokensBefore/After/Saved</code>, alteration
+   summary) surfaced on the AG-UI stream.</li>
+</ol>
+<p><strong>Non-goals (v1)</strong></p>
+<ul>
+<li>Cross-encoder re-ranking (deferred behind a measurement gate, §10.4).</li>
+<li>Model fine-tuning / LoRA for tool calling (separate initiative; §3.4 notes
+  when it becomes the higher-leverage move).</li>
+<li>Changing the embedding model or <code>EMBED_DIM</code> (stays 384 / all-MiniLM-L6-v2).</li>
+<li>Prompt-content authoring (skills/personas). This spec governs <em>assembly and
+  budgets</em>, not what the system prompt says.</li>
+</ul></article><article id="S07-004" class="source-clause"><h4>S07-004 · 3. Research foundation (condensed, with sources)</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>3. Research foundation (condensed, with sources)</h2>
+<p>Findings gathered across this design session; each shaped a specific mechanism
+below. Full citations in §16.</p>
+<p><strong>3.1 Effective context ≪ nominal context.</strong> Qwen3.5-4B and -9B share an
+identical 32-layer hybrid layout — 8 × (3 × Gated DeltaNet → 1 × Gated
+Attention), <code>full_attention_interval: 4</code> — so both have exactly 8
+full-attention "precision checkpoints"; the difference is width (2560 vs 4096
+hidden), not checkpoint density. GDN layers compress history into fixed-size
+recurrent state; precise recall depends on the 8 full-attention layers.
+Nominal 262K is a training capability, not a usable retrieval window.
+Consequence: <strong>8K operating ceiling, 16K only behind an explicit degraded-mode
+flag; reliable RAG budget is low thousands of tokens</strong> (§7 tables).</p>
+<p><strong>3.2 Quantization compounds with context length.</strong> 8-bit ≈ −0.8% on
+long-context suites; 4-bit methods lose up to 59% worst-case, damage growing
+past 8K; K-quants are gentler than GPTQ/BNB-nf4 but Q4_K_M is still 4-bit.
+The GDN-recurrent-state × 4-bit interaction is uncharacterized in the
+literature — an explicit empirical risk. Consequence: <strong>needle-in-haystack
+smoke test against our actual GGUFs is a Phase 0 gate, not an afterthought.</strong></p>
+<p><strong>3.3 Position matters ("lost in the middle").</strong> Small models retrieve worst
+at 20–70% depth. Consequence: the <strong>placement policy</strong> (§10.3): best hit last
+(adjacent to the query), second-best first, middle treated as distractor
+space.</p>
+<p><strong>3.4 Agentic limits.</strong> Success ∝ (1−p)^m — 99% per-step accuracy is 36.6% at
+100 steps; per-step accuracy itself degrades with step count
+(self-conditioning). Deviations on <em>mutating</em> actions reduce success odds by
+up to 92–96%; read-only deviations barely matter (SABER). Tool-selection
+accuracy degrades past ~20–25 exposed tools; Anthropic measured 58 tools ≈
+55K tokens. Two-stage retrieve-then-load gives ~6× system-prompt reduction and
+10–25× context-growth reduction (TinyAgent/ToolRAG lineage). Small models
+cannot self-manage tool memory (MemTool); structured subsystems close the gap
+(fastWorkflow). Consequence: <strong>max 3–4 autonomous steps before checkpoint,
+individual gates on all mutating actions, 5–8 tool shortlist ceiling, harness
+owns planning.</strong> A purpose-LoRA over our real schemas becomes the better
+investment only after a tool cluster stabilizes — not before.</p>
+<p><strong>3.5 Thermal envelope is a budget dimension.</strong> Sustained inference: iPhone
+−41.5% throughput plateau (Hot state by ~iteration 17); S25-class GPU cliffs
+680→231 MHz at 78.3 °C; shell &gt;42 °C in 100 s at peak; dense on-device RAG
+prefill has exceeded 14 s TTFT in published deployments. Consequence: the
+<strong>SessionEnvelope</strong> (§6.4) tracks cumulative inference and degrades or hands
+off to cloud; RAG budgets also bound prefill latency, not just recall.</p>
+<p><strong>3.6 Structured output.</strong> Grammar-constrained decoding (llguidance, already a
+declared-but-unwired feature of our vendored <code>llama-cpp-2</code>) makes malformed
+JSON structurally impossible; it fixes shape, not semantics. Consequence:
+wire <code>llama-cpp-2/llguidance</code> into both mobile composite features; keep
+in-prompt tool descriptions to name + one line; compile grammars once per
+session; temp 0.0–0.2 on structured turns; post-parse semantic validation;
+1–2 capped repair retries then fail closed.</p></article><article id="S07-005" class="source-clause"><h4>S07-005 · 4. Current-state review</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>4. Current-state review</h2></article><article id="S07-006" class="source-clause"><h4>S07-006 · 4.1 know-me-system (Rust workspace)</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>4.1 know-me-system (Rust workspace)</h3>
+<p>What exists and is kept:</p>
+<ul>
+<li><strong><code>InferenceProvider</code> trait seam</strong> (<code>gen_ui_inference</code>): engines behind a
+  trait; Android = LiteRT-LM Gemma 4 E2B through the Rust boundary, iOS retains
+  the existing llama.cpp/Qwen lane until re-certification, desktop has its own
+  local engine lanes. The context fabric slots in as a sibling seam, not inside
+  any engine.</li>
+<li><strong>Hybrid retrieval</strong> (<code>gen_ui_db_graph</code>): SurrealDB <code>search::rrf</code> fuses
+  vector + BM25 lanes; <code>rrf.rs</code> fuses the RELATE graph-hop lane (k=60,
+  limit=20) with an explicitly documented constraint — RRF only for lanes that
+  can agree; disjoint-ordered lanes score by hop distance. Kept as-is; the new
+  pipeline wraps it (§10).</li>
+<li><strong>Embedder trait</strong> (<code>embed.rs</code>): 384-dim, model-provenance check, batch API,
+  <code>spawn_blocking</code> discipline. Chunking reuses it unchanged.</li>
+<li><strong>Atomic note ingest</strong> (<code>corpus.rs</code>/<code>store.rs</code>): <code>memory_ingest</code> embeds each
+  note whole; idempotent stable ids. Correct for short notes; there is <strong>no
+  document chunking anywhere</strong> — the gap §9 fills.</li>
+<li><strong>Streaming chat loop</strong> (<code>gen_ui_agent::chat</code>): OpenAI-shaped streaming with
+  tool-call accumulation across chunks. It currently <em>assembles</em> context
+  inline; after this spec it <em>requests</em> an assembled context from the builder.</li>
+</ul>
+<p>Gaps this spec closes: no capability profiles; no budget arithmetic anywhere;
+no chunking; no MMR/recency re-ranking; no history strategies; Android tool
+calling now targets LiteRT-LM constrained decoding/manual tools rather than
+llama.cpp <code>llguidance</code>; no context telemetry.</p></article><article id="S07-007" class="source-clause"><h4>S07-007 · 4.2 cherry-studio fork (`src/renderer/.../contextStrategy.ts` + agent lane)</h4><p class="source-note">Governing revision: <a href="../index.html#surfaces">UI-01–11</a> · source requirement, not release evidence.</p><h3>4.2 cherry-studio fork (<code>src/renderer/.../contextStrategy.ts</code> + agent lane)</h3>
+<p>The fork defines exactly four managed strategies plus <code>none</code>, a layered
+resolution model, and telemetry. Honest implementation status, verified in
+source:</p>
+<table>
+<thead>
+<tr>
+<th>Strategy</th>
+<th>Config</th>
+<th>Chat apply path</th>
+<th>Persistence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sliding_window</code></td>
+<td><code>maxMessages</code> (else dynamic by token budget)</td>
+<td><strong>Fully wired</strong> — <code>takeLastMessages</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>truncate_middle</code></td>
+<td><code>keepFirstMessages=2</code>, <code>keepLastMessages=4</code>, <code>showOmissionMarker</code></td>
+<td><strong>Fully wired</strong> — first+last slices</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>summarize</code></td>
+<td><code>summarizationModelId</code>, <code>summaryMaxTokens=500</code>, <code>summarizeThreshold=6</code></td>
+<td>Falls back to sliding window in the synchronous path</td>
+<td><code>TopicContextMetadata.conversationSummary</code>, <code>summarizedMessageIds</code></td>
+</tr>
+<tr>
+<td><code>hierarchical</code></td>
+<td><code>shortTermTurns=5</code>, <code>midTermSummaryTokens=2000</code>, <code>longTermFactsTokens=500</code></td>
+<td>Falls back likewise</td>
+<td><code>TopicContextMetadata.longTermFacts</code>, <code>factsUpdatedAt</code></td>
+</tr>
+</tbody>
+</table>
+<p>Additional fork mechanics ported into the fabric:</p>
+<ul>
+<li><strong>Layered resolution</strong>: <code>resolveEffectiveChatContextStrategy</code> merges
+  global → assistant → topic overrides key-by-key; agents default to
+  <code>{ type: 'none' }</code> and opt in separately. Ported as <code>StrategyResolver</code> (§8.1).</li>
+<li><strong>Agent pre-compact</strong>: <code>shouldRunSdkCompactBeforeTurn</code> compares the <em>prior
+  turn's</em> total-token usage (usage cache) against <code>compactTriggerTokens</code> and
+  runs a compaction step before the next user message. Ported as the
+  <code>PreCompactPolicy</code> on cloud/agent sessions (§8.6).</li>
+<li><strong>Telemetry</strong>: <code>ContextManagementStreamPayload</code> (tokensBefore/After/Saved,
+  messagesRemoved, alterationSummary, trigger). Ported as
+  <code>ContextTelemetryEvent</code> on the AG-UI stream (§12).</li>
+<li><strong>Hygiene filters</strong>: the fork runs a fixed filter chain (context-clear,
+  useful-message, error-pair, adjacent-user, user-role-start) <em>before</em> the
+  strategy. The fabric keeps the same two-phase shape: normalize → strategize.</li>
+<li><strong>Token estimation</strong>: the fork uses chars/4. Acceptable for Electron; not
+  acceptable as the only estimator on-device (§6.5).</li>
+</ul>
+<p>The port obligation: <strong>all four strategies become real in Rust</strong> — the fork's
+fallback behavior for <code>summarize</code>/<code>hierarchical</code> is a TypeScript-renderer
+limitation, not a design decision to preserve.</p></article><article id="S07-008" class="source-clause"><h4>S07-008 · 5. Architecture</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>5. Architecture</h2></article><article id="S07-009" class="source-clause"><h4>S07-009 · 5.1 Crate placement</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>5.1 Crate placement</h3>
+<p>New workspace crate <strong><code>gen_ui_context</code></strong> (Rust, no engine deps, <code>no_std</code>-clean
+core not required but wasm32-clean <strong>is</strong>):</p>
+<pre><code>gen_ui_types ──► gen_ui_context ──► consumed by: gen_ui_agent, gen_ui_host,
+                     │                gen_ui_server_axum, gen_ui_ffi,
+                     │                gen_ui_wasm, tauri-plugin-gen-ui
+                     ├── depends on: gen_ui_db_graph (retrieval traits only)
+                     └── never depends on: gen_ui_inference engines
+</code></pre>
+<p>Capability inversion holds: <code>gen_ui_context</code> knows <em>about</em> budgets and
+retrieval capabilities through traits; it never links an inference engine, and
+no engine crate links it. <code>gen_ui_agent</code> asks the builder for an
+<code>AssembledContext</code>; the builder asks injected providers (history store, memory
+store, KB store, tool registry, token estimator) for slices. Compile-time
+dependency direction is the guarantee, per the standing Fabric invariant.</p></article><article id="S07-010" class="source-clause"><h4>S07-010 · 5.2 Module layout</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>5.2 Module layout</h3>
+<pre><code>gen_ui_context/
+├── src/
+│   ├── lib.rs
+│   ├── capability/        # §6 — Device/Model/Runtime profiles, resolver
+│   │   ├── device.rs
+│   │   ├── model.rs
+│   │   ├── runtime.rs
+│   │   ├── resolve.rs     # → EffectiveCapabilities
+│   │   └── presets.rs     # named tiers (§7)
+│   ├── budget/            # §7 — BudgetPlan, slices, enforcement
+│   │   ├── plan.rs
+│   │   ├── ledger.rs      # running spend during assembly
+│   │   └── policy.rs      # overflow policies
+│   ├── strategy/          # §8 — the four fork strategies + resolver
+│   │   ├── mod.rs         # ContextStrategy trait
+│   │   ├── sliding_window.rs
+│   │   ├── truncate_middle.rs
+│   │   ├── summarize.rs
+│   │   ├── hierarchical.rs
+│   │   └── resolver.rs    # global→assistant→session override merge
+│   ├── chunking/          # §9
+│   │   ├── mod.rs         # ChunkingStrategy trait + router
+│   │   ├── semantic.rs    # paragraph/boundary splitter
+│   │   ├── recursive.rs   # size-targeted with overlap
+│   │   └── parent_child.rs
+│   ├── retrieval/         # §10 — pipeline around gen_ui_db_graph
+│   │   ├── pipeline.rs    # lanes → RRF → MMR → recency → placement
+│   │   ├── mmr.rs
+│   │   └── recency.rs
+│   ├── assemble/          # §11 — the ContextBuilder itself
+│   │   ├── builder.rs
+│   │   ├── placement.rs
+│   │   └── render.rs      # → engine-neutral PromptPlan
+│   ├── tokens/            # §6.5 — TokenEstimator trait + impls
+│   └── telemetry.rs       # §12
+└── tests/                 # golden assembly tests, property tests
+</code></pre></article><article id="S07-011" class="source-clause"><h4>S07-011 · 5.3 Platform adapters (thin, config-only)</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>5.3 Platform adapters (thin, config-only)</h3>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Adapter</th>
+<th>What differs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Mobile (Flutter/FFI)</td>
+<td><code>gen_ui_ffi</code> exposes <code>context_resolve_profile</code> + <code>context_assemble</code> via flutter_rust_bridge</td>
+<td>Loads <code>mobile-4b-android</code> / <code>mobile-9b-ios</code> presets; runtime probe fills DeviceProfile</td>
+</tr>
+<tr>
+<td>Desktop (Tauri 2)</td>
+<td><code>tauri-plugin-gen-ui</code> command</td>
+<td><code>desktop-local</code> preset; Metal/large-RAM numbers</td>
+</tr>
+<tr>
+<td>Web</td>
+<td><code>gen_ui_wasm</code></td>
+<td><code>web-wasm</code> preset; estimator = tokenizer-in-wasm or chars-heuristic fallback</td>
+</tr>
+<tr>
+<td>Cloud (Axum)</td>
+<td><code>gen_ui_server_axum</code> middleware</td>
+<td><code>cloud-server</code> preset; provider-declared context sizes via liter-llm metadata</td>
+</tr>
+</tbody>
+</table>
+<p>No adapter contains budget logic. An adapter that needs an <code>if platform</code>
+inside the pipeline is a spec violation.</p></article><article id="S07-012" class="source-clause"><h4>S07-012 · 6. Capabilities model</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>6. Capabilities model</h2>
+<p>Three declared layers plus one measured layer, resolved into one effective
+struct. Declared layers are data (TOML/JSON, shippable, overridable);
+measurement adjusts at runtime.</p></article><article id="S07-013" class="source-clause"><h4>S07-013 · 6.1 DeviceProfile — what the hardware can sustain</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>6.1 DeviceProfile — what the hardware can sustain</h3>
+<pre><code class="language-rust">#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeviceProfile {
+    pub id: String,                     // "iphone-17-pro-max", "gcp-l4", "browser"
+    pub class: DeviceClass,             // MobileHigh | MobileMid | Desktop | Web | Server
+    pub ram_mb: u32,
+    pub sustained_infer_class: SustainedClass, // Bursty | Sustained | Unlimited
+    pub thermal: ThermalPolicy,         // §6.4
+    pub battery_aware: bool,
+}
+</code></pre></article><article id="S07-014" class="source-clause"><h4>S07-014 · 6.2 ModelProfile — what the weights can do</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>6.2 ModelProfile — what the weights can do</h3>
+<pre><code class="language-rust">#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelProfile {
+    pub id: String,                     // "gemma-4-e2b-it-litertlm"
+    pub family: String,
+    pub params_b: f32,
+    pub quant: QuantTier,               // F16 | Q8 | Q5 | Q4 | Cloud
+    pub nominal_context: u32,           // 32_768 for Android Gemma 4 E2B
+    pub trusted_context: u32,           // 8_192 — empirically defended ceiling
+    pub extended_context: Option&lt;u32&gt;,  // 16_384 behind degraded-mode flag
+    pub attention: AttentionKind,       // Dense | HybridGdn { full_attn_layers: u8 }
+    pub supports_vision: bool,          // Android default is text-only; Xberg/OCR feeds text
+    pub tool_call_format: ToolCallFormat, // LiteRtLm | Qwen35 | Hermes | OpenAI | ...
+    pub thinking_modes: ThinkingModes,  // None | Toggleable | Always
+}
+</code></pre>
+<p><code>trusted_context</code> is the load-bearing field: it is set by the Phase 0 needle
+test (§14, P0-3), not copied from a model card. <code>nominal_context</code> exists only
+so the UI can explain the difference to a curious user.</p></article><article id="S07-015" class="source-clause"><h4>S07-015 · 6.3 RuntimeProfile — what the engine build offers</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>6.3 RuntimeProfile — what the engine build offers</h3>
+<pre><code class="language-rust">#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RuntimeProfile {
+    pub engine: EngineKind,             // LlamaCpp | MistralRs | WebLlm | CloudApi
+    pub grammar_constrained: bool,      // llguidance wired?
+    pub kv_cache_quant: Option&lt;KvQuant&gt;,
+    pub streaming: bool,
+    pub mtmd: bool,
+    pub tokenizer: TokenizerRef,        // exact tokenizer for the estimator
+}
+</code></pre></article><article id="S07-016" class="source-clause"><h4>S07-016 · 6.4 SessionEnvelope — the measured layer</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>6.4 SessionEnvelope — the measured layer</h3>
+<p>Mutable per-session state the resolver consults on every turn:</p>
+<pre><code class="language-rust">pub struct SessionEnvelope {
+    pub consecutive_inferences: u32,
+    pub session_infer_ms: u64,
+    pub thermal_state: ThermalState,    // Nominal | Warm | Hot (OS-reported where available)
+    pub last_ttft_ms: Option&lt;u64&gt;,
+    pub last_total_tokens: Option&lt;u32&gt;, // feeds PreCompactPolicy (fork parity)
+}
+</code></pre>
+<p>Envelope rules (deterministic, tunable per DeviceProfile): after
+<code>max_consecutive_inferences</code> (default 12 mobile) or <code>thermal_state == Hot</code>,
+the resolver downgrades — shorter output reserve, fewer RAG chunks, then
+recommends cloud handoff via a typed <code>EscalationAdvice</code> the host surfaces.
+This encodes §3.5 as mechanism instead of hope.</p></article><article id="S07-017" class="source-clause"><h4>S07-017 · 6.5 TokenEstimator</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>6.5 TokenEstimator</h3>
+<p><code>trait TokenEstimator { fn estimate(&amp;self, text: &amp;str) -&gt; u32; fn kind(&amp;self) -&gt; EstimatorKind; }</code>
+Implementations: <code>ExactTokenizer</code> (llama.cpp vocab via FFI on-device; HF
+tokenizer server-side), <code>CharsHeuristic</code> (chars/4, fork parity, web fallback).
+The plan records which estimator produced its numbers; safety margin widens
+from 10% → 15% when the heuristic is in play. Cross-platform consistency
+requires estimating with the <em>model's own</em> tokenizer wherever possible —
+Qwen3.5's 248K vocab tokenizes materially differently than chars/4 assumes.</p></article><article id="S07-018" class="source-clause"><h4>S07-018 · 6.6 Resolution</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>6.6 Resolution</h3>
+<pre><code class="language-rust">pub fn resolve(
+    device: &amp;DeviceProfile,
+    model: &amp;ModelProfile,
+    runtime: &amp;RuntimeProfile,
+    envelope: &amp;SessionEnvelope,
+    overrides: &amp;BudgetOverrides,        // user/agent/session layered, fork-style
+) -&gt; EffectiveCapabilities
+</code></pre>
+<p>Order: preset lookup (device×model) → derivation rules (§7.2) → envelope
+degradation → override merge (only <em>tightening</em> overrides accepted from
+non-privileged layers, mirroring the Cedar posture: product supplies
+defaults, users may tighten). Result is cached per (profiles, envelope-bucket)
+and logged once per session for reproducibility.</p></article><article id="S07-019" class="source-clause"><h4>S07-019 · 7. Budget abstraction</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>7. Budget abstraction</h2></article><article id="S07-020" class="source-clause"><h4>S07-020 · 7.1 BudgetPlan — the contract every platform honors</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>7.1 BudgetPlan — the contract every platform honors</h3>
+<pre><code class="language-rust">#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BudgetPlan {
+    pub context_ceiling: u32,           // = trusted_context unless extended flag
+
+    // Token slices (hard caps)
+    pub system_prompt_max: u32,
+    pub tool_schema_max: u32,
+    pub history_max: u32,
+    pub memory_max: u32,                // user memories slice
+    pub knowledge_max: u32,             // dropped-notes / KB RAG slice
+    pub output_reserve: u32,
+    pub thinking_reserve: u32,          // 0 when thinking disabled this turn
+    pub safety_margin_pct: u8,          // 10 exact-tokenizer / 15 heuristic
+
+    // Item-count caps (independent of tokens)
+    pub max_tool_shortlist: u8,         // tools exposed to one call
+    pub max_memory_items: u8,
+    pub max_kb_retrievals: u8,          // chunks after re-ranking
+    pub max_history_messages: Option&lt;u16&gt;,
+
+    // Retrieval tuning
+    pub chunk_target_tokens: u16,       // 250–400 band
+    pub rerank: RerankPlan,             // §10
+    pub placement: PlacementPolicy,     // §10.3
+
+    // Agentic caps (§3.4)
+    pub max_autonomous_steps: u8,       // before checkpoint
+    pub mutating_action_gate: GatePolicy, // AlwaysConfirm (non-negotiable default)
+}
+</code></pre></article><article id="S07-021" class="source-clause"><h4>S07-021 · 7.2 Derivation rules</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>7.2 Derivation rules</h3>
+<p>Given <code>C = context_ceiling</code> after safety margin:</p>
+<ol>
+<li><code>output_reserve</code> and <code>thinking_reserve</code> come off the top (never squeezed).</li>
+<li><code>system_prompt_max</code> + <code>tool_schema_max</code> are fixed by tier.</li>
+<li><code>history_max</code> fixed by tier; strategy (§8) keeps history inside it.</li>
+<li><code>memory_max + knowledge_max = remainder</code>, split by tier ratio
+   (default 30/70 — dropped notes are the larger corpus; memories are short).</li>
+<li>Invariant checked at resolve time:
+   <code>Σ slices + margin ≤ C</code> — violation is a config error, not a runtime clamp.</li>
+</ol></article><article id="S07-022" class="source-clause"><h4>S07-022 · 7.3 Named tier presets (initial values)</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>7.3 Named tier presets (initial values)</h3>
+<p>Numbers for the two mobile tiers carry over from the budget analysis earlier
+in this design cycle; cloud/desktop are set generously but still finite —
+consistency of <em>shape</em> across platforms is the product requirement.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>mobile-4b (S25U)</th>
+<th>mobile-9b (iPhone 17 PM)</th>
+<th>desktop-local</th>
+<th>web-wasm</th>
+<th>cloud-server</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>context_ceiling</td>
+<td>8 192</td>
+<td>8 192</td>
+<td>16 384</td>
+<td>8 192</td>
+<td>32 768¹</td>
+</tr>
+<tr>
+<td>system_prompt_max</td>
+<td>500</td>
+<td>600</td>
+<td>1 200</td>
+<td>600</td>
+<td>2 000</td>
+</tr>
+<tr>
+<td>tool_schema_max</td>
+<td>200</td>
+<td>300</td>
+<td>800</td>
+<td>300</td>
+<td>1 500</td>
+</tr>
+<tr>
+<td>history_max</td>
+<td>1 200</td>
+<td>1 800</td>
+<td>4 000</td>
+<td>1 800</td>
+<td>8 000</td>
+</tr>
+<tr>
+<td>memory_max</td>
+<td>600</td>
+<td>850</td>
+<td>1 800</td>
+<td>850</td>
+<td>3 000</td>
+</tr>
+<tr>
+<td>knowledge_max</td>
+<td>1 400</td>
+<td>1 950</td>
+<td>4 200</td>
+<td>1 950</td>
+<td>7 000</td>
+</tr>
+<tr>
+<td>output_reserve</td>
+<td>768</td>
+<td>1 024</td>
+<td>2 048</td>
+<td>1 024</td>
+<td>4 096</td>
+</tr>
+<tr>
+<td>thinking_reserve (when on)</td>
+<td>512</td>
+<td>768</td>
+<td>1 536</td>
+<td>512</td>
+<td>4 096</td>
+</tr>
+<tr>
+<td>safety_margin_pct</td>
+<td>10</td>
+<td>10</td>
+<td>10</td>
+<td>15</td>
+<td>10</td>
+</tr>
+<tr>
+<td>max_tool_shortlist</td>
+<td>4</td>
+<td>6</td>
+<td>8</td>
+<td>5</td>
+<td>8</td>
+</tr>
+<tr>
+<td>max_memory_items</td>
+<td>3</td>
+<td>4</td>
+<td>6</td>
+<td>4</td>
+<td>8</td>
+</tr>
+<tr>
+<td>max_kb_retrievals</td>
+<td>3</td>
+<td>5</td>
+<td>8</td>
+<td>5</td>
+<td>10</td>
+</tr>
+<tr>
+<td>chunk_target_tokens</td>
+<td>250</td>
+<td>320</td>
+<td>400</td>
+<td>320</td>
+<td>400</td>
+</tr>
+<tr>
+<td>max_autonomous_steps</td>
+<td>3</td>
+<td>4</td>
+<td>6</td>
+<td>3</td>
+<td>8</td>
+</tr>
+</tbody>
+</table>
+<p>¹ Cloud ceiling is per-model via liter-llm metadata; 32K is the floor preset.
+Thinking reserve is carved from output+knowledge when toggled on for a turn —
+the resolver emits a per-turn variant plan, so "thinking on" visibly costs RAG
+chunks rather than silently overflowing.</p></article><article id="S07-023" class="source-clause"><h4>S07-023 · 7.4 Enforcement — the BudgetLedger</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>7.4 Enforcement — the BudgetLedger</h3>
+<p>Assembly runs against a <code>BudgetLedger</code> that debits each slice as content is
+admitted. Policies per slice: <code>Hard</code> (refuse and record), <code>Shrink</code> (drop
+lowest-ranked items first — retrieval slices), <code>Summarize</code> (history slice,
+strategy-mediated). Overflow at final render is a <strong>defect</strong>: the ledger makes
+it unreachable by construction, and a debug assertion + telemetry counter
+back that claim in CI and in the field.</p></article><article id="S07-024" class="source-clause"><h4>S07-024 · 8. Context-management strategies (fork port, budget-aware)</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>8. Context-management strategies (fork port, budget-aware)</h2></article><article id="S07-025" class="source-clause"><h4>S07-025 · 8.1 Trait and resolver</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>8.1 Trait and resolver</h3>
+<pre><code class="language-rust">#[async_trait]
+pub trait ContextStrategy: Send + Sync {
+    fn kind(&amp;self) -&gt; StrategyKind; // None|SlidingWindow|TruncateMiddle|Summarize|Hierarchical
+    async fn apply(
+        &amp;self,
+        history: Vec&lt;Turn&gt;,
+        cfg: &amp;StrategyConfig,
+        ledger: &amp;mut BudgetLedger,   // history slice only
+        cx: &amp;StrategyCx&lt;'_&gt;,         // estimator, summarizer handle, persisted metadata
+    ) -&gt; Result&lt;StrategyOutcome, ContextError&gt;;
+}
+
+pub struct StrategyOutcome {
+    pub turns: Vec&lt;Turn&gt;,
+    pub summary_updated: Option&lt;SummaryRecord&gt;,
+    pub facts_extracted: Vec&lt;FactRecord&gt;,
+    pub removed: u32,
+    pub tokens_saved: u32,
+    pub was_applied: bool,
+}
+</code></pre>
+<p><code>StrategyResolver</code> reproduces the fork's layered merge exactly: defaults →
+global settings → assistant/agent config → topic/session override, key-by-key,
+with <code>hasOverride</code> semantics preserved so a partial override doesn't clobber
+unrelated fields. Agent sessions default to <code>None</code> + explicit opt-in, as in
+the fork. The hygiene filter chain (context-clear, empty, error-pair,
+adjacent-user, user-role-start) runs before any strategy, ported as pure
+functions with the fork's tests translated to Rust.</p></article><article id="S07-026" class="source-clause"><h4>S07-026 · 8.2 SlidingWindow</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>8.2 SlidingWindow</h3>
+<p>Token-budget-first (the fork's "dynamic" mode becomes the primary mode):
+admit turns newest→oldest until <code>history_max</code> or <code>max_history_messages</code> is
+hit; <code>maxMessages</code> remains as an optional cap for fork parity. Never splits a
+turn; never separates a tool call from its result (a constraint the fork
+handles upstream via filters — here it is a builder invariant).</p></article><article id="S07-027" class="source-clause"><h4>S07-027 · 8.3 TruncateMiddle</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>8.3 TruncateMiddle</h3>
+<p><code>keep_first</code> (default 2) + <code>keep_last</code> (default 4) with an explicit omission
+marker turn (<code>[… N earlier messages omitted …]</code>) when <code>show_omission_marker</code>.
+Marker text is part of the token math, not free.</p></article><article id="S07-028" class="source-clause"><h4>S07-028 · 8.4 Summarize (progressive)</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>8.4 Summarize (progressive)</h3>
+<p>Real implementation, not fallback. Trigger: history over <code>history_max</code> AND
+turn count ≥ <code>summarize_threshold</code> (6). The oldest overflow block is
+summarized into ≤ <code>summary_max_tokens</code> (500) by a <strong>summarizer route</strong>:
+on-device it reuses the loaded model with a short constrained prompt at temp
+0.2 (one extra inference — the SessionEnvelope charges it); cloud/desktop may
+route to a designated small model (fork's <code>summarizationModelId</code>).
+<code>SummaryRecord</code> persists (SurrealDB, §11.3) with the covered turn-ids so
+re-summarization is incremental — fork's <code>summarizedMessageIds</code> parity.
+Failure mode honored: if the summarizer call fails or the envelope forbids the
+extra inference, degrade to SlidingWindow for this turn and record it in
+telemetry; never block the user's message on a summary.</p></article><article id="S07-029" class="source-clause"><h4>S07-029 · 8.5 Hierarchical (three-tier) — the KnowMe-native strategy</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>8.5 Hierarchical (three-tier) — the KnowMe-native strategy</h3>
+<p>Short-term: last <code>short_term_turns</code> (5) verbatim. Mid-term: rolling summary
+inside <code>mid_term_summary_tokens</code> (2000 desktop/cloud; clamped to the history
+slice on mobile). Long-term: extracted durable facts within
+<code>long_term_facts_tokens</code> (500). The KnowMe twist: <strong>long-term facts are not a
+parallel store</strong> — extraction writes them through the existing memory ingest
+(<code>gen_ui_db_graph::memory_ingest</code>, kind <code>"fact"</code>, provenance = session id),
+so hierarchical memory and user memories converge on one governed store and
+facts become retrievable by the same RRF pipeline in future sessions. This is
+the mechanism that makes "it knows the user" compound over time. Extraction is
+opt-in per assistant and surfaced in the UI (sovereignty: users see what was
+written and can delete it; deletion respects the standing memory-removal path).</p></article><article id="S07-030" class="source-clause"><h4>S07-030 · 8.6 PreCompactPolicy (agent/cloud lane)</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>8.6 PreCompactPolicy (agent/cloud lane)</h3>
+<p>Fork parity: cache the prior turn's total-token usage; when it exceeds
+<code>compact_trigger_tokens</code>, run a compaction step (strategy-mediated summarize)
+before dispatching the next user message. On-device this maps to
+"force-summarize now"; on cloud SDK sessions it maps to the provider compact
+primitive where one exists.</p></article><article id="S07-031" class="source-clause"><h4>S07-031 · 9. Chunking subsystem</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>9. Chunking subsystem</h2></article><article id="S07-032" class="source-clause"><h4>S07-032 · 9.1 Router</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>9.1 Router</h3>
+<p>Content entering the knowledge path is routed by size and structure:</p>
+<table>
+<thead>
+<tr>
+<th>Condition</th>
+<th>Strategy</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>≤ 1.5 × chunk_target_tokens</td>
+<td><strong>Atomic</strong></td>
+<td>Current <code>memory_ingest</code> path unchanged — short notes stay whole</td>
+</tr>
+<tr>
+<td>Prose above threshold</td>
+<td><strong>SemanticBoundary</strong></td>
+<td>Split on paragraph/heading boundaries near target size; never mid-sentence</td>
+</tr>
+<tr>
+<td>Unstructured / very long</td>
+<td><strong>RecursiveOverlap</strong></td>
+<td>Size-targeted splits with 10–15% overlap</td>
+</tr>
+<tr>
+<td>Long docs where precision matters</td>
+<td><strong>ParentChild</strong></td>
+<td>Embed child chunks (target size); store parent window reference; inject parent context at assembly</td>
+</tr>
+</tbody>
+</table></article><article id="S07-033" class="source-clause"><h4>S07-033 · 9.2 Data model</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>9.2 Data model</h3>
+<pre><code class="language-rust">pub struct ChunkRecord {
+    pub id: String,                  // stable: {doc_id}#c{ordinal}
+    pub doc_id: String,
+    pub ordinal: u32,
+    pub text: String,
+    pub token_len: u32,              // by the ingest-time estimator
+    pub parent_span: Option&lt;(u32, u32)&gt;, // char range in parent for window fetch
+    pub kind: String,                // extends MemoryRecord.kind: "chunk"
+    pub source: ChunkProvenance,     // doc title, ingest ts, origin (dropped|scribe|fact)
+}
+</code></pre>
+<p>SurrealDB (3.x strict syntax) additions live beside the existing memory table;
+chunks embed through the same <code>Embedder</code> (batch API, <code>spawn_blocking</code>), HNSW
+<code>DIMENSION 384</code> unchanged. Ingest of an N-chunk doc is one transaction;
+re-ingest of the same <code>doc_id</code> replaces its chunk set (stable ids ⇒
+idempotent, matching <code>seed_corpus</code> discipline).</p></article><article id="S07-034" class="source-clause"><h4>S07-034 · 9.3 Injection</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>9.3 Injection</h3>
+<p>At assembly, a selected child chunk may be widened to its parent span if and
+only if the knowledge ledger can afford it; widening is ranked (best hit
+widens first). Provenance flows into <code>ContentBlock::Citation</code>/<code>Memory</code> so the
+UI can show <em>which note</em> grounded an answer — a sovereignty feature, not just
+debugging.</p></article><article id="S07-035" class="source-clause"><h4>S07-035 · 10. Retrieval &amp; re-ranking pipeline</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>10. Retrieval &amp; re-ranking pipeline</h2></article><article id="S07-036" class="source-clause"><h4>S07-036 · 10.1 Stages</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>10.1 Stages</h3>
+<pre><code>query ──► lanes (vector | BM25 | graph-hop)      [existing gen_ui_db_graph]
+      ──► RRF fuse (k=60, limit=20)              [existing, unchanged]
+      ──► MMR diversity pass (λ default 0.7)     [new — embedding math only]
+      ──► recency boost: score × exp(−λr·age_d)  [new — λr per corpus kind]
+      ──► truncate to max_kb_retrievals / max_memory_items
+      ──► optional parent widening (§9.3)
+      ──► placement (§10.3)
+</code></pre>
+<p>MMR uses the vectors already fetched for the RRF candidates — zero extra
+model calls, bounded O(k²) at k ≤ 20. Recency defaults: memories λr = 0.01/day
+(gentle), facts 0.005, chunks 0 unless the doc kind opts in. Both passes are
+pure functions with property tests.</p></article><article id="S07-037" class="source-clause"><h4>S07-037 · 10.2 Memory vs knowledge lanes</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>10.2 Memory vs knowledge lanes</h3>
+<p>Memories and knowledge chunks are retrieved as <strong>separate pipeline runs
+against separate ledger slices</strong> (<code>memory_max</code> / <code>knowledge_max</code>). One shared
+run would let a large dropped document starve the user's explicit memories —
+the exact inversion of the product promise.</p></article><article id="S07-038" class="source-clause"><h4>S07-038 · 10.3 PlacementPolicy</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>10.3 PlacementPolicy</h3>
+<p>Per §3.3: rank-1 item is placed <em>last</em> in its section (adjacent to the user
+query); rank-2 first; remaining ranks fill the middle. Sections order:
+system → tools → long-term facts → history → memories → knowledge → query.
+Placement is deterministic and covered by golden tests: same inputs, same
+bytes.</p></article><article id="S07-039" class="source-clause"><h4>S07-039 · 10.4 Cross-encoder gate (deferred)</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>10.4 Cross-encoder gate (deferred)</h3>
+<p>Add a reranker model only if, after MMR+recency ship, retrieval precision is
+still the measured bottleneck (eval set: ≥50 real query/expected-note pairs;
+precision@3 target 0.8). If added: runs over RRF top-15–20 only, desktop/cloud
+first; mobile only if the envelope affords it. Until that gate, the extra
+forward passes buy less than they cost on-device.</p></article><article id="S07-040" class="source-clause"><h4>S07-040 · 11. Assembly pipeline &amp; data models</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>11. Assembly pipeline &amp; data models</h2></article><article id="S07-041" class="source-clause"><h4>S07-041 · 11.1 End-to-end turn sequence</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>11.1 End-to-end turn sequence</h3>
+<pre><code>1  resolve EffectiveCapabilities (profiles + envelope + overrides)   [cached]
+2  derive per-turn BudgetPlan variant (thinking on/off, degraded?)
+3  tool stage: registry → relevance shortlist (≤ max_tool_shortlist)
+      → minimal one-line descriptions in-prompt
+      → full schemas compiled to grammar (llguidance) once per session
+4  history stage: hygiene filters → resolved ContextStrategy.apply(ledger)
+5  memory stage: retrieval pipeline against memory_max slice
+6  knowledge stage: retrieval pipeline against knowledge_max slice (+widening)
+7  assemble: PlacementPolicy orders sections; ledger proves Σ ≤ ceiling
+8  render: engine-neutral PromptPlan → engine adapter maps to chat template
+9  generate (structured turns: grammar-constrained, temp ≤ 0.2)
+10 post: semantic validation → ≤2 repair retries → fail closed
+11 telemetry event; envelope update; PreCompactPolicy check for next turn
+</code></pre>
+<p>Steps 1–8 are synchronous, deterministic, engine-free. Only 3 (grammar
+compile) and 4 (summarize path) may incur model work, both envelope-charged.</p></article><article id="S07-042" class="source-clause"><h4>S07-042 · 11.2 Core assembly types</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>11.2 Core assembly types</h3>
+<pre><code class="language-rust">pub struct AssembleRequest {
+    pub user_turn: Turn,
+    pub session_id: String,
+    pub assistant_id: String,
+    pub thinking_requested: bool,
+    pub overrides: BudgetOverrides,
+}
+
+pub struct AssembledContext {
+    pub plan: BudgetPlan,               // the variant actually used
+    pub prompt: PromptPlan,             // ordered sections, engine-neutral
+    pub tool_shortlist: Vec&lt;ToolRef&gt;,
+    pub grammar: Option&lt;GrammarHandle&gt;,
+    pub telemetry: ContextTelemetryEvent,
+    pub escalation: Option&lt;EscalationAdvice&gt;,
+}
+
+pub struct PromptPlan {
+    pub sections: Vec&lt;Section&gt;,         // (SectionKind, Vec&lt;RenderedItem&gt;)
+    pub estimated_tokens: u32,
+    pub estimator: EstimatorKind,
+}
+</code></pre>
+<p><code>PromptPlan</code> is the cross-platform contract: Dart/TS mirrors are generated
+(flutter_rust_bridge / ts-rs) so every UI can display <em>exactly</em> what will be
+sent — the transparency surface the sovereignty story requires.</p></article><article id="S07-043" class="source-clause"><h4>S07-043 · 11.3 SurrealDB additions (3.x strict)</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>11.3 SurrealDB additions (3.x strict)</h3>
+<pre><code class="language-sql">DEFINE TABLE chunk SCHEMAFULL;
+DEFINE FIELD doc_id     ON chunk TYPE string;
+DEFINE FIELD ordinal    ON chunk TYPE int;
+DEFINE FIELD text       ON chunk TYPE string;
+DEFINE FIELD token_len  ON chunk TYPE int;
+DEFINE FIELD kind       ON chunk TYPE string;
+DEFINE FIELD provenance ON chunk TYPE object;
+DEFINE FIELD embedding  ON chunk TYPE array&lt;float&gt;;
+DEFINE INDEX chunk_hnsw ON chunk FIELDS embedding HNSW DIMENSION 384;
+
+DEFINE TABLE context_summary SCHEMAFULL;   -- SummaryRecord (fork TopicContextMetadata parity)
+DEFINE FIELD session_id  ON context_summary TYPE string;
+DEFINE FIELD text        ON context_summary TYPE string;
+DEFINE FIELD covered_ids ON context_summary TYPE array&lt;string&gt;;
+DEFINE FIELD updated_at  ON context_summary TYPE datetime;
+
+DEFINE TABLE context_turn_log SCHEMAFULL;  -- telemetry ring (bounded, local-only)
+DEFINE FIELD session_id ON context_turn_log TYPE string;
+DEFINE FIELD event      ON context_turn_log TYPE object;
+DEFINE FIELD at         ON context_turn_log TYPE datetime;
+</code></pre>
+<p>Writes use <code>type::record($table, $key)</code> and two-arg UPDATE form per standing
+SurrealDB 3.x discipline; no <code>id</code> field inside content objects. Facts from
+§8.5 go to the existing memory table (kind <code>"fact"</code>), not a new table.</p></article><article id="S07-044" class="source-clause"><h4>S07-044 · 12. Telemetry &amp; consistency guarantees</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>12. Telemetry &amp; consistency guarantees</h2>
+<p><code>ContextTelemetryEvent</code> (Rust mirror of the fork payload, extended):
+<code>strategy_kind, tokens_before, tokens_after, tokens_saved, messages_removed,
+slices: Vec&lt;(SliceKind, budget, spent, items)&gt;, estimator, degraded: bool,
+escalation: Option&lt;…&gt;, trigger</code>. Emitted on the AG-UI stream (<code>agui.*</code>
+namespace) so any surface can render a context inspector; persisted to the
+bounded local ring only. Guarantees the fabric makes testable: (G1)
+byte-deterministic assembly; (G2) ledger-proven no-overflow; (G3) tool
+call/result pairing never split; (G4) mutating-action gate cannot be disabled
+by non-privileged override layers; (G5) memory slice cannot be starved by
+knowledge slice.</p></article><article id="S07-045" class="source-clause"><h4>S07-045 · 13. Failure scenarios &amp; trade-offs (what hurts)</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>13. Failure scenarios &amp; trade-offs (what hurts)</h2>
+<p>Per standing discipline, the scenarios that hurt this design, named:</p>
+<ol>
+<li><strong>Token-estimation drift.</strong> chars/4 on Qwen3.5's 248K vocab can misestimate
+   by 20–30% on code/multilingual text; even the exact tokenizer path costs an
+   FFI round-trip per slice. Mitigation is the widened margin + estimator
+   telemetry, but a systematic underestimate still means silent quality loss
+   near the ceiling. Residual risk: <strong>medium</strong> until P0-2 measures real drift.</li>
+<li><strong>Summarization on-device is an extra inference.</strong> It competes with the
+   thermal envelope and adds latency exactly when conversations are longest.
+   The degrade-to-sliding-window path caps the damage but means the summarize
+   strategy silently behaves like sliding window on hot devices — users may
+   perceive memory loss. Telemetry makes it visible; it does not make it free.</li>
+<li><strong>GDN × Q4 interaction is uncharacterized.</strong> If the P0-3 needle test shows
+   retrieval breaking below 8K on either GGUF, every tier table in §7.3
+   shrinks and the product's on-device RAG story narrows. Probability
+   subjectively 20–35%; impact contained because <code>trusted_context</code> is a data
+   field, not a constant.</li>
+<li><strong>Two token vocabularies of truth.</strong> Fork-era chats managed by chars/4 and
+   fabric-era chats managed by exact counts will window differently; users
+   migrating desktop→mobile may see different history depth. Accepted;
+   documented in release notes rather than papered over.</li>
+<li><strong>Preset ossification.</strong> Hardcoded tier numbers rot as models/devices
+   change. Mitigation: presets are data files versioned with the app +
+   overridable server-side for cloud tier; the needle test is rerun per new
+   GGUF as a release gate.</li>
+<li><strong>The scenario that hurts Prometheus:</strong> a competitor ships "just use the
+   cloud" with a 200K window and no budget UX, and it <em>feels</em> smarter on day
+   one. Our counter is compounding personal memory (§8.5) + sovereignty +
+   consistency — but that is a bet on retention economics, not an immediate
+   demo win, and it should be stated as such to stakeholders.</li>
+</ol></article><article id="S07-046" class="source-clause"><h4>S07-046 · 14. Project plan</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>14. Project plan</h2>
+<p>Phases gate on KDD discipline: each ends in a reviewable artifact + explicit
+approval before the next begins. Estimates are ranges at stated confidence;
+they assume one primary implementer with review support.</p>
+<p><strong>Phase 0 — Spikes &amp; gates (3–5 days, 80% confidence)</strong>
+- P0-1: Wire LiteRT-LM Android SDK constrained decoding/manual tool calling on Android;
+  keep iOS Qwen/Metal as a separate re-certification lane.
+  <em>Gate: Android CPU baseline produces valid bounded tool calls before GPU/NPU optimization.</em>
+- P0-2: Estimator drift measurement — exact tokenizer vs chars/4 over a 50-doc
+  corpus (notes, code, mixed-language). <em>Gate: margin table confirmed.</em>
+- P0-3: Needle-in-haystack on actual Q4_K_M GGUFs (facts at 10/40/70/95%
+  depth × 4K/8K/16K, both devices). <em>Gate: <code>trusted_context</code> values set from
+  data.</em>
+- P0-4: SessionEnvelope thermal probe feasibility per OS (thermal state APIs
+  on iOS/Android; fallback = inference-count-only).</p>
+<p><strong>Phase 1 — <code>gen_ui_context</code> core: capabilities + budgets (1.5–2.5 wks, 75%)</strong>
+Profiles, presets, resolver, BudgetPlan/Ledger, TokenEstimator impls, golden
+tests. Exit: G1/G2 proven in CI; presets reviewed against P0 data.</p>
+<p><strong>Phase 2 — Strategies + assembly (2–3 wks, 70%)</strong>
+Hygiene filters, four strategies (summarize/hierarchical real), resolver
+layering with fork tests ported, PromptPlan render, telemetry event.
+Exit: fork-parity test suite green; <code>gen_ui_agent::chat</code> consumes the builder
+behind a feature flag.</p>
+<p><strong>Phase 3 — Chunking + retrieval upgrades (1.5–2 wks, 75%)</strong>
+Chunk router/strategies, SurrealDB schema, MMR + recency passes, placement,
+memory/knowledge slice separation, citation provenance to ContentBlock.
+Exit: precision@3 eval harness exists with baseline numbers recorded.</p>
+<p><strong>Phase 4 — Platform adapters (1–2 wks, 70%)</strong>
+FFI surface (flutter_rust_bridge), Tauri command, wasm build, Axum middleware;
+preset loading + envelope probes per platform. Exit: same golden assembly
+bytes on all four targets in CI.</p>
+<p><strong>Phase 5 — Field hardening (1–1.5 wks, 60%)</strong>
+Context inspector UI hook-up, degraded-mode UX, PreCompactPolicy on cloud
+lane, telemetry ring bounds, release-gate automation for P0-3 reruns.</p>
+<p>Critical path: P0-3 → §7.3 numbers → everything. Total: <strong>7–11 weeks</strong>.
+Explicitly out: cross-encoder (gated, §10.4), tool-calling LoRA.</p></article><article id="S07-047" class="source-clause"><h4>S07-047 · 15. Open decisions (need your call before Phase 1)</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>15. Open decisions (need your call before Phase 1)</h2>
+<ol>
+<li>Memory/knowledge remainder split — 30/70 proposed; confirm or set per-tier.</li>
+<li>Fact extraction default: opt-in per assistant (proposed) vs global opt-in.</li>
+<li>Summarizer route on desktop: same loaded model vs designated small model.</li>
+<li>Preset distribution for cloud tier: baked vs server-fetched with pinning.</li>
+<li>Whether <code>extended_context</code> (16K) ships in v1 UI at all, or stays a dev flag.</li>
+</ol></article><article id="S07-048" class="source-clause"><h4>S07-048 · 16. References (session research base)</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>16. References (session research base)</h2>
+<p>RULER / effective-context and hybrid-attention analyses (Qwen3.5 model cards
+and config.json, HF; Gated DeltaNet deep-dives); "Does quantization affect
+models' performance on long-context tasks?" (arXiv 2505.20276); lost-in-the-
+middle SLM survey (arXiv 2409.15790); SABER mutating-action analysis (arXiv
+2512.07850); long-horizon execution / self-conditioning (arXiv 2509.09677);
+error-compounding formalization (arXiv 2601.22290); Tau-Bench mock SLM result
+(arXiv 2601.12979); TinyAgent/ToolRAG (arXiv 2409.00608) and adaptive context
+management 6×/10–25× reductions (OpenReview); MemTool (arXiv 2507.21428);
+fastWorkflow (ACM AIAS 2026); tool-count degradation &amp; Anthropic 58-tool
+measurement (Composio 2026 guide); mobile thermal studies (arXiv 2603.23640,
+2410.03613, 2606.23001; MNN-AECS); on-device RAG TTFT (arXiv 2602.13229).
+Cherry Studio fork sources: <code>src/renderer/src/types/contextStrategy.ts</code>,
+<code>services/chatContextStrategy.ts</code>, <code>main/.../agentContextStrategy/*</code>.</p>
+<p>— End of PAGS-SPEC-KM-CTX-001 —</p></article></main></body></html>

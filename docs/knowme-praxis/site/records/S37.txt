@@ -1,0 +1,50 @@
+PART I · 01
+Thesis: the coach that cannot be bought from a model vendor
+Agentic coding does not fail for want of capability. It fails at the finish line: intent is lost between sessions, completion is claimed before it is earned, repairs loop, budgets are reinterpreted, and the closeout report is more persuasive than the evidence behind it. The Private Dot is a persistent operator-coach whose only job is that finish line, and whose authority is deliberately smaller than the ledger it serves.
+The three claims this paper makes
+1 · Self-reports are not evidence
+OverclaimBench (arXiv 2609.20812, Sept 2026): twelve agents left file reviews incomplete in 67.9% of runs and misreported it in 80.4% of those. The Travis–Kimi/OpenCode case showed the same shape: "30 passing checks" that were historical, phase-name closure, not candidate closure.
+2 · A second model is not a verdict
+Cross-judge agreement of κ = 0.51, verdict flips in 25% of cases under equivalent prompts, and 72% first-position bias (arXiv 2606.13685). A model's opinion of completion cannot override a deterministic gate. It can only point at evidence the gate lacks.
+3 · Persistence must be owned
+OpenAI's dot (29 Sep 2026) shares memory with ChatGPT in both directions, cannot have individual memories viewed, edited or exported, has no API and no agent-addressable surface. A coach whose beliefs about the contract cannot be audited cannot be trusted with the contract.
+What the Private Dot is
+Not a second agent. A role with a bounded mandate, hosted in BossFang, subordinate to KBD, acting through UAR:
+It reads.
+The adopted contract, the current candidate, the receipts, the ledger, the budgets, through least-privilege read-only adapters.
+It detects.
+Repeated identical failures, conflicting terminal claims, a required scenario with no candidate-bound receipt, scope growth, budget inconsistency, stale evidence, a missing phase receipt, a claim that outruns the transcript.
+It proposes.
+One discrepancy, its source, the unchanged objective, one bounded next action, the evidence expected afterward. Either pre-authorized by the coaching contract or sent to the owner as a decision.
+It closes.
+A terminal packet that keeps VerifiedSuccess, Blocked, FailedAcceptance, ExhaustedAllowance, Cancelled and MissingEvidence distinguishable. Then it stops.
+It pays.
+Its own model calls, retrieval and interventions are UsageEvents on a valid Assignment. "No Assignment, no spend" applies to the coach.
+AUTHORITY FLOWS DOWN · EVIDENCE FLOWS UP · THE COACH HOLDS NEITHER
+Owner
+adopts contract · authorizes change
+KBD
+state · counters · deterministic gates
+Coach (Private Dot)
+observes · proposes · bounded steering
+Executor
+implements · reports
+adopts rev N
+gate results · allowances
+one bounded request, via UAR
+candidate-bound receipts (signed by uar-sidecar)
+proposal · terminal packet · decision_required
+The coach sits between the ledger and the worker and can only move two things: a proposal upward and a bounded request downward. Acceptance never passes through it.
+Why now, and why KnowMe
+Three things changed in 2026. Vendors made the persistent assistant the product (OpenAI dots, Claude Tag in Slack, Cowork scheduled and remote tasks), so the interaction model is no longer a research question. Harness engineering was shown to move outcomes on a fixed model (LangChain's deepagents-cli, 52.8% to 66.5% on Terminal Bench 2.0 from pre-completion checklists and loop detection alone). And the honesty problem was measured, not just suspected. The remaining question is who owns the persistence, the authority, and the receipts. The Operator Model already answers that for plans and keys: the person, on their own device, under their own identity. The Private Dot extends the same answer to supervision.
+KnowMe's stack already has the pieces the vendor dot lacks. BossFang (the librefang fork) carries kernel metering, RBAC, a hash-chained audit trail, channels, and a provenance-stamped memory wiki. UAR carries Cedar governance, tool approvals, A2A and MCP transports, and signs every usage event from the
+uar-sidecar
+. KBD already tracks phase, change, constraints and waypoints in
+.kbd-orchestrator/
+. Flint-gate issues the identity that signs telemetry. The coach is the role that connects them, not a new subsystem.
+What this paper does not claim
+That coaching improves completion rate. No study compares a persistent cross-session supervisor to per-task review or to deterministic gates alone. The three-arm evaluation in Part IV is the contribution, not a replication.
+That the coach is cheap. Anthropic's own harness comparison ran $200 and six hours against $9 and twenty minutes solo. The coach is retained only if its measured intervention yield pays for its measured total cost, including the human minutes it consumes.
+That the coach is enforcement. Where a skill instruction can be bypassed, it is advisory. Enforcement lives in UAR's tool gate and KBD's counters, and the paper says so wherever it applies.
+That a ChatGPT dot can play this role. It cannot read KBD, cannot be addressed by UAR, cannot export its beliefs, and runs on a plan whose terms for supervising third-party agents are unpublished.
+The Private Dot is worth building because the vendor dot cannot be made accountable. Ownership of memory, identity and authority is the feature. Everything else in this paper is the engineering required to keep that feature true under load.

@@ -1,0 +1,214 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>S34 · implementation.html</title><link rel="stylesheet" href="../records.css"><body><main><a href="../index.html">KnowMe Praxis</a><h1>S34 · implementation.html</h1><p>Complete technical source record. Historical names and requirements remain visible for audit. Revised clauses and explicit corrections govern their application.</p><p><a href="S34.txt">Download complete technical text</a></p><article id="S34-001" class="source-clause"><h4>S34-001 · Preamble</h4><p class="source-note">Governing revision: <a href="../index.html#dots">DOT-01–10</a> · source requirement, not release evidence.</p><pre class="retained-text">PART IV · 06
+</pre></article><article id="S34-002" class="source-clause"><h4>S34-002 · Implementation plan</h4><p class="source-note">Governing revision: <a href="../index.html#dots">DOT-01–10</a> · source requirement, not release evidence.</p><pre class="retained-text">Implementation plan
+Phases advance on evidence, not dates, and each one runs under KBD with its own coaching contract. The first four touch no runtime at all. The runtime work lands in the repos that already exist (UAR, librefang/BossFang, know-me-system, know-me-decision) as adapters and one new Hand.
+0 · Manual
+protocol + log
+no infra
+docs/
+1 · Receipts
+kbd receipts ledger
+kbd-mcp · sidecar emit
+kbd · UAR
+2 · Read-only
+coach Hand
+proposals only
+BossFang
+3 · Phase Exit
+schema + bounded
+classification
+know-me-decision
+4 · Steering
+A2A via UAR
+Cedar grant
+UAR · harness
+5 · Pilot
+one project
+restart-safe
+know-me-system
+6 · Personal
+KnowMe app dot
+on-device
+mobile · desktop
+three-arm evaluation A / B / C runs continuously from phase 4
+gate: 10 logged
+interventions
+gate: closure refuses
+stale receipts
+gate: 6 acceptance
+cases pass
+gate: κ reported;
+abstains on conflict
+gate: denied path
+never bypassed
+gate: C ≥ B on
+equal envelope
+gate: no &quot;verified&quot;
+language; export works
+Each phase is its own KBD phase with a coaching contract. Phase 5 is the first time the coach supervises a phase of its own construction; phase 2 is coached manually.
+</pre></article><article id="S34-003" class="source-clause"><h4>S34-003 · Phase detail</h4><p class="source-note">Governing revision: <a href="../index.html#dots">DOT-01–10</a> · source requirement, not release evidence.</p><pre class="retained-text">Phase detail
+Phase 0 · Documented manual coaching
+Adopt the finite protocol on the current
+desktop-stable-port
+change in know-me-system. Travis acts as coach by hand; every intervention logged with discrepancy, source, action, expected evidence, outcome and minutes spent. Deliverable: ten logged interventions and a first intervention-yield number. No code.
+Phase 1 · Receipts and the read surface
+Add
+receipts/
+to
+.kbd-orchestrator/
+with the BLAKE3 chain; teach
+uar-sidecar
+to emit a Receipt per deterministic check (build_health_command, test_command, lint_command already defined in
+project.json
+); ship
+kbd-mcp
+as a stdio server exposing the five read-only tools. Change closure in KBD to require candidate-bound receipts. Deliverable: KBD refuses a closure whose only S4 receipt is historical.
+Phase 2 · Read-only coach Hand
+Author the
+operator-coach
+Hand in
+librefang-hands
+with a workflow in the kernel: Stage A on contract load, Stage B as an Iggy consumer of Assignment topics, Stage C over
+kbd-mcp
+, proposals and packets emitted as A2UI cards through
+librefang-channels
+to the BossFang workbench and the KnowMe desktop
+uar
+lane. Memory via
+librefang-memory-wiki
+over surreal-memory with the provenance frontmatter. No steering. Deliverable: the six acceptance cases in PD-SPEC pass with human-executed steering.
+Phase 3 · Phase Exit proof
+Build the Phase Exit schema (clause ↔ receipt satisfaction) and the bounded classifier in
+know-me-decision
+on Qwen3.8-27B via the model gateway. Classifier output is an input to KBD&#x27;s gate with
+source: model
+, never a verdict. Report κ against a human-labelled set of 50 real stalled-phase examples from Phase 0–2 logs; require abstention on contradictory receipts. Deliverable: κ ≥ 0.7 against human labels on the held-out set, or the classifier stays out of the gate path.
+Phase 4 · Authorized steering
+Proposal → owner authorization → A2A task through UAR under the owner&#x27;s identity with
+act=coach
+; Cedar policy for coach grants in
+uar/governance
+; stop condition as expected receipt in the run manager; first
+knowme:harness
+adapters for Kimi Code / OpenCode (proxy-mode plan) and Claude Code (observe-mode; sidecar off-path). Coach inference metered through the Promethity gateway. Deliverable: denied-steering case shows no bypass in the audit chain; coach UsageEvents land in the ledger.
+Phase 5 · Private-dot pilot
+One project (know-me-system), one owner, always-on node (Mac Studio over the tailnet), restart-safe observation and authorized steering, three-arm evaluation on the pilot&#x27;s own task stream. Deliverable: arm C matches or beats arm B on independently accepted completion within an equal envelope, with false acceptance = 0 and false-blocking rate reported.
+Phase 6 · Personal dot in the KnowMe app
+Same Hand machinery embedded behind
+gen_ui_ffi
+on mobile and the Tauri desktop, with the personal dispositions (PD-P), on-device memory in
+gen_ui_db_graph
+, local inference lanes already certified (Qwen3-4B MLX on iPhone 17 Pro Max; LiteRT-LM on Android), and CounselMe escalation as a typed action. Deliverable: export/import round-trip; no &quot;verified&quot; language anywhere in the surface.
+Phase 7 · Multi-project autonomy
+Only after phase 5&#x27;s decision rule holds across two more projects (San Saba Royalty&#x27;s Stage 2 node; ASSET InterTech if Stage 2 is approved). Adds per-project memory partitions, one coach identity per owner with per-project grants, and the Plan Pool lane view showing coach cost per lane.
+</pre></article><article id="S34-004" class="source-clause"><h4>S34-004 · Work breakdown by repository</h4><p class="source-note">Governing revision: <a href="../index.html#dots">DOT-01–10</a> · source requirement, not release evidence.</p><pre class="retained-text">Work breakdown by repository
+Repo
+Changes
+Phase
+Risk
+know-me-system / .kbd-orchestrator
+receipts/
+ledger; closure predicate update;
+kbd-mcp
+server (new crate
+rust/crates/kbd_mcp
+); OpenSpec change proposal per phase
+1
+Low; additive
+universal-agent-runtime
+Receipt emitter in
+uar-sidecar
+; Cedar policy for
+act=coach
+grants; A2A task stop-condition in
+uar/orchestrator
+;
+Receipt
+and
+Disposition
+in
+uar/domain
+; fix the three known-open defects (empty-turn history loss, orphaned tool pairs, RUN_FINISHED misreport) before Phase 4 since steering depends on clean run state
+1, 4
+Medium; AGPL runtime, SDKs MIT; feature-gate behind
+coach-receipts
+librefang / BossFang
+operator-coach
+Hand (HAND.toml, workflow); Iggy consumer in
+librefang-channels
+; wiki provenance fields in
+librefang-memory-wiki
+; RBAC role
+coach
+without subprocess rights; gate
+librefang-runtime-oauth
+off for work lanes; A2UI card templates
+2, 4
+Medium; upstream drift (crate count 24→31 locally); keep as adapters and upstreamable patches
+know-me-decision
+Phase Exit schema; bounded classifier with abstention; κ harness against human labels; gateway endpoint
+3
+High on quality; mitigated by keeping it out of the gate until κ clears
+flint-gate
+Delegate credential type for the coach with
+act
+claim and revocation tied to the operator credential
+4
+Low
+Plan Pool Control Plane
+actor
+field on UsageEvent; intervention-yield, false-completion and false-blocking metrics; lane view column for coach cost
+4, 5
+Low
+know-me-system app (desktop, mobile)
+Packet and proposal renderers as ContentBlocks; decision interrupt in the
+uar
+lane; personal-dot Hand; Settings export; CounselMe escalation action
+2, 6
+Medium; depends on UAR-2/UAR-3 embedded kernel certification
+</pre></article><article id="S34-005" class="source-clause"><h4>S34-005 · Evaluation plan</h4><p class="source-note">Governing revision: <a href="../index.html#dots">DOT-01–10</a> · source requirement, not release evidence.</p><pre class="retained-text">Evaluation plan
+Three arms on the same executor model, harness version, repo starting state, tools and privacy rules.
+A
+: ordinary executor with project instructions.
+B
+: finite contract, evidence requirements, explicit limits and deterministic KBD exit checks, no coach.
+C
+: B plus the Private Dot. Tasks are frozen and scored before execution, counterbalanced so no run leaks a solution to another, and mix ordinary feature work with seeded failures: ambiguous acceptance, a genuine defect, a broken fixture, an unavailable permission, stale evidence, budget exhaustion, healthy quiet execution, and success with tempting optional improvements.
+</pre></article><article id="S34-006" class="source-clause"><h4>S34-006 · Primary outcome</h4><p class="source-note">Governing revision: <a href="../index.html#dots">DOT-01–10</a> · source requirement, not release evidence.</p><pre class="retained-text">Primary outcome
+Proportion of started eligible tasks reaching independently accepted completion within an equal aggregate resource envelope (executor + coach + human minutes).
+</pre></article><article id="S34-007" class="source-clause"><h4>S34-007 · Guardrails</h4><p class="source-note">Governing revision: <a href="../index.html#dots">DOT-01–10</a> · source requirement, not release evidence.</p><pre class="retained-text">Guardrails
+False acceptance, unauthorized effects, requirement weakening, false blocking, false-completion rate. Any unauthorized effect or false acceptance in a required adversarial case blocks qualification until fixed and re-run under a new bound.
+</pre></article><article id="S34-008" class="source-clause"><h4>S34-008 · Decision rule</h4><p class="source-note">Governing revision: <a href="../index.html#dots">DOT-01–10</a> · source requirement, not release evidence.</p><pre class="retained-text">Decision rule
+Coaching is kept only if its incremental improvement or saved human effort justifies measured total cost under the owner&#x27;s stated tradeoff, fixed before results are seen. If B ≈ C at lower cost, ship B and reserve the coach for the task classes where it earned its keep.
+</pre></article><article id="S34-009" class="source-clause"><h4>S34-009 · Ablations (after the pilot)</h4><p class="source-note">Governing revision: <a href="../index.html#dots">DOT-01–10</a> · source requirement, not release evidence.</p><pre class="retained-text">Ablations (after the pilot)
+Event-triggered vs continuous commentary; minimal source-linked packets vs full-history replay; targeted diagnosis vs fixed reviewer; one model vs the Know Decision assistant; owner-mediated vs directly authorized steering. One factor at a time.
+</pre></article><article id="S34-010" class="source-clause"><h4>S34-010 · Risks</h4><p class="source-note">Governing revision: <a href="../index.html#dots">DOT-01–10</a> · source requirement, not release evidence.</p><pre class="retained-text">Risks
+Risk
+Likelihood
+Impact
+Mitigation
+Coach invents requirements
+High (observed in the case study)
+False blocking; rework
+Proposals must cite an adopted clause; schema rejects references outside the phase; false-blocking is a ledger metric
+Coach adds ceremony
+High
+Cost exceeds yield
+Trigger-only wakeups; intervention allowance; quiet-case gate (coach cost under 2% of executor cost)
+Classifier noise enters the gate
+Medium
+False acceptance
+Deterministic predicates only in the gate; classifier input tagged
+source: model
+and never overrides; κ threshold before use
+Plan-terms breach via harness adapters
+Medium
+Account suspension
+OAuth routes gated off; coach on metered inference when unattended; proxy-mode plans only where the vendor permits third-party agents
+Upstream librefang drift
+High
+Adapter breakage
+Hand + adapters pattern; pin submodule; CI against pinned commit
+UAR run-state defects corrupt evidence
+Medium (three known-open)
+Spurious triggers
+Fix the three defects in Phase 1; receipts bound to candidate hash not to run transcript</pre></article></main></body></html>

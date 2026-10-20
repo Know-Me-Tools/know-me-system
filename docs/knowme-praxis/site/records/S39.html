@@ -1,0 +1,545 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>S39 · SSW-ARCH-001-architecture-spec-and-plan.md</title><link rel="stylesheet" href="../records.css"><body><main><a href="../index.html">KnowMe Praxis</a><h1>S39 · SSW-ARCH-001-architecture-spec-and-plan.md</h1><p>Complete technical source record. Historical names and requirements remain visible for audit. Revised clauses and explicit corrections govern their application.</p><p><a href="S39.txt">Download complete technical text</a></p><article id="S39-001" class="source-clause"><h4>S39-001 · Sansaba Workspace — Architecture, Functional Specification &amp; Project Plan</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h1>Sansaba Workspace — Architecture, Functional Specification &amp; Project Plan</h1></article><article id="S39-002" class="source-clause"><h4>S39-002 · The Entity‑Graph‑Centered Agentic Shell (web edition)</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><div class="source-note"><strong>Explicit amendments:</strong><ul><li>Legacy module kind/embed routes require the independent placement/protection/surface and registry migration in PL/IM clauses.</li></ul></div><h3>The Entity‑Graph‑Centered Agentic Shell (web edition)</h3>
+<p><strong>Document:</strong> SSW‑ARCH‑001 · <strong>Date:</strong> 2026‑07‑26 (rev. 2026‑07‑27, v1.1) · <strong>Author:</strong> Travis James / Prometheus AGS
+<strong>Status:</strong> Implemented POC architecture; the 2026-07-29 implementation
+revision below supersedes conflicting scaffold-era details.
+<strong>Companion to:</strong> <code>SSR‑P3‑SHELL‑001</code> (Shell Spec &amp; POC Catalog) and <code>claude/sansaba-shell-operating-philosophy.md</code> (validated operating philosophy)
+<strong>Grounding (verified by code inspection):</strong>
+<code>prometheus-entity-management</code> (entity‑graph state library) · <code>flint-forge</code> (A2UI registry + surface assembler) · <code>flint-realtime-fabric</code> (AG‑UI/A2A agent bus, Loro CRDT sync, entity watch) · <code>hybrid-mobile-architecture</code> skill (TJ‑ARCH‑MOB‑001, KnowMe) · <code>ssr-frontend</code> + <code>document-generation-agent</code> (the frozen app and its Mastra agent).</p>
+<blockquote>
+<p><strong>Operator ruling (2026-07-30):</strong> Sansaba uses verified <code>admin</code>/<code>user</code> roles
+as the app-level authorization boundary for every non-user-admin function,
+including <code>POST /agui/{agent}</code>. Tenant context comes only from verified
+claims, and PostgreSQL RLS is the durable data boundary. Cedar and Ory Keto
+are not Sansaba runtime requirements; every conflicting reference below is
+superseded by this ruling.</p>
+<p><strong>Contract revision (2026-07-30) — retired approaches.</strong> The Mini App contract
+is <code>prometheusags.ai/v1alpha1</code>, defined by <code>manifests/mini-app.schema.json</code>.
+The following were tried and rejected; do not reintroduce them from any
+passage below that predates this note:</p>
+<table>
+<thead>
+<tr>
+<th>Retired</th>
+<th>Replaced by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET /embed/*</code> same-origin reverse proxy</td>
+<td>The SSR app is framed at its <strong>registered origin</strong>; <code>frame-ancestors</code> is applied at the edge. Root-relative Next.js assets escape a path prefix, so the proxy could never host the real application.</td>
+</tr>
+<tr>
+<td><code>kind: core \| agentic</code></td>
+<td><code>navSection</code> (sidebar group), <code>protected</code> (undeletable), and <code>surface.kind</code> (<code>embedded-app</code> | <code>a2ui-surface</code> | <code>native</code>) — three independent fields.</td>
+</tr>
+<tr>
+<td><code>embed.path</code> literal</td>
+<td><code>embed.ref</code>, resolved server-side against the trusted embed registry.</td>
+</tr>
+<tr>
+<td>top-level <code>entities</code> array</td>
+<td><code>capabilities.entities</code> with an access level, <strong>enforced</strong> at the BFF rather than documented.</td>
+</tr>
+<tr>
+<td>caller-composed sub-paths under the AG-UI root</td>
+<td><code>POST /agui/{agent}</code> with a registered id only; the server resolves the backend.</td>
+</tr>
+<tr>
+<td>center surface bound to an agent run's event stream</td>
+<td>The surface binds to durable watched graph state.</td>
+</tr>
+</tbody>
+</table>
+</blockquote>
+<hr/></article><article id="S39-003" class="source-clause"><h4>S39-003 · 0. Reading guide</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h2>0. Reading guide</h2></article><article id="S39-004" class="source-clause"><h4>S39-004 · 0.1 Implemented runtime revision — 2026-07-29</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h3>0.1 Implemented runtime revision — 2026-07-29</h3>
+<p>The root route renders an edge-to-edge shadcn shell: a fixed left navigation
+plane, a fluid center plane, and a fixed right assistant plane. <strong>Mineral Rights
+Manager</strong> is the required, non-deletable core Mini App and mounts the complete
+registered SSR origin through <code>RemoteMiniAppHost</code>, which resolves a
+registry-held <code>embed.ref</code>.</p>
+<p>Forge is the runtime source of Mini App metadata and assembly parameters through
+the tenant-scoped <code>sansaba.mini_app</code> table. A database trigger protects the
+core identity, label, navigation section, surface descriptor, protection flag,
+availability, embed reference, and declared capability set.
+Checked-in manifests are a validated bootstrap fallback. Controller-backed
+modules remain visible but unavailable until their runtime contracts pass the
+tenant-isolation gate.</p>
+<p>Axum hosts the React build and exposes the authenticated entity,
+<code>/a2ui/v1/surfaces/assemble</code>, and <code>/agui/{agent}</code> boundaries. A2UI renders only
+the registered closed primitive catalog and fails closed on malformed or
+unknown components.</p>
+<p>The installed UAR AG-UI contract was audited. Its current user claims omit
+<code>tenant_id</code>, its shared-secret authentication is incompatible with this BFF's
+RS256 identity, and its generic A2A task store is not tenant-partitioned.
+Consequently UAR-backed Mini Apps stay unavailable. The bounded direct Mastra
+C-29 integration is not evidence of generic UAR or A2A readiness.</p>
+<p>This document does three things, in order:</p>
+<ol>
+<li><strong>Theory.</strong> It states the operating philosophy of the Sansaba Workspace shell and introduces the load‑bearing idea: a single <strong>normalized, reactive entity graph</strong> is the shared state plane through which every surface — the embedded legacy app, the A2UI content surfaces, and the chat sidebar — stays consistent, for humans and agents alike.</li>
+<li><strong>Evidence.</strong> It shows, from the public state of the art <em>and</em> from our own already‑built platform, that this is a sound and genuinely novel pattern rather than a bet.</li>
+<li><strong>Plan.</strong> It specifies the web build — an <strong>Axum REST/SSE server</strong> serving a <strong>React 19 / Vite 8 / shadcn‑ui</strong> container — built with the <strong>KnowMe hybrid‑mobile AI skills</strong>, names the one skill extension we should make first, and lays out the POC→MVP project plan.</li>
+</ol>
+<p>It does <strong>not</strong> re‑derive the shell requirements (R‑1…R‑9), the module model, or the POC candidate catalog (C‑01…C‑44) — those live in <code>SSR‑P3‑SHELL‑001</code> and are treated here as settled. This document is the <strong>client‑state and web‑delivery layer</strong> that the shell spec left open: <code>SSR‑P3‑SHELL‑001</code> names the S‑1 deal‑state machine and S‑2 entity‑resolution service but does not name a client state model, Axum, or local‑first delivery. This document supplies them.</p>
+<hr/></article><article id="S39-005" class="source-clause"><h4>S39-005 · 1. The theory</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h2>1. The theory</h2></article><article id="S39-006" class="source-clause"><h4>S39-006 · 1.1 One shell, three planes</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h3>1.1 One shell, three planes</h3>
+<p>The Sansaba Workspace is a single governed shell with three planes:</p>
+<ul>
+<li><strong>Navigation (left)</strong> — selects a <em>Mini App</em>.</li>
+<li><strong>Content (center)</strong> — hosts the selected Mini App.</li>
+<li><strong>Conversation (right)</strong> — the agent chat sidebar.</li>
+</ul>
+<p>A <strong>Mini App</strong> is one of two kinds:</p>
+<ul>
+<li><strong>Embedded App</strong> — an opaque, pre‑existing UI mounted in the content area via <code>&lt;iframe&gt;</code> + a versioned postMessage bridge. The frozen SSR <em>Mineral Rights Manager</em> is one. User administration remains in the separate admin site and is not mounted in Sansaba Workspace.</li>
+<li><strong>Agentic Module</strong> — a declaration of <strong>one‑to‑many agents</strong> plus, optionally, an <strong>A2UI surface</strong> rendered in the content area. Sourcing and Reports Intelligence are examples.</li>
+</ul>
+<p>This is the same "everything is a module" model as <code>SSR‑P3‑SHELL‑001</code> (each module is simultaneously an MCP server, a REST/OpenAI‑style endpoint, and an A2UI UI endpoint). This document adds the missing verb: <strong>how those surfaces share state.</strong></p></article><article id="S39-007" class="source-clause"><h4>S39-007 · 1.2 One agent channel</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h3>1.2 One agent channel</h3>
+<p>The content surface and the chat sidebar are <strong>two consumers of one AG‑UI channel</strong>, not two protocols. They differ only in <em>trigger</em> and <em>presentation</em>:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Conversation surface (right)</th>
+<th>Application surface (center)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Trigger</strong></td>
+<td>user message</td>
+<td>UI/lifecycle event: <code>mount</code>, <code>navigate</code>, <code>Button → Action → A2A task</code></td>
+</tr>
+<tr>
+<td><strong>Presentation</strong></td>
+<td>text/ContentBlock stream + inline A2UI</td>
+<td>an <strong>assembled A2UI surface</strong> in layout regions</td>
+</tr>
+<tr>
+<td><strong>Lifecycle</strong></td>
+<td>episodic (per turn)</td>
+<td><strong>durable</strong> (persists across runs/navigations)</td>
+</tr>
+<tr>
+<td><strong>Transport</strong></td>
+<td>AG‑UI</td>
+<td>AG‑UI — <em>same channel</em></td>
+</tr>
+<tr>
+<td><strong>UI vocabulary</strong></td>
+<td>A2UI catalog</td>
+<td>A2UI catalog — <em>same renderers</em></td>
+</tr>
+</tbody>
+</table>
+<p>This composition was validated separately (<code>sansaba-shell-operating-philosophy.md</code>) against AG‑UI's <code>STATE_SNAPSHOT</code>/<code>STATE_DELTA</code> model and against <code>flint-forge</code>'s own <code>POST /a2ui/v1/surfaces/assemble</code>, which assembles a surface into layout regions (<code>region:"main"</code>) from a <strong>non‑chat</strong> <code>event_type</code> of <code>"mount"</code> or <code>"navigate"</code>. The center‑area‑as‑agent‑surface is already the Flint design.</p></article><article id="S39-008" class="source-clause"><h4>S39-008 · 1.3 The load‑bearing idea: the entity graph is the shared state plane</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h3>1.3 The load‑bearing idea: the entity graph is the shared state plane</h3>
+<p>The philosophy validation ended on one non‑negotiable discipline: <strong>bind surfaces to durable state, not to a single run, and keep one source of truth.</strong> Two surfaces that both mutate the same deal must read and write the <em>same</em> record or they will drift.</p>
+<p>That single source of truth is <strong><code>prometheus-entity-management</code></strong> — a normalized, globally‑reactive <strong>entity graph</strong>. Its contract, verified in the code:</p>
+<ul>
+<li>Each <code>(entityType, id)</code> maps to <strong>exactly one</strong> canonical record (<code>entities[type][id]</code>). Lists store <strong>IDs</strong>, not copies; rows are joined to the graph at render time. Therefore <em>"update a post in one screen and every list row, detail panel, and badge that reads that entity updates automatically — without hand‑maintained query keys."</em></li>
+<li>Data flows <strong>up</strong> into the graph (REST, GraphQL, WebSocket/Supabase/Convex, Prisma‑shaped APIs, <strong>ElectricSQL + PGlite local‑first sync</strong>, and realtime adapters); UI reads <strong>down</strong> through hooks (<code>useEntity</code>, <code>useEntityList</code>, <code>useEntityView</code>, <code>useEntityCRUD</code>). There is <strong>no sideways data flow between components</strong>.</li>
+<li>It is <strong>local‑first native</strong>: <code>startLocalFirstGraph</code>, PGlite persistence, tenant‑scoped Electric adapter (refuses shapes without a <code>tenantColumn</code>; builds the <code>WHERE</code> from a validated <code>{ companyId }</code> claim so predicates can never widen past RLS), offline action replay with backoff.</li>
+<li>It is <strong>agent‑ready</strong>: <code>createGraphTool</code> / <code>createSchemaGraphTool</code> / <code>exportGraphSnapshot</code> expose the graph to AI runtimes <em>without bundling an AI runtime</em>; <code>registerEntityFromSql</code> generates a JSON Schema straight from a Postgres <code>CREATE TABLE</code> (no hand‑kept duplicates); schema‑aware export is explicitly built "for A2UI/runtime‑generated entity models."</li>
+<li>Its sibling packages complete the picture: <strong><code>a2ui-react</code></strong> (render A2UI bound to the graph), <strong><code>entity-graph-a2a</code></strong> (A2A binding), <strong><code>entity-graph-mcp</code></strong> (MCP), <strong><code>entity-graph-sync</code></strong> (sync), plus React/Solid/Svelte/HTMX/Tauri/Flutter renderers.</li>
+</ul>
+<p>So the four ways state changes — a <strong>human</strong> edits a field, an <strong>agent</strong> writes via AG‑UI/A2A, an <strong>embedded app</strong> posts a bridge message, or a <strong>realtime/sync</strong> event arrives — all land in the <em>same</em> normalized node, and every surface subscribed to that node re‑renders consistently. That is the pattern.</p>
+<p><strong>Named:</strong> the <strong>Shared Entity‑Graph Pattern</strong> — a normalized reactive entity graph as the single meeting point for human views, agent writes, embedded‑app bridges, and realtime sync, running local‑first on the client and reconciled by the realtime fabric on the server.</p>
+<hr/></article><article id="S39-009" class="source-clause"><h4>S39-009 · 2. Evidence this is a sound, novel pattern</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h2>2. Evidence this is a sound, novel pattern</h2></article><article id="S39-010" class="source-clause"><h4>S39-010 · 2.1 The single‑normalized‑store idea is the state of the art for fast, consistent apps</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h3>2.1 The single‑normalized‑store idea is the state of the art for fast, consistent apps</h3>
+<p>The best local‑first products already put a normalized client store at the center and let every view read from it:</p>
+<ul>
+<li><strong>Linear</strong> built a sync engine that treats the browser's IndexedDB as a real database; <strong>every change happens locally first</strong>, the UI reads from the local store, and sync propagates in the background — which is <em>why Linear "feels impossibly fast."</em> Interaction latency stops depending on the network. (<a href="https://bytemash.net/posts/i-went-down-the-linear-rabbit-hole/">bytemash</a>, <a href="https://www.birjob.com/blog/local-first-software-2026">BirJob 2026</a>)</li>
+<li><strong>Replicache / Convex object sync / ElectricSQL</strong> generalize this: a local store as source of truth, background sync, no hand‑maintained cache‑invalidation. (<a href="https://replicache.dev/">Replicache</a>, <a href="https://stack.convex.dev/object-sync-engine">Convex object sync</a>)</li>
+</ul>
+<p><code>prometheus-entity-management</code> is this idea, packaged as a library, with the normalization key being your <code>(type, id)</code> rather than an opaque query key — the exact property that gives cross‑view consistency for free.</p></article><article id="S39-011" class="source-clause"><h4>S39-011 · 2.2 The protocols were designed for shared state, not just chat</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h3>2.2 The protocols were designed for shared state, not just chat</h3>
+<ul>
+<li>AG‑UI carries <strong><code>STATE_SNAPSHOT</code> / <code>STATE_DELTA</code></strong> (JSON‑Patch, RFC 6902) for <strong>bidirectional shared state</strong>: a frontend binds to agent state and the agent reads UI/app state — <strong>no chat message required</strong>. (<a href="https://docs.ag-ui.com/concepts/state">AG‑UI state</a>)</li>
+<li><strong>A2UI is the UI payload; AG‑UI is the runtime channel</strong> — complementary layers; "the agent emits A2UI, AG‑UI delivers it, the UI renders locally." (<a href="https://webflow.copilotkit.ai/blog/the-state-of-agentic-ui-comparing-ag-ui-mcp-ui-and-a2ui-protocols">Agentic UI comparison</a>)</li>
+</ul></article><article id="S39-012" class="source-clause"><h4>S39-012 · 2.3 Local‑first is now recognized as the right substrate for *agents*, not just humans</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h3>2.3 Local‑first is now recognized as the right substrate for <em>agents</em>, not just humans</h3>
+<p>Agent‑storage guidance in 2026 argues agents should <strong>read and write locally first, then sync</strong>, so agents in edge/secure/intermittent environments keep working; and that a shared local store keeps <strong>agent memory and UI state aligned without constant API calls</strong> — "if a human drops a new dataset into the shared folder, it appears on the agent's local disk automatically." (<a href="https://fast.io/resources/ai-agent-local-first-storage/">Fast.io: local‑first storage for AI agents</a>)</p></article><article id="S39-013" class="source-clause"><h4>S39-013 · 2.4 What is novel here</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h3>2.4 What is novel here</h3>
+<p>The public examples do <strong>one</strong> of these at a time — Linear syncs <em>human</em> views; AG‑UI syncs <em>agent</em> state; Fast.io syncs <em>agent</em> files. <strong>Nobody has published the unification.</strong> Our pattern makes a <strong>single normalized entity graph the common substrate for all four writers at once</strong> — human views, agent AG‑UI/A2A writes, embedded‑app postMessage bridges, and realtime CRDT sync — and renders both the chat sidebar and the content surface from it via one A2UI catalog. And we are not theorizing it: the substrate exists (<code>prometheus-entity-management</code> with <code>a2ui-react</code> + <code>entity-graph-a2a</code> + <code>entity-graph-mcp</code> + <code>entity-graph-sync</code>), the surface assembler exists (<code>flint-forge</code>), and the reconciling transport exists (<code>flint-realtime-fabric</code>: <code>AgentService.RunAgent</code> over AG‑UI/A2A, Loro CRDT <code>SyncService</code>, <code>EntityService.WatchEntity</code>, and verified-claim tenant filtering). This document is the first time they are composed into one shell.</p>
+<hr/></article><article id="S39-014" class="source-clause"><h4>S39-014 · 3. Architecture (web edition)</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h2>3. Architecture (web edition)</h2></article><article id="S39-015" class="source-clause"><h4>S39-015 · 3.1 Deployment shape</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h3>3.1 Deployment shape</h3>
+<p>The web edition is <strong>server‑backed</strong>, not WASM‑in‑browser. An <strong>Axum</strong>
+service is the shell's backend‑for‑frontend (BFF) and gateway; it serves the
+React container and brokers every agent/data call. The shell must frame the
+registered SSR origin, call the hosted Mastra
+<code>document-generation-agent</code>, preserve tenant and generic platform boundaries
+without exposing service credentials, and authenticate against Flint Gate.
+None of that fits a purely in-browser WASM runtime.</p>
+<pre><code>Browser
+┌───────────────────────────────────────────────────────────────────────┐
+│  React 19 / Vite 8 / shadcn-ui  — the Sansaba Workspace container       │
+│  ┌───────────┐  ┌──────────────────────────┐  ┌────────────────────┐   │
+│  │ Nav rail  │  │ Content plane            │  │ Conversation plane │   │
+│  │ (Mini     │  │  ├ Embedded App (iframe) │  │  Assistant-UI +    │   │
+│  │  Apps)    │  │  └ A2UI surface (a2ui-   │  │  AG-UI stream      │   │
+│  │           │  │     react, region:main) │  │                    │   │
+│  └───────────┘  └──────────────────────────┘  └────────────────────┘   │
+│            ▲                    ▲                        ▲              │
+│            └──────── prometheus-entity-management (entity graph) ───────┤
+│                     PGlite (local-first) · Zustand (transient UI)       │
+└───────────────────────────────┬───────────────────────────────────────┘
+                 REST + SSE/WebSocket (same origin)
+                                │
+┌───────────────────────────────┴───────────────────────────────────────┐
+│  Axum server (Rust 0.8.8)  — BFF / gateway                             │
+│  • serves the SPA; the SSR mini-app frames its own origin             │
+│  • REST entity endpoints  (feed the entity graph)                     │
+│  • AG-UI SSE bridge  → document-generation-agent (Mastra) / UAR       │
+│  • A2UI surface assemble  → flint-forge  /a2ui/v1/surfaces/assemble    │
+│  • authz: verified admin/user role + tenant claims + PostgreSQL RLS    │
+│  • sync bridge → flint-realtime-fabric (WatchEntity / SyncService)    │
+└───────┬───────────────┬───────────────┬───────────────┬───────────────┘
+        │               │               │               │
+   ssr-frontend   document-gen     flint-forge     flint-realtime-fabric
+   (frozen app)   agent (Mastra)   (A2UI catalog)  (AG-UI/A2A, CRDT, watch)
+        │
+   companion Postgres (anonymized SSR replica · deal-state · capability metadata)
+</code></pre>
+<p><code>gen_ui_core</code> (the KnowMe Rust workspace) provides the agent/protocol/inference building blocks. In this edition it is composed <strong>server‑side inside the Axum process</strong> (a new <code>gen_ui_server</code> composition — see §7), exposing AG‑UI/A2UI/A2A/MCP over HTTP/SSE rather than over FFI (Flutter) or IPC (Tauri) or WASM (in‑browser).</p></article><article id="S39-016" class="source-clause"><h4>S39-016 · 3.2 The entity graph as the state plane</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h3>3.2 The entity graph as the state plane</h3>
+<p>Every plane reads and writes the graph; nothing talks sideways.</p>
+<ul>
+<li><strong>Human edit</strong> (content surface or embedded app form) → <code>useEntityCRUD</code> / <code>useEntityMutation</code> → graph write → server → all subscribers re‑render.</li>
+<li><strong>Agent write</strong> — the AG‑UI run's tool calls and <code>STATE_DELTA</code>s are applied to the graph through an <strong>AG‑UI→graph adapter</strong> (a realtime adapter in <code>RealtimeManager</code> terms). The chat sidebar shows the run; the content surface, bound to the same entities, updates without any chat‑to‑view plumbing.</li>
+<li><strong>Embedded app</strong> — the postMessage bridge translates <code>{type, version, payload, correlationId}</code> envelopes into graph reads/writes. When Rachel edits the Receipt Date in the frozen app, the bridge writes <code>LetterAgreement:4016</code> into the graph; the gate surface and the chat both see it.</li>
+<li><strong>Sync</strong> — <code>flint-realtime-fabric</code> <code>WatchEntity</code>/<code>SyncService</code> (Loro CRDT) feeds a realtime adapter; the tenant‑scoped Electric/PGlite path gives offline‑first reads. Sync provenance is visible on reads as <code>$synced</code> / <code>$origin</code> / <code>$updatedAt</code>.</li>
+</ul>
+<p>This directly operationalizes <code>SSR‑P3‑SHELL‑001</code>'s <strong>S‑1 deal‑state machine</strong> and <strong>S‑2 entity‑resolution service</strong>: S‑1/S‑2 own the <em>server</em> truth in companion Postgres; the entity graph is their <em>client projection</em>, kept live by the fabric. One deal, one node, every view.</p></article><article id="S39-017" class="source-clause"><h4>S39-017 · 3.3 Four canonical sequences</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h3>3.3 Four canonical sequences</h3>
+<p><strong>(A) Navigate to an Agentic Module (assemble a surface).</strong>
+<code>navigate</code> → Axum → <code>flint-forge /a2ui/v1/surfaces/assemble { event_type:"navigate", event_context, application_id }</code> → <code>components[]</code> with <code>layout.region</code> → <code>a2ui-react</code> renders into the content plane, its data props resolved through the entity graph.</p>
+<p><strong>(B) Chat drives work; all views update.</strong>
+User message → AG‑UI <code>RunAgent</code> (SSE) → <code>TOOL_CALL</code> / <code>STATE_DELTA</code> → AG‑UI→graph adapter applies to <code>entities[...]</code> → content surface + any list/badge bound to those entities re‑render. The chat is a <em>writer into the graph</em>, not a private context.</p>
+<p><strong>(C) Embedded app ↔ shell.</strong>
+<code>iframe</code> posts <code>{type:"entity.changed", version:1, payload:{type,id,patch}, correlationId}</code> → bridge → graph write. Shell posts <code>{type:"apply", ...}</code> back to patch the frozen app's field. Exact registered origin in both directions, with <code>event.source</code>, protocol version, mini‑app id and correlation id checked; context only, never tokens (R‑2).</p>
+<p><strong>(D) The C‑29 pre‑generation gate (the POC), over the graph.</strong>
+Documents tab "Generate" → bridge emits intent → Axum starts an AG‑UI run on <code>document-generation-agent</code> → <code>validate-required-fields</code> + <code>check-amount-plausibility</code> tool calls read <code>LetterAgreement:4016</code> from the graph → <code>A2UI_ARTIFACT { schema: letter-agreement-precheck }</code> renders the gate in the conversation plane → reviewer sets Receipt Date → <code>a2uiResponse</code> → graph write + bridge <code>apply</code> back to the frozen app → <code>render-document</code> → <code>RUN_FINISHED</code> stages <code>letter-agreement-4016-&lt;ts&gt;.docx</code>. <strong>No money moves; a human releases.</strong> (Boundaries per <code>SSR‑P3‑SHELL‑001</code>.)</p></article><article id="S39-018" class="source-clause"><h4>S39-018 · 3.4 The Mini‑App manifest</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h3>3.4 The Mini‑App manifest</h3>
+<p>Each Mini App is declared once and registered with the shell:</p>
+<p>Schema: <code>manifests/mini-app.schema.json</code> (<code>prometheusags.ai/v1alpha1</code>). Every
+object rejects unknown properties, because the manifest is a <strong>privilege
+document</strong>; <code>parameters</code> is the only forward-compatible extension point.</p>
+<pre><code class="language-jsonc">{
+  "apiVersion": "prometheusags.ai/v1alpha1",
+  "id": "sourcing",
+  "label": "Sourcing",
+  "description": "Texas RRC drilling permits",
+
+  "navSection": "modules",           // which sidebar group — nothing else
+  "protected": false,                // undeletable? independent of placement
+  "availability": "unavailable",
+
+  "surface": {                       // what renders in the center plane
+    "kind": "a2ui-surface",          // "embedded-app" | "a2ui-surface" | "native"
+    "componentLibrary": "sansaba-workspace@1",
+    "initialComponent": "SourcingQueue"
+  },
+
+  // Embedded apps only — a REFERENCE, never a URL. The trusted server-side
+  // registry resolves it to {origin, path, sandbox}.
+  // "embed": { "ref": "ssr-mineral-rights-manager", "bridgeVersion": "1.0.0" },
+
+  "agent": {
+    "orchestrator": "sourcingAgent", // registry id; drives the assistant plane
+    "runtimeRef": "sourcing-controller",  // advisory; the server resolves the backend
+    "artifacts": ["permit-triage"],
+    "quickActions": [ /* { id, display.label, command.{action,targetAgent,payload.prompt} } */ ]
+  },
+
+  // Deny-by-default and ENFORCED at the BFF and the renderer — not documentation.
+  // An absent list is an empty list, never unrestricted.
+  "capabilities": {
+    "entities": [{ "type": "Permit", "access": "read-write" }],
+    "agents": ["sourcingAgent"],
+    "components": ["SourcingQueue"]
+  },
+
+  "parameters": { "catalog": "default", "assembleOn": ["mount", "navigate"] },
+
+  "governance": {
+    "humanInTheLoop": ["valuation", "send-no-send"],
+    "stagesDocuments": false,
+    "transmits": false,              // pinned false by schema
+    "movesMoney": false              // pinned false by schema
+  }
+}
+</code></pre>
+<p>Referential integrity the JSON Schema cannot express is enforced by the
+validator: <code>agent.orchestrator</code> and every <code>quickActions[].command.targetAgent</code>
+must appear in <code>capabilities.agents</code>; <code>surface.initialComponent</code> must appear in
+<code>capabilities.components</code>; every declared component must belong to the resolved
+<code>surface.componentLibrary</code>; and <code>embed.ref</code> must resolve in the trusted
+registry.</p>
+<ul>
+<li><strong>Core</strong> navigation section (<code>navSection: core</code>, <code>protected: true</code>): <code>Mineral Rights Manager</code> (<code>surface.kind: embedded-app</code>). User administration remains in the separate admin site.</li>
+<li><strong>Modules</strong> navigation section (<code>navSection: modules</code>): <code>Curative Tracker</code>, <code>Reports Intelligence</code>, and
+  <code>Sourcing</code> are seeded as unavailable until their controllers pass the
+  runtime gate.</li>
+<li>Registration wires: the graph entities (via <code>registerEntityFromSql</code> against the anonymized replica's <code>CREATE TABLE</code>s), the A2UI surface/assembly, and the agent endpoints. It declares no Sansaba role, owner, or resource permission.</li>
+</ul>
+<hr/></article><article id="S39-019" class="source-clause"><h4>S39-019 · 4. Functional specification</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h2>4. Functional specification</h2></article><article id="S39-020" class="source-clause"><h4>S39-020 · 4.1 Components and responsibilities</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h3>4.1 Components and responsibilities</h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Tech</th>
+<th>Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Container SPA</strong></td>
+<td>React 19, Vite 8, shadcn‑ui, Tailwind 4, TanStack Router, Zustand 5 (transient UI only)</td>
+<td>Renders the three planes; nav; hosts iframe + <code>a2ui-react</code>; Assistant‑UI chat</td>
+</tr>
+<tr>
+<td><strong>Entity graph</strong></td>
+<td><code>prometheus-entity-management</code> + PGlite</td>
+<td>Single source of truth; local‑first; cross‑view reactivity</td>
+</tr>
+<tr>
+<td><strong>AG‑UI client</strong></td>
+<td><code>entity-graph</code>/gen‑ui‑react AG‑UI bridge</td>
+<td>Consume <code>RunAgent</code> SSE; apply <code>STATE_DELTA</code>/tool results to graph; feed chat</td>
+</tr>
+<tr>
+<td><strong>A2UI renderer</strong></td>
+<td>Closed local primitive catalog</td>
+<td>Render validated Forge-assembled surfaces; fail closed on unknown primitives</td>
+</tr>
+<tr>
+<td><strong>Bridge</strong></td>
+<td>postMessage envelope <code>@1</code></td>
+<td>Embedded‑app ↔ graph, allow‑listed origins, context‑only</td>
+</tr>
+<tr>
+<td><strong>Axum BFF</strong></td>
+<td>Rust Axum 0.8.8</td>
+<td>Serve SPA; authenticated REST entity, AG-UI, and A2UI proxies</td>
+</tr>
+<tr>
+<td><strong>gen_ui_server</strong></td>
+<td>gen_ui_core (server profile)</td>
+<td>Server‑side agent/protocol/MCP/inference composition (§7)</td>
+</tr>
+<tr>
+<td><strong>Policy</strong></td>
+<td>Flint Gate identity/role + claim tenant + PostgreSQL RLS</td>
+<td>Authenticate protected routes without Sansaba resource roles</td>
+</tr>
+<tr>
+<td><strong>Sync</strong></td>
+<td>flint‑realtime‑fabric</td>
+<td><code>WatchEntity</code>/<code>SyncService</code> → realtime adapter; tenant isolation</td>
+</tr>
+</tbody>
+</table></article><article id="S39-021" class="source-clause"><h4>S39-021 · 4.2 Server contracts (Axum)</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><div class="source-note"><strong>Explicit amendments:</strong><ul><li>Legacy module kind/embed routes require the independent placement/protection/surface and registry migration in PL/IM clauses.</li></ul></div><h3>4.2 Server contracts (Axum)</h3>
+<ul>
+<li><code>GET /</code> and static — the SPA. <strong>The <code>/embed/*</code> reverse proxy is retired</strong>: root‑relative Next.js assets escape the prefix, so the SSR mini‑app is framed directly from its registered origin and <code>frame-ancestors</code> is applied at the edge.</li>
+<li><code>GET /api/v1/entities/:type</code> · <code>GET /api/v1/entities/:type/:id</code> · <code>POST|PATCH|DELETE</code> — REST feeding the graph (compiled from the graph's <code>FilterSpec</code> via <code>toRestParams</code>).</li>
+<li><code>POST /agui/:agent</code> (SSE) — proxied AG‑UI stream to <code>document-generation-agent</code>/UAR; events <code>RUN_STARTED · TEXT_MESSAGE_* · TOOL_CALL_* · STATE_SNAPSHOT/DELTA · A2UI_ARTIFACT · RUN_FINISHED</code>.</li>
+<li><code>POST /a2ui/v1/surfaces/assemble</code> — proxied to <code>flint-forge</code>.</li>
+<li><code>GET /sync/watch</code> (SSE/WebSocket) — bridge to <code>flint-realtime-fabric</code> <code>WatchEntity</code>.</li>
+<li>All routes require verified authentication with an <code>admin</code> or <code>user</code> role.
+  Sansaba adds no per-user, per-agent, or per-resource gate; tenant isolation
+  comes from verified claims and PostgreSQL RLS.</li>
+</ul></article><article id="S39-022" class="source-clause"><h4>S39-022 · 4.3 Acceptance criteria (POC gate = C‑29)</h4><p class="source-note">Governing revision: <a href="../index.html#acceptance">G01–16</a> · source requirement, not release evidence.</p><h3>4.3 Acceptance criteria (POC gate = C‑29)</h3>
+<ol>
+<li>The frozen <code>ssr-frontend</code> application frames from its registered origin in the content plane; the bridge round‑trips a field edit into the graph and back. (R‑1, R‑2)</li>
+<li>Clicking <strong>Generate</strong> starts a real AG‑UI run against <code>document-generation-agent</code>; the chat shows <code>RUN_STARTED → TOOL_CALL(validate-required-fields, check-amount-plausibility) → A2UI_ARTIFACT(letter-agreement-precheck) → RUN_FINISHED</code>.</li>
+<li>The gate blocks on empty <strong>Receipt Date</strong>; the reviewer's fix writes <code>LetterAgreement:4016</code> <strong>once</strong> in the graph and both the embedded app and any bound surface reflect it without a refetch.</li>
+<li>On release, a <code>letter-agreement-4016-&lt;ts&gt;.docx</code> is <strong>staged</strong> (never sent); a human performs release. No money is moved.</li>
+<li>Runs on the <strong>anonymized</strong> replica; never touches production data.</li>
+<li>Offline resilience: with the network cut after load, the graph still renders last‑known state and queues the action for replay (local‑first).</li>
+</ol>
+<hr/></article><article id="S39-023" class="source-clause"><h4>S39-023 · 5. Why this makes the POC easier — and the MVP smoother</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h2>5. Why this makes the POC easier — and the MVP smoother</h2>
+<p><strong>For the POC:</strong></p>
+<ul>
+<li><strong>No per‑view cache wiring.</strong> Cross‑view consistency is a property of the graph, not code you write per screen. The gate surface, the embedded app, and the chat agree because they read one node.</li>
+<li><strong>The demo works without a live backend.</strong> Local‑first + PGlite means the prototype renders and behaves offline; adapters can point at mocks or the anonymized replica with no architectural change. (This is exactly what our HTML prototype already fakes; the graph makes it real with the same shape.)</li>
+<li><strong>Schema without duplication.</strong> <code>registerEntityFromSql</code> turns the replica's <code>CREATE TABLE</code> into the client entity schema and dynamic forms/detail views — days of hand‑written types removed.</li>
+<li><strong>The agent already fits.</strong> <code>document-generation-agent</code> speaks AG‑UI + <code>A2UI_ARTIFACT</code> today; the graph just receives its writes.</li>
+</ul>
+<p><strong>For the MVP evolution:</strong></p>
+<ul>
+<li><strong>Swap adapters, not architecture.</strong> POC (anonymized replica, mock connectors) → MVP (companion Postgres, real S‑1/S‑2, Electric/CRDT sync) is a change of <em>adapters</em> feeding the same graph. The UI never learns where data came from.</li>
+<li><strong>New modules are additive.</strong> Ship a Mini App by registering its Forge
+  metadata, entities, surface, and controllers—without a Sansaba permission
+  scope or shell-specific branch.</li>
+<li><strong>One consistency story across surfaces and devices.</strong> The same graph + fabric powers web today and (via the KnowMe skill) Tauri/Flutter later, so a module written once behaves the same everywhere.</li>
+<li><strong>Governance is uniform.</strong> Every protected path begins with verified
+  authentication and claim-derived tenant context; every write path remains
+  subject to the same workflow and audit boundaries.</li>
+</ul>
+<hr/></article><article id="S39-024" class="source-clause"><h4>S39-024 · 6. Technology stack (pinned)</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h2>6. Technology stack (pinned)</h2>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Choice</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Backend</td>
+<td><strong>Rust + Axum 0.8.8</strong> (BFF/gateway), <code>gen_ui_server</code> composition of <code>gen_ui_core</code></td>
+</tr>
+<tr>
+<td>Frontend</td>
+<td><strong>React 19</strong>, <strong>Vite 8</strong>, <strong>TypeScript 7</strong>, <strong>shadcn‑ui</strong>, <strong>Tailwind 4</strong>, <strong>TanStack Router</strong>, <strong>TanStack Table</strong></td>
+</tr>
+<tr>
+<td>State</td>
+<td><strong><code>@prometheus-ags/prometheus-entity-management</code> <code>3.0.0-alpha.0</code></strong> (the <code>alpha</code> dist‑tag; entity graph; PEM) + <strong>PGlite</strong> (local‑first); <strong>Zustand 5</strong> for transient UI only. <strong>PEM replaces TanStack Query</strong> — do not add TanStack Query.</td>
+</tr>
+<tr>
+<td>Chat UI</td>
+<td><strong>Assistant‑UI</strong> (thread/composer/streaming), Flat 2.0 (no borders/dividers/shadows)</td>
+</tr>
+<tr>
+<td>Agent UI vocabulary</td>
+<td><strong>A2UI</strong> via <code>a2ui-react</code> + <code>flint-forge</code> catalog (a2ui.org v0.9.1)</td>
+</tr>
+<tr>
+<td>Agent transport</td>
+<td><strong>AG‑UI</strong> (SSE) to <code>document-generation-agent</code> (Mastra) / UAR; <strong>A2A</strong> for task lifecycle</td>
+</tr>
+<tr>
+<td>Realtime/sync</td>
+<td><strong>flint‑realtime‑fabric</strong> (<code>WatchEntity</code>, Loro CRDT <code>SyncService</code>)</td>
+</tr>
+<tr>
+<td>Identity/policy</td>
+<td><strong>Flint Gate</strong> authentication + claim-derived tenant; Forge/fabric retain generic platform policy</td>
+</tr>
+<tr>
+<td>Data</td>
+<td>Companion <strong>Postgres</strong> (deal‑state, capability metadata) + <strong>anonymized SSR replica</strong> (PL‑22 pipeline)</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Version — decided.</strong> We pin <strong><code>@prometheus-ags/prometheus-entity-management@3.0.0-alpha.0</code></strong> (published under the <code>alpha</code> dist‑tag; latest stable is <code>2.2.0</code>). Install with <code>pnpm add @prometheus-ags/prometheus-entity-management@alpha</code>. React peer is <code>&gt;=18</code> (we run 19). The 3.x line may rename/add hooks vs. the 1.x README (e.g. <code>useEntities</code> / <code>useEntityQuery</code>); confirm the exact hook surface against the installed alpha as the first scaffold step. Note the workspace itself depends on <code>loro-crdt</code> — the same CRDT engine as <code>flint-realtime-fabric</code>, so the local‑first and fabric‑sync paths share a merge format.</p>
+</blockquote>
+<hr/></article><article id="S39-025" class="source-clause"><h4>S39-025 · 7. Extend the KnowMe skill first: add a **web‑server (Axum + React SPA)** target</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h2>7. Extend the KnowMe skill first: add a <strong>web‑server (Axum + React SPA)</strong> target</h2>
+<p>The <code>hybrid-mobile-architecture</code> skill (TJ‑ARCH‑MOB‑001) already prescribes the exact stack we want — <strong>Zustand 5 + Prometheus Entity Management, TanStack Router/Table, shadcn/ui, Assistant‑UI, local‑first PGlite, Component→Hook→Store→API layering</strong> — and already compiles <code>gen_ui_core</code> to three targets: <strong>Flutter (FFI)</strong>, <strong>Tauri (IPC)</strong>, and <strong>Web (WASM, in‑browser)</strong>.</p>
+<p>What it does <strong>not</strong> have is a <strong>server‑backed web</strong> target: <strong>Axum hosting <code>gen_ui_core</code> server‑side, serving a React 19/Vite 8 SPA over REST + SSE</strong>, with the entity graph on the client and Flint Gate plus PostgreSQL RLS at the trust boundary. This is the target the Sansaba Workspace needs, and it will be <strong>our company pattern for server‑backed agentic web apps</strong> (wrapping existing hosted apps, enterprise auth, server‑side policy, hosted agents). We should add it to the skill <strong>before</strong> we scaffold, so the pattern is repeatable and audited from day one.</p>
+<p><strong>Proposed additions to the skill:</strong></p>
+<ol>
+<li><code>references/web/patterns.md</code> — the server‑backed web contract: Axum route map (SPA, REST entity endpoints, AG‑UI SSE proxy, A2UI assemble proxy, sync bridge), the AG‑UI→entity‑graph adapter, the A2UI surface renderer wiring, Flint Gate role/tenant middleware, PostgreSQL RLS, and the postMessage bridge envelope spec.</li>
+<li>A new leaf crate/composition <strong><code>gen_ui_server</code></strong> (sibling to <code>gen_ui_ffi</code> / <code>tauri-plugin-gen-ui</code> / <code>gen_ui_wasm</code>) that exposes the <code>gen_ui_core</code> pipeline over Axum HTTP/SSE (UAR in <code>External</code> or <code>Embedded</code> mode via <code>config.rs</code>).</li>
+<li><code>scripts/scaffold-web-axum.sh &lt;project&gt;</code> — scaffolds the Axum server + React SPA + PEM + <code>a2ui-react</code> + AG‑UI bridge + auth, and emits the project‑local UI/UX skills (<code>content-block-ui</code>, <code>hybrid-design-tokens</code>, <code>tauri-ui-review</code>→a <code>web-ui-review</code> variant at 320/768/1024/1440 × themes, <code>a11y-gate</code>).</li>
+<li><code>audit.sh</code> web‑surface checks — layer‑boundary tests (no <code>fetch</code> in components; graph writes only through hooks), registered‑origin embed policy, manifest capability enforcement, authentication on every trigger, and tenant isolation.</li>
+<li>Decision‑matrix row and platform‑selection rule: <em>"Wrapping an existing hosted app / enterprise auth / server‑side policy / hosted agents → </em><em>Web (Axum + React SPA)</em><em>."</em></li>
+</ol>
+<p>This is a bounded, additive change to a skill we own; it converts a one‑off build into the standard.</p>
+<p><strong>Now drafted (v0.1.0), as project‑local skills we test by building this app.</strong> Rather than edit the parent skill first, we author the web target as three project‑local skills under <code>sansaba-workspace/.claude/skills/</code>, each deferring to <code>hybrid-mobile-architecture</code> and the Prometheus skill pack:</p>
+<ul>
+<li><strong><code>entity-graph-web-shell</code></strong> — build/maintain the shell: three planes, PEM 3.0.0‑alpha as the single source of truth, A2UI surfaces, AG‑UI sidebar, the layer boundary, local‑first.</li>
+<li><strong><code>mini-app-module</code></strong> — add a Mini App (Embedded App or Agentic Module): manifest + entity registration + A2UI surface/assembly + agents, with <strong>no shell changes</strong> and no app-specific permission scope.</li>
+<li><strong><code>axum-agent-gateway</code></strong> — the Rust/Axum BFF: serve the SPA, REST entity endpoints, AG‑UI SSE proxy, A2UI assemble proxy, Flint Gate role/tenant validation, sync bridge, <code>gen_ui_server</code> composition.</li>
+</ul>
+<p>We refine these while building; the stable parts are then promoted back into <code>hybrid-mobile-architecture</code> as its <code>web</code> target. Wire their activation with the parent skill's <code>add-project-skills.sh</code> <code>UserPromptSubmit</code> hook.</p>
+<hr/></article><article id="S39-026" class="source-clause"><h4>S39-026 · 8. Project plan (POC → MVP)</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><div class="source-note"><strong>Explicit amendments:</strong><ul><li>Legacy module kind/embed routes require the independent placement/protection/surface and registry migration in PL/IM clauses.</li></ul></div><h2>8. Project plan (POC → MVP)</h2>
+<p>Cadence assumption from the client engagement: Monday reviews, 1–2 acquisitions/day, demo‑first. The POC is the <strong>C‑29 pre‑generation gate</strong>; everything else is staged behind it.</p>
+<p><strong>Phase 0 — Skill extension &amp; scaffold (½ week).</strong>
+Add the web‑server target to the KnowMe skill (§7). Scaffold <code>sansaba-workspace</code> (Axum + React 19/Vite 8/shadcn + PEM + PGlite + Assistant‑UI). Wire Flint Gate JWT role/tenant validation and PostgreSQL RLS. <strong>Exit:</strong> hello‑world A2UI surface renders beside the framed SSR page; entity graph round‑trips one entity. (This is <code>SSR‑P3‑SHELL‑001</code> acceptance <strong>AC‑01</strong>.)</p>
+<p><strong>Phase 1 — Shell frame &amp; bridge (1 week).</strong>
+Left nav + Mini‑App registry; content plane hosts the framed <code>ssr-frontend</code> application from its registered origin; postMessage bridge <code>@1</code> round‑trips a field edit into the graph and back; conversation plane with Assistant‑UI on an AG‑UI SSE stream. <strong>Exit:</strong> the v5 prototype behavior, real.</p>
+<p><strong>Phase 2 — The C‑29 gate, end‑to‑end (1–1.5 weeks).</strong>
+AG‑UI run against <code>document-generation-agent</code>; <code>validate-required-fields</code> + <code>check-amount-plausibility</code> tools reading the graph; <code>A2UI_ARTIFACT(letter-agreement-precheck)</code> gate; <code>a2uiResponse</code> → single graph write + bridge <code>apply</code>; <code>render-document</code> stages the <code>.docx</code>. Runs on the anonymized replica. <strong>Exit:</strong> §4.3 acceptance criteria 1–5 pass; the demo Hal's team recognizes.</p>
+<p><strong>Phase 3 — Local‑first &amp; sync (0.5–1 week).</strong>
+PGlite persistence; offline action replay; <code>flint-realtime-fabric</code> <code>WatchEntity</code> adapter so a second surface/user sees the same deal update live. <strong>Exit:</strong> acceptance criterion 6; two views/one deal stay consistent across a simulated reconnect.</p>
+<p><strong>Phase 4 — Second module, to prove additivity (1 week).</strong>
+Ship <strong>Sourcing</strong> as a pure Agentic Module (A2UI surface over the RRC permit entities + a sourcing agent) with <strong>no shell changes</strong> beyond a manifest registration. <strong>Exit:</strong> a module added by registration alone, demonstrating the MVP growth path.</p>
+<p><strong>Phase 5 — MVP hardening (ongoing, post‑POC, separately commissioned).</strong>
+Swap anonymized replica → companion Postgres with real S‑1/S‑2; retain the flat <code>admin</code>/<code>user</code> application model and RLS tenant isolation; add observability/trace; PMPO Reflect + sycophancy‑correction at closeout. Each full module is separately proposed and priced (per SOW).</p>
+<p><strong>Milestones:</strong> M0 scaffold (AC‑01) · M1 shell+bridge · <strong>M2 C‑29 demo (the money moment for Hal)</strong> · M3 local‑first/sync · M4 additive module.</p>
+<p><strong>Risk register (deltas beyond <code>SSR‑P3‑SHELL‑001</code>'s):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PEM version drift (3.x vs 1.3.x)</td>
+<td>Resolve in Phase 0; pin; reconcile the skill text</td>
+</tr>
+<tr>
+<td>Cross‑origin framing of the SSR app (X‑Frame‑Options/auth)</td>
+<td><strong>Resolved 2026‑07‑30.</strong> The Axum reverse proxy was tried and <strong>rejected</strong> — root‑relative Next.js assets escape the <code>/embed/</code> prefix. The app is framed at its registered origin; the edge sets <code>frame-ancestors</code> for the shell origin and the shared Kratos session carries in. Verify login/refresh/logout on Chromium, Firefox and WebKit before cutover.</td>
+</tr>
+<tr>
+<td>AG‑UI→graph adapter double‑render / trigger loops</td>
+<td>Define which events <em>assemble</em> vs <em>patch</em>; debounce navigation; idempotent apply (philosophy caveat #3)</td>
+</tr>
+<tr>
+<td>Two writers, one entity, drift</td>
+<td>One graph node is truth; bridge/agent/human all write the same node; never hold divergent local copies (caveat #1–2)</td>
+</tr>
+<tr>
+<td>Authentication/authz bypass via the view</td>
+<td>Require verified authentication for every trigger; preserve tenant isolation and platform-side policy checks uniformly (caveat #4)</td>
+</tr>
+</tbody>
+</table>
+<hr/></article><article id="S39-027" class="source-clause"><h4>S39-027 · 9. Boundaries (restated, binding)</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h2>9. Boundaries (restated, binding)</h2>
+<p>From <code>SSR‑P3‑SHELL‑001</code>, carried without change: <strong>frozen substrate</strong> (only the R‑2 bridge changes the SSR app); <strong>POC is demo‑only</strong> (anonymized/sandboxed, private preview URL, never production data); <strong>augment, never replace judgment</strong> (Chris owns valuation; sends and releases are human); <strong>prepare and flag, never move money</strong> (agents draft/stage/notify; funds/legal/release stay with named people); <strong>human‑in‑the‑loop</strong> on valuation, send/no‑send, payment release, and document release; <strong>Template Bible governs</strong> document generation; <strong>do‑not‑send markings carry dates</strong> and are honored.</p>
+<hr/></article><article id="S39-028" class="source-clause"><h4>S39-028 · 10. Open decisions to confirm before build</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h2>10. Open decisions to confirm before build</h2>
+<ol>
+<li><strong>PEM version</strong> — ✅ <strong>decided: <code>3.0.0-alpha.0</code></strong> (the <code>alpha</code> tag), replacing TanStack Query. First scaffold step confirms the exact 3.x hook names against the installed alpha.</li>
+<li><strong>UAR mode</strong> — <code>Embedded</code> (gen_ui_server runs the loop) vs <code>External</code> (BossFang/UAR as a service the Axum server calls). POC likely <code>External</code> against the existing <code>document-generation-agent</code>.</li>
+<li><strong>Sync engine for the POC</strong> — <code>flint-realtime-fabric</code> (Loro CRDT, our own) vs ElectricSQL+PGlite (PEM's built‑in) for Phase 3. Recommendation: PEM/Electric for the POC's single‑tenant demo; FRF for MVP multi‑user.</li>
+<li><strong>Admin site handoff</strong> — user administration stays in the separate admin site; if Sansaba links to it later, use a normal external navigation handoff rather than embedding it as a Mini App.</li>
+<li><strong>Docs home</strong> — this document and all design notes now live under <code>sansaba-workspace/docs/</code>; confirm we migrate the raw <code>San Saba Automation</code> transcripts/notes into <code>docs/notes/</code> or leave them in place and index them.</li>
+</ol>
+<hr/></article><article id="S39-029" class="source-clause"><h4>S39-029 · Appendix A — Proposed `sansaba-workspace` layout</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h2>Appendix A — Proposed <code>sansaba-workspace</code> layout</h2>
+<pre><code>sansaba-workspace/
+  docs/                         ← design docs (this file, philosophy, prototypes, notes index)
+    SSW-ARCH-001-architecture-spec-and-plan.md
+    operating-philosophy.md
+    prototypes/                 ← the refined HTML container prototype(s)
+    notes/                      ← (optional) migrated San Saba Automation source notes
+  server/                       ← Axum BFF (Rust 0.8.8), gen_ui_server composition
+  web/                          ← React 19 / Vite 8 / shadcn container
+    src/app/                    ← shell (nav / content / conversation planes)
+    src/features/&lt;module&gt;/      ← data / domain / presentation (per Mini App)
+    src/entities/               ← PEM registration (registerEntityFromSql)
+  manifests/                    ← Mini-App manifests
+  .claude/skills/               ← project-local UI/UX skills (emitted by the KnowMe skill)
+</code></pre></article><article id="S39-030" class="source-clause"><h4>S39-030 · Appendix B — Source map</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h2>Appendix B — Source map</h2>
+<ul>
+<li>Operating philosophy &amp; protocol validation: <code>claude/sansaba-shell-operating-philosophy.md</code></li>
+<li>Shell requirements, module model, POC catalog (C‑01…C‑44), constraints: <code>SSR‑P3‑SHELL‑001</code></li>
+<li>State substrate: <code>prometheus-entity-management</code> (README, ARCHITECTURE, packages: entity‑graph‑core/sync/react, <code>a2ui-react</code>, <code>entity-graph-a2a</code>, <code>entity-graph-mcp</code>)</li>
+<li>A2UI catalog + surface assembler: <code>flint-forge/docs/api/a2ui.md</code></li>
+<li>AG‑UI/A2A transport, CRDT, entity watch, tenant isolation: <code>flint-realtime-fabric/docs/API-REFERENCE.md</code>, <code>adr-001</code>, <code>adr-002</code></li>
+<li>Build skill to extend: <code>hybrid-mobile-architecture</code> (TJ‑ARCH‑MOB‑001) — <code>SKILL.md</code>, <code>references/arch-standard.md</code>, <code>references/ui-skills.md</code></li>
+<li>The frozen app &amp; agent: <code>ssr-frontend</code>, <code>document-generation-agent</code></li>
+</ul></article><article id="S39-031" class="source-clause"><h4>S39-031 · Appendix C — Code‑generation kickoff (first PR)</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h2>Appendix C — Code‑generation kickoff (first PR)</h2>
+<p>The build is driven by the project‑local skills (<code>entity-graph-web-shell</code>, <code>mini-app-module</code>, <code>axum-agent-gateway</code>) and OpenSpec (already installed in this repo). The first vertical slice is the <strong>C‑29 pre‑generation gate</strong> end‑to‑end, because it exercises every plane and the whole state path.</p>
+<p><strong>Step 0 — confirm the state module.</strong>
+```bash
+cd sansaba-workspace/web
+pnpm add @prometheus-ags/prometheus-entity-management@alpha zustand immer @electric-sql/pglite
+node -e "console.log(require('@prometheus-ags/prometheus-entity-management/package.json').version)"  # expect 3.0.0-alpha.0</p></article><article id="S39-032" class="source-clause"><h4>S39-032 · then enumerate the alpha&#x27;s hook exports and reconcile names in entity-graph-web-shell/SKILL.md</h4><p class="source-note">Governing revision: <a href="../index.html#containers">CT-01–07</a> · source requirement, not release evidence.</p><h1>then enumerate the alpha's hook exports and reconcile names in entity-graph-web-shell/SKILL.md</h1>
+<pre><code>
+**Step 1 — scaffold the two surfaces.**
+</code></pre>
+<p>sansaba-workspace/
+  web/    → Vite 8 + React 19 + TS 7 + Tailwind 4 + shadcn (npx shadcn@latest init) + TanStack Router
+            + PEM 3.0.0-alpha + Assistant-UI ; src/app (three planes), src/entities, src/features
+  server/ → cargo new (Axum 0.8.8) ; gen_ui_server composition ; routes per axum-agent-gateway
+```</p>
+<p><strong>Step 2 — the first vertical slice (C‑29), in dependency order.</strong></p>
+<ol>
+<li><code>server</code>: <code>GET /api/v1/entities/letter-agreement/:id</code> against the anonymized replica; Flint Gate JWT role/tenant middleware with PostgreSQL RLS.</li>
+<li><code>web</code>: shell frame (nav + content + conversation planes) from the v6 prototype; register <code>LetterAgreement</code> with PEM (<code>registerEntityFromSql</code> from the replica DDL); frame the SSR application from its registered origin in the content plane.</li>
+<li><code>web</code>: postMessage bridge <code>@1</code> — a field edit in the embedded app writes <code>LetterAgreement:4016</code> into the graph; a graph change posts <code>apply</code> back.</li>
+<li><code>server</code>: <code>POST /agui/documentGenerationAgent</code> SSE proxy to <code>$DOCUMENT_GENERATION_AGENT_URL</code>; <code>web</code> AG‑UI→graph adapter applies <code>STATE_DELTA</code>/tool results into the graph and feeds the Assistant‑UI sidebar.</li>
+<li><code>web</code>: the gate — on Generate, run the agent; render <code>A2UI_ARTIFACT(letter-agreement-precheck)</code> via <code>a2ui-react</code>; <code>a2uiResponse</code> writes the Receipt Date <strong>once</strong> into the graph (embedded app + any bound surface update); <code>render-document</code> stages <code>letter-agreement-4016-&lt;ts&gt;.docx</code>. <strong>No send; human release.</strong></li>
+<li><code>server</code>: verified authentication on assemble, entity write, and agent run;
+   tenant isolation and platform-side policy remain separate controls.</li>
+</ol>
+<p><strong>Step 3 — verify against §4.3 acceptance criteria 1–6.</strong> Then Phase 3 adds PGlite persistence + the <code>flint-realtime-fabric</code> <code>WatchEntity</code> adapter; Phase 4 adds <strong>Sourcing</strong> as a pure <code>mini-app-module</code> (manifest only) to prove additivity.</p>
+<p><strong>Definition of done for the first PR:</strong> criteria 1–5 pass on the anonymized replica; zero <code>fetch()</code> in components (all reads/writes through PEM hooks); <code>audit</code> web‑surface checks green; the demo Hal's team recognizes runs from <code>pnpm dev</code> + <code>cargo run</code>.</p>
+<hr/>
+<p><em>Prepared by Prometheus AGS. This is a design specification for review; it introduces no changes to the frozen SSR application beyond the versioned postMessage bridge already sanctioned in <code>SSR‑P3‑SHELL‑001</code>.</em></p></article></main></body></html>

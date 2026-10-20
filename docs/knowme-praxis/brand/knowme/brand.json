@@ -1,0 +1,142 @@
+{
+  "$schema": "../../schemas/brand.schema.json",
+  "id": "knowme",
+  "name": "KnowMe",
+  "identity": {
+    "siteName": "KnowMe",
+    "author": "AI-generated with Codex, OpenAI",
+    "preparedBy": "KnowMe, LLC \u00b7 know-me.tools",
+    "credit": "KnowMe, LLC"
+  },
+  "fonts": {
+    "display": "\"Space Grotesk\",\"Helvetica Neue\",Arial,sans-serif",
+    "body": "\"Roboto\",\"Helvetica Neue\",Arial,sans-serif",
+    "mono": "\"JetBrains Mono\",ui-monospace,\"SFMono-Regular\",Menlo,monospace",
+    "googleFontsUrl": null
+  },
+  "logos": {
+    "lockup": "lockup.svg",
+    "lockupOnDark": "lockup-on-dark.svg",
+    "favicon": "favicon.svg",
+    "appIcon": "app-icon.svg",
+    "recolor": {
+      "#0B0F14": "logoInk",
+      "#E04E28": "logoAccent"
+    }
+  },
+  "colors": {
+    "light": {
+      "canvas": "#F7F7F8",
+      "surface": "#FFFFFF",
+      "surface2": "#EEEEF1",
+      "surface3": "#E8ECF0",
+      "fg": "#0B0F14",
+      "fgMuted": "#4B5563",
+      "fgSubtle": "#6F7C89",
+      "heading": "#15025D",
+      "primary": "#C8431F",
+      "primaryHover": "#A83617",
+      "primaryFg": "#FFFFFF",
+      "primarySoft": "#F2D6CF",
+      "primarySoftFg": "#8A2E14",
+      "secondary": "#4B5563",
+      "eyebrow": "#8A2E14",
+      "logoInk": "#0B0F14",
+      "logoAccent": "#E04E28",
+      "success": "#2F6F4E",
+      "successSoft": "#DDEFE4",
+      "warning": "#B7791F",
+      "warningSoft": "#F6E7C8",
+      "danger": "#C53030",
+      "dangerSoft": "#F5D0D0",
+      "info": "#2B5C8A",
+      "infoSoft": "#DCE8F3",
+      "codeBg": "#0F1620",
+      "codeFg": "#E8EDF3",
+      "codeMuted": "#A7B0BC",
+      "codeKey": "#FF6A3D",
+      "codeStr": "#9FD1E0"
+    },
+    "dark": {
+      "canvas": "#0B0F14",
+      "surface": "#0F1620",
+      "surface2": "#141C26",
+      "surface3": "#1E2D3D",
+      "fg": "#E8EDF3",
+      "fgMuted": "#A7B0BC",
+      "fgSubtle": "#7A8999",
+      "heading": "#FFFFFF",
+      "primary": "#FF6A3D",
+      "primaryHover": "#FF8661",
+      "primaryFg": "#0B0F14",
+      "primarySoft": "#2A1510",
+      "primarySoftFg": "#FFB59C",
+      "secondary": "#A7B0BC",
+      "eyebrow": "#FF8661",
+      "logoInk": "#E8EDF3",
+      "logoAccent": "#FF6A3D",
+      "success": "#5FBF8A",
+      "successSoft": "#12261B",
+      "warning": "#E0A84A",
+      "warningSoft": "#2B2210",
+      "danger": "#F27070",
+      "dangerSoft": "#2E1414",
+      "info": "#7FB3E6",
+      "infoSoft": "#10243A",
+      "codeBg": "#0A1220",
+      "codeFg": "#E8EDF3",
+      "codeMuted": "#A7B0BC",
+      "codeKey": "#FF6A3D",
+      "codeStr": "#9FD1E0"
+    }
+  },
+  "diagram": {
+    "light": {
+      "ink": "#0B0F14",
+      "text": "#0B0F14",
+      "quiet": "#4B5563",
+      "edge": "#8A94A3",
+      "box": "#FFFFFF",
+      "band": "#EEEEF1",
+      "accent": "#E04E28",
+      "accentSoft": "#F2D6CF",
+      "good": "#2F6F4E",
+      "goodSoft": "#DDEFE4",
+      "alt": "#2B5C8A",
+      "altSoft": "#DCE8F3",
+      "warn": "#B7791F",
+      "warnSoft": "#F6E7C8",
+      "crit": "#C53030"
+    },
+    "dark": {
+      "ink": "#FFFFFF",
+      "text": "#E8EDF3",
+      "quiet": "#A7B0BC",
+      "edge": "#3C4C5E",
+      "box": "#0F1620",
+      "band": "#141C26",
+      "accent": "#FF6A3D",
+      "accentSoft": "#2A1510",
+      "good": "#5FBF8A",
+      "goodSoft": "#12261B",
+      "alt": "#7FB3E6",
+      "altSoft": "#10243A",
+      "warn": "#E0A84A",
+      "warnSoft": "#2B2210",
+      "crit": "#F27070"
+    }
+  },
+  "print": {
+    "pageSize": "Letter",
+    "coverBand": "#0B0F14",
+    "coverBandText": "#FF6A3D",
+    "coverBg": "#F7F7F8",
+    "footerLeft": "KnowMe, LLC \u00b7 know-me.tools"
+  },
+  "pwa": {
+    "themeColor": "#0B0F14",
+    "background": "#F7F7F8",
+    "darkBackground": "#0B0F14",
+    "iconBg": "#0B0F14"
+  }
+}

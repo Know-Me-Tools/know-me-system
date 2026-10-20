@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "od-design-system-project/v1",
+  "id": "knowme",
+  "name": "KnowMe",
+  "category": "Software / AI infrastructure",
+  "description": "KnowMe documents: deep charcoal with a single ember accent, Space Grotesk display, Roboto body, JetBrains Mono.",
+  "source": {
+    "type": "local",
+    "origin": "KnowMe Brand System v1.0 tokens (operator-model papers, 2026)"
+  },
+  "files": {
+    "design": "DESIGN.md",
+    "tokens": "tokens.css"
+  },
+  "x-htmx-doc-forge": {
+    "profile": "brand.json"
+  }
+}

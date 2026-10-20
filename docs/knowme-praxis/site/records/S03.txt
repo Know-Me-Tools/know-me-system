@@ -1,0 +1,991 @@
+Overview
+01
+Introduction
+02
+Design Philosophy
+Architecture
+03
+System Architecture
+04
+Threading Model
+05
+Content Block System
+Protocols
+06
+A2UI Protocol
+07
+AG-UI Protocol
+08
+Protocol Pipeline
+Infrastructure
+09
+Local Inference
+10
+SurrealDB Integration
+11
+MCP Client
+12
+Agent Runtime
+Delivery
+13
+Build System
+14
+Project Structure
+15
+Extension Guide
+SPECIFICATION
+TJ-SPEC-GENUI-001
+March 2026
+gen_ui
+— Generative AI
+Native Platform
+A production-grade Flutter + Rust application delivering native AI agent interaction on iOS and Android. Combines Flutter's rendering with Rust's performance through a zero-copy FFI bridge, implementing the A2UI and AG-UI protocols for structured agent output, local on-device inference, MCP tool use, and embedded SurrealDB for graph and vector operations.
+Flutter 3.x
+Rust 1.80+
+A2UI Protocol
+AG-UI Protocol
+flutter_rust_bridge v2
+candle GGUF
+SurrealDB Embedded
+MCP JSON-RPC 2.0
+Riverpod
+Tokio
+Metal / BLAS
+Source Files
+41
+files
+Rust Modules
+14
+modules
+Block Types
+11
+variants
+Local Models
+7
+supported
+Author
+Travis James
+02
+Design Philosophy
+The Right Language for Each Layer
+Four interlocking principles drive every architectural decision. Each concern lives at the layer where it has the best combination of performance and information.
+Language Stratification
+Dart owns pixels and reactive state. Rust owns bytes and threads. The FFI boundary is essentially free — flutter_rust_bridge generates zero-copy marshalling with no heap duplication where avoidable.
+Single Runtime Principle
+One Tokio runtime per process, globally owned. All async tasks share one work-stealing scheduler. The blocking pool (max 8 threads) handles GGUF loading and inference forward passes — never mixing them with SSE event loops.
+Sealed Content Block as Protocol
+The
+ContentBlock
+sealed union is not just a data type — it is the protocol between the agent runtime and the UI. Semantic annotation happens once, at the stream boundary, in the layer with full context.
+Locality-First Agent Loop
+The PMPO loop runs entirely in Rust, adjacent to both the network and state. Tool dispatch, memory hydration, and result caching happen before Dart sees a single event. The
+max_turns
+budget enforces loop termination structurally.
+Core Invariant
+Push semantic annotation as early as possible; let downstream code stay dumb and declarative. The compiler enforces exhaustiveness at every layer boundary.
+03
+Architecture
+System Architecture
+The system is structured in three horizontal layers separated by two well-defined boundaries: the FFI bridge and the SSE stream parser. No layer reaches past its adjacent neighbour.
+FLUTTER / DART — UI LAYER
+Thinking
+Block
+ThinkingBlockWidget
+Code
+Block
+CodeBlockWidget
+Tool / Skill
+Block
+Tool/SkillBlock
+Artifact
+Block
+ArtifactBlockWidget
+Memory
+Block
+MemoryBlockWidget
+Citation
+Block
+CitationBlockWidget
++ 5 more
+Text · Image · Divider
+compiler-enforced
+Riverpod — ChatNotifier · A2uiContentDriver · A2uiSession · AguiClient
+A2uiEvent sealed → ContentBlock mutations → MessageBubble exhaustive switch
+AguiClient: state tree · pending confirmations · render slots · bidirectional events
+Dart Sealed Event Hierarchies
+A2uiEvent (27 variants) · AguiEvent (12 variants)
+fromFrb() factory · JSON deserialization · type dispatch
+flutter_rust_bridge v2 FFI
+RUST — PROTOCOL LAYER
+api.rs — FFI Surface
+stream_agent_a2ui()
+stream_agent_agui()
+local_generate()
+memory_write/read()
+mcp_call_tool()
+protocol/
+A2uiAdapter (27 events)
+AguiAdapter (translate)
+ProtocolPipeline
+broadcast::channel ×2
+streaming.rs
+parse_anthropic_event()
+StreamEvent (sealed)
+ContentBlockType
+raw SSE → typed events
+runtime.rs
+global Tokio runtime
+N-1 worker threads
+8 blocking threads
+spawn / spawn_blocking
+RUST — INFRASTRUCTURE LAYER
+agent/
+AgentRuntime
+PMPO loop
+max_turns guard
+tool routing
+api_http.rs
+AnthropicClient
+reqwest HTTP/2
+rustls TLS
+prompt caching
+inference/
+candle GGUF
+7 model catalog
+Metal / BLAS
+sampler.rs
+mcp/
+McpRegistry
+SSE transport
+stdio transport
+tool namespace routing
+db/
+SurrealDB RocksDB
+MemoryStore
+ToolCache + EntityGraph
+vector similarity search
+Android arm64 / armv7 / x86 → .so (JNI)
+iOS aarch64 / sim → XCFramework (Metal)
+Figure 1 — Full System Architecture: Flutter UI Layer · Rust Protocol Layer · Rust Infrastructure Layer
+04
+Threading
+Threading Model
+Three distinct execution contexts, each assigned work that matches its performance profile. Tokio work-stealing ensures idle workers pull tasks from busy workers automatically — no manual thread coordination.
+Flutter Main Thread
+Widget build / layout / paint
+Riverpod state propagation
+Dart event loop
+A2uiContentDriver dispatch
+AguiClient state patches
+⚡ frb async → Dart Future
+Stream Sinks
+A2uiEvent → ContentBlock
+back-pressure: channel(256)
+GC runs here — isolated
+from inference loop
+no GC pauses in stream
+FFI
+Tokio Worker Pool (N−1 cores)
+SSE Event Loop
+reqwest-eventsource · sub-ms response
+Protocol Pipeline
+A2uiAdapter + AguiAdapter · broadcast
+Agent PMPO Loop
+tool dispatch · memory · HTTP calls
+MCP Client I/O
+per-server async req/resp
+work-stealing across all tasks · thread_keep_alive 60s
+spawn_blocking
+Blocking Pool (max 8)
+GGUF Model Loading
+disk I/O + memory map
+tokenizer init
+Inference Forward Pass
+CPU: rayon BLAS
+token sampling loop
+SurrealDB RocksDB
+vector search · graph ops
+memory writes / reads
+Metal Command Queue
+iOS/macOS GPU dispatch
+(outside Tokio, async GPU)
+Figure 2 — Three-Context Threading Model: Flutter Main · Tokio Workers · Blocking Pool
+Context
+Thread Count
+Work Profile
+Back-Pressure
+Flutter main / Dart event loop
+1 (+ Dart isolates)
+Widget render, reactive state, GC
+mpsc channel(256) → parks Rust
+Tokio worker pool
+cpu_count − 1
+SSE I/O, protocol adaptation, HTTP, agent loop
+Tokio back-pressure + bounded channels
+Tokio blocking pool
+max 8
+GGUF loading, tensor math, RocksDB I/O
+spawn_blocking queue depth
+Metal command queue (iOS)
+GPU async
+candle Metal dispatch for forward pass
+GPU command buffer
+05
+Content Blocks
+Content Block System
+The
+ContentBlock
+sealed union is the central data primitive of the entire application. It is simultaneously the Dart model, the widget dispatch table, and the UI-layer projection of the A2UI protocol schema. Eleven variants, each mapped exhaustively to a dedicated widget by the compiler.
+Compiler Invariant
+Adding a new
+ContentBlock
+variant produces compile errors at:
+MessageBubble._buildBlock()
+and
+A2uiContentDriver._handle()
+. The compiler guides you to every location that needs updating — you cannot forget a case.
+ContentBlock
+sealed union · freezed
+11 variants · compiler-exhaustive
+TextBlock
+text · isStreaming
+→ StreamingTextWidget
+→ GenUIMarkdown
+ThinkingBlock
+thinking · isStreaming
+→ ThinkingBlockWidget
+pulse dot · collapsible
+CodeBlock
+code · language · filename
+→ CodeBlockWidget
+highlight.js · copy button
+CitationBlock
+text · sources[]
+→ CitationBlockWidget
+source chips · score
+ImageBlock
+source · altText · ratio
+MemoryBlock
+key · type · isNew · ns
+→ MemoryBlockWidget
+type icon · recall badge
+ToolUseBlock
+toolName · input · status
+→ ToolUseBlockWidget
+expand JSON · spin icon
+ToolResultBlock
+content · isError · time
+→ ToolResultBlockWidget
+elapsed · error tint
+SkillBlock
+skillName · status · tools
+→ SkillBlockWidget
+orbit icon · progress bar
+ArtifactBlock
+type · contentJson · lang
+DividerBlock
+→ styled hr separator
+Figure 3 — ContentBlock Sealed Union: 11 Variants · Each Variant = One Widget
+Variant
+A2UI Source Event
+Widget Class
+Key Features
+TextBlock
+TextDelta
+StreamingTextWidget → GenUIMarkdown
+Blinking cursor while streaming; full markdown on complete
+ThinkingBlock
+ThinkingDelta
+ThinkingBlockWidget
+Pulsing dot, collapsible, italic prose
+CodeBlock
+CodeBlock
+CodeBlockWidget
+highlight.js 30+ languages, copy, filename badge
+CitationBlock
+CitationBlock
+CitationBlockWidget
+Source chips, relevance score, external link
+MemoryBlock
+MemoryWrite / MemoryRead
+MemoryBlockWidget
+Type icon (episodic/semantic/working/procedural), new/recall badge, namespace
+ToolUseBlock
+ToolCallStarted / Complete
+ToolUseBlockWidget
+Status enum, expandable JSON input, spin animation for running
+ToolResultBlock
+ToolResultReceived
+ToolResultBlockWidget
+Execution time, error tint, JSON/text content
+SkillBlock
+SkillActivated / SkillComplete
+SkillBlockWidget
+Orbit icon, progress bar, output summary, tool call count
+ArtifactBlock
+ArtifactBlock
+ArtifactBlockWidget
+Type router (code/data/document/UI), full-screen expand, copy
+ImageBlock
+inline image
+_ImageBlock
+URL/base64, aspect ratio, alt text
+DividerBlock
+separator sentinel
+styled Divider
+Token-matched border color
+06
+Protocols
+A2UI Protocol
+A2UI (Agent-to-UI — gen_ui’s internal protocol;
+not
+Google’s A2UI standard at a2ui.org — see
+docs/corrections-2026-07-16.md
+) is the semantic event envelope that sits above the raw Anthropic SSE stream. Where raw SSE delivers
+content_block_delta
+bytes, A2UI delivers structured, named events with typed payloads that map 1:1 to renderable UI blocks.
+Anthropic
+Messages API
+SSE stream
+streaming.rs
+parse_anthropic
+_event()
+StreamEvent enum
+A2uiAdapter
+ingest(StreamEvent)
+→ Vec<A2uiEvent>
+stateful block accumulator
+tool_map: HashMap<u32,usize>
+FFI
+A2uiEvent
+Dart sealed class
+27 variants
+fromFrb() factory
+JSON deserialization
+Content
+Driver
+_blockIndex
+_blockTexts
+→ CB
+A2UI EVENT TYPES — 27 variants
+RunStarted
+RunFinished
+RunError
+TextDelta
+ThinkingDelta
+CodeBlock
+ToolCallStarted
+ToolCallComplete
+ToolResultReceived
+CitationBlock
+MemoryWrite
+MemoryRead
+SkillActivated
+SkillComplete
+ArtifactBlock
+StateSnapshot
+StateDelta
++9 more variants
+Figure 4 — A2UI Pipeline: SSE → StreamEvent → A2uiAdapter → FFI → Dart → ContentBlock
+07
+Protocols
+AG-UI Protocol — Bidirectional
+AG-UI (CopilotKit open standard) extends A2UI with bidirectionality. Where A2UI is agent→UI only, AG-UI supports
+frontend→agent
+events: interrupts, confirmations, state requests. The
+AguiClient
+Riverpod notifier is the Flutter-side owner of agent state, pending confirmations, and generative UI render slots.
+Agent Runtime (Rust)
+AguiAdapter::translate()
+broadcast::Sender<AguiEvent>
+ConfirmationRequest park
+oneshot::Receiver<String>
+bidirectional
+frb StreamSink
+AguiClient (Flutter)
+agentState: Map<String, dynamic>
+pendingConfirmations: List
+renderSlots: Map<String, Comp>
+aguiSendClientEvent(json)
+StateSnapshot / StateDelta
+RFC 6902 JSON Patch applied locally
+ConfirmationOverlay
+showDialog → confirm() → resume
+AguiRenderSlot
+registry map → ComponentBuilder
+Figure 5 — AG-UI Bidirectional Protocol: Agent State · Confirmations · Generative UI Slots
+Human-in-the-Loop Pattern
+1
+Agent signals confirmation needed
+Before executing a destructive action, the agent emits
+A2uiConfirmationRequest
+with a prompt and option list. The Rust runtime parks a
+oneshot::Receiver<String>
+in a
+DashMap
+keyed by
+confirmation_id
+.
+2
+Flutter renders confirmation dialog
+AguiConfirmationOverlay
+listens to the
+AguiClient
+provider. When a new confirmation arrives,
+showDialog()
+is called with the options. No polling, no timers — pure reactive.
+3
+User responds
+AguiClient.confirm(id, option)
+calls
+ffi.aguiSendClientEvent()
+, which routes to the Rust
+AguiClientEventRouter
+, resolves the oneshot, and resumes the PMPO loop.
+4
+Agent loop resumes
+The confirmation is appended to the conversation as a tool result. The next agent turn has full context of what was approved. No blocking thread was held during the wait.
+08
+Protocols
+Dual Protocol Pipeline
+The
+ProtocolPipeline
+drives a single
+mpsc::Receiver<StreamEvent>
+through both adapters sequentially. A2UI events are produced first (no re-parsing), then passed directly to
+AguiAdapter::translate()
+. Two
+broadcast
+channels fan out to any number of subscribers with zero duplication.
+Agent
+Runtime
+Sender<StreamEvent>
+ProtocolPipeline::drive()
+mpsc::Receiver
+<StreamEvent>
+A2uiAdapter
+ingest()
+AguiAdapter
+translate()
+broadcast
+A2uiEvent
+broadcast
+AguiEvent
+Flutter A2uiContentDriver
+→ ContentBlock mutations
+Flutter AguiClient
+→ state · confirm · slots
+optional: HTTP SSE / CopilotKit
+Figure 6 — Dual Protocol Pipeline: one stream, two adapters, broadcast to N subscribers
+09
+Infrastructure
+Local Inference Engine
+On-device LLM inference using candle with GGUF quantized models downloaded from HuggingFace Hub. Metal-accelerated on Apple Silicon; rayon BLAS multi-core on Android. The inference loop runs entirely on the Tokio blocking thread pool — never touching the SSE event loop.
+Supported Models
+Model ID
+HF Repository
+GGUF Size
+RAM Required
+Best Use
+qwen2_5_0_5b
+Qwen/Qwen2.5-0.5B-Instruct-GGUF
+~400 MB
+~600 MB
+Ultra-fast completions
+qwen2_5_1_5b
+Qwen/Qwen2.5-1.5B-Instruct-GGUF
+~1.0 GB
+~1.4 GB
+Quality + speed balance
+phi3_5_mini
+bartowski/Phi-3.5-mini-instruct-GGUF
+~2.2 GB
+~3 GB
+Best reasoning per size
+llama3_2_1b
+bartowski/Llama-3.2-1B-Instruct-GGUF
+~650 MB
+~900 MB
+Llama family tasks
+llama3_2_3b
+bartowski/Llama-3.2-3B-Instruct-GGUF
+~1.8 GB
+~2.4 GB
+Strong instruction following
+gemma2_2b
+bartowski/gemma-2-2b-it-GGUF
+~1.5 GB
+~2 GB
+Google instruction model
+smollm2_1_7b
+HuggingFaceTB/SmolLM2-1.7B-Instruct-GGUF
+~1.1 GB
+~1.5 GB
+Compact, capable
+All models use Q4_K_M quantization. Cached at platform HuggingFace default path. Download streams
+DownloadEvent
+progress to Dart via
+StreamSink
+.
+Chat Templates
+Template
+Format
+Used By
+ChatML
+<|im_start|>role\ncontent<|im_end|>
+Qwen 2.5, SmolLM2
+Llama3
+<|start_header_id|>role…<|eot_id|>
+Llama 3.2 1B / 3B
+Phi3
+<|role|>\ncontent<|end|>
+Phi-3.5 Mini
+Gemma
+<start_of_turn>role\ncontent<end_of_turn>
+Gemma 2 2B
+Sampling Pipeline
+Each token passes through:
+repeat penalty
+(penalizes recently generated tokens) →
+temperature scaling
+→
+softmax normalization
+→
+top-k filtering
+→
+top-p (nucleus) filtering
+→
+weighted random sample
+. All sampling runs synchronously on the blocking thread; tokens stream to Dart via bounded
+mpsc::channel(256)
+.
+10
+Infrastructure
+SurrealDB Integration
+SurrealDB with RocksDB backend runs embedded — no separate process, no network hop. Initialized once on app start from the
+dataDir
+passed to
+initCore()
+. Schema migration runs automatically on first open.
+MemoryStore
+write(key, value, type, ns, emb)
+read(key, namespace)
+vector_search(query_emb, top_k)
+search(query, namespace)
+episodic · semantic · working · procedural
+ToolCache
+get(tool_name, input_hash)
+set(name, hash, result, ttl)
+TTL-based expiry
+default: 300 seconds
+hash = DefaultHasher(input_json)
+reduces repeated MCP round-trips
+EntityGraph
+upsert_entity(name, type, props, emb)
+relate(from, relation, to, weight)
+neighbors(name, depth)
+FETCH relates_to.N..
+depth-N graph traversal
+cosine similarity on embeddings
+SurrealDB 2.x — RocksDB backend — embedded in process — no separate daemon
+OnceCell<Arc<Surreal>>
+Figure 7 — SurrealDB: Three Access Patterns — Memory · Tool Cache · Entity Graph
+Schema Summary
+Table
+Key Fields
+Purpose
+memory
+key, value, memory_type, namespace, embedding
+Agent memory — all four types + vector index
+conversation
+title, created_at, updated_at
+Conversation thread metadata
+message
+conversation_id, role, content_json
+Full message history with content JSON
+tool_cache
+tool_name, input_hash, result_json, expires_at
+TTL-based tool result cache
+entity
+name, entity_type, properties, embedding
+Graph nodes with optional embeddings
+relates_to
+weight, relation, properties
+Graph edges (source → target)
+11
+Infrastructure
+MCP Client Architecture
+The MCP registry manages N servers simultaneously. Tool names are namespaced as
+server_name::tool_name
+to avoid collisions across servers. The agent runtime routes tool calls through the registry transparently — the PMPO loop has no knowledge of which server handled a call.
+Transport
+Protocol
+Connection Pattern
+Status
+SSE Transport
+GET {url}/sse → POST {endpoint}
+Persistent SSE channel; JSON-RPC over POST. Responses return via SSE channel using request ID correlation.
+Implemented
+Stdio Transport
+subprocess stdin/stdout
+Spawn process, write JSON-RPC to stdin, read from stdout. Used for local MCP servers like filesystem, git.
+Stub — wire tokio::process
+Tool Name Routing
+// Qualified call — explicit server
+mcp_reg.call_tool(
+"tavily::web_search"
+, args).await
+// Unqualified — scans all servers for first match
+mcp_reg.call_tool(
+"web_search"
+, args).await
+// Local Rust tool — no network hop, sub-microsecond
+agent.register_tool(
+"memory_recall"
+,
+"..."
+, schema, |args| {
+    Ok(
+format!
+(
+"recalled: {:?}"
+, args.get(
+"key"
+)))
+});
+Well-Known MCP Servers
+Server
+URL
+Capability
+Tavily
+https://mcp.tavily.com/mcp
+Web search with citations
+Filesystem
+http://localhost:3000/mcp
+File read/write/list
+Supabase
+http://localhost:54321/mcp
+Database queries
+SurrealDB
+local (db/ module)
+Memory, vector search, graph
+12
+Infrastructure
+Universal Agent Runtime
+The PMPO (Prometheus Meta-Prompting Orchestration) loop drives every agent run. Tool calls, memory hydration, and result caching happen within the Rust loop — before any event reaches Dart. A hard
+max_turns
+budget enforces termination.
+PMPO Loop (Rust)
+for turn in 0..config.max_turns
+1. Hydrate context from SurrealDB
+memory search · recent tool results
+2. Build AnthropicRequest
+system · messages · tools (cache-pinned) · thinking
+3. Stream SSE Response
+→ protocol pipeline → Flutter events
+4. Execute Tool Calls (if any)
+local → MCP → cache result in SurrealDB
+5. Check stop_reason
+end_turn → break · tool_use → continue
+next turn
+max_turns guard — structural termination
+INPUTS
+AnthropicClient
+McpRegistry
+MemoryStore
+ToolCache
+Local tool registry
+Figure 8 — PMPO Agent Loop: Hydrate → Build → Stream → Execute → Check
+Config Field
+Default
+Description
+model
+claude-opus-4-5-20251101
+Anthropic model string
+max_tokens
+16,000
+Maximum output tokens per turn
+max_turns
+10
+Hard limit on agentic loop iterations
+thinking_budget
+10,000
+Extended thinking token budget (None to disable)
+enable_mcp
+true
+Include all registered MCP tools
+enable_db_memory
+true
+Hydrate context from SurrealDB on each turn
+tool_cache_ttl
+300 seconds
+TTL for tool result caching in SurrealDB
+13
+Delivery
+Build System
+Android
+# Install tools
+cargo install cargo-ndk
+rustup target add \
+  aarch64-linux-android \
+  armv7-linux-androideabi \
+  x86_64-linux-android
+# Build all ABIs
+./scripts/android/build.sh release
+# Output locations
+gen_ui/android/app/src/main/jniLibs/
+arm64-v8a/libgen_ui_core.so
+  armeabi-v7a/libgen_ui_core.so
+  x86_64/libgen_ui_core.so
+iOS / macOS
+# Install tools
+rustup target add \
+  aarch64-apple-ios \
+  aarch64-apple-ios-sim \
+  x86_64-apple-ios
+# Build universal XCFramework
+./scripts/ios/build_xcframework.sh release
+# Output
+gen_ui/ios/Frameworks/GenUICore.xcframework/
+Dart Bindings (post-build)
+flutter_rust_bridge_codegen generate \
+  --rust-input  rust/gen_ui_core/src/api.rs \
+  --dart-output gen_ui/lib/bridge/generated_api.dart \
+  --c-output    scripts/ios/Headers/gen_ui_core.h
+Cargo Profile
+Setting
+Value
+Rationale
+opt-level
+3
+Maximum optimization
+lto
+thin
+Link-time optimization across crates — fast enough for CI
+codegen-units
+1
+Single unit enables maximum cross-function inlining
+panic
+abort
+Eliminates panic unwind code — ~15% binary size reduction
+strip
+symbols
+Debug symbols stripped from release binary
+14
+Delivery
+Project Structure
+Flutter —
+gen_ui/lib/
+core/theme/
+  tokens.dart
+← all design tokens
+app_theme.dart
+← ThemeData
+bridge/
+  rust_bridge_provider.dart
+  a2ui/
+    a2ui_event.dart
+← sealed hierarchy
+a2ui_content_driver.dart
+  agui/
+    agui_provider.dart
+
+features/chat/
+  models/message.dart
+← ContentBlock union
+providers/
+    chat_provider.dart
+  screens/
+    chat_screen.dart
+  widgets/
+    message_bubble.dart
+    blocks/
+      thinking_block.dart
+      code_block.dart
+      citation_block.dart
+      memory_block.dart
+      tool_block.dart
+      skill_block.dart
+      artifact_block.dart
+    markdown/
+      gen_ui_markdown.dart
+    input/
+      chat_input_bar.dart
+Rust —
+rust/gen_ui_core/src/
+lib.rs
+← module declarations
+api.rs
+← FFI surface (frb target)
+api_http.rs
+← Anthropic HTTP client
+runtime.rs
+← Tokio runtime
+streaming.rs
+← SSE parser + StreamEvent
+protocol/
+  mod.rs
+← ProtocolPipeline
+a2ui.rs
+← A2UI adapter + events
+agui.rs
+← AG-UI adapter + events
+agent/mod.rs
+← PMPO loop
+inference/
+  mod.rs
+← InferenceEngine
+sampler.rs
+← token sampling
+mcp/
+  mod.rs
+← McpClient + Registry
+sse_transport.rs
+  stdio_transport.rs
+db/mod.rs
+← SurrealDB stores
+scripts/
+  android/build.sh
+  ios/build_xcframework.sh
+15
+Delivery
+Extension Guide
+Adding a New Content Block Type
+The compiler enforces every step. You cannot skip step 4 or 6 — they produce exhaustive switch errors.
+1
+Add variant to
+ContentBlock
+In
+gen_ui/lib/features/chat/models/message.dart
+, add a new
+const factory ContentBlock.myBlock({...}) = MyBlock;
+variant.
+2
+Regenerate freezed
+dart run build_runner build
+— generates the
+.freezed.dart
+and
+.g.dart
+files.
+3
+Create the widget
+Create
+widgets/blocks/my_block.dart
+. Follow the token system — use
+T.blockDecoration(bg:..., accent:...)
+for consistent visual language.
+4
+Add case to
+MessageBubble._buildBlock()
+Compiler enforced.
+The exhaustive switch in
+message_bubble.dart
+fails to compile until this case is added.
+5
+Add StreamEvent variant (Rust)
+In
+rust/gen_ui_core/src/streaming.rs
+, add a new arm to the
+StreamEvent
+enum. Add ingestion logic to
+A2uiAdapter::ingest()
+.
+6
+Add A2uiEvent Dart class + driver case
+Add the sealed subclass in
+bridge/a2ui/a2ui_event.dart
+. Add the mapping case in
+A2uiContentDriver._handle()
+.
+Compiler enforced.
+7
+Run frb codegen
+If the Rust FFI surface changed, re-run
+flutter_rust_bridge_codegen generate
+to regenerate
+lib/bridge/generated_api.dart
+.
+Registering a Generative UI Component
+// Register once at app startup (main.dart or provider init)
+AguiRenderSlot.
+register
+(
+'stock_chart'
+, (context, props) {
+return
+StockChartWidget(
+    symbol: props[
+'symbol'
+]
+as
+String,
+    period: props[
+'period'
+]
+as
+String,
+  );
+});
+// Place anywhere in widget tree
+AguiRenderSlot
+(slot:
+'stock_chart'
+)
+// Agent pushes the component at runtime:
+// A2uiEvent::RenderComponent { component: "stock_chart",
+//   props: { "symbol": "NVDA", "period": "1Y" }, slot: "stock_chart" }
+Connecting the Real FFI Bridge
+Three changes activate the Rust backend for a production build.
+// 1. In lib/bridge/rust_bridge_provider.dart
+import
+'generated_api.dart'
+as
+ffi;
+// uncomment
+// replace stub bodies with ffi.* calls
+// 2. In lib/features/chat/providers/chat_provider.dart
+// Replace _simulateA2UI() with:
+final
+stream = streamAgentA2ui(AgentRunRequest(
+  history: _buildFlatHistory(),
+  userMessage: text,
+  config:
+const
+AgentConfig(),
+));
+_driver = A2uiContentDriver(
+  messageId: assistantId,
+  onBlock: streamBlock,
+  onFinalize: finalizeMessage,
+)..connect(stream);
+// 3. In lib/main.dart
+await
+initRustBridge(dataDir: appDir.path);
+// Local chat is ready without credentials. Optional cloud providers are
+// configured through the Rust provider-admin API and platform secure storage.
+Integration Checklist
+Run build scripts → run frb codegen → uncomment imports → replace simulation → call initRustBridge() before runApp(). All other app code is unchanged — the simulation and production paths share the same
+ContentBlock
+model and widget tree.
+travis
+james
+.ai — Prometheus Agentic Growth Solutions
+TJ-SPEC-GENUI-001 · v1.0.0 · March 2026 · CONFIDENTIAL
+
+Source link and image-reference ledger
+Reference: 01 Introduction — #overview
+Reference: 02 Design Philosophy — #design-philosophy
+Reference: 03 System Architecture — #system-architecture
+Reference: 04 Threading Model — #threading
+Reference: 05 Content Block System — #content-blocks
+Reference: 06 A2UI Protocol — #a2ui-protocol
+Reference: 07 AG-UI Protocol — #agui-protocol
+Reference: 08 Protocol Pipeline — #protocol-pipeline
+Reference: 09 Local Inference — #inference
+Reference: 10 SurrealDB Integration — #surrealdb
+Reference: 11 MCP Client — #mcp
+Reference: 12 Agent Runtime — #agent-runtime
+Reference: 13 Build System — #build-system
+Reference: 14 Project Structure — #project-structure
+Reference: 15 Extension Guide — #extension-guide

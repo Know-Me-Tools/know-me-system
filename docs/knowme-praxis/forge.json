@@ -1,0 +1,12 @@
+{
+  "brand": "brand/knowme",
+  "docs": [
+    "source/knowme_praxis.py"
+  ],
+  "out": "dist",
+  "ipfs": {
+    "api": "https://rpc.prometheusags.ai",
+    "gateway": "https://ipfs.prometheusags.ai",
+    "subdomain_gateway": "ipfs.prometheusags.ai"
+  }
+}

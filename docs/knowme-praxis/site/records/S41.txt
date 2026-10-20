@@ -1,0 +1,193 @@
+# Workspace pane layout
+
+**Status:** design brief for an implementing agent, 5 October 2026.
+**Scope:** layout and bridge changes only. No data, API, route or business-logic changes.
+
+**Reference to match:**
+- `workspace-pane/ssr-workspace-pane.html`: the target layout. It runs from the file system.
+- `workspace-pane/ssr-workspace-pane-widths.html`: the same screens at 375, 560 and 920px side by side.
+
+## 1. Why
+
+The San Saba Workspace hosts this app as its system mini app. It sits in an iframe in the right-hand canvas, next to the deal conversation, at `workspace-ssr.prometheusags.ai`.
+
+Today the app assumes a full browser window:
+- a two-row header with the logo, user and sign-out;
+- a desktop menu bar and a 13-button toolbar;
+- record pages laid out as three or four card columns;
+- tables up to 20 columns wide.
+
+In a 560px pane, almost half the height is chrome and every list scrolls sideways.
+
+**Decision:** adapt the app to the pane rather than giving it a separate full-screen space. Two reasons:
+- **The pane width is the iframe's viewport.** Inside the iframe, the app's breakpoints already respond to the pane, not the monitor.
+- **The narrow layout is phone work the app needs anyway.** Mobile handling already exists, and finishing it serves both.
+
+Some work really needs the full width: the all-fields list view and clipboard import. For those, the pane asks the workspace for its full-width mode instead of building a second layout (§4.6).
+
+## 2. The space the workspace provides
+
+| Mode | Width | When |
+|---|---|---|
+| Docked (default) | 560px. 500px on screens up to 1280px. Never under 480px. | Beside the deal conversation |
+| Expanded | about 760–980px | The user widens the canvas |
+| Full width ("focus") | The workspace width minus its navigator and rail | The user, or the app via `layout.intent`, asks for it |
+| Phone sheet | Full screen, between the workspace top bar and its bottom bar | Phones and tablets up to 820px. Touch targets are 44px. |
+
+The workspace draws a one-line strip above the iframe ("Following D-0149 · same sign-in"). The app must not draw its own outer border or page background gradient when embedded.
+
+## 3. What already exists (verified in code)
+
+- **Bridge:** `src/lib/mini-app-bridge.ts` and `src/components/providers/mini-app-bridge-provider.tsx`.
+  - Channel `sansaba.mini-app-bridge` v1, mini app id `letter-agreement`.
+  - Parent origin pinned to `https://workspace-ssr.prometheusags.ai`.
+  - Strict envelope and key parsing, with no credentials or caller identity allowed.
+  - Host messages: `host.handshake`, `entity.apply` (re-dispatched as the window event `sansaba:entity-apply`) and `navigation.apply`.
+  - Guest messages: `guest.handshake` and `auth.state`.
+  - **Limitation:** `navigation.apply` accepts only `/` and `/admin/letter-agreements`.
+  - `entity.intent` and `navigation.intent` are declared as capabilities but never sent.
+- **Frame policy:** `next.config.ts` sets `frame-ancestors 'self' https://workspace-ssr.prometheusags.ai`. It is correct as is.
+- **Mobile handling:**
+  - `src/hooks/use-mobile.ts` treats under 768px as mobile.
+  - `AdminShell` (`src/components/admin/admin-shell.tsx`) folds the menu bar behind a **Menu** button below `lg` (1024px) and stacks the header below `sm`.
+  - Record editors use `grid-cols-1 md:grid-cols-2 xl:grid-cols-3`, in `AcquisitionEditorTabs.tsx`.
+  - `SectionAnchorNav.tsx` exists.
+- **Tailwind 4** is in use, so container queries (`@container`, `@sm:` …) are available without a plugin. `ui/card.tsx` and `ui/field.tsx` already use them.
+- **Tables:** `components/tables/shared-data-table` wraps tables in `overflow-x-auto`. There is no card substitute.
+
+## 4. Changes, in order
+
+Each step is independent and can be merged on its own.
+
+### 4.1 Embedded mode
+
+Add `useEmbedMode()` in `src/hooks/use-embed-mode.ts`. It is true when `window.self !== window.top`, and it becomes certain once `host.handshake` arrives. Set `data-embedded="true"` on `<html>`.
+
+In `AdminShell`, when embedded:
+- **Remove:** the logo row, `DocsButton`, `InboxBell`, `FeedbackButton`, `ThemeToggle`, the user chip, **Sign Out**, `AdminShellNavigation` and the toolbar strip. The workspace owns identity, theme, notifications and navigation. `auth.state` keeps reporting sign-outs.
+- **Keep:** `SseStatusBanner`, `DirtyNavigationProvider` behaviour, `FeedbackSidebar` and `DocsSheet`. Guide and Feedback open from the overflow menu.
+- **Use as the only chrome:** the page's own record bar (§4.2).
+
+When not embedded on a phone, keep a one-line header: the SR mark, the app name and a **Menu** button that opens the same overflow sheet. The reference shows this as `chrome=own`.
+
+### 4.2 Record bar and overflow sheet
+
+Every page gets one sticky bar:
+- a Back button to the list;
+- the record type and number;
+- a status chip (Active, Converted, Due date, Paid);
+- **Save**, the only primary button, disabled until the form is dirty;
+- **⋯**, which opens the overflow sheet.
+
+A context line under the bar shows the seller, the county and a link to the related letter agreement or acquisition.
+
+The overflow sheet is built from the existing `adminMenus` and `adminToolbarActions` in `src/lib/admin-navigation.ts`, and calls the same `handleMenuAction` and `handleToolbarClick` paths. It has the groups File, Display, Edit (with Print and Refresh), Reports & documents, View, Tools and Help. Do not duplicate handlers.
+
+Below a 440px container, drop the record-type word, keep the number, and make Save icon-only. ⌘/Ctrl-S still saves.
+
+### 4.3 Record editors
+
+This covers the letter-agreement editor, `AcquisitionEditorTabs` and its sections.
+
+- **Section grid:** make the information tab's grid a container query capped at **two** columns. Use one column under 640px and two from 640px. Three narrow columns in a 920px pane produce unreadable 280px cards, so do not use them.
+- **Collapsible sections:** each section becomes a collapsible card with a one-line summary when closed, for example "Wren Creek Minerals LLC · Midland, TX" or "$86,500.00 · due 10/17/2026". Seller information and Title & property start closed. The payment and agreement sections start open.
+- **Section chips:** under the tabs, show a horizontal row of section chips (Seller · Payment · Title · Status · Buyers · Property · Generate). Reuse `SectionAnchorNav`. Hide it when the pane is 900px or wider.
+- **Field layout follows the card's width**, not the window's:
+  - label above the field below a 440px card;
+  - a 132px label column beside the field at 440px and wider;
+  - paired fields (Buyer eff. date / Due date …) side by side from a 300px card, always with labels above.
+- **Tabs** scroll sideways (`overflow-x-auto`, no wrap). Counts show beside each tab: Notes 1, Documents 3, Curative 1, Liens 0.
+- **Property units** become one card per unit: name, county, interest type, operator, net acres and decimal, with book/page as a chip, red when missing. Totals show as two chips (Gross, Net).
+- **Status history** becomes a timeline list (date, status, user initials) with the add-status control under it.
+- **Buyers & invoicing** shows the allocation bar, then one card per buyer (share, invoice number, status), then Create invoices and Buyer detail.
+
+### 4.4 Lists and tables
+
+In `shared-data-table`:
+- **Under a 720px container,** render a card per row:
+  - the first identifying column as the title (seller);
+  - amount and status on the right;
+  - a second line with the next three fields of the active **View**, for example LA ID · county · effective date.
+- **From 720px,** keep the table.
+- **Above the list,** show a search box, a Filters button (opens a sheet), the active filter and view as chips, and **Use full width** (§4.6).
+
+### 4.5 Dialogs and sheets
+
+Under a 640px container, dialogs open as bottom sheets with a sticky header and close button. This covers the buyer search, unit editor, add lien and requirement, copy, upload and save-before-leaving dialogs. The DOCX document viewer opens full screen. When `layout.apply` says `touch: true`, or `pointer: coarse` matches, controls become 44px tall.
+
+### 4.6 Bridge additions
+
+All of these go in `mini-app-bridge.ts`, keeping the parser's strict key checks, and in the provider.
+
+1. **`navigation.apply` deep links.** Replace the two-value check with an allow-list of patterns:
+   - `/admin/letter-agreements` and `/admin/letter-agreements/:id/edit`;
+   - `/admin/acquisitions` and `/admin/acquisitions/:id/edit`;
+   - `/reports` and `/admin/documents/search`;
+   - `:id` must be digits.
+
+   Navigate through the app router (`router.push`) so `DirtyNavigationProvider` still asks before discarding unsaved edits.
+
+   The workspace sends this whenever the user opens another deal.
+2. **`entity.apply` into editors.** Editors listen for `sansaba:entity-apply`. When the event's `entityType` and `entityId` match the open record:
+   - write the fields into the form;
+   - mark the form dirty;
+   - outline each changed field and add "Filled in from the workspace" under it.
+
+   **Never save automatically.** A person reviews and saves.
+
+   Field keys follow the form's field names. Unit fields use `unit:<index>:<field>`.
+
+   The workspace uses this when a person confirms values there, such as an effective date or a recording book and page found by the pre-generation check.
+3. **Send `entity.intent`** (guest to host) with `{ entityType, entityId }` whenever an editor opens a record and after each save. The workspace uses it to show which record the pane is on and to warn when it is not the current deal's record.
+4. **New `layout.apply`** (host to guest): `{ mode: "docked" | "expanded" | "focus" | "sheet", touch: boolean }`. It is only a density hint. Layout still comes from container queries.
+5. **New `layout.intent`** (guest to host): `{ mode: "focus" | "docked" }`. It is sent by **Use full width**. The host decides; the guest never resizes itself.
+
+   Add `layout.apply` to `MiniAppCapability` and `SUPPORTED_MINI_APP_CAPABILITIES`. Reject unknown modes.
+
+The workspace side of all five is implemented in the design prototype at `deal-workspace.html` (`mrmMount`, `mrmFollow`, `sendLayout`, `mrmApplyConfirmed` and the `message` listener).
+
+## 5. Do not change
+
+- Routes, data shapes, Prisma models, API calls, validation or calculations. This is layout plus bridge only.
+- Build and deploy files: `.github/workflows/`, Dockerfile, `k8s/` and `next.config.ts` headers. The frame policy is already right (`AGENTS.md`).
+- Desktop behaviour when the app is opened directly in a wide browser window. The menu bar and toolbar stay there.
+
+## 6. Acceptance
+
+Check at 375px (`chrome=own`, touch), 560px and 920px (embedded):
+
+- [ ] No horizontal page scroll. Tables only appear from 720px.
+- [ ] Save is visible without scrolling on every record page and is the only primary button in view.
+- [ ] Every action from the desktop menu bar and toolbar is reachable from the overflow sheet.
+- [ ] In embedded mode there is no logo row, menu bar, toolbar, user chip or Sign Out.
+- [ ] Every section on the acquisition information tab is reachable in one tap from the section chips under 900px.
+- [ ] `navigation.apply` to `/admin/acquisitions/9412/edit` opens that record. With unsaved edits, the save-before-leaving prompt appears first.
+- [ ] `entity.apply` fills the effective date, marks it, marks the form dirty and does **not** save.
+- [ ] **Use full width** sends `layout.intent { mode: "focus" }`. It does nothing when not embedded.
+- [ ] Touch targets are at least 44px in sheet mode.
+
+**Testing:**
+- Unit tests for the new parser branches go next to `src/lib/mini-app-bridge.test.ts`.
+- BDD UI scenarios at the three viewport sizes go under `tests/features/ui`.
+- Run both locally. **Do not add any test step to CI** (`AGENTS.md`).
+
+## 7. Mapping: desktop element to pane element
+
+| Desktop today | Pane / phone |
+|---|---|
+| Header: SR mark, "Mineral Rights Manager", Guide, Inbox, Feedback, theme, user, Sign Out | Removed when embedded (workspace owns them). Standalone phone: a one-line header with Menu. |
+| Menu bar: File · Edit · Report · Documents · View · Tools | ⋯ overflow sheet, grouped the same way |
+| Toolbar: New, Save, Print, Copy, Delete, List, Edit, Filters, Views, Last ×3, Refresh | Save in the record bar. Everything else is in the overflow sheet. |
+| "Edit Letter Agreement #4016" heading + Import + Save | Record bar. Import goes in the overflow sheet's File group. |
+| Three or four card columns | Collapsible sections, one column under 640px and two above |
+| Label-left forms | Label above under a 440px card |
+| Property Setup / Property Information sub-tabs | One card per unit with totals chips |
+| Status history table | Timeline list |
+| 20-column list table | Cards under 720px, table above. Use full width for all fields. |
+| Modal dialogs | Bottom sheets under 640px |
+
+## 8. Open questions
+
+- Whether **Import** (clipboard spreadsheet import) should only be offered in full-width mode. The paste-capture dialog is wide.
+- Whether the 30-day due date counts calendar days or banking days. The letter agreement form has **Banking days**, but the deal brief says LA + 30. This is unchanged here, but the workspace shows the due date as well.
+- Whether `layout.intent` may also request `expanded`.

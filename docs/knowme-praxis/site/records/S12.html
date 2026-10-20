@@ -1,0 +1,35 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>S12 · afc-c11-durable-intent-contract.md</title><link rel="stylesheet" href="../records.css"><body><main><a href="../index.html">KnowMe Praxis</a><h1>S12 · afc-c11-durable-intent-contract.md</h1><p>Complete technical source record. Historical names and requirements remain visible for audit. Revised clauses and explicit corrections govern their application.</p><p><a href="S12.txt">Download complete technical text</a></p><article id="S12-001" class="source-clause"><h4>S12-001 · AFC C11 — durable business intent source contract</h4><p class="source-note">Governing revision: <a href="../index.html#api">API-01–06</a> · source requirement, not release evidence.</p><h1>AFC C11 — durable business intent source contract</h1>
+<p>Source adoption: committed KnowMe system <code>68f7ab8</code> merged into the retained AFC
+worktree at <code>d2eb2ae1</code>. Original source checkout and its dirty vendor/iOS/docs changes
+remain untouched. This is a bounded production slice of C11, not phase completion.</p></article><article id="S12-002" class="source-clause"><h4>S12-002 · Implemented path</h4><p class="source-note">Governing revision: <a href="../index.html#api">API-01–06</a> · source requirement, not release evidence.</p><h2>Implemented path</h2>
+<p>Configured desktop notes/memories writes enter the sync queue from the existing
+Tauri entity commands. A single local PostgreSQL transaction persists the entity
+projection, tombstone where applicable, and <code>sync_outbox</code> intent. New submissions
+receive a database UUID; transport callers may provide <code>idempotency_key</code> to identify
+an IPC retry. The queue always reuses the stored identity across process restarts.</p>
+<p>Replay sends <code>Idempotency-Key</code> to Forge. Its returned row and local command settlement
+commit together; later pending edits are reapplied in sequence. Lost responses are
+recovered by repeating the identical request against Forge's stored receipt.
+An attempt is persisted before network IO; a crash/lost reply remains visibly uncertain until the identical command receipt settles. Conflict/precondition refusals are disclosed separately from other rejections. Rejected optimistic rows are removed and their selected shape is resnapshotted.
+Transient failures remain pending with bounded backoff, including prolonged offline
+periods. Authoritative terminal refusals remain inspectable as poison records.</p>
+<p>Projection scope includes Forge/Fabric endpoints, tenant, channel, device consumer
+and token subject. The decoded subject partitions local cache only; Forge verifies
+the token and applies RLS. Changing scope clears the previous read cache while keeping
+its command history and preventing replay under the new scope. Resnapshot clears
+committed live rows while preserving tombstones and pending intent.</p></article><article id="S12-003" class="source-clause"><h4>S12-003 · Provider and migration requirements</h4><p class="source-note">Governing revision: <a href="../index.html#api">API-01–06</a> · source requirement, not release evidence.</p><h2>Provider and migration requirements</h2>
+<ul>
+<li>Forge production-readiness source <code>ed72018</code> and migration
+  <code>0020_mutation_receipts.sql</code> are required. Older servers must not be credited as
+  receipt-backed merely because they accept the header.</li>
+<li>Local additive migration <code>0004_sync_outbox.sql</code> runs through the existing startup
+  migrator before sync attachment. Rolling back application code does not remove
+  pending intents or reverse already committed server effects.</li>
+<li>An authenticated Forge subject is required by that provider's receipt contract.
+  Anonymous demo configuration does not establish business mutation authority.</li>
+</ul></article><article id="S12-004" class="source-clause"><h4>S12-004 · Authenticated read lane</h4><p class="source-note">Governing revision: <a href="../index.html#security">SEC-01–06</a> · source requirement, not release evidence.</p><h2>Authenticated read lane</h2>
+<p>Fabric SDK source <code>8966d6b1fef002a663d98f762955b2d273f8c07d</code> is declared on the native client. Its real ShapeClient reads Gate-selected catalog shape IDs with the bearer; caller predicates cannot widen selection. Configure <code>sync.frf.shape_gateway</code> and <code>shapes: [{shape_id, table}]</code> for notes and/or memories. Missing selection remains explicit write-only/offline status.</p>
+<p>Additive migration <code>0005_sync_read_cursors.sql</code> stores opaque handle/offset pairs. A compare-and-set against the previous pair and row application commit together, rejecting stale concurrent batches without interpreting opaque offsets. Provider must-refetch clears live cache and restarts snapshot; tombstones and pending intents remain. Revoked/expired grants clear all disclosed rows and suspend replay/overlay. In-flight mutation receipts remain durable without repopulating revoked rows. Per-shape status aggregation prevents one live shape hiding another revoked grant.</p></article><article id="S12-005" class="source-clause"><h4>S12-005 · Consumer source boundary</h4><p class="source-note">Governing revision: <a href="../index.html#api">API-01–06</a> · source requirement, not release evidence.</p><h2>Consumer source boundary</h2>
+<p>KnowMe app source 64b1d0a implements the Surreal3.0.5 adapter, native composition, registered row/write/status/recovery APIs and real scope/freshness/outcome settings UI using this shared queue. System entity IPC and guest wrappers now accept optional commandId for retained submission identities; omitting it preserves the existing new-submission behavior. No declaration here certifies an unrun packaged path.</p>
+<p>No compiler, test, build, packaged operation or certification gate ran for this
+increment, per the current production-first instruction. Those results remain pending.</p></article></main></body></html>

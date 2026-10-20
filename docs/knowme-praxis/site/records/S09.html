@@ -1,0 +1,116 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>S09 · adr-001-wasm-target.md</title><link rel="stylesheet" href="../records.css"><body><main><a href="../index.html">KnowMe Praxis</a><h1>S09 · adr-001-wasm-target.md</h1><p>Complete technical source record. Historical names and requirements remain visible for audit. Revised clauses and explicit corrections govern their application.</p><p><a href="S09.txt">Download complete technical text</a></p><article id="S09-001" class="source-clause"><h4>S09-001 · ADR-001 — WASM Target for KnowMe Plugin Modules</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h1>ADR-001 — WASM Target for KnowMe Plugin Modules</h1>
+<p><strong>Status:</strong> Accepted
+<strong>Date:</strong> 2026-08-03
+<strong>Decider:</strong> Travis James
+<strong>Supersedes:</strong> open decision A-03 raised against KNOWME-SEC-AGT-001 v1.0
+<strong>Related:</strong> PAGS-SPEC-KM-CRM-001, PAGS-SPEC-KM-GOAL-001, ADR-002</p>
+<hr/></article><article id="S09-002" class="source-clause"><h4>S09-002 · Decision</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h2>Decision</h2>
+<p><strong>Target the WebAssembly Component Model on <code>wasm32-wasip2</code>, hosted via <code>wasmtime::component</code> on a pinned Wasmtime LTS.</strong> Keep the <code>wasm32-wasip1</code> + <code>wasi_snapshot_preview1</code> adapter path as a documented hedge. Guest modules remain synchronous on WASI 0.2 — do not adopt Component Model async or WASI 0.3 in guests yet.</p>
+<p>Amends KNOWME-SEC-AGT-001 §07, which specifies only <code>runtime: wasm</code>. The manifest field becomes <code>runtime: wasm-component</code> with an explicit <code>wit_world</code> binding.</p></article><article id="S09-003" class="source-clause"><h4>S09-003 · Why this decision, specifically</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><div class="source-note"><strong>Explicit amendments:</strong><ul><li>Clock and randomness imports are capabilities; a true no-import evaluator is a stricter profile.</li></ul></div><h2>Why this decision, specifically</h2>
+<p>KNOWME-SEC-AGT-001 §07 makes static import-surface validation a hard registration gate: <em>"UAR compares declared capabilities against actual WASM imports — any undeclared import causes rejection."</em> That single requirement decides the target.</p>
+<p>Under core modules (P1), imports are untyped two-level string pairs. Validation means parsing <code>Payload::ImportSection</code> with <code>wasmparser</code> and string-matching an allowlist. Workable, but "zero capability" is defined <strong>negatively</strong> — as the absence of any WASI import — and the allowlist semantics are hand-maintained.</p>
+<p>Under the Component Model, imports are a typed WIT world. <code>wasmtime::component::Component::component_type()</code> gives programmatic, typed reflection <em>before</em> instantiation, and the component <code>Linker</code> refuses to instantiate on interface mismatch. "Zero capability" becomes a <strong>positively specified, auditable fact</strong>: a world that imports nothing but <code>wasi:clocks/wall-clock</code> and <code>wasi:random/random</code>. Registration validation becomes a typed structural comparison rather than string matching.</p>
+<p>Microsoft's Wassette — the closest production analog to the UAR skill model (deny-by-default capability gating on Wasmtime, exposed via MCP) — is components-only and builds its entire security and introspection model on exactly this property.</p></article><article id="S09-004" class="source-clause"><h4>S09-004 · Evidence</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h2>Evidence</h2></article><article id="S09-005" class="source-clause"><h4>S09-005 · Standards status (mid-2026)</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h3>Standards status (mid-2026)</h3>
+<ul>
+<li>WASI 0.2 (Preview 2) stable since January 2024, latest patch v0.2.12.</li>
+<li><strong>WASI 0.3 ratified June 11, 2026</strong>, rebasing WASI onto Component Model async primitives; removes <code>wasi:io</code>, folding streams/futures into the Canonical ABI.</li>
+<li>WASI 1.0 targeted late 2026 / early 2027, gated on Component Model 1.0.</li>
+<li>Preview 1 is frozen, not deleted. The rustc book: WASIp1 syscalls <em>"have not changed since then"</em>, APIs are <em>"no longer receiving any maintenance"</em>, and <code>wasm32-wasip1</code> is <em>"intended for historical compatibility."</em> Bytecode Alliance maintains an explicit long-term backward-compatibility commitment: P1 modules still work, P2 components still work.</li>
+</ul>
+<p><strong>Read:</strong> Preview 1 is a safe-but-stagnant floor on a long sunset track, not a cliff. Choosing it is not risky; it is merely terminal.</p></article><article id="S09-006" class="source-clause"><h4>S09-006 · Rust toolchain</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h3>Rust toolchain</h3>
+<ul>
+<li><code>wasm32-wasip1</code> and <code>wasm32-wasip2</code> both Tier 2, installable via rustup.</li>
+<li>wasip2 reached Tier 2 in Rust 1.82 (2024-10-17), with the <code>wasm-component-ld</code> linker.</li>
+<li>Legacy <code>wasm32-wasi</code> name removed in Rust 1.84 (Jan 2025).</li>
+<li><code>cargo build --target wasm32-wasip2</code> produces components natively — no post-processing.</li>
+<li><code>cargo-component</code> is being deprecated in favor of native tooling + <code>wit-bindgen</code>.</li>
+<li>WASI 0.3 Rust target exists but is <strong>Tier 3</strong> (not in rustup) as of mid-2026 — a direct reason to stay on 0.2 in guests.</li>
+<li>Known gaps: <code>std::thread</code> missing on component targets; exporting/importing types still needs third-party bindgen.</li>
+</ul>
+<p>None of these block a Rust-only, synchronous, pure-function plugin on wasip2 today.</p></article><article id="S09-007" class="source-clause"><h4>S09-007 · Wasmtime</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h3>Wasmtime</h3>
+<ul>
+<li>Documented UAR position is v41 (~Nov 2025). Current is v46 (2026-06-22); v47 published 2026-07-20.</li>
+<li><strong>LTS policy:</strong> every 12th release (24, 36, 48…) is LTS with 24 months support. Non-LTS releases get ~2 months.</li>
+<li>v36 (2025-08-20) is supported to 2027-08-20. v48 is due August 2026.</li>
+<li>WASI 0.3 support landed in 43+; v46 ships WASI 0.3.0 with Component Model Async <strong>on by default</strong>.</li>
+</ul>
+<p><strong>Security note, action-required:</strong> CVE-2026-27195 affects the <code>component-model-async</code> feature, which became default in Wasmtime 39.0.0. A <code>call_async</code> future-drop bug can panic the host. Patched in 40.0.4 and 41.0.4; 42.0.0+ unaffected. <strong>If UAR remains on v41 transiently, it must be ≥41.0.4.</strong></p></article><article id="S09-008" class="source-clause"><h4>S09-008 · Overhead for small pure functions</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h3>Overhead for small pure functions</h3>
+<p>Evidence here is thinner than ideal — flagged as such.</p>
+<ul>
+<li><strong>Binary size:</strong> componentization adds KB-scale wrapper metadata always, plus the ~100 KB preview1→preview2 adapter <em>only when the module imports WASI/std</em>. A truly capability-free module needs no adapter — <code>wasm-tools component new adder.wasm</code> runs without <code>--adapt</code>. No credible published head-to-head wasip1-vs-wasip2 release-size table exists. <strong>Measure locally on a representative module before finalizing.</strong></li>
+<li><strong>Instantiation:</strong> Wasmtime spawns instances in ~5 µs with the pooling allocator plus copy-on-write memory init. Components share the identical compile/instantiate model — <code>Component::new</code> compiles synchronously, nothing compiles at instantiation. No published micro-benchmark isolates the component-vs-module delta; maintainer statements imply it is small because instantiation is dominated by memory/table setup. <code>Engine::precompile_component</code> removes compilation from the hot path entirely.</li>
+<li><strong>Per-call marshalling:</strong> primitives and small records that fit the Canonical ABI flat representation cost ≈ zero. Strings/lists incur one <code>cabi_realloc</code> per element under today's eager ABI; the planned lazy ABI (non-breaking, opt-in, shipping in a 0.3.x minor) makes this zero-copy.</li>
+<li><strong>The one measured overhead:</strong> ~3.5x on synchronous cross-call paths, from async task infrastructure (Nick Fitzgerald, Plumbers Summit, reported in "The Road to Component Model 1.0", June 2026). This is a <strong>regression introduced by adding component-model async</strong>, under active repair (Wasmtime #12311), with the stated goal of restoring the pre-async synchronous performance profile.</li>
+</ul>
+<p><strong>Assessment for our workload:</strong> irrelevant. These modules are invoked once per brief run with a structured payload. A 3.5x multiplier on a microsecond-scale cross-call is not on any path that matters, and staying synchronous on WASI 0.2 avoids it entirely.</p></article><article id="S09-009" class="source-clause"><h4>S09-009 · Ecosystem signals</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h3>Ecosystem signals</h3>
+<table>
+<thead>
+<tr>
+<th>System</th>
+<th>Target</th>
+<th>Note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Wassette (Microsoft)</td>
+<td>Components only</td>
+<td>Closest analog; WIT introspection is the security model</td>
+</tr>
+<tr>
+<td>wasmCloud (CNCF)</td>
+<td>Components only</td>
+<td><code>wasm32-wasip2</code>; WASI 0.3 behind a <code>wasip3</code> flag</td>
+</tr>
+<tr>
+<td>Spin / Fermyon</td>
+<td>Components</td>
+<td>WASI 0.3 RC in Spin v3.5 (Nov 2025)</td>
+</tr>
+<tr>
+<td>Shopify Functions</td>
+<td><strong>Core module / wasip1</strong></td>
+<td>Bespoke NaN-boxed i64 ABI over stdin/stdout</td>
+</tr>
+<tr>
+<td>Extism</td>
+<td><strong>Core module</strong></td>
+<td>Generic bytes-in/bytes-out; <em>"no concrete plans"</em> for Component Model</td>
+</tr>
+<tr>
+<td>Helm 4</td>
+<td><strong>Core module</strong> (via Extism)</td>
+<td>Chose Extism because Component Model unsupported in Wazero</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Reading:</strong> greenfield capability-secure systems standardized on components. The core-module holdouts stayed for reasons that do not apply here — existing bespoke ABI investment (Shopify), or a non-Wasmtime/polyglot runtime constraint (Extism, Helm on Wazero). We are a new Rust + Wasmtime host with a mandatory typed-validation requirement. We match the first group.</p></article><article id="S09-010" class="source-clause"><h4>S09-010 · Migration cost</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h3>Migration cost</h3>
+<p>Low in both directions. A wasip1 core module componentizes at build time:</p>
+<pre><code>wasm-tools component new module.wasm \
+  --adapt wasi_snapshot_preview1.reactor.wasm \
+  -o component.wasm
+</code></pre>
+<p>The cost avoided by starting on components <strong>now</strong> is the data-marshalling contract. Moving from JSON-over-linear-memory (P1) to WIT-typed records (P2) is a breaking interface change touching every module and the host boundary. Do it once, up front.</p></article><article id="S09-011" class="source-clause"><h4>S09-011 · Known rough edges (accepted)</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h3>Known rough edges (accepted)</h3>
+<ul>
+<li>Component debugging tooling immature; componentization errors can be cryptic.</li>
+<li>Guest support beyond Rust uneven — Go via TinyGo/componentize-go; Python/JS via componentize-py/jco. <strong>Non-issue for a Rust-only module set.</strong></li>
+<li>Component Model is pre-1.0; the ABI will change before standardization, though via a deliberately non-breaking transition.</li>
+<li>Wasmtime ships semver-major monthly. Mitigated by LTS pinning.</li>
+</ul></article><article id="S09-012" class="source-clause"><h4>S09-012 · Consequences</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h2>Consequences</h2>
+<p><strong>Required actions:</strong></p>
+<ol>
+<li><strong>Pin Wasmtime to an LTS.</strong> Adopt v36 (supported to 2027-08-20) now, or plan the jump to v48 in August 2026. If v41 persists in the interim, ensure ≥41.0.4 for CVE-2026-27195. This decouples UAR from monthly <code>wasmtime::component</code> API churn.</li>
+<li><strong>Define the module contract in WIT.</strong> One world exporting <code>run: func(input: &lt;record&gt;) -&gt; result&lt;&lt;record&gt;, error&gt;</code>, importing only <code>wasi:clocks/wall-clock</code> and <code>wasi:random/random</code>. Everything else — filesystem, sockets, env, monotonic clock — is absent from the world by construction.</li>
+<li><strong>Implement §07 validation via <code>component_type()</code></strong> for typed structural comparison against the declared manifest, plus <code>wasm-tools component wit</code> in CI. Retain the <code>wasmparser</code> core-module validator only if P1 modules are ever accepted.</li>
+<li><strong>Use WIT-typed records at the boundary</strong>, not JSON blobs.</li>
+<li><strong>Stay synchronous.</strong> No Component Model async, no WASI 0.3 in guests. Revisit when Wasmtime #12311 lands and the WASI 0.3 Rust target reaches Tier 2.</li>
+<li><strong>Amend KNOWME-SEC-AGT-001 §07</strong> — <code>runtime: wasm-component</code>, plus a <code>wit_world</code> manifest field and the host-function export table (amendment A-02).</li>
+</ol>
+<p><strong>Fallback trigger:</strong> if a required guest language lacks a mature native wasip2 toolchain, fall back to building core modules for wasip1 and componentizing at registration time. UAR still hosts components; typed validation is preserved.</p>
+<p><strong>When pure Preview 1 would have been correct:</strong> broad non-Rust guest support with only core-module paths; a non-Wasmtime runtime without Component Model support; or an existing heavily invested bytes-in/bytes-out ABI. None apply.</p></article><article id="S09-013" class="source-clause"><h4>S09-013 · Confidence and caveats</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h2>Confidence and caveats</h2>
+<ul>
+<li><strong>High confidence</strong> on standards status, toolchain tiers, Wasmtime LTS policy, and the introspection argument. All primary-sourced.</li>
+<li><strong>Moderate confidence</strong> on overhead. No controlled component-vs-module benchmark for tiny pure functions exists publicly. The ~5 µs instantiation and ~100 KB adapter figures are primary-sourced but not from a head-to-head comparison. Several 2026 "state of Wasm" sources giving precise cold-start numbers are low-authority or AI-generated and were not relied on.</li>
+<li><strong>The 3.5x figure is a single maintainer measurement</strong> reported secondhand, describing a regression under repair — directional, not a stable property.</li>
+<li><strong>This is partly a judgment call, not a settled fact.</strong> Shopify and Extism demonstrate that a well-built core-module ABI remains viable in production. The decision comes down on components specifically because KNOWME-SEC-AGT-001's static-capability-validation requirement is materially better served by typed WIT worlds.</li>
+</ul></article></main></body></html>

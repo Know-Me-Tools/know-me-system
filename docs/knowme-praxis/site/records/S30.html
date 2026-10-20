@@ -1,0 +1,561 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>S30 · README.md</title><link rel="stylesheet" href="../records.css"><body><main><a href="../index.html">KnowMe Praxis</a><h1>S30 · README.md</h1><p>Complete technical source record. Historical names and requirements remain visible for audit. Revised clauses and explicit corrections govern their application.</p><p><a href="S30.txt">Download complete technical text</a></p><article id="S30-001" class="source-clause"><h4>S30-001 · UAR knowledge base, RAG, and Karpathy wiki strategy</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h1>UAR knowledge base, RAG, and Karpathy wiki strategy</h1>
+<p>Status: architecture assessment
+Date: 2026-07-19
+Scope: knowledge architecture and delivery strategy only; no runtime code is implemented by this document
+KBD phase context: <code>model-runtime-per-device</code>; implementation is 4 of 5 after completing this document-only change</p></article><article id="S30-002" class="source-clause"><h4>S30-002 · Decision</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>Decision</h2>
+<p>Use the Universal Agent Runtime (UAR) as the shared knowledge control plane, but deploy a different runtime profile at each platform boundary:</p>
+<ul>
+<li><strong>Mobile:</strong> embed a small, platform-safe UAR knowledge kernel in the shared Rust core. Flutter reaches it only through typed FFI. Reuse KnowMe's existing embedded SurrealDB hybrid graph store rather than creating a second mobile database or vector index.</li>
+<li><strong>Desktop:</strong> run exactly one supervised UAR service. BossFang supervises it when BossFang is present; KnowMe supervises it otherwise. Both clients may use the service, but they must not start competing UAR writers for the same scope.</li>
+<li><strong>Web:</strong> run UAR as a private service behind the KnowMe Axum application. React communicates with the Axum boundary, not directly with UAR and never with provider credentials.</li>
+</ul>
+<p>The knowledge system has three related but deliberately separate artifact classes:</p>
+<ol>
+<li><strong>Evidence corpus:</strong> source documents, chunks, embeddings, lexical indexes, graph facts, and citations used by RAG.</li>
+<li><strong>Karpathy wiki:</strong> concise, human-readable Markdown lessons distilled from evidence and evaluated execution traces.</li>
+<li><strong>Episodic memory:</strong> run events, tool outcomes, feedback, checkpoints, and evaluation records from which lessons may be proposed.</li>
+</ol>
+<p>Raw evidence, wiki revisions, provenance, and tombstones are canonical and syncable. Embeddings, BM25 indexes, graph projections, and retrieval caches are derived per device and rebuilt against a declared model binding. Vector rows must not be merged across different embedding models or dimensions.</p></article><article id="S30-003" class="source-clause"><h4>S30-003 · Why this shape</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>Why this shape</h2></article><article id="S30-004" class="source-clause"><h4>S30-004 · Evidence language and source snapshot</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>Evidence language and source snapshot</h3>
+<p>This document uses the following status language deliberately:</p>
+<ul>
+<li><strong>Observed:</strong> directly verified in repository source or an official source.</li>
+<li><strong>Inference:</strong> a conclusion drawn from multiple observed facts; the inference is identified as such.</li>
+<li><strong>Decision/recommendation:</strong> the architecture this strategy selects; it is not a claim that implementation already exists.</li>
+<li><strong>Blocker:</strong> missing evidence or capability that prevents certification.</li>
+<li><strong>Open decision:</strong> a product, legal, policy, or ownership choice that this architecture cannot safely infer.</li>
+<li><strong>Future stage:</strong> ordered work proposed by this strategy, not work completed by this document.</li>
+</ul>
+<p>Local implementation observations were rechecked against UAR commit
+<code>9bee88d9745f82d7a63445c36e5e4c6a42048fd5</code> and the concurrent KnowMe working
+tree on 2026-07-19. Later submodule revisions require revalidation before these
+status claims are reused.</p>
+<p>The original RAG work treats retrieval as explicit non-parametric memory that improves updateability and provenance, while the Ragas framework separates retrieval quality from answer faithfulness and relevance. That distinction maps cleanly to UAR's knowledge APIs and to a separate, reviewable wiki layer. <a href="https://arxiv.org/abs/2005.11401">Lewis et al., <em>Retrieval-Augmented Generation</em></a> and <a href="https://arxiv.org/abs/2309.15217">Es et al., <em>Ragas</em></a> provide the research basis.</p>
+<p>The codebase already contains most of the seams needed for this direction:</p>
+<ul>
+<li>UAR has knowledge-base CRUD, ingestion and search APIs, embedding backends, citation events, a retrieval pipeline abstraction, lexical verification, and hybrid vector/graph RRF.</li>
+<li>The UAR submodule includes <code>prometheus-knowledge</code>: a Markdown wiki, TF-IDF focus/search, linting, a trace store, evaluation, trace-to-wiki compilation, MCP tools, and a UAR tool-provider bridge.</li>
+<li>KnowMe already has an embedded SurrealDB graph store with 384-dimensional embeddings, BM25, vector search, graph expansion, and RRF.</li>
+<li>KnowMe already projects UAR run events into its UI protocol, but mobile UAR execution is explicitly reported as not wired.</li>
+</ul>
+<p>Those are useful foundations, not proof of production readiness. The current UAR Rust SDK's embedded builder still starts the full HTTP server and does not expose populated direct-runtime handles. Its root crate is monolithic and its smallest published bundle still includes the Surreal backend. The product matrix marks web stable, desktop preview, mobile experimental, and arbitrary browser WASM unsupported. The present self-learning CLI also has concrete gaps: Codex/OpenCode file adapters return no trace data, trace fields are incompletely correlated, and the CLI's compile block does not yet invoke the available batch compiler.</p></article><article id="S30-005" class="source-clause"><h4>S30-005 · Target architecture</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>Target architecture</h2>
+<pre><code class="language-mermaid">flowchart TB
+  subgraph UX[Presentation boundaries]
+    F[Flutter mobile]
+    R[React web and desktop]
+  end
+
+  subgraph KM[KnowMe application boundary]
+    FFI[Typed Rust FFI]
+    AX[Axum BFF]
+    PROJ[AG-UI to KnowMe A2UI projection]
+  end
+
+  subgraph UAR[UAR knowledge control plane]
+    RUN[Run and event capture]
+    RET[Retrieval orchestration]
+    PK[Karpathy wiki lifecycle]
+    GOV[Scope, policy, audit, evaluation]
+  end
+
+  subgraph DATA[Knowledge artifacts]
+    EV[Evidence corpus]
+    WI[Markdown wiki]
+    EP[Episodic traces]
+    IX[Derived local indexes]
+  end
+
+  F --&gt; FFI
+  R --&gt; AX
+  FFI --&gt; UAR
+  AX --&gt; UAR
+  RUN --&gt; EP
+  EP --&gt; PK
+  EV --&gt; RET
+  WI --&gt; RET
+  RET --&gt; PROJ
+  PROJ --&gt; FFI
+  PROJ --&gt; AX
+  EV --&gt; IX
+  WI --&gt; IX
+  GOV --&gt; RUN
+  GOV --&gt; RET
+  GOV --&gt; PK
+</code></pre>
+<p>This is one logical control plane, not one identical process topology. UAR owns the semantics of runs, retrieval, wiki lifecycle, policy, and events. The platform profile decides whether those semantics execute through an in-process kernel or a supervised service.</p></article><article id="S30-006" class="source-clause"><h4>S30-006 · Artifact and authority model</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>Artifact and authority model</h2>
+<table>
+<thead>
+<tr>
+<th>Artifact</th>
+<th>Purpose</th>
+<th>Canonical form</th>
+<th>Derived form</th>
+<th>Default authority</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Source document</td>
+<td>Verifiable evidence</td>
+<td>Original bytes or normalized text plus content hash</td>
+<td>Chunks and extracted metadata</td>
+<td>Ingesting knowledge scope</td>
+</tr>
+<tr>
+<td>Chunk</td>
+<td>Retrieval unit</td>
+<td>Text span with source offsets and lineage</td>
+<td>Embedding and lexical postings</td>
+<td>Corpus revision</td>
+</tr>
+<tr>
+<td>Graph fact</td>
+<td>Multi-hop/entity context</td>
+<td>Typed relation with supporting source spans</td>
+<td>Neighborhood/community summaries</td>
+<td>Corpus revision</td>
+</tr>
+<tr>
+<td>Wiki entry</td>
+<td>Reusable lesson or anti-pattern</td>
+<td>Markdown with revision, tags, claims, provenance, confidence</td>
+<td>TF-IDF/vector representation</td>
+<td>Project-private by default</td>
+</tr>
+<tr>
+<td>Execution trace</td>
+<td>Learning evidence</td>
+<td>Redacted structured run/tool/outcome record</td>
+<td>Evaluation features and aggregates</td>
+<td>Session/project scope</td>
+</tr>
+<tr>
+<td>Evaluation</td>
+<td>Promotion evidence</td>
+<td>Metric results, grader version, golden-set version</td>
+<td>Dashboard projections</td>
+<td>Evaluation run</td>
+</tr>
+<tr>
+<td>Skill revision</td>
+<td>Executable behavior</td>
+<td>Versioned skill artifact and policy decision</td>
+<td>Runtime caches</td>
+<td>Human-approved release</td>
+</tr>
+</tbody>
+</table>
+<p>The evidence corpus answers “what sources support this response?” The wiki answers “what durable lesson has survived evaluation?” Episodic memory answers “what happened during this run?” Conflating them would make retention, trust, and conflict handling unmanageable.</p>
+<p>Every record should carry, as applicable:</p>
+<ul>
+<li>tenant, user, workspace/project, knowledge-base, agent, run, and session scopes;</li>
+<li>source URI or local source identity, content hash, capture time, and parser version;</li>
+<li>embedding model identifier, immutable revision, dimension, normalization, and chunking policy;</li>
+<li>origin device/runtime, creation actor, sensitivity class, consent basis, and retention class;</li>
+<li>parent revision, supersedes relation, tombstone state, and synchronization clock;</li>
+<li>claim-to-source spans for wiki entries and answer citations.</li>
+</ul>
+<p>The safe default is project-private and user-private. Cross-project or shared-global knowledge is an explicit promotion, never an inference from filesystem location or account identity.</p></article><article id="S30-007" class="source-clause"><h4>S30-007 · The Karpathy learning loop</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>The Karpathy learning loop</h2>
+<p>The UAR submodule already expresses the broad loop. KnowMe should make its state transitions and promotion gates explicit:</p>
+<pre><code class="language-mermaid">stateDiagram-v2
+  [*] --&gt; Capture
+  Capture --&gt; Redact
+  Redact --&gt; Evaluate
+  Evaluate --&gt; Reject: unsafe or low evidence
+  Evaluate --&gt; Candidate: threshold met
+  Candidate --&gt; Compile
+  Compile --&gt; Lint
+  Lint --&gt; Reject: contradiction or provenance failure
+  Lint --&gt; ProjectWiki: project-private lesson
+  ProjectWiki --&gt; Focus: retrieval selection
+  Focus --&gt; Observe: used in a run
+  Observe --&gt; Evaluate
+  ProjectWiki --&gt; SharedCandidate: repeated cross-project evidence
+  SharedCandidate --&gt; HumanReview
+  HumanReview --&gt; SharedWiki: approved
+  HumanReview --&gt; Reject: declined
+  ProjectWiki --&gt; SkillCandidate: repeatable behavioral improvement
+  SkillCandidate --&gt; RegressionGate
+  RegressionGate --&gt; HumanReview: tests pass
+  RegressionGate --&gt; Reject: tests fail
+</code></pre></article><article id="S30-008" class="source-clause"><h4>S30-008 · 1. Capture</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>1. Capture</h3>
+<p>Capture normalized UAR run events, tool names, permission decisions, retrieval identifiers, citations, outcome signals, user corrections, latency, and cancellation/checkpoint events. Do not capture hidden chain-of-thought, secrets, raw credentials, or unrestricted file contents.</p>
+<p>UAR's current <code>TraceCapture</code> trait and <code>ExecutionTrace</code> store are a starting point. They are not yet a universal capture implementation: the Claude Code adapter parses only part of its source format, generic file-based adapters return empty results, tool-result correlation and duration are incomplete, and there is no KnowMe-native UAR event adapter. The first production adapter should consume UAR's own typed run/event stream rather than scrape tool-specific session directories.</p></article><article id="S30-009" class="source-clause"><h4>S30-009 · 2. Redact and classify</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>2. Redact and classify</h3>
+<p>Apply deterministic secret/PII removal before durable storage. Assign sensitivity and retention classes. Keep an audit event for redaction without retaining the removed value. Mobile traces remain local unless the user and policy permit synchronization.</p></article><article id="S30-010" class="source-clause"><h4>S30-010 · 3. Evaluate</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>3. Evaluate</h3>
+<p>Use deterministic signals first: task completion, tool failures, citation coverage, schema validation, user correction, rollback, cancellation reason, and golden-set assertions. LLM judging is supplementary and must record model, prompt, version, and uncertainty.</p>
+<p>The current UAR trace evaluator primarily scores whether output exists and whether tool calls failed. That is insufficient for learning because a fluent but wrong output can score well. A production evaluator needs task-specific success criteria plus retrieval and grounding metrics.</p></article><article id="S30-011" class="source-clause"><h4>S30-011 · 4. Compile</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>4. Compile</h3>
+<p>Compile only eligible traces into a candidate wiki entry containing the reusable lesson, failure mode, conditions, evidence links, confidence, and explicit non-applicability boundaries. UAR's <code>KnowledgeCompiler</code> already converts an <code>ExecutionTrace</code> into <code>pk_core::WikiEntry</code>; the CLI wiring and complete trace data remain unfinished.</p></article><article id="S30-012" class="source-clause"><h4>S30-012 · 5. Lint, link, and deduplicate</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>5. Lint, link, and deduplicate</h3>
+<p>Reject unsupported claims, duplicate lessons, orphaned citations, scope escalation, and contradictions that lack an explicit resolution. Link related, superseded, and conflicting entries. A contradiction is data to resolve, not text to silently overwrite.</p></article><article id="S30-013" class="source-clause"><h4>S30-013 · 6. Select and focus</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>6. Select and focus</h3>
+<p>Build a bounded context packet from four lanes:</p>
+<ol>
+<li>direct wiki focus using deterministic lexical/TF-IDF selection;</li>
+<li>semantic and BM25 evidence retrieval;</li>
+<li>graph expansion for related entities and multi-hop facts;</li>
+<li>recent episodic context that is relevant and permitted.</li>
+</ol>
+<p>Fuse ranked identifiers, then apply authorization, provenance, freshness, diversity, and token-budget filters. UAR's RRF and retrieval abstractions should orchestrate the lanes. On mobile, KnowMe's existing graph store should implement the retrieval backend instead of duplicating retrieval state.</p></article><article id="S30-014" class="source-clause"><h4>S30-014 · 7. Compress and archive</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>7. Compress and archive</h3>
+<p>Compression must be reversible. Preserve old revisions and source lineage, mark replacements with <code>supersedes</code>, and create tombstones for deletions. Scheduled memory compression exists in the submodule, but platform scheduling, scope isolation, and evidence-preserving behavior must be certified independently for KnowMe.</p></article><article id="S30-015" class="source-clause"><h4>S30-015 · 8. Optimize only behind a release gate</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>8. Optimize only behind a release gate</h3>
+<p>Do not automatically rewrite production skills from one successful trace. A skill candidate needs multiple independent examples, negative examples, deterministic tests, security-policy checks, sycophancy screening, regression evaluation, and human approval. Wiki promotion and skill optimization are separate approvals.</p></article><article id="S30-016" class="source-clause"><h4>S30-016 · Retrieval pipeline</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>Retrieval pipeline</h2>
+<p>The common retrieval contract should be behavioral rather than database-specific:</p>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Required behavior</th>
+<th>UAR/KnowMe seam</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Query preparation</td>
+<td>Normalize, classify scope, optionally decompose</td>
+<td>UAR retrieval pipeline</td>
+</tr>
+<tr>
+<td>Candidate generation</td>
+<td>Dense, lexical, wiki, and graph lanes</td>
+<td>UAR backend traits; KnowMe graph-store adapter on mobile</td>
+</tr>
+<tr>
+<td>Fusion</td>
+<td>Stable identifier-level RRF</td>
+<td>Existing UAR and KnowMe RRF implementations</td>
+</tr>
+<tr>
+<td>Verification</td>
+<td>Check source spans, authorization, lexical support, and freshness</td>
+<td>Extend beyond current overlap-only lexical annotation</td>
+</tr>
+<tr>
+<td>Context assembly</td>
+<td>Deduplicate, diversify, budget, preserve citations</td>
+<td>KnowMe context fabric</td>
+</tr>
+<tr>
+<td>Generation</td>
+<td>Use selected provider/model without changing knowledge semantics</td>
+<td>UAR provider routing</td>
+</tr>
+<tr>
+<td>Streaming</td>
+<td>Emit retrieval, citation, run, tool, and final-answer events</td>
+<td>UAR events projected to AG-UI/A2UI</td>
+</tr>
+<tr>
+<td>Evaluation</td>
+<td>Record retrieval and answer metrics against a frozen set</td>
+<td>UAR evaluation assets plus KnowMe platform matrix</td>
+</tr>
+</tbody>
+</table>
+<p>UAR's current lexical verification annotates overlap and, by default, does not drop uncorroborated material. Treat it as a weak signal rather than a factuality guarantee. Citation validity requires source existence, byte/span integrity, scope authorization, and claim support.</p>
+<p>Graph retrieval is valuable for relationship and corpus-level questions, but it is not a universal replacement for chunk retrieval. Microsoft's GraphRAG work specifically targets global questions over a corpus, which is why KnowMe should retain direct lexical/vector retrieval and invoke graph/community expansion only when query classification or evaluation shows value. <a href="https://www.microsoft.com/en-us/research/project/graphrag/">Microsoft Research GraphRAG</a> and <a href="https://arxiv.org/abs/2404.16130">the GraphRAG paper</a> support this hybrid role.</p></article><article id="S30-017" class="source-clause"><h4>S30-017 · Platform contract summary</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>Platform contract summary</h2>
+<table>
+<thead>
+<tr>
+<th>Platform</th>
+<th>Runtime/process owner</th>
+<th>Persistence authority</th>
+<th>UI boundary</th>
+<th>Required degraded mode</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Mobile</td>
+<td>Embedded UAR knowledge kernel owned by the shared KnowMe Rust core</td>
+<td>App-private canonical artifacts plus the existing embedded <code>gen_ui_db_graph</code> SurrealDB projection</td>
+<td>Flutter → Riverpod/repository → typed Rust FFI</td>
+<td>Offline reads and deterministic wiki focus continue from the last certified local state; interrupted jobs checkpoint and resume</td>
+</tr>
+<tr>
+<td>Desktop</td>
+<td>Exactly one supervised UAR service; BossFang supervises when present, otherwise KnowMe/Tauri</td>
+<td>That service's exclusive writable UAR scope; UI/entity caches are projections</td>
+<td>React → hook → store → typed Tauri/Rust service client</td>
+<td>If UAR is unavailable, cached read-only projections remain visible with an explicit stale/unavailable state; writes and learning jobs pause</td>
+</tr>
+<tr>
+<td>Web</td>
+<td>Private UAR service behind the KnowMe Axum BFF</td>
+<td>Server-side UAR knowledge scope; PGlite is a client projection/cache only</td>
+<td>React → hook → entity/store → KnowMe Axum → UAR</td>
+<td>Axum returns typed unavailable/retry state, preserves stream cancellation, and may serve authorized cached projections without silently generating ungrounded answers</td>
+</tr>
+</tbody>
+</table></article><article id="S30-018" class="source-clause"><h4>S30-018 · Mobile profile: embedded knowledge kernel over FFI</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h2>Mobile profile: embedded knowledge kernel over FFI</h2></article><article id="S30-019" class="source-clause"><h4>S30-019 · Placement</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>Placement</h3>
+<p>The target is a mobile-safe library embedded in the existing Rust core, not the current UAR full-server crate. The kernel should contain only:</p>
+<ul>
+<li>run/event types and a native trace adapter;</li>
+<li>knowledge and wiki domain types;</li>
+<li>retrieval orchestration traits and ranking/verification logic;</li>
+<li><code>prometheus-knowledge</code> core/store/librarian functionality that is safe on iOS and Android;</li>
+<li>scope, policy, redaction, evaluation, and checkpoint primitives;</li>
+<li>provider callbacks that delegate embeddings and LLM work to KnowMe's selected runtime.</li>
+</ul>
+<p>Exclude Axum listeners, admin UI, Wasmtime, desktop document helpers, process supervision, native filesystem watchers, and duplicated persistence/provider stacks. This requires a real feature and crate boundary in the UAR fork; toggling the SDK's current <code>embedded</code> feature is not sufficient.</p></article><article id="S30-020" class="source-clause"><h4>S30-020 · Persistence and retrieval</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>Persistence and retrieval</h3>
+<p>Use the existing <code>gen_ui_db_graph</code> embedded SurrealDB store as the mobile persistence/retrieval engine. Adapt UAR's retrieval behavior to it. This preserves one source of truth for mobile memories, existing hybrid BM25/vector/graph RRF, and the architecture invariant that persistence stays in Rust.</p>
+<p>Markdown wiki entries remain human-readable canonical artifacts in app-private storage or an equivalent record representation with lossless Markdown export. TF-IDF focus provides a small deterministic offline path. Dense indexes use the active mobile embedding model and are rebuilt when its immutable binding changes.</p></article><article id="S30-021" class="source-clause"><h4>S30-021 · Flutter boundary</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>Flutter boundary</h3>
+<p>Flutter receives typed commands and streams for:</p>
+<ul>
+<li>ingest status and cancellation;</li>
+<li>search/focus results with citations and provenance;</li>
+<li>run/retrieval/wiki lifecycle events;</li>
+<li>review queues and conflict summaries;</li>
+<li>runtime capability and resource-budget status.</li>
+</ul>
+<p>Flutter does not open databases, build embeddings, call providers, parse raw UAR SSE, or execute the learning loop. Flutter Rust Bridge supports native targets and typed/streaming interop, which fits this boundary. <a href="https://cjycode.com/flutter_rust_bridge/guides/cross-platform/overview">Flutter Rust Bridge cross-platform guide</a>.</p></article><article id="S30-022" class="source-clause"><h4>S30-022 · Scheduling and resource policy</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>Scheduling and resource policy</h3>
+<p>Ingestion, indexing, and wiki compilation must be resumable stages with durable checkpoints. Foreground user work has priority. Background processing is opportunistic: Apple background processing can be interrupted, and Android WorkManager is for persistent deferrable work with bounded execution. <a href="https://developer.apple.com/documentation/backgroundtasks/bgprocessingtask">Apple Background Tasks</a> and <a href="https://developer.android.com/reference/androidx/work/WorkManager">Android WorkManager</a>.</p>
+<p>Recommended mobile policy:</p>
+<ul>
+<li>small text ingestion and TF-IDF updates may run locally immediately;</li>
+<li>embedding batches stop on thermal, memory, battery, or time-budget pressure;</li>
+<li>large documents and expensive graph extraction are deferred, user-triggered, or delegated to an authorized desktop/web peer;</li>
+<li>every stage is idempotent and resumes from a content hash/checkpoint;</li>
+<li>offline reads continue against the last certified local indexes.</li>
+</ul></article><article id="S30-023" class="source-clause"><h4>S30-023 · Mobile blockers</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>Mobile blockers</h3>
+<ul>
+<li>No mobile-safe UAR kernel crate/profile exists.</li>
+<li>KnowMe currently excludes the UAR SDK dependency on iOS/Android and reports embedded UAR as not wired.</li>
+<li><code>prometheus-knowledge</code> transitive dependencies and filesystem/network features need a target audit.</li>
+<li>Cross-platform UAR-native trace capture is not implemented.</li>
+<li>Embedded distribution invokes AGPL obligations and requires an explicit licensing decision before product shipment.</li>
+<li>Physical-device memory, thermal, startup, ingestion, and retrieval evidence does not exist.</li>
+</ul></article><article id="S30-024" class="source-clause"><h4>S30-024 · Desktop profile: one supervised UAR service</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>Desktop profile: one supervised UAR service</h2></article><article id="S30-025" class="source-clause"><h4>S30-025 · Placement</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>Placement</h3>
+<p>The default desktop topology is one UAR sidecar/service per user data authority:</p>
+<ul>
+<li><strong>BossFang present:</strong> BossFang owns UAR supervision; KnowMe discovers and uses that instance.</li>
+<li><strong>BossFang absent:</strong> KnowMe/Tauri owns UAR supervision.</li>
+<li><strong>Advanced isolated mode:</strong> a second instance is permitted only with a separate storage namespace and explicit reason, never against the same writable database or wiki directory.</li>
+</ul>
+<p>This follows UAR's own BossFang integration recommendation and Tauri's supported external-binary model. Tauri packages target-specific sidecar binaries and exposes controlled spawn permissions. <a href="https://v2.tauri.app/develop/sidecar/">Tauri sidecar documentation</a>.</p></article><article id="S30-026" class="source-clause"><h4>S30-026 · Responsibilities</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>Responsibilities</h3>
+<p>The supervisor owns binary version compatibility, loopback binding, per-install authentication, readiness, restart/backoff, migrations, logs, graceful shutdown, and exclusive-writer lease. UAR owns knowledge APIs, run capture, indexing, wiki lifecycle, and evaluation. BossFang may route agent/model work through UAR's OpenAI-compatible, A2A, or AG-UI surfaces; it must not maintain a competing hidden wiki for the same scope.</p>
+<p>KnowMe's Rust service layer uses the typed UAR SDK over loopback HTTP/SSE. React remains behind hooks/stores and Tauri commands. Direct React access to the sidecar would violate the project layering rule.</p></article><article id="S30-027" class="source-clause"><h4>S30-027 · Why not link the full runtime on desktop now</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>Why not link the full runtime on desktop now</h3>
+<p>The service boundary is already the supported and testable UAR path. Linking the full runtime would couple KnowMe to UAR's monolithic dependency graph, persistence boot, and AGPL runtime while bypassing operational contracts already documented for BossFang. Reconsider linked desktop mode only after a narrow kernel exists and measured IPC overhead is a demonstrated bottleneck.</p></article><article id="S30-028" class="source-clause"><h4>S30-028 · Desktop blockers</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>Desktop blockers</h3>
+<ul>
+<li>No certified BossFang/KnowMe supervisor discovery and ownership handshake exists for this knowledge scope.</li>
+<li>No exclusive-writer lease has been demonstrated across restart, upgrade, and crash recovery.</li>
+<li>Per-install authentication, migration compatibility, readiness, and graceful-shutdown behavior remain uncertified in KnowMe.</li>
+<li>The read-only degraded UI state and queued-job recovery contract require integration evidence.</li>
+</ul></article><article id="S30-029" class="source-clause"><h4>S30-029 · Web profile: UAR behind the KnowMe Axum BFF</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>Web profile: UAR behind the KnowMe Axum BFF</h2></article><article id="S30-030" class="source-clause"><h4>S30-030 · Placement</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>Placement</h3>
+<p>The browser never embeds UAR. The supported flow is:</p>
+<p>React → hook → entity/store layer → KnowMe Axum API → typed UAR client → UAR service</p>
+<p>The Axum application owns user/session authentication, tenant and project scoping, rate limits, request validation, provider-policy selection, stream lifecycle, and public error mapping. UAR remains on a private network or authenticated loopback/service network.</p>
+<p>The browser receives projected AG-UI/A2UI events and citation-safe records. AG-UI is an event-based bridge between agent backends and user applications; its lifecycle and snapshot/delta patterns fit run and retrieval progress. A2UI supplies safe declarative UI data rather than executable UI code. <a href="https://docs.ag-ui.com/">AG-UI overview</a>, <a href="https://docs.ag-ui.com/concepts/events">AG-UI events</a>, and <a href="https://a2ui.org/">A2UI</a>.</p>
+<p>PGlite may cache UI projections and entity state, following the project rules, but it is not the authoritative web knowledge store. Provider keys, unredacted traces, cross-tenant identifiers, and unrestricted source paths never enter React.</p></article><article id="S30-031" class="source-clause"><h4>S30-031 · Web blockers</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>Web blockers</h3>
+<ul>
+<li>KnowMe's current Axum server has chat/run surfaces but no scoped knowledge facade/proxy.</li>
+<li>The existing general agent strategy's browser-WASM statement conflicts with UAR's current support matrix; this document supersedes that statement for the knowledge runtime.</li>
+<li>Tenant/scope mappings and service-to-service authentication need one canonical contract.</li>
+<li>Streaming reconnect, citation authorization, and cancellation semantics need web integration tests.</li>
+</ul></article><article id="S30-032" class="source-clause"><h4>S30-032 · Synchronization and conflict rules</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>Synchronization and conflict rules</h2>
+<p>Synchronize canonical artifacts, not implementation artifacts:</p>
+<table>
+<thead>
+<tr>
+<th>Sync</th>
+<th>Do not sync</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Source metadata/content when policy permits</td>
+<td>HNSW or other vector-index files</td>
+</tr>
+<tr>
+<td>Wiki Markdown, revision graph, tags, claims, citations</td>
+<td>Raw embedding vectors across model bindings</td>
+</tr>
+<tr>
+<td>Redacted traces selected for sync</td>
+<td>Secrets or unrestricted local paths</td>
+</tr>
+<tr>
+<td>Evaluation records and golden-set identifiers</td>
+<td>Device caches and temporary context packets</td>
+</tr>
+<tr>
+<td>Tombstones and supersession edges</td>
+<td>Process leases and local job checkpoints</td>
+</tr>
+</tbody>
+</table>
+<p>Conflict handling:</p>
+<ol>
+<li>Identical content hashes coalesce.</li>
+<li>Concurrent wiki edits create sibling revisions; neither silently overwrites the other.</li>
+<li>A merge records both parents and preserves claim-level provenance.</li>
+<li>A deletion produces a tombstone; resurrection requires an explicit later revision.</li>
+<li>Embedding-model mismatch triggers local re-embedding from canonical text.</li>
+<li>Shared/global promotion creates a new reviewed artifact; it does not mutate the project-private source entry.</li>
+</ol>
+<p>Mobile is local-first. Desktop/web may be an authoritative synchronization peer for a user, but authority is declared per scope and not inferred from connectivity. SurrealDB's combined graph, full-text, and vector capabilities support the proposed single-store mobile projection and RRF-style hybrid retrieval. <a href="https://surrealdb.com/docs/learn/data-models/vector-search/overview">SurrealDB vector search</a>, <a href="https://surrealdb.com/docs/learn/data-models/full-text-search/overview">full-text search</a>, and <a href="https://surrealdb.com/docs/learn/data-models/vector-search/hybrid-search">hybrid search</a>.</p></article><article id="S30-033" class="source-clause"><h4>S30-033 · Security, privacy, and governance</h4><p class="source-note">Governing revision: <a href="../index.html#security">SEC-01–06</a> · source requirement, not release evidence.</p><h2>Security, privacy, and governance</h2>
+<ul>
+<li>Enforce authorization before retrieval, not after generation.</li>
+<li>Filter every retrieval lane by the same scope predicate before fusion.</li>
+<li>Treat imported documents, wiki entries, and traces as untrusted content subject to prompt-injection scanning and source labelling.</li>
+<li>Keep source hashes and citation spans so a response can be re-audited after an index rebuild.</li>
+<li>Redact before persistence and again before promotion to a broader scope.</li>
+<li>Separate “may retrieve,” “may compile,” “may promote,” and “may optimize a skill” permissions.</li>
+<li>Require explicit consent for syncing private traces or personal knowledge off device.</li>
+<li>Retain evaluator and model provenance so a lesson can be regraded.</li>
+<li>Screen candidate lessons and skill changes for sycophancy; the assessment thesis was checked with the project's strict detector and scored 0.0.</li>
+<li>Never use the absence of a user correction as proof that a response was correct.</li>
+</ul></article><article id="S30-034" class="source-clause"><h4>S30-034 · Licensing gate</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>Licensing gate</h2>
+<p>UAR's repository describes the runtime as AGPL-3.0-only while its SDKs are MIT; enabling the Rust SDK's embedded runtime links the AGPL runtime into the application. This is an engineering observation, not legal advice. Before distributing an embedded mobile or linked desktop runtime, product/legal ownership must decide whether the distribution model satisfies the intended license obligations. A service deployment has different distribution considerations but still needs review. No implementation phase may treat the SDK license as if it automatically covers the embedded runtime.</p></article><article id="S30-035" class="source-clause"><h4>S30-035 · Evaluation and certification</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>Evaluation and certification</h2>
+<p>Maintain one frozen KnowMe knowledge golden set with platform slices and privacy-safe fixtures. BEIR demonstrates why retrieval should be tested across heterogeneous tasks and domains, while Ragas provides separate end-to-end grounding dimensions. <a href="https://arxiv.org/abs/2104.08663">BEIR</a> and <a href="https://arxiv.org/abs/2309.15217">Ragas</a>.</p>
+<p>Required metrics:</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Metrics</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Retrieval</td>
+<td>Recall@k, MRR, nDCG, lane contribution, duplicate rate, unauthorized-hit count</td>
+</tr>
+<tr>
+<td>Grounding</td>
+<td>Citation precision/coverage, claim support, faithfulness, context precision/recall</td>
+</tr>
+<tr>
+<td>Answer</td>
+<td>Task correctness, answer relevance, abstention correctness, user correction rate</td>
+</tr>
+<tr>
+<td>Wiki</td>
+<td>Provenance completeness, lint failures, contradiction rate, stale-entry rate, promotion reversals</td>
+</tr>
+<tr>
+<td>Loop</td>
+<td>Trace completeness, evaluator agreement, candidate acceptance, regression rate, rollback success</td>
+</tr>
+<tr>
+<td>Mobile</td>
+<td>Cold start, peak RSS, storage growth, energy/thermal budget, checkpoint recovery, offline success</td>
+</tr>
+<tr>
+<td>Desktop</td>
+<td>Sidecar readiness, restart recovery, single-writer enforcement, IPC latency</td>
+</tr>
+<tr>
+<td>Web</td>
+<td>tenant isolation, stream reconnect, cancellation propagation, service degradation behavior</td>
+</tr>
+</tbody>
+</table>
+<p>Promotion gates:</p>
+<ul>
+<li><strong>RAG pilot:</strong> zero cross-scope retrieval, complete citations, and measurable improvement over lexical-only and vector-only baselines.</li>
+<li><strong>Project wiki pilot:</strong> every compiled claim has trace/source provenance; contradictions and deletion are reversible.</li>
+<li><strong>Shared wiki:</strong> human review, repeated evidence from independent contexts, privacy approval, and no unresolved contradiction.</li>
+<li><strong>Skill optimization:</strong> deterministic regression suite, negative examples, policy checks, sycophancy check, human approval, and rollback artifact.</li>
+<li><strong>Mobile certification:</strong> physical iOS and Android evidence for memory, thermal, interruption, offline, migration, and license gates.</li>
+</ul></article><article id="S30-036" class="source-clause"><h4>S30-036 · Delivery sequence</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>Delivery sequence</h2>
+<p>This is an architecture sequence, not implementation performed by this assessment.</p></article><article id="S30-037" class="source-clause"><h4>S30-037 · Stage 0 — contracts and evidence</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>Stage 0 — contracts and evidence</h3>
+<ul>
+<li>Freeze artifact identities, scopes, provenance, event vocabulary, and embedding-model binding.</li>
+<li>Add a current-vs-stale marker to UAR/Prometheus future-work inventories.</li>
+<li>Define the golden set and baseline current KnowMe hybrid retrieval.</li>
+<li>Make licensing and data-residency decisions.</li>
+</ul>
+<p>Exit: contracts reviewed; no unresolved ownership or licensing ambiguity.</p></article><article id="S30-038" class="source-clause"><h4>S30-038 · Stage 1 — service-first vertical slice</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>Stage 1 — service-first vertical slice</h3>
+<ul>
+<li>Use desktop/web UAR service mode for ingest → retrieve → cite → project events.</li>
+<li>Add a UAR-native trace adapter and complete trace correlation.</li>
+<li>Wire evaluate → compile → lint into a project-private review queue.</li>
+<li>Keep skill optimization disabled.</li>
+</ul>
+<p>Exit: reproducible service tests, complete provenance, and single-writer behavior.</p></article><article id="S30-039" class="source-clause"><h4>S30-039 · Stage 2 — BossFang supervision and web BFF</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>Stage 2 — BossFang supervision and web BFF</h3>
+<ul>
+<li>Establish supervisor discovery/lease semantics.</li>
+<li>Expose scoped knowledge operations through KnowMe's Rust/Axum service boundary.</li>
+<li>Certify reconnect, cancellation, restart, and tenant isolation.</li>
+</ul>
+<p>Exit: one UAR authority per scope and no direct UI/runtime coupling.</p></article><article id="S30-040" class="source-clause"><h4>S30-040 · Stage 3 — mobile kernel extraction</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>Stage 3 — mobile kernel extraction</h3>
+<ul>
+<li>Split UAR domain/orchestration from the full server and audit mobile dependencies.</li>
+<li>Implement the KnowMe graph-store retrieval adapter and typed FFI surface.</li>
+<li>Add checkpointed ingestion/compile scheduling and platform budgets.</li>
+<li>Rebuild derived indexes from canonical synced artifacts.</li>
+</ul>
+<p>Exit: physical-device certification and offline parity for the supported mobile subset.</p></article><article id="S30-041" class="source-clause"><h4>S30-041 · Stage 4 — controlled learning and promotion</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>Stage 4 — controlled learning and promotion</h3>
+<ul>
+<li>Enable reviewed project-wiki candidates.</li>
+<li>Measure retrieval/answer outcomes with and without wiki context.</li>
+<li>Introduce shared promotion only after privacy and conflict evidence.</li>
+<li>Introduce skill candidates last, behind the full regression and human-release gate.</li>
+</ul>
+<p>Exit: reversible, audited improvements without automatic policy expansion.</p></article><article id="S30-042" class="source-clause"><h4>S30-042 · Rejected alternatives</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>Rejected alternatives</h2>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Decision</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Embed the current full UAR runtime on mobile</td>
+<td>Reject now</td>
+<td>It starts the server path, lacks populated direct handles, carries unsuitable features/dependencies, and is only experimentally supported on mobile.</td>
+</tr>
+<tr>
+<td>Run UAR in browser WASM</td>
+<td>Reject</td>
+<td>UAR's current matrix marks arbitrary browser WASM unsupported; it would also expose inappropriate runtime and credential surfaces.</td>
+</tr>
+<tr>
+<td>Let BossFang and KnowMe each start UAR against the same store</td>
+<td>Reject</td>
+<td>Competing writers make migrations, jobs, revision order, and shutdown unsafe.</td>
+</tr>
+<tr>
+<td>Store wiki lessons only as vectors</td>
+<td>Reject</td>
+<td>Human audit, revision merge, re-embedding, citations, and portability require canonical text.</td>
+</tr>
+<tr>
+<td>Use one table for documents, wiki lessons, and traces</td>
+<td>Reject</td>
+<td>Their trust, retention, promotion, and conflict semantics differ.</td>
+</tr>
+<tr>
+<td>Automatically update skills from successful runs</td>
+<td>Reject</td>
+<td>Current evaluation is too shallow and success traces can encode unsafe or sycophantic behavior.</td>
+</tr>
+<tr>
+<td>Replace KnowMe mobile graph storage with a second UAR database</td>
+<td>Reject</td>
+<td>It duplicates persistence and indexes and violates the single Rust-owned context-fabric direction.</td>
+</tr>
+</tbody>
+</table></article><article id="S30-043" class="source-clause"><h4>S30-043 · Open decisions</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>Open decisions</h2>
+<ol>
+<li>Which canonical sync authority owns each user's personal knowledge scope when both desktop and hosted web are available?</li>
+<li>Is private mobile-to-cloud trace synchronization opt-in per device, per workspace, or per run?</li>
+<li>Which subset of <code>prometheus-knowledge</code> dependencies can be made mobile-safe without forking behavior?</li>
+<li>Does the mobile product distribute an AGPL-compatible embedded runtime, use a separately licensed kernel, or keep UAR service-only?</li>
+<li>What minimum number and diversity of independent traces qualifies a wiki entry for shared promotion?</li>
+<li>Which graph extraction workloads are allowed locally versus delegated?</li>
+<li>What retention policy applies to rejected candidates and raw traces after their derived wiki lesson is accepted?</li>
+</ol>
+<p>These choices materially affect product behavior and must be resolved before implementation, not guessed inside adapters.</p></article><article id="S30-044" class="source-clause"><h4>S30-044 · Codebase evidence reviewed</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>Codebase evidence reviewed</h2>
+<ul>
+<li><span>UAR overview [source repository reference: ../../../rust/vendor/universal-agent-runtime/README.md]</span></li>
+<li><span>UAR product support matrix [source repository reference: ../../../rust/vendor/universal-agent-runtime/docs/product-support-matrix.md]</span></li>
+<li><span>UAR/BossFang integration [source repository reference: ../../../rust/vendor/universal-agent-runtime/docs/librefang-integration.md]</span></li>
+<li><span>UAR Rust embedded runtime [source repository reference: ../../../rust/vendor/universal-agent-runtime/sdks/rust/src/runtime.rs]</span></li>
+<li><span>UAR retrieval pipeline [source repository reference: ../../../rust/vendor/universal-agent-runtime/src/uar/rag/pipeline.rs]</span>, <span>hybrid retrieval [source repository reference: ../../../rust/vendor/universal-agent-runtime/src/uar/rag/retrieval.rs]</span>, and <span>verification [source repository reference: ../../../rust/vendor/universal-agent-runtime/src/uar/rag/verification.rs]</span></li>
+<li><span>Prometheus knowledge system [source repository reference: ../../../rust/vendor/universal-agent-runtime/crates/prometheus-skill-system/README.md]</span></li>
+<li><span>Cross-platform trace protocol [source repository reference: ../../../rust/vendor/universal-agent-runtime/crates/prometheus-skill-system/tools/prometheus-cli/crates/prometheus-agents/src/trace_protocol.rs]</span>, <span>learning command [source repository reference: ../../../rust/vendor/universal-agent-runtime/crates/prometheus-skill-system/tools/prometheus-cli/crates/prometheus-cli/src/commands/learn.rs]</span>, and <span>trace compiler [source repository reference: ../../../rust/vendor/universal-agent-runtime/crates/prometheus-skill-system/tools/prometheus-cli/crates/prometheus-learn/src/compile.rs]</span></li>
+<li><span>KnowMe UAR integration seam [source repository reference: ../../../rust/crates/gen_ui_agent/src/uar.rs]</span> and <span>current chat deployment path [source repository reference: ../../../rust/crates/gen_ui_agent/src/chat.rs]</span></li>
+<li><span>KnowMe embedded graph-RAG store [source repository reference: ../../../rust/crates/gen_ui_db_graph/src/lib.rs]</span></li>
+<li><span>KnowMe context fabric specification [source repository reference: ../../knowme-context-fabric-spec.md]</span></li>
+<li><span>General UAR integration strategy [source repository reference: ../uar-knowme-runtime-integration.md]</span></li>
+</ul>
+<p>The associated deep-research package, including source registry, contradictions, evidence graph, citations, and synthesis, is in <span>the .research package [source repository reference: research/uar-karpathy-knowledge-plane-2026.research/]</span>.</p></article></main></body></html>

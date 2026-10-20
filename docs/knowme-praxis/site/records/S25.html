@@ -1,0 +1,314 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>S25 · README.md</title><link rel="stylesheet" href="../records.css"><body><main><a href="../index.html">KnowMe Praxis</a><h1>S25 · README.md</h1><p>Complete technical source record. Historical names and requirements remain visible for audit. Revised clauses and explicit corrections govern their application.</p><p><a href="S25.txt">Download complete technical text</a></p><article id="S25-001" class="source-clause"><h4>S25-001 · Provider &amp; Model Configuration Strategy</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h1>Provider &amp; Model Configuration Strategy</h1>
+<p><strong>Scope:</strong> how KnowMe configures LLM/embedding providers and models across three
+resolution levels — <strong>global defaults</strong>, <strong>agent/assistant</strong> (client- or server-side),
+and <strong>conversation</strong> — plus embedding-model management for RAG indexes (knowledge
+bases, karpathy wikis, logs, loops) and usage-driven suggestions.</p>
+<p><strong>Status:</strong> v1.0 strategy, 2026-07-18. Companion to
+<code>docs/strategies/local-models/README.md</code> (acquisition, library UX) and
+<code>docs/knowme-builder-extensibility-spec.md</code> (settings scopes/sync). Studied against
+Cherry Studio, which handles this unusually well; we adopt its load-bearing ideas and
+diverge where KnowMe's multi-device sovereignty changes the problem.</p>
+<hr/></article><article id="S25-002" class="source-clause"><h4>S25-002 · 1. What Cherry Studio gets right (and what we adopt)</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>1. What Cherry Studio gets right (and what we adopt)</h2>
+<p>From the <a href="https://docs.cherryai.com.cn/docs/en-us/pre-basic/settings/default-models.md">Cherry Studio default-models docs</a>,
+<a href="https://docs.cherryai.com.cn/docs/en-us/cherry-studio/preview/chat">chat docs</a>, and the
+<a href="https://deepwiki.com/CherryHQ/cherry-studio/5.3-model-configuration-and-capabilities">model-configuration internals</a>:</p>
+<ol>
+<li><strong>Role-slot defaults, not one global model.</strong> Separate defaults for the <em>default
+   assistant model</em>, a <em>fast model</em> for background chores (topic naming, keyword
+   extraction), and a <em>translation model</em> — "the models used by the behind-the-scenes
+   helpers," explicitly distinct from the chat model. <strong>Adopt</strong>, with more roles (§3).</li>
+<li><strong>Assistant = role, Topic = conversation with that role.</strong> The assistant pins the
+   system prompt, model, and sampling params; topics inherit; any topic can override;
+   <code>@</code>-mention temporarily borrows another model <em>for one reply</em> while keeping context;
+   an <strong>auto-reset</strong> policy decides whether new topics revert to the assistant's model
+   or inherit the last override. <strong>Adopt all four behaviors verbatim</strong> (§4).</li>
+<li><strong>Deterministic model identity: <code>providerId::modelId</code>.</strong> One key format everywhere
+   (their <code>user_model</code> table), with per-model <code>capabilities</code>, <code>userOverrides</code>, and
+   <code>orderKey</code>. <strong>Adopt</strong> — it is exactly what our entity graph and OFP sync want (§2).</li>
+<li><strong>Capability tags with a resolution precedence.</strong> vision / function-calling /
+   reasoning / embedding / rerank per model; resolved as <em>registry-force → user
+   overrides → registry add/remove</em>, so user removals survive registry updates.
+   <strong>Adopt precedence unchanged</strong> (§2.3).</li>
+<li><strong>Provider-specific settings are schema, not special-cased UI</strong> (Azure api-version,
+   Vertex project, custom OpenAI-compatible base URLs). <strong>Adopt</strong> via our
+   settings-schema renderer (§2.2) — one generic form engine, per-provider schemas.</li>
+</ol>
+<p>Where we must diverge: Cherry Studio is a single-machine app. KnowMe's config must
+survive <strong>multiple devices with different local capabilities plus shared peers</strong> —
+that changes identity, resolution, and sync (§5).</p></article><article id="S25-003" class="source-clause"><h4>S25-003 · 2. The registry</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>2. The registry</h2></article><article id="S25-004" class="source-clause"><h4>S25-004 · 2.1 Providers</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>2.1 Providers</h3>
+<pre><code class="language-jsonc">{
+  "id": "prov-anthropic",             // stable, user-scoped
+  "kind": "anthropic",                 // local-engine | bossfang | anthropic | openai |
+                                       // openai-compatible | ollama | azure-openai | vertex | …
+  "label": "Anthropic",
+  "base_url": null,                    // overridable where kind allows
+  "auth_ref": "keychain://prov-anthropic",  // secrets NEVER in the settings doc —
+                                       // OS keychain via Tauri secure storage / Flint Vault server-side
+  "settings": { /* validated by the provider-kind's JSON Schema */ },
+  "health": { "state": "ok", "checked_at": "…", "latency_ms": 240 }
+}
+</code></pre>
+<p>Two provider kinds are KnowMe-specific and <strong>auto-registered, never hand-configured</strong>:</p>
+<ul>
+<li><strong><code>local-engine</code></strong> — the in-process llama.cpp/mistral.rs runtime; its model list <em>is</em>
+  the local model library (local-models §12). Exists on every device; contents differ
+  per device.</li>
+<li><strong><code>bossfang</code></strong> — one provider per connected instance from Settings → Instances,
+  created/removed with the instance itself. Its model list is served by the peer
+  (the cyan <code>remote</code> rows in the moodboard). Health = OFP reachability.</li>
+</ul>
+<p>Cloud kinds route through liter-llm in UAR — the vendored submodule
+(<code>rust/vendor/universal-agent-runtime</code> v1.0.0) carries a 269-provider catalog as
+<em>discovery</em> data (a catalog entry is not execution certification; provider access
+stays capability- and health-gated) — but are
+<em>presented</em> as first-class providers with their own rows, keys, and health checks.
+Every provider row: status dot · label · base host · kind pill · "Check" button
+(connectivity + auth + a 1-token echo), matching the moodboard Providers tab.</p></article><article id="S25-005" class="source-clause"><h4>S25-005 · 2.2 Provider-kind schemas</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>2.2 Provider-kind schemas</h3>
+<p>Each <code>kind</code> ships a JSON-Schema for its settings (api-version for Azure, project/region
+for Vertex, org id for OpenAI, TLS options for custom). The generic schema→form
+renderer from the extensibility spec draws the UI; adding a provider kind (including
+via a <code>.pxt</code> extension exporting a <code>provider</code> capability) never requires new settings
+UI code. This is how we stay "Cherry-class" on provider coverage without their
+hand-built per-provider screens.</p></article><article id="S25-006" class="source-clause"><h4>S25-006 · 2.3 Models</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>2.3 Models</h3>
+<p>Key: <strong><code>provider_id::model_id</code></strong> (adopted). Record: capability set (<code>chat</code>, <code>vision</code>,
+<code>tools</code>, <code>reasoning</code>, <code>embedding</code>, <code>rerank</code>), context length, pricing (cloud) or
+size/quant + measured tok/s (local, from the benchmark gate), <code>enabled</code>, <code>order_key</code>,
+user overrides. Capability resolution: <strong>registry force → user overrides → registry
+add/remove</strong> (adopted). The registry layer is fed by: the signed KnowMe catalog (local
+models), the provider's <code>/models</code> listing (cloud), and the peer's advertisement
+(bossfang). Users can hand-add models a provider doesn't list (custom deployments).</p></article><article id="S25-007" class="source-clause"><h4>S25-007 · 3. Global level — role slots</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>3. Global level — role slots</h2>
+<p>Cherry Studio's insight, extended. Global settings bind <strong>roles</strong> to model refs:</p>
+<table>
+<thead>
+<tr>
+<th>Role slot</th>
+<th>Used by</th>
+<th>Default guidance</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>chat.default</code></td>
+<td>New assistants/conversations without a pin</td>
+<td>The §10 device recommendation (local)</td>
+</tr>
+<tr>
+<td><code>utility.fast</code></td>
+<td>Topic naming, summarization, memory extraction, digest drafting, karpathy log/loop summarization</td>
+<td>Small + cheap + local: Qwen3 1.7–4B class</td>
+</tr>
+<tr>
+<td><code>agent.default</code></td>
+<td>New Hands without an explicit model</td>
+<td>Tool-calling floor for the tier (14B+/MoE, or a peer)</td>
+</tr>
+<tr>
+<td><code>vision.default</code></td>
+<td>Ask Image, image drops in chat</td>
+<td>Gemma E-class / 3 4B+</td>
+</tr>
+<tr>
+<td><code>translation</code></td>
+<td>One-click translate</td>
+<td>Any chat model; user preference</td>
+</tr>
+<tr>
+<td><code>embedding.default</code></td>
+<td><strong>Seed for new indexes only</strong> (§6 — never applied retroactively)</td>
+<td>EmbeddingGemma@768 (device-appropriate)</td>
+</tr>
+<tr>
+<td><code>rerank.default</code></td>
+<td>Optional second retrieval stage</td>
+<td>Qwen3-Reranker-0.6B, desktop/server only</td>
+</tr>
+</tbody>
+</table>
+<p>Rules: every slot shows <em>provenance and fallback</em> ("local Qwen3 8B; falls back to
+BossFang <code>home-mac</code> when unloaded"). Role slots are <strong>user-scoped settings</strong> — they sync
+via the CRDT settings layer — but a slot bound to a <code>local-engine</code> model resolves
+per-device (§5). The <code>utility.fast</code> slot is what keeps background chores (Cherry's
+"behind-the-scenes helpers") off the expensive model — same separation, more consumers:
+Hands digests, memory writes, wiki/log/loop maintenance all draw from it.</p></article><article id="S25-008" class="source-clause"><h4>S25-008 · 4. Agent and conversation levels</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>4. Agent and conversation levels</h2></article><article id="S25-009" class="source-clause"><h4>S25-009 · 4.1 Agent/assistant level</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>4.1 Agent/assistant level</h3>
+<p>An assistant (chat persona) or Hand pins: <code>model_ref</code> (or "inherit global"), sampling
+params (temperature, top-p, max tokens, ctx), and — for Hands — the <strong>deployment
+target</strong>, which scopes resolution: a Hand deployed to <code>home-mac</code> resolves its model
+against <em>that instance's</em> providers at run time, not the authoring device's. This is
+the client-side/server-side split the FUNC-SPEC's Hands wizard (Step 2 Model,
+Step 3 Deployment) already sketches; the registry makes it precise: the wizard's model
+picker filters to <code>capabilities ⊇ tools</code> and <em>the chosen target's</em> available models,
+and warns when a pick is below the tool-calling floor for that target's hardware.</p></article><article id="S25-010" class="source-clause"><h4>S25-010 · 4.2 Conversation level</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>4.2 Conversation level</h3>
+<p>Adopted from Cherry Studio wholesale, in moodboard terms:</p>
+<ul>
+<li>The <strong>model chip</strong> at the top of Chat (already in Screen 02) is the per-conversation
+  override: tap → selector grouped by provider, capability-filtered, with fit/trust
+  pills carried over from the library. An override is <strong>sticky for that conversation</strong>
+  and labeled with provenance: "Qwen3-14B — set for this conversation."</li>
+<li><strong><code>@</code>-mention</strong> in the composer borrows a model for a single reply with full context
+  ("Mention model" behavior) — including <em>multiple</em> mentions for side-by-side answers;
+  the transcript records which model produced which message (per-message model
+  attribution is already implied by the moodboard's per-message thinking blocks).</li>
+<li><strong>Auto-reset policy</strong> (per assistant, default ON): new conversations revert to the
+  assistant's model; OFF inherits the last override. Exposed as one toggle, phrased in
+  outcomes: "New conversations start with this assistant's model."</li>
+</ul></article><article id="S25-011" class="source-clause"><h4>S25-011 · 4.3 Resolution order (the whole system in six lines)</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h3>4.3 Resolution order (the whole system in six lines)</h3>
+<pre><code>message-level  @mention            (one reply)
+  → conversation override          (sticky, this topic)
+    → assistant/Hand pin           (+ params; Hands: scoped to deployment target)
+      → role slot                  (chat.default / agent.default / …)
+        → device recommendation    (local-models §10, if the slot is unset)
+          → ask the user           (never silently pick a cloud provider)
+</code></pre>
+<p>Every level may be unset; the effective choice always renders its source. One hard
+rule from the sovereignty posture: <strong>resolution never escalates locality on its own</strong> —
+a chain that resolves to a local model may fall back to a <em>peer</em>, but falling back to a
+<em>cloud</em> provider requires an existing Cedar grant for that provider, or a prompt.</p></article><article id="S25-012" class="source-clause"><h4>S25-012 · 5. Multi-device semantics (where we go beyond Cherry Studio)</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>5. Multi-device semantics (where we go beyond Cherry Studio)</h2>
+<p>A pinned <code>local-engine</code> model may not exist on the next device. Resolution therefore
+has a <strong>placement walk</strong> when the bound ref is unavailable <em>here</em>:</p>
+<ol>
+<li>Same <code>model_id</code> on a reachable <code>bossfang</code> provider → use it (chip shows cyan
+   <code>remote</code>);</li>
+<li>Same catalog <strong>equivalence class</strong> locally (the signed catalog groups e.g.
+   Qwen3 {4B, 8B, 14B} as tier-variants of one family; pick the device-appropriate
+   tier and label it "device equivalent");</li>
+<li>Offer: download it here (jumps into the local-models §2 flow) / pick another / use
+   peer.</li>
+</ol>
+<p>Sync scopes (per the extensibility-spec settings model): role slots and assistant pins
+are <strong>user-scoped</strong> (CRDT-synced); the <em>placement</em> of <code>local-engine</code> refs and anything
+bound to device hardware is <strong>device-scoped</strong>; provider auth is <strong>secret</strong> (keychain,
+never CRDT — each device holds its own copy; BossFang instances may hold shared keys in
+Flint Vault). Conversation overrides travel <em>with the conversation entity</em> through
+normal OFP sync, and the placement walk re-runs on whatever device opens it.</p></article><article id="S25-013" class="source-clause"><h4>S25-013 · 6. Embedding models — per-index bindings, not a global knob</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>6. Embedding models — per-index bindings, not a global knob</h2>
+<p>The <code>embedding.default</code> slot only <em>seeds creation flows</em>. The binding that matters
+lives on the index, because vectors are only comparable within one model+dim
+(local-models §11):</p>
+<pre><code class="language-jsonc">// stamped on every KB / karpathy wiki / log index / loop memory at creation
+{
+  "index_id": "kb-client-acme",
+  "embedding": { "model_ref": "prov-local::embeddinggemma-300m", "dim": 256 },
+  "rerank":    { "model_ref": null },
+  "chunking":  { "strategy": "semantic", "target_tokens": 480, "overlap": 64 },
+  "created_at": "…"
+}
+</code></pre>
+<ul>
+<li><strong>Immutable after creation</strong> except through an explicit <strong>re-embed migration</strong>: a
+  visible job (progress, cancellable, old index kept until the new one completes) —
+  the honest version of what most tools hide. Cherry Studio binds the embedding model
+  at KB creation for the same reason; we make the migration path first-class instead
+  of impossible.</li>
+<li><strong>Creation wizard</strong>: defaults from <code>embedding.default</code>, shows dim choice with the
+  tradeoff stated ("256-dim: ~3× smaller/faster, slight recall cost — recommended on
+  this device"), warns when the chosen model can't run on devices that sync this index
+  ("your phone can embed queries with EmbeddingGemma but not BGE-M3 — queries will
+  route to a peer").</li>
+<li><strong>Karpathy wikis / logs / loops</strong> (the <code>karpathy-progress-memory</code> artifacts): each
+  gets the same binding block. Their <em>maintenance</em> passes (summarize, distill, link)
+  draw from <code>utility.fast</code>; their <em>retrieval</em> uses the index's own embedding binding;
+  loops that grade/reflect may pin a reasoning-capable model explicitly — that pin is
+  an agent-level setting on the loop's Hand, resolved like any other (§4.1).</li>
+<li><strong>Mismatch on sync = re-embed job, never merge</strong> (restated from local-models §11);
+  the index's <code>{model_ref, dim}</code> stamp is the guard.</li>
+<li><strong>Server-side indexes</strong> (flint-forge/BossFang corpus): may bind heavier models
+  (BGE-M3 hybrid) and optionally embed <em>in-database</em> via Flint Ember; devices keep a
+  device-appropriate binding over their hot subset. Two indexes, two bindings, one
+  query plan — the read path merges results, it does not pretend the vectors are
+  comparable.</li>
+</ul></article><article id="S25-014" class="source-clause"><h4>S25-014 · 7. Usage-based suggestions</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>7. Usage-based suggestions</h2>
+<p>All signals are <strong>local-only</strong> (SurrealDB; no analytics pipeline — FUNC-SPEC §09), the
+engine is rules over counters, and every suggestion is a dismissible card that
+<em>explains itself and applies with one tap</em> — never an automatic switch.</p>
+<p>Tracked per <code>(context, model_ref)</code>: use counts and recency; measured latency/tok/s;
+error and <strong>malformed-tool-call rates</strong>; regenerate-with-a-different-model events (the
+strongest preference signal: the user tried A, redid it with B); manual override
+frequency per assistant/topic-class; token spend per cloud provider (priced from the
+registry) vs. local; provider health history.</p>
+<p>The cards these rules produce:</p>
+<ul>
+<li>"In coding conversations you switch to <strong>Qwen3-Coder</strong> 8 of the last 10 times —
+  make it the Coding assistant's model?"</li>
+<li>"<strong>Inbox Triage</strong> has an 18 % malformed-tool-call rate on Qwen3-4B. Its target
+  <code>home-mac</code> can run 30B-A3B at ~40 t/s — redeploy?" (agent-level, ties §4.1 to the
+  tool-calling floor)</li>
+<li>"This month: $14.20 to Anthropic for summarization tasks your local
+  <code>utility.fast</code> model handles within quality thresholds — route utility tasks local?"</li>
+<li>"Provider <strong>Groq</strong> failed 40 % of requests this week — health-check or disable?"</li>
+<li>"<strong>Phi-4-mini</strong> hasn't been used in 90 days — reclaim 2.3 GB?"</li>
+<li>After a benchmark: "Measured 47 t/s on the new model — 2.1× faster than your current
+  chat default with equal capability tags. Swap?"</li>
+</ul>
+<p>Suggestion cards land in the Models tile and (for agent-level ones) on the Hand's
+detail card, in the moodboard's cyan-annotation style: claim, evidence, one action.</p></article><article id="S25-015" class="source-clause"><h4>S25-015 · 8. UI surface map (moodboard-anchored)</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>8. UI surface map (moodboard-anchored)</h2>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Level</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Settings → <strong>Providers</strong> (tab exists in Screen 05's rail)</td>
+<td>registry</td>
+<td>Provider rows (dot · label · host · kind pill · Check); detail sheet = schema-driven settings + key entry (keychain) + model list with enable toggles, capability pills, order</td>
+</tr>
+<tr>
+<td>Settings → <strong>Default Models</strong> (new pane under Providers)</td>
+<td>global</td>
+<td>The §3 role-slot list, each row: slot name · bound model chip with provenance · fallback line</td>
+</tr>
+<tr>
+<td>Assistant editor / Hands wizard Step 2</td>
+<td>agent</td>
+<td>Model picker (capability- and target-filtered) · params · inherit toggle · floor warnings</td>
+</tr>
+<tr>
+<td>Chat header model chip (Screen 02)</td>
+<td>conversation</td>
+<td>Sticky override selector, provenance label, auto-reset per assistant</td>
+</tr>
+<tr>
+<td>Composer <code>@</code></td>
+<td>message</td>
+<td>One-reply borrow, multi-model compare</td>
+</tr>
+<tr>
+<td>KB / wiki / loop creation wizards</td>
+<td>index</td>
+<td>Embedding binding block (§6), re-embed migration entry point on the index detail sheet</td>
+</tr>
+<tr>
+<td>Models tile</td>
+<td>cross-cutting</td>
+<td>Suggestion cards (§7), measured numbers, library (local-models §12)</td>
+</tr>
+</tbody>
+</table></article><article id="S25-016" class="source-clause"><h4>S25-016 · 9. Implementation notes (this repo)</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>9. Implementation notes (this repo)</h2>
+<ul>
+<li>Registry + resolver in Rust (<code>gen_ui_client</code> / a small <code>knowme_model_registry</code>
+  module): <code>ModelRef(provider_id, model_id)</code>, capability resolution, the §4.3 resolver
+  with placement walk — one implementation behind FFI/IPC/WASM so React, Flutter, and
+  Hands runtime resolve identically; resolution results carry <code>{ref, source_level,
+  placement, reason}</code> for provenance rendering.</li>
+<li>Settings storage: role slots + assistant pins as user-scoped CRDT settings docs;
+  device-scoped placement cache; keys in keychain (<code>gen_ui_agent::secrets</code> already
+  exists) / Flint Vault server-side.</li>
+<li>Usage counters: local SurrealDB tables written by the runtime (chat + Hands + UAR
+  tool results already flow through the core); the suggestion rules run in
+  <code>utility.fast</code>-priced background passes.</li>
+<li>Provider-kind schemas ship in the app + are extensible via <code>.pxt</code> <code>provider</code>
+  capability (extensibility spec §5).</li>
+</ul></article><article id="S25-017" class="source-clause"><h4>S25-017 · 10. References</h4><p class="source-note">Governing revision: <a href="../index.html#context">CX-01–08</a> · source requirement, not release evidence.</p><h2>10. References</h2>
+<ul>
+<li>Cherry Studio: <a href="https://docs.cherryai.com.cn/docs/en-us/pre-basic/settings/default-models.md">default model settings</a> ·
+  <a href="https://docs.cherryai.com.cn/docs/en-us/cherry-studio/preview/chat">chat interface (topics, @mention, auto-reset)</a> ·
+  <a href="https://deepwiki.com/CherryHQ/cherry-studio/5.3-model-configuration-and-capabilities">model configuration &amp; capabilities internals</a> ·
+  <a href="https://docs.cherry-ai.com/docs/en-us/cherry-studio/preview/settings/providers">provider settings</a> ·
+  <a href="https://docs.cherry-ai.com/docs/en-us/pre-basic/providers/zi-ding-yi-fu-wu-shang">custom providers</a> ·
+  <a href="https://docs.cherryai.com.cn/docs/en-us/cherry-studio/preview/knowledge-base.md">knowledge base</a></li>
+<li>In-repo: <code>docs/strategies/local-models/README.md</code> (§10 picks, §11 embeddings, §12
+  library UX) · <code>docs/knowme-builder-extensibility-spec.md</code> (§6 settings scopes/sync) ·
+  <code>docs/knowme-functional-spec.html</code> (§04, §09, §10)</li>
+</ul></article></main></body></html>

@@ -1,0 +1,16 @@
+:root{
+  --bg:#F7F7F8; --surface:#FFFFFF; --surface-warm:#EEEEF1; --border:#D8DEE6; --border-soft:#E8ECF0;
+  --fg:#0B0F14; --fg-2:#4B5563; --muted:#6F7C89; --meta:var(--muted);
+  --accent:#C8431F; --accent-on:#FFFFFF; --accent-hover:#A83617; --accent-active:#8A2E14;
+  --ember:#E04E28; --ember-soft:#F2D6CF; --charcoal:#0B0F14; --heading:#0B0F14;
+  --success:#2F6F4E; --warn:#B7791F; --danger:#C53030;
+  --font-display:"Space Grotesk","Helvetica Neue",Arial,sans-serif;
+  --font-body:"Roboto","Helvetica Neue",Arial,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  --text-xs:12px; --text-sm:14px; --text-base:16px; --text-lg:18px; --text-xl:22px; --text-2xl:26px; --text-3xl:34px; --text-4xl:46px;
+  --leading-body:1.7; --leading-tight:1.15; --tracking-display:-0.02em;
+  --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px; --space-5:20px; --space-6:24px; --space-8:32px; --space-10:40px; --space-12:48px;
+  --radius-sm:4px; --radius-md:10px; --radius-lg:14px; --radius-pill:999px;
+  --shadow-none:none; --focus-ring:0 0 0 2px #E04E28;
+  --motion-ease:cubic-bezier(.2,.7,.3,1); --motion-fast:.25s; --motion-base:.45s;
+}

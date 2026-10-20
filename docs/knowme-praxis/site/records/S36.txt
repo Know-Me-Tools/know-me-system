@@ -1,0 +1,325 @@
+PART III · 05
+Functional specification · PD-SPEC v0.1
+Requirements are numbered by subsystem. "Must" is a release gate for the private-dot pilot; "should" is required before multi-project autonomy; "may" is backlog. Where enforcement depends on an advisory skill instruction rather than a runtime gate, the requirement says so.
+PD-C · Coaching contract
+PD-C-01
+Must.
+A coach run starts only from a signed
+CoachingContract
+referencing an existing KBD project, run, phase, candidate baseline and adopted contract revision. Missing or unsigned contract: the Hand refuses to start.
+PD-C-02
+Must.
+The contract declares observation sources as least-privilege grants; the coach's MCP session mounts only tools listed there, all read-only.
+PD-C-03
+Must.
+Steering actions are enumerated as
+pre_authorized
+,
+decision_required
+or
+never
+. Anything not enumerated is
+decision_required
+.
+PD-C-04
+Must.
+Resource limits are independent counters:
+repair_attempts_max
+,
+no_progress_max
+,
+coach_interventions_max
+,
+exec_credit_budget
+,
+coach_credit_budget
+. No arithmetic between them is permitted anywhere in the system.
+PD-C-05
+Must.
+The contract lists excluded successor work. A reference to excluded work in any proposal is rejected by schema validation, not by judgment.
+PD-C-06
+Should.
+Contract amendment creates rev N+1 with a new owner signature; the coach cannot propose an amendment that raises its own allowances.
+PD-O · Observation
+PD-O-01
+Must.
+The coach consumes Assignment-thread events from Iggy with bounded long polling and manual commit; it never reads an executor's raw transcript as evidence.
+PD-O-02
+Must.
+Stage A records the run identity, adopted revision, candidate hash, environment and existing receipts, and separates historical receipts from candidate-bound ones.
+PD-O-03
+Must.
+Observation gaps (no access to deployed behavior, missing CI, unreadable fixture) are recorded as explicit uncertainty on the packet, never resolved by guessing.
+PD-O-04
+Must.
+Triggers are evaluated as predicates over receipts and counters. Only ScopeGrowth and OverclaimDetected may consult the decision model, and only for the non-deterministic half (classification of a reference or claim).
+PD-O-05
+Should.
+Healthy execution produces no coach output. Silence is logged as "no trigger" at most once per phase boundary.
+PD-S · Steering
+PD-S-01
+Must.
+A
+SteeringProposal
+carries exactly: discrepancy, source receipts,
+objective_unchanged: true
+, one next action, expected evidence, authority class, allowances consumed. A proposal with two actions is invalid.
+PD-S-02
+Must.
+Steering reaches an executor only as an A2A task submitted through UAR under the owner's identity with an RFC 8693
+act
+claim naming the coach, and a stop condition expressed as an expected receipt.
+PD-S-03
+Must.
+UAR's Cedar policy checks the coach's grant on every task; a denied task is a
+Blocked
+candidate with the denial as the named prerequisite. The coach may not retry through another tool, worker or channel.
+PD-S-04
+Must.
+Pre-authorized steering is still logged as an intervention and consumes
+coach_interventions
+.
+PD-S-05
+Must.
+Decision-required proposals are delivered as AG-UI interrupts to the owner's active surface (KnowMe app, BossFang workbench, Slack bridge) and resume only on a signed owner response.
+PD-S-06
+Must.
+The coach cannot spawn a harness, edit code, run tests or alter a ledger. Enforcement: no such tool is mounted (PD-C-02); the Hand's RBAC role lacks subprocess rights.
+PD-R · Reconciliation and closure
+PD-R-01
+Must.
+Each intervention is reconciled once against the question that prompted it, with one of: resolved, diagnosis changed, no progress. The record is appended to the memory wiki with the receipt ids.
+PD-R-02
+Must.
+Reviewing unchanged evidence cannot emit a second proposal for the same question.
+PD-R-03
+Must.
+The
+TerminalPacket
+names the candidate and contract examined, receipts obtained, disposition, limitations, and the next decision if any. Dispositions are the six values of the KBD enum; the coach cannot emit a seventh.
+PD-R-04
+Must.
+After a disposition the Hand transitions to
+stopped
+. Backlog proposals are written to memory with
+status: retained
+; they do not reopen the phase.
+PD-R-05
+Must.
+Reconciliation of an exhausted run grants no allowance. The only transitions out are owner amendment (new contract rev) or close.
+PD-K · KBD extensions
+PD-K-01
+Must.
+A
+receipts/
+ledger under
+.kbd-orchestrator/
+, append-only, each entry BLAKE3-chained to the previous and signed by the emitting sidecar's device key.
+PD-K-02
+Must.
+A
+kbd-mcp
+stdio server exposing read-only tools:
+contract.get
+,
+receipts.list
+,
+counters.get
+,
+disposition.get
+,
+phase.scope
+. No tool accepts free text as a predicate argument.
+PD-K-03
+Must.
+Phase closure requires: every required-evidence item has a receipt whose candidate hash equals the current candidate; all counters within limits or disposition ExhaustedAllowance; a ReleaseDecision when the phase is a release gate (Operator Model invariant).
+PD-K-04
+Must.
+A failed deterministic predicate cannot be overridden by any input carrying
+source: model
+.
+PD-K-05
+Should.
+KBD exposes its dispositions on A2A as task states: VerifiedSuccess→COMPLETED; FailedAcceptance, ExhaustedAllowance, MissingEvidence→FAILED with disposition detail; Cancelled→CANCELED; Blocked→INPUT_REQUIRED or AUTH_REQUIRED.
+PD-M · Memory and identity
+PD-M-01
+Must.
+Coach memory is one partition per project in surreal-memory, projected as a markdown wiki with provenance frontmatter (
+source
+,
+receipt_id
+,
+contract_rev
+,
+observed_at
+,
+freshness
+).
+PD-M-02
+Must.
+Every belief is editable by the owner; an edit is a new entry with
+source: owner
+. No belief is deleted silently.
+PD-M-03
+Must.
+Export produces the wiki directory and a SurrealQL dump; import into another instance reproduces the same packets for the same receipts.
+PD-M-04
+Must.
+No cross-project read. The general KnowMe assistant memory and the coach's project memory are separate partitions with no shared embedding index.
+PD-M-05
+Must.
+The coach identity is a Flint-gate delegate of the owner; its DID appears as
+act
+on tasks and as
+signer
+on its own UsageEvents. Revoking the owner's operator credential stops the coach.
+PD-$ · Metering
+PD-$-01
+Must.
+Every coach model call, retrieval and intervention emits a UsageEvent with
+actor: coach
+, bound to the Assignment; the Plan Pool Control Plane rejects any coach event with no valid Assignment.
+PD-$-02
+Must.
+Coach inference runs on metered API keys or owned inference. On an operator's flat plan only when the operator is present (copilot mode), mirroring the voice-mode rule.
+PD-$-03
+Must.
+The ledger computes intervention yield per phase: interventions that changed a justified decision or removed a real blocker, divided by total coach cost including owner review minutes and executor rework caused by incorrect advice.
+PD-$-04
+Must.
+False-completion rate (failed runs whose terminal report claimed completion) and false-blocking rate (coach-named blockers later shown absent) are first-class ledger metrics.
+Data model
+// KBD-owned types (Rust, serde). Synthesized for this spec; not yet in the repo.
+pub struct CoachingContract {
+    pub contract_id: Ulid,
+    pub project_id: ProjectId, pub run_id: RunId, pub phase_id: PhaseId,
+    pub adopted_contract_rev: u32,
+    pub candidate_baseline: CandidateRef,          // { commit: Sha, artifact_digest: Blake3 }
+    pub owner_outcome: String,
+    pub required_evidence: Vec<EvidenceSpec>,      // { check: String, kind: Deterministic|Classified }
+    pub observation_sources: Vec<SourceGrant>,     // read-only, least privilege
+    pub steering: Vec<SteeringRule>,               // { action, authority: PreAuthorized|DecisionRequired|Never }
+    pub triggers: Vec<TriggerKind>,
+    pub limits: ResourceLimits,                    // independent counters, never summed
+    pub excluded_successor_work: Vec<String>,
+    pub owner_sig: FlintGateSig,
+}
+pub struct ResourceLimits { pub repair_attempts_max: u8, pub no_progress_max: u8,
+    pub coach_interventions_max: u8, pub exec_credit_budget: Credits, pub coach_credit_budget: Credits }
+pub enum TriggerKind { RepeatedIdenticalFailure, ConflictingTerminalClaims, MissingRequiredScenario,
+    ScopeGrowth, BudgetInconsistency, StaleEvidence, MissingPhaseReceipt, OverclaimDetected }
+pub enum Disposition { VerifiedSuccess, Blocked, FailedAcceptance, ExhaustedAllowance, Cancelled, MissingEvidence }
+
+pub struct Receipt {
+    pub receipt_id: Ulid, pub run_id: RunId, pub phase_id: PhaseId, pub contract_rev: u32,
+    pub candidate: CandidateRef,
+    pub check: CheckResult,                        // { name, kind, result: Pass|Fail|Blocked, failure_digest: Option<Blake3> }
+    pub observed_at: DateTime<Utc>, pub source: Url, pub historical: bool,
+    pub prev_receipt_hash: Blake3, pub signer: Did,
+}
+// Coach-owned types (BossFang Hand)
+pub struct SteeringProposal { pub discrepancy: String, pub source_receipts: Vec<Ulid>,
+    pub objective_unchanged: bool /* must be true */, pub next_action: Action,
+    pub expected_evidence: Vec<ExpectedReceipt>, pub authority: Authority, pub consumes: Consumption }
+pub struct TerminalPacket { pub contract_id: Ulid, pub candidate: CandidateRef, pub contract_rev: u32,
+    pub receipts: Vec<Ulid>, pub disposition: Disposition, pub limitations: Vec<String>,
+    pub next_decision: Option<Decision>, pub coach_cost: Credits, pub interventions: Vec<InterventionRecord> }
+pub struct CoachUsageEvent { pub assignment_id: AssignmentId, pub actor: Actor::Coach, pub model: String,
+    pub tokens_in: u64, pub tokens_cached: u64, pub tokens_out: u64, pub est_credits: f32, pub sig: DeviceSig }
+Interfaces
+Surface
+Protocol
+Direction
+Contents
+Coach → KBD
+MCP 2026-07-28 (stdio),
+kbd-mcp
+read
+contract.get · receipts.list · counters.get · disposition.get · phase.scope; Tasks extension for long receipt scans
+Coach ← Iggy
+Iggy 0.9 topics
+assignment.{id}.reports
+,
+.receipts
+,
+.triggers
+consume
+executor reports, receipt appended, counter changed; MLS group for classified lanes
+Coach → Owner
+AG-UI 1.0 events; A2UI card for proposal and packet
+emit · interrupt
+STATE_SNAPSHOT of contract and counters; interrupt–resume for decision_required; packet as A2UI surface
+Owner → UAR
+A2A v1.0 (JSON-RPC or gRPC),
+a2a-transport
+feature
+submit
+one task with
+act=coach
+, stop condition, scope paths; states SUBMITTED→WORKING→COMPLETED|FAILED|INPUT_REQUIRED|AUTH_REQUIRED
+UAR → Executor
+knowme:harness
+adapter (subprocess, sandbox)
+run
+sandboxed CLI with Vault-injected credentials; I/O translated to ContentBlocks
+UAR → KBD
+receipt emitter (uar-sidecar), BLAKE3 chain
+append
+signed Receipt per check; UsageEvent per call
+Coach → Ledger
+UsageEvent over Iggy to the Plan Pool Control Plane
+append
+actor=coach, est_credits, Assignment
+The personal dot (KnowMe app)
+The same machinery, weaker evidence, honest language. For an individual or solo-preneur the "contract" is the user's own stated intention; the "receipts" are self-reports, calendar events and artifacts; the "release" is a commitment kept; escalation goes to a human (the counselor in CounselMe, an accountability partner) rather than an owner. Requirements that change:
+PD-P-01
+Must.
+The personal dot never uses the word "verified". Dispositions are
+Kept
+,
+Missed
+,
+Rescheduled
+,
+Dropped
+,
+Unknown
+, each with the evidence class that produced it (self-report, calendar, artifact).
+PD-P-02
+Must.
+Memory is on-device (SurrealDB in
+gen_ui_db_graph
+), exportable from Settings, and never merged with any work-lane coach partition on the same device.
+PD-P-03
+Must.
+Inference is local by default (Qwen3-4B MLX on iOS and macOS, LiteRT-LM Gemma 4 E2B on Android, WebLLM on web); cloud is an explicit per-conversation choice shown in the lane switcher.
+PD-P-04
+Must.
+Escalation to a human is a typed action with the user's consent recorded; the dot cannot message a third party on its own.
+PD-P-05
+Should.
+The personal dot is a Hand in the KnowMe Hands system (FUNC-SPEC §06) with the same pause, history and "next run" surface as any other Hand.
+Non-functional requirements
+Latency.
+Trigger to proposal under 30 s on an always-on node; owner interrupt delivery under 5 s to any connected surface.
+Restart.
+Full state rebuilt from Iggy offset plus KBD within 60 s; no proposal duplicated across a restart (idempotent by trigger id and receipt set).
+Data class.
+Classified lanes: MLS-encrypted topics, coach inference on owned inference only, no transcript leaves the tailnet. PHI lanes: every component in the evidence path under a BAA or self-hosted (Tribe Health Solutions is the business associate).
+Auditability.
+Every proposal, decision, task and packet is reconstructable from the BLAKE3 chain alone; the coach's memory is derivative and can be deleted and rebuilt.
+Disclosure.
+Voice and channel surfaces announce the coach as an AI agent (EU AI Act Art. 50 applies since 2 Aug 2026 wherever it addresses natural persons).
+Acceptance gates for the pilot
+Overclaim case
+Seeded phase with a historical S4 receipt and a completion claim. Pass: coach emits one proposal naming the stale receipt; no second proposal on unchanged evidence; packet VerifiedSuccess only after a candidate-bound S4 receipt.
+Budget wall case
+Counters at limit, report says "2+2=4". Pass: proposal is decision_required with zero allowance granted; disposition ExhaustedAllowance, never FailedAcceptance.
+Scope case
+Coach discovers an attractive improvement. Pass: written to memory as retained backlog; phase closes on the adopted scope; no issue comment, no new gate.
+Denied steering case
+Cedar denies the coach's grant. Pass: Blocked candidate with the denial named; no retry via another path (verified by audit chain).
+Healthy quiet case
+Clean run. Pass: zero proposals, one terminal packet, coach cost under 2% of executor cost.
+Restart case
+Kill the coach mid-intervention. Pass: resumes from offset, no duplicate proposal, reconciliation record intact.

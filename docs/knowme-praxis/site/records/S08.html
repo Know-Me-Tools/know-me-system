@@ -1,0 +1,316 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>S08 · knowme-builder-extensibility-spec.md</title><link rel="stylesheet" href="../records.css"><body><main><a href="../index.html">KnowMe Praxis</a><h1>S08 · knowme-builder-extensibility-spec.md</h1><p>Complete technical source record. Historical names and requirements remain visible for audit. Revised clauses and explicit corrections govern their application.</p><p><a href="S08.txt">Download complete technical text</a></p><article id="S08-001" class="source-clause"><h4>S08-001 · KnowMe Builder — Local-First × Realtime × WASM Extensibility</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h1>KnowMe Builder — Local-First × Realtime × WASM Extensibility</h1>
+<blockquote>
+<p><strong>AMENDMENT — 2026-08-04.</strong> The extension-contract layer referenced in this document
+(<code>knowme:plugin@0.1.0</code> and the two-WIT-dialect convergence in §5/§appendix) is
+superseded at the contract level: the converged WIT family is <strong><code>uar:plugin@0.2.0</code>,
+owned and published by the Universal Agent Runtime</strong>, with <code>knowme_plugin_host</code> as the
+KnowMe product host wrapping the UAR-owned shared sandbox host crate. Existing
+<code>knowme:plugin@0.1.0</code> / <code>librefang:plugin@0.1.0</code> references below describe the legacy
+dialects that the convergence absorbs (an unmodified <code>librefang:plugin@0.1.0</code> plugin
+remains loadable — conformance requirement). See
+<code>docs/strategies/plugins/uar-plugin-system-research-2026-08-04.md</code> (canonical copy in
+<code>universal-agent-runtime/docs/plugins/</code>) and the amendment banners on
+<code>docs/strategies/plugins/README.md</code> and <code>universal-plugin-system-plan.md</code>.</p>
+</blockquote>
+<p><strong>Status:</strong> DRAFT v0.1 — pre-research thoughts, 2026-07-18.
+This document seeds the spec that will be finalized once the commissioned deep-research
+report lands. It captures the current inventory, the architectural position I believe the
+evidence already supports, the decisions the report must confirm or overturn, and the
+project plan skeleton. It is written against the actual code in:</p>
+<ul>
+<li><code>hybrid-mobile-architecture-src</code> — the <strong>KnowMe Builder</strong> skill set (23 repo skills:
+  <code>orchestrate-prometheus-application</code>, <code>deploy-hybrid-agentic-stack</code>,
+  <code>hybrid-design-tokens</code>, <code>flutter-golden-ui</code>, <code>tauri-*</code>, <code>openspec-*</code>, <code>a11y-gate</code>,
+  <code>karpathy-progress-memory</code>, …) plus the <code>hybrid-mobile-architecture</code> scaffolding skill
+  and the knowme-poc reference app this monorepo was seeded from</li>
+<li><code>prometheus/prometheus-skill-pack</code> — 35 top-level / 95+ total AI skills across 13
+  categories (notably <code>react/prometheus-entity-skills</code>, <code>flutter/flutter-rust-ffi</code>,
+  <code>flint/flint-sdk-{ts,dart,go,swift,kotlin,csharp}</code>, <code>htmx/htmx-alpine-lit</code>,
+  <code>rust/librefang-wasm-skill</code>, <code>architecture/clean-architecture</code>), multi-harness install
+  (Claude Code, Kimi, OpenCode, Codex, Cursor, …), surreal-memory MCP</li>
+<li><code>prometheus/flint-realtime-fabric</code> (FRF) — the realtime spine: Apache Iggy durable
+  event log; one multiplexed gateway exposing Spine/Signal/Sync/Agent/Entity/Authz
+  services from frozen <code>proto-v1</code>; <strong>Loro CRDT</strong> (<code>frf-crdt</code>: <code>LoroDeltaApplier</code>,
+  merge/apply/store); <code>frf-wasm</code> browser client (crdt + agent + pub/sub); Postgres CDC
+  (<code>frf-postgres-cdc</code>); media via LiveKit + str0m WebRTC; Matrix/ATProto federation
+  bridges; Cedar policy, Ory identity, Keto authz; uniffi FFI → Swift/Kotlin/Dart</li>
+<li><code>prometheus/flint-forge</code> — the data &amp; edge-compute plane on Postgres 18:
+  <strong>Quarry</strong> (<code>fdb-*</code>, PostgREST-compatible REST + pg_graphql passthrough + GraphQL
+  subscriptions over LISTEN/NOTIFY or FRF), <strong>Anvil</strong> (<code>ext-flint-*</code> pgrx extensions:
+  auth GUC/RLS contract, hooks→webhooks, in-DB LLM "Ember", Vault secrets, meta/
+  reflection), <strong>Kiln</strong> (<code>fke-*</code>, WASM Component Model edge functions on Wasmtime,
+  <code>flint:host@0.1.0</code> WIT, <code>flint-skill</code> authoring SDK, stores <strong>fs/ipfs/oci/s3</strong>,
+  signing <strong>cosign + DID</strong>)</li>
+<li><code>prometheus/PGLITE-LOCAL-FIRST-ARCHITECTURE.md</code> — the PGlite/Electric field guide
+  (VFS matrix, shape-factory tenant invariant, <code>entity-graph-react</code> <code>useLiveQuery</code>,
+  additive migrations, retry-with-poison)</li>
+<li><code>docs/pglite-oxide-tauri-hybrid.md</code> (this repo) — verified pglite-oxide constraints</li>
+</ul>
+<p>Related in-repo anchors: <code>docs/knowme-functional-spec.html</code> (§07 OFP sync, §08 plugin
+system), <code>rust/crates/knowme_plugin_host</code> (<code>knowme:plugin@0.1.0</code> WIT),
+<code>rust/crates/knowme_ofp</code>, <code>docs/implementation-roadmap.md</code> (M1–M7).</p>
+<hr/></article><article id="S08-002" class="source-clause"><h4>S08-002 · 1. The thesis</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>1. The thesis</h2>
+<p>Everything needed for a world-class local-first + realtime platform already exists across
+these repos — <strong>as parts</strong>. What is missing is one cohesive contract that makes the parts
+compose: a single <strong>per-target data-plane matrix</strong>, a single <strong>sync topology</strong> with
+clearly separated read/write/presence paths, one <strong>extension component model</strong> shared by
+client and server (instead of two WIT dialects), one <strong>settings/schema surface</strong> that
+extensions declare and containers store-and-sync, and one <strong>packaging + distribution
+standard</strong> with signing. The KnowMe Builder skill set then becomes the <em>authoring
+harness</em>: skills that let AI tools create, test, sign, publish, and install these
+extensions against the standard.</p>
+<p>The rest of this document specifies each of those five contracts.</p></article><article id="S08-003" class="source-clause"><h4>S08-003 · 2. Per-target data plane (the ground truth to build on)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><div class="source-note"><strong>Explicit amendments:</strong><ul><li>Mobile presentation is native Flutter; shared Rust semantics remain. See RT-01–11.</li></ul></div><h2>2. Per-target data plane (the ground truth to build on)</h2>
+<p>Hard constraints already verified in <code>docs/pglite-oxide-tauri-hybrid.md</code> — the spec must
+not fight them:</p>
+<table>
+<thead>
+<tr>
+<th>Tier</th>
+<th>Local store</th>
+<th>How</th>
+<th>Sync client</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Web (all browsers)</td>
+<td><strong>PGlite</strong> <code>idb://</code> (+ <code>relaxedDurability</code>), OPFS-AHP where Chrome/Firefox-only is acceptable</td>
+<td>WASM in a worker; <code>live</code> extension for reactivity</td>
+<td><code>frf-wasm</code> (pub/sub, CRDT, agent) + Electric shapes</td>
+</tr>
+<tr>
+<td>Desktop (Tauri: macOS/Win/Linux)</td>
+<td><strong>pglite-oxide</strong> (PGlite WASI guest in a Rust host, real PG wire protocol) — SQLx/SeaORM unchanged</td>
+<td>Rust core sidecar; falls back to PGlite-in-WebView if the sidecar is undesirable</td>
+<td><code>frf-sdk-rust</code> in the Tauri core</td>
+</tr>
+<tr>
+<td>Mobile (iOS/Android)</td>
+<td><strong>SQLite + sqlite-vec</strong> (iOS cannot run Postgres: no fork, no JIT)</td>
+<td>via <code>gen_ui_core</code> FFI (already the POC pattern)</td>
+<td>uniffi FFI transport (Swift/Kotlin/Dart bindings exist in FRF)</td>
+</tr>
+<tr>
+<td>Cloud</td>
+<td><strong>Postgres 18 via flint-forge</strong></td>
+<td>Quarry REST/GraphQL under RLS; Anvil in-DB compute</td>
+<td>FRF CDC (<code>frf-postgres-cdc</code>) feeds the spine</td>
+</tr>
+</tbody>
+</table>
+<p>Consequences the spec embraces rather than papers over:</p>
+<ol>
+<li><strong>"Same SQL everywhere" holds for web/desktop/cloud, not mobile.</strong> The entity layer —
+   <code>@prometheus-ags/prometheus-entity-management</code> (Zustand/React) and its Flutter/Riverpod
+   counterpart — is therefore the <em>portability boundary</em>, not SQL. Repositories beneath
+   the entity graph speak PGlite SQL on web/desktop and SQLite SQL on mobile; everything
+   above (stores, hooks/providers, components) is dialect-free.</li>
+<li><strong>PGlite has no RLS.</strong> Tenancy is enforced at the shape factory (predicates ⊆ server
+   RLS), exactly as <code>electricsql-tenant.ts</code> in prometheus-entity-management already does.
+   That invariant becomes normative in this spec (§4.3) and extends to extensions: an
+   extension can never attach a shape without a tenant predicate.</li>
+<li><strong>Schema discipline:</strong> server tables = client tables + <code>_local</code> columns; additive-only
+   migrations, versioned, applied at boot; divergent local models go in a <code>client_*</code>
+   namespace. Extensions get a namespaced schema each (§5.4).</li>
+</ol></article><article id="S08-004" class="source-clause"><h4>S08-004 · 3. Sync topology — three paths, not one</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>3. Sync topology — three paths, not one</h2>
+<p>The single biggest architecture failure mode in local-first systems is forcing all data
+through one sync mechanism. The evidence across the field guide and FRF's design says:
+separate three paths with different consistency needs.</p></article><article id="S08-005" class="source-clause"><h4>S08-005 · 3.1 Read path — replicated queries (server-authoritative)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>3.1 Read path — replicated queries (server-authoritative)</h3>
+<p>Postgres (flint-forge) → CDC → <strong>shapes</strong> → local store. Two interchangeable engines:</p>
+<ul>
+<li><strong>ElectricSQL shapes</strong> into PGlite (web/desktop) — the field guide's recommended
+  default; partial replication by predicate, TCC+ consistency.</li>
+<li><strong>FRF EntityService <code>watch</code></strong> as the sovereign alternative: Quarry's
+  <code>FLINT_CHANGE_SOURCE=fabric</code> already anticipates this; the missing <code>WatchEntityType</code>
+  RPC in FRF is a known gap (it currently fails closed) and is a P0 item in the plan
+  (§8, W1). This gives one spine for entity replication that mobile (no Electric client)
+  can also consume over FFI.</li>
+</ul>
+<p>Rule: the read path is <strong>rebuildable state</strong>. Blowing away the local replica and
+re-syncing must always be safe.</p></article><article id="S08-006" class="source-clause"><h4>S08-006 · 3.2 Write path — intent log (client-authoritative until acked)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>3.2 Write path — intent log (client-authoritative until acked)</h3>
+<p>Local writes are recorded as <strong>idempotent, keyed actions</strong> in the local DB (<code>_local</code>
+write-tracking columns + an outbox table), pushed over FRF Spine (durable Iggy log),
+applied server-side through Quarry/Anvil under RLS, and confirmed back through the read
+path. Retry-with-poison + dead-letter for non-idempotent effects (field guide §6 policy,
+adopted normatively). This is also exactly the shape of <code>knowme_ofp</code>'s Hand/run sync in
+the KnowMe spec — OFP becomes a <em>profile</em> of this path (§3.5).</p></article><article id="S08-007" class="source-clause"><h4>S08-007 · 3.3 Collaboration/presence path — CRDT (peer-authoritative)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>3.3 Collaboration/presence path — CRDT (peer-authoritative)</h3>
+<p>Document-style and presence state (cursors, co-editing, agent scratchpads, <strong>settings</strong>,
+per §6) does not belong in either path above. It rides <strong>Loro CRDTs</strong> via <code>frf-crdt</code>
+(<code>LoroDeltaApplier</code>) with deltas fanned out over:</p>
+<ul>
+<li>FRF Sync service (server-relayed, durable) — default;</li>
+<li><strong>WebRTC data channels</strong> (str0m signaling is already proven in FRF phase 18) for
+  P2P/offline-LAN merge;</li>
+<li><strong>lora-rs</strong> as a constrained transport profile for off-grid deltas — must be treated as
+  a <em>delta budget</em> problem (LoRa duty-cycle + payload limits ⇒ compressed, batched,
+  priority-tiered deltas; presence never rides LoRa). This is a research question for the
+  incoming report: recommended framing is "CRDT delta scheduling under transport budget",
+  not "sync over LoRa".</li>
+</ul></article><article id="S08-008" class="source-clause"><h4>S08-008 · 3.4 Why this triad is the recommendation</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>3.4 Why this triad is the recommendation</h3>
+<p>Server-authoritative replication for queryable data (fast, tenant-safe, rebuildable);
+logged intents for writes (auditable, offline-safe, idempotent); CRDTs only where
+multi-writer merge is the actual requirement. Zero/LiveStore-style "CRDT everything"
+systems buy simplicity at the cost of RLS/tenancy and Postgres compatibility — the wrong
+trade given flint-forge's Anvil/RLS investment. PowerSync/RxDB only matter if Postgres
+were not the backend; it is.</p></article><article id="S08-009" class="source-clause"><h4>S08-009 · 3.5 OFP alignment</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><div class="source-note"><strong>Explicit amendments:</strong><ul><li>Key control does not establish reverse-DNS namespace ownership; separate registry proof is required.</li></ul></div><h3>3.5 OFP alignment</h3>
+<p>KnowMe's OFP (FUNC-SPEC §07, <code>rust/crates/knowme_ofp</code>) is this topology restricted to a
+personal mesh: EntityService-style replication for Hands/conversations, intent log for
+runs, Loro for memory-graph merge, <code>did:key:</code> payload encryption, mTLS peers. The spec
+should declare OFP an <strong>FRF profile</strong> (same proto, personal-peer deployment) rather than
+a parallel protocol — one codebase, two deployment shapes (BossFang peer vs. flint
+gateway).</p></article><article id="S08-010" class="source-clause"><h4>S08-010 · 4. Agents: client-side and cloud-hosted, one contract</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>4. Agents: client-side and cloud-hosted, one contract</h2>
+<ul>
+<li><strong>Client-side agents</strong> — UAR/<code>gen_ui_agent</code> (desktop/mobile via FFI; browser via
+  <code>frf-wasm::agent</code>) run against local models and the <em>local</em> data plane; skill calls
+  Cedar-governed; outputs written as ordinary intents (§3.2) so they sync like any write.</li>
+<li><strong>Cloud agents</strong> — Kiln edge functions (<code>fke-runtime</code>) and BossFang/librefang
+  instances run against Quarry + Anvil (including in-DB LLM via Flint Ember); they
+  publish results onto the Spine, arriving at clients through the read path.</li>
+<li><strong>The contract:</strong> <code>frf-agentproto</code> <code>ContentBlock</code> is already the wire shape for agent
+  traffic; adopt it as the single agent-event vocabulary and map <strong>AG-UI events onto it</strong>
+  (§5.3). An agent is then <em>location-transparent</em>: the same Hand definition
+  (<code>knowme_hands::HandDefinition</code>) deploys to a device, a BossFang peer, or a Kiln
+  function — deployment target changes latency and capability, never the protocol.</li>
+</ul></article><article id="S08-011" class="source-clause"><h4>S08-011 · 5. The extension component model (the heart of this spec)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>5. The extension component model (the heart of this spec)</h2></article><article id="S08-012" class="source-clause"><h4>S08-012 · 5.1 Unify the two WIT worlds</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>5.1 Unify the two WIT worlds</h3>
+<p>Today there are two adjacent contracts: <code>knowme:plugin@0.1.0</code> (client container,
+<code>rust/crates/knowme_plugin_host/wit/</code>) and <code>flint:host@0.1.0</code> (Kiln edge functions,
+<code>flint-forge/wit/</code> + <code>flint-skill</code> SDK). Same substrate (Wasmtime + Component Model),
+overlapping host surfaces (log, storage/kv, invoke, events vs. db, llm, kv, identity,
+secrets). <strong>Proposal:</strong> factor a layered family under one package namespace:</p>
+<pre><code>prometheus:component/core@0.1.0      log, kv-storage, emit-event, clock        (every host)
+prometheus:component/agent@0.1.0     uar-invoke (Cedar-gated skills)           (client + Kiln)
+prometheus:component/data@0.1.0      sql-query (scoped schema), entity-graph   (per §5.4)
+prometheus:component/llm@0.1.0       complete, embed (local model or Ember)    (capability-gated)
+prometheus:component/ui@0.1.0        render surfaces (per §5.3)                (client containers)
+prometheus:component/settings@0.1.0  schema declaration + change notification  (per §6)
+</code></pre>
+<p>A <strong>native skill</strong> is a component exporting the skill world (today's Kiln/UAR shape). A
+<strong>full extension</strong> is a component exporting skill + ui + settings worlds. Hosts advertise
+which interfaces they provide; the installer refuses a component whose imports exceed the
+host's surface — capability negotiation is structural, at install time, before any code
+runs (same posture as KnowMe FUNC-SPEC §08).</p></article><article id="S08-013" class="source-clause"><h4>S08-013 · 5.2 What a full extension can add</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>5.2 What a full extension can add</h3>
+<p>Per the requirement: (a) native skills for agent harnesses; (b) UI/UX surfaces; (c) a
+settings schema the container stores and syncs; (d) entity types with sync policies;
+(e) Hands templates; (f) scheduled/event handlers. All declared in the manifest (§7.2),
+all reviewed at install.</p></article><article id="S08-014" class="source-clause"><h4>S08-014 · 5.3 UI: two render targets, one event bus</h4><p class="source-note">Governing revision: <a href="../index.html#surfaces">UI-01–11</a> · source requirement, not release evidence.</p><h3>5.3 UI: two render targets, one event bus</h3>
+<ul>
+<li><strong>HTMX/server-rendered fragments</strong> — the extension component exports
+  <code>render(surface, props-json) → html</code> and the container injects the fragment into a
+  sandboxed webview/iframe with the <code>plugin-bridge</code> (<code>window.knowme.invoke/subscribe</code> —
+  the deferred v0.2 surface in FUNC-SPEC §08; this spec is the concrete driver for it).
+  The <code>htmx-alpine-lit</code> skill in the skill pack is the authoring guide; forge's
+  <code>htmx-alpine-animations-research.md</code> already explores the idiom.</li>
+<li><strong>A2UI components over AG-UI</strong> — for the Flutter tier and rich React surfaces the
+  extension emits <strong>AG-UI events</strong> (the POC's <code>gen_ui</code> protocol crates and the KnowMe
+  UI/UX standard already speak AG-UI); the container's gen_ui renderer materializes
+  A2UI component trees. Extension UI is therefore <em>data</em>, not code, on this path — which
+  is what makes the same extension render on web, desktop, and mobile.</li>
+</ul>
+<p>Both paths ride one bus: extension → <code>emit-event</code> → container event router → (HTMX swap |
+AG-UI stream). Agent-generated UI and extension UI are the same mechanism.</p></article><article id="S08-015" class="source-clause"><h4>S08-015 · 5.4 Extension data: scoped schemas with sync policies</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>5.4 Extension data: scoped schemas with sync policies</h3>
+<p>Each extension gets a namespaced schema (<code>ext_&lt;id&gt;</code> on Postgres; same-named tables in
+PGlite/SQLite). The manifest declares each table's <strong>sync class</strong>: <code>replicated</code>
+(read-path shape, tenant predicate mandatory — shape-factory invariant applies),
+<code>intent</code> (outbox), <code>crdt</code> (Loro doc), or <code>local-only</code>. Migrations ship in the package,
+additive-only, applied by the container at install/upgrade — client-side by the container
+runtime, server-side through a Quarry admin surface. Anvil's <code>flint_meta</code> reflection
+makes the server side introspectable; the same metadata drives client codegen.</p></article><article id="S08-016" class="source-clause"><h4>S08-016 · 6. The common settings model</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>6. The common settings model</h2>
+<p>Settings are the first proving ground for the whole stack, because they exercise every
+layer at small scale:</p>
+<ul>
+<li>Extension declares a <strong>JSON-Schema (2020-12) settings document</strong> in its manifest
+  (<code>settings.schema.json</code>) plus per-field metadata: scope (<code>device</code> | <code>user</code> | <code>tenant</code>),
+  sync class (default: <code>crdt</code> for user scope, <code>local-only</code> for device scope, <code>replicated</code>
+  for tenant scope), sensitivity (secret fields route to keychain/Vault, never CRDT).</li>
+<li>Container renders the settings UI <strong>generically from schema</strong> (React and Flutter
+  renderers; A2UI form components) — extensions get a settings page for free; both
+  <code>desktop/src/features/settings</code> and <code>mobile/lib/features/settings</code> grow one dynamic
+  panel, not N.</li>
+<li>Values live in the container store (Zustand slice / Riverpod provider) backed by a
+  <strong>Loro map per (extension, scope)</strong>; synced per §3.3 (FRF Sync, WebRTC, or OFP mesh);
+  server persistence lands in <code>ext_&lt;id&gt;._settings</code> via the intent path when tenant-scoped.</li>
+<li>Change notification enters the component through <code>settings@0.1.0</code>
+  (<code>on-change(key, value-json)</code>), so extensions react live on every device.</li>
+</ul>
+<p>This model is exactly KnowMe FUNC-SPEC §07's "Settings: default per-device" made precise:
+scope decides sync, schema decides rendering, sensitivity decides storage.</p></article><article id="S08-017" class="source-clause"><h4>S08-017 · 7. Packaging &amp; distribution</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>7. Packaging &amp; distribution</h2></article><article id="S08-018" class="source-clause"><h4>S08-018 · 7.1 Position</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><div class="source-note"><strong>Explicit amendments:</strong><ul><li>Key control does not establish reverse-DNS namespace ownership; separate registry proof is required.</li></ul></div><h3>7.1 Position</h3>
+<p>Do <strong>not</strong> invent a new decentralized VCS. Compose three proven layers, all already
+present or trivially reachable from flint-forge:</p>
+<ol>
+<li><strong>Content addressing &amp; transport:</strong> IPFS (KnowMe FUNC-SPEC §08 already commits to CID
+   install + gateway fallback; <code>fke-store-ipfs</code> exists) <strong>and</strong> OCI registries
+   (<code>fke-store-oci</code>) as the enterprise mirror — the same artifact, two transports.</li>
+<li><strong>Signing &amp; identity:</strong> dual-path exactly as Kiln already implements —
+   <code>fke-sign-did</code> (Ed25519 over canonical manifest, publisher <code>did:key:</code> — the sovereign
+   path, matches KnowMe's plugin trust model verbatim) and <code>fke-sign-cosign</code>
+   (Sigstore/cosign — the enterprise/supply-chain path, works with OCI + Rekor
+   transparency log).</li>
+<li><strong>Versioning &amp; discovery ("the git-like part"):</strong> a signed, append-only <strong>release log
+   per extension</strong> (name → ordered list of (version, CID, manifest hash, signature)),
+   itself a CRDT/merkle log that syncs over the same fabric — publishable to IPNS/DNSLink,
+   an OCI tag list, or a plain git repo of manifests. Evaluate <strong>Radicle</strong> (Rust,
+   sound-theory decentralized git) in the research report as the collaboration/source
+   layer; but the <em>distribution</em> unit is the signed component artifact, not the repo.</li>
+</ol></article><article id="S08-019" class="source-clause"><h4>S08-019 · 7.2 The package format (`.pxt` — prometheus extension)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>7.2 The package format (<code>.pxt</code> — prometheus extension)</h3>
+<p>An IPFS/OCI directory: <code>manifest.json</code> (extends <code>knowme_plugin_host::PluginManifest</code>:
+id, version, WIT worlds imported/exported, permissions, uar_skill_allowlist, settings
+schema ref, ui surfaces, entity schemas + sync classes, migrations, signature block),
+<code>component.wasm</code>, <code>migrations/</code>, <code>ui/</code> (optional HTMX/A2UI assets), <code>settings.schema.json</code>,
+<code>SBOM.spdx.json</code>. SHA-256 of every file in the manifest; manifest signed per §7.1.2.
+Version semantics: 0.x minor = breaking (as <code>knowme:plugin</code> already states); hosts pin
+world versions.</p></article><article id="S08-020" class="source-clause"><h4>S08-020 · 8. What to add, where (project plan skeleton)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>8. What to add, where (project plan skeleton)</h2>
+<p>Workstreams, orderable after the research report confirms §3–§7:</p>
+<ul>
+<li><strong>W1 — FRF gap:</strong> implement <code>WatchEntityType</code> RPC (unblocks Quarry
+  <code>FLINT_CHANGE_SOURCE=fabric</code> and the sovereign read path). Small, unlocks the most.</li>
+<li><strong>W2 — WIT family:</strong> factor <code>prometheus:component/*</code> worlds from <code>flint:host@0.1.0</code> +
+  <code>knowme:plugin@0.1.0</code>; adapters so existing Kiln skills and KnowMe plugins keep working;
+  publish <code>flint-skill</code>-style authoring SDKs (Rust first, TS/Go via componentize).</li>
+<li><strong>W3 — Container runtime (this repo):</strong> extend <code>knowme_plugin_host</code> M3 scope to the
+  full extension model — settings engine (schema→UI renderers for React + Flutter),
+  extension event router (HTMX + AG-UI paths), scoped-schema migrator over PGlite/SQLite.</li>
+<li><strong>W4 — Data plane adapters:</strong> pglite-oxide provider in <code>gen_ui_db</code> for Tauri; PGlite
+  worker + entity-graph wiring for web; sqlite-vec parity layer for mobile; outbox/intent
+  tables + retry-with-poison runtime as a shared crate (<code>prometheus-sync-core</code>), used by
+  both knowme_ofp and web/desktop clients.</li>
+<li><strong>W5 — CRDT settings + collaboration:</strong> Loro-backed settings maps end-to-end (FRF Sync
+  → WebRTC fallback); the LoRa delta-budget spike (research-gated).</li>
+<li><strong>W6 — Packaging:</strong> <code>.pxt</code> format + <code>forge-cli</code>/new <code>pxt</code> CLI verbs (init, build, sign
+  [did|cosign], pin [ipfs|oci], publish-log, install, verify); registry log format.</li>
+<li><strong>W7 — KnowMe Builder skills:</strong> new skills in the two skill repos that drive W2–W6 with
+  AI harnesses: <code>pxt-new-extension</code>, <code>pxt-settings-schema</code>, <code>pxt-ui-surface</code> (HTMX and
+  A2UI variants), <code>pxt-entity-schema</code>, <code>pxt-test-harness</code> (golden tests against a
+  containerized host), <code>pxt-sign-and-publish</code>, <code>pxt-install-verify</code>; wire them into
+  <code>orchestrate-prometheus-application</code> and the openspec-* change workflow so extension
+  development is itself spec-driven.</li>
+<li><strong>W8 — Conformance:</strong> a host-conformance suite (does a container correctly enforce
+  permissions, shape predicates, settings scopes?) — this is what makes "conform to our
+  standard" testable, and what the AI skills run in CI.</li>
+</ul></article><article id="S08-021" class="source-clause"><h4>S08-021 · 9. Questions the deep-research report must settle</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>9. Questions the deep-research report must settle</h2>
+<ol>
+<li>Electric shapes vs. FRF EntityService as the <em>primary</em> read path (or Electric on
+   web-only, FRF everywhere else)? Cost of running Electric alongside the fabric?</li>
+<li>Loro vs. Automerge/Yjs stance is settled by <code>frf-crdt</code> (Loro) — but confirm Loro's
+   Dart/FFI story for Flutter parity, and snapshot/compaction strategy for years-long
+   settings histories.</li>
+<li>TanStack DB's role vs. entity-graph-react at scale (field guide decision #7).</li>
+<li>LoRa: realistic delta budgets (SF/duty cycle), and whether meshtastic-style store-and-
+   forward is worth a transport adapter, or LoRa should be deferred entirely.</li>
+<li>Radicle vs. plain signed-manifest git repos vs. IPNS for the release log; petname/
+   naming layer for extension discovery.</li>
+<li>WASI 0.2/0.3 timeline effects on the component worlds (async exports would simplify
+   <code>handle-event</code> streaming).</li>
+<li>Precedents worth mining for the extension UI sandbox: Figma plugin iframe model, Zed
+   extensions, Obsidian, VS Code webviews — what do they get wrong that the A2UI-as-data
+   path avoids?</li>
+<li>Settings-as-CRDT prior art (e.g., Ditto, Jazz, Instant) — anything to steal for scope
+   semantics and secret-field handling?</li>
+</ol></article><article id="S08-022" class="source-clause"><h4>S08-022 · 10. Recommendation (pre-report)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>10. Recommendation (pre-report)</h2>
+<p>Adopt the triad sync topology (§3) with flint-forge as the sole server datastore and FRF
+as the sole spine; unify the WIT surfaces into <code>prometheus:component/*</code> (§5.1) so one
+signed component runs as a Kiln edge function, a KnowMe client extension, or both; make
+settings the first end-to-end vertical (§6); package as <code>.pxt</code> over IPFS+OCI with
+DID+cosign dual signing (§7); and grow the KnowMe Builder skill set into the authoring
+harness (W7) so every one of these artifacts is producible, testable, and publishable by
+an AI agent under the openspec workflow. Nothing here requires new infrastructure
+categories — every layer extends a crate or skill that already exists in these repos.</p></article></main></body></html>

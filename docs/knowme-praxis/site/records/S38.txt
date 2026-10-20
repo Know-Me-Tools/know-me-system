@@ -1,0 +1,114 @@
+PART II · 04
+Workflows and sequences
+Five stages, one allowance set, six dispositions. The loop is a state machine whose transitions are deterministic and whose only model-mediated step, classification during inspection, produces an input for a gate rather than a verdict.
+Contract
+adopted · signed
+A · Baseline
+run id · candidate · gaps
+B · Observe
+event-driven
+C · Inspect
+smallest read-only look
+D · Reconcile
+once · consume allowance
+E · Close
+terminal packet
+trigger
+pre-auth
+no trigger · credible progress · wait
+Owner decision
+AG-UI interrupt
+decision_required
+authorize
+decline · keep watching
+evidence returned · question open · allowance remains
+VerifiedSuccess
+Blocked
+FailedAcceptance
+also: ExhaustedAllowance · Cancelled · MissingEvidence
+exhausted · blocker named
+B is the resting state. C is entered only on a trigger. D runs once per trigger and either returns to B with a reconciled record or exits to E. There is no path from E back into the loop; a successor run gets a new identity and explicit authority.
+Trigger taxonomy
+Trigger
+Detected from
+Deterministic?
+Default first inspection
+RepeatedIdenticalFailure
+Two receipts with equal check name, equal failure digest, same candidate lineage
+Yes
+Compare the two failure digests and the repair diff between them
+ConflictingTerminalClaims
+Executor report claims complete while KBD disposition for the phase is not VerifiedSuccess
+Yes
+Read the exact adopted clause the claim would satisfy
+MissingRequiredScenario
+A required evidence item in contract rev N has no receipt bound to the current candidate
+Yes
+List receipts for that check across candidates; flag historical ones
+ScopeGrowth
+Diff touches paths outside the phase's declared scope; new issues or gates referenced in reports
+Partly (path sets yes; "new requirement" needs classification)
+Resolve the reference against the adopted phase; propose a backlog entry, not a gate
+BudgetInconsistency
+Report-stated allowance differs from KBD counters, or two counters are summed
+Yes
+Read counters; the report is wrong by definition
+StaleEvidence
+Receipt candidate hash differs from the current candidate; receipt older than the last code change
+Yes
+Name the check that needs re-running against the current candidate
+MissingPhaseReceipt
+Phase closure requested with no terminal receipt in the ledger
+Yes
+Nothing to inspect; decline closure, name the missing receipt
+OverclaimDetected
+Final report coverage claim exceeds transcript or receipt coverage (OverclaimBench pattern)
+Partly (coverage sets yes; claim parsing is classification)
+Diff claimed set against receipted set; record the overclaim on the candidate
+Sequence: an overclaim intervention
+Owner
+Coach
+KBD
+UAR
+Executor
+1 · "S1–S4 pass, phase complete"
+2 · receipts S1–S3 (candidate 6c1f2a), signed
+3 · Iggy: phase.report + receipt.appended
+4 · kbd.contract.get(rev 3) · kbd.receipts.list(S4)
+5 · S4 receipt exists · candidate 2b8e0 (historical)
+trigger: MissingRequiredScenario + OverclaimDetected
+6 · proposal: run S4 on 6c1f2a · objective unchanged
+expected: receipt:S4 · consumes 1 intervention
+7 · authorize: A2A task under owner identity, act=coach, stop=receipt:S4
+8 · Cedar grant ok · sandboxed run · one request
+9 · S4 fail · repair ×1 · S4 pass
+10 · receipt S4 (candidate 9d04c) · repair counter 1/2
+11 · gate: {S1..S4} satisfied on 9d04c · overclaim recorded on 6c1f2a
+12 · terminal packet: VerifiedSuccess · yield: removed false completion
+13 · UsageEvent actor=coach · 2.1 credits · Assignment asg_…
+Thirteen messages, one intervention, one repair. The coach never talks to the executor directly (steps 7–8 go through the owner's authorization and UAR's governance), and the verdict at step 11 comes from KBD's gate, not from the coach.
+Sequence: a budget wall
+The second common failure is reconciling an exhausted run. The executor's final report shows a no-progress threshold of two as "2 + 2 = 4". The coach reads counters: repairs 2/2, no-progress 2/2. These are independent constraints; neither lends capacity to the other, and the coach has no discretionary reserve. The proposal is
+decision_required
+: amend to contract rev 4 with new allowances, or close. The owner closes. KBD's disposition is
+ExhaustedAllowance
+, kept distinct from
+FailedAcceptance
+because the product was never judged; the allowance ran out before judgment. The terminal packet names the blocker (the S4 fixture) and the next decision, then coaching stops.
+E · Close requested
+all required evidence receipted on candidate?
+any allowance exhausted?
+prerequisite outside executor authority?
+owner cancelled?
+deterministic check failed, no repairs left?
+VerifiedSuccess
+ExhaustedAllowance
+Blocked · who resolves it
+Cancelled
+FailedAcceptance
+else · MissingEvidence
+yes
+no
+Dispositions are evaluated in this order and never collapsed. The order matters: an exhausted allowance is reported as such even when a check also failed, because the product was not judged.
+Restart safety
+The coach keeps no in-process state it cannot rebuild. On restart it replays its Iggy consumer from the last committed offset, reloads the coaching contract by id, reads the current counters from KBD, and reconciles its memory wiki against the receipt ledger (any belief whose source receipt no longer matches the current candidate is marked stale). A pause stops observation, steering and scheduled checks together; a stopped coach cannot leave a delegated task running, because the task belongs to UAR under the owner's identity and carries its own stop condition.

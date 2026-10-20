@@ -1,0 +1,199 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>S23 · README.md</title><link rel="stylesheet" href="../records.css"><body><main><a href="../index.html">KnowMe Praxis</a><h1>S23 · README.md</h1><p>Complete technical source record. Historical names and requirements remain visible for audit. Revised clauses and explicit corrections govern their application.</p><p><a href="S23.txt">Download complete technical text</a></p><article id="S23-001" class="source-clause"><h4>S23-001 · AG-UI Event Transport Strategy — Profile, Normalization, and Completion Path</h4><p class="source-note">Governing revision: <a href="../index.html#api">API-01–06</a> · source requirement, not release evidence.</p><h1>AG-UI Event Transport Strategy — Profile, Normalization, and Completion Path</h1>
+<p><strong>Scope:</strong> AG-UI as the event vocabulary between the Universal Agent Runtime (UAR)
+and every KnowMe surface — the wire profile, the normalization seam into KnowMe's
+provider-neutral contracts, what exists today in this repo, the verified gaps, and
+the releases that close them.</p>
+<p><strong>Status:</strong> v1.1 strategy, 2026-07-19 (v1.1 reconciles with the service facade that
+landed the same day). Grounded in the vendored UAR submodule
+(<code>rust/vendor/universal-agent-runtime</code>, v1.0.0) and the existing seam in
+<code>rust/crates/gen_ui_protocol</code>. The governing integration documents are
+<code>docs/strategies/uar-knowme-runtime-integration.md</code> (ownership, deployment modes,
+phases) and <code>docs/strategies/uar-future-release-roadmap.md</code> (releases UAR-1…5);
+this doc owns the <strong>event contract</strong> those releases speak. Companions:
+<code>docs/strategies/agents/README.md</code>
+(placements, UAR grounding), <code>docs/strategies/a2ui/README.md</code> (the rendering
+contract these events carry), <code>docs/strategies/local-models/android-agentskills-process-future-roadmap.md</code>
+(mobile execution releases), PAGS-SPEC-KM-UIX-001 (the UI that consumes the stream).</p>
+<hr/></article><article id="S23-002" class="source-clause"><h4>S23-002 · 1. Terminology — one sentence, never confused again</h4><p class="source-note">Governing revision: <a href="../index.html#api">API-01–06</a> · source requirement, not release evidence.</p><h2>1. Terminology — one sentence, never confused again</h2>
+<p>Per the UAR README: <strong>AG-UI is the event transport vocabulary; A2UI is the
+validated declarative rendering contract.</strong> AG-UI answers "what happened in the
+run"; A2UI answers "draw this surface." KnowMe's <code>ContentBlock</code> projection sits
+<em>downstream</em> of AG-UI and must not be mistaken for either.</p></article><article id="S23-003" class="source-clause"><h4>S23-003 · 2. The wire profile (UAR, verified in the submodule)</h4><p class="source-note">Governing revision: <a href="../index.html#api">API-01–06</a> · source requirement, not release evidence.</p><h2>2. The wire profile (UAR, verified in the submodule)</h2>
+<p>UAR emits a profiled AG-UI event stream over SSE:</p>
+<ul>
+<li><strong>Profile id:</strong> <code>uar.agui/1</code>; JSON Schema at
+  <code>uar/schemas/uar-agui-v1.schema.json</code>
+  (<code>$id: https://prometheus-ags.dev/schemas/uar-agui-v1.schema.json</code>).</li>
+<li><strong>Event families:</strong> <code>RUN_STARTED</code> / <code>RUN_FINISHED</code> / <code>RUN_ERROR</code>;
+  <code>STEP_STARTED</code> / <code>STEP_FINISHED</code>; <code>TEXT_MESSAGE_START</code> / <code>CONTENT</code> / <code>END</code>;
+  <code>REASONING_*</code> (incl. <code>REASONING_MESSAGE_CONTENT</code>); <code>TOOL_CALL_START</code> / <code>ARGS</code> /
+  <code>END</code> / <code>RESULT</code>; <code>STATE_SNAPSHOT</code>; <code>STATE_DELTA</code>; <code>MESSAGES_SNAPSHOT</code>; <code>RAW</code>;
+  <code>CUSTOM</code> (e.g. <code>uar.skill.activated</code>).</li>
+<li><strong>Envelope fields:</strong> <code>type</code>, <code>profile</code>, <code>eventId</code>, <code>sequence</code>, <code>threadId</code>,
+  <code>runId</code>, <code>messageId</code>, <code>toolCallId</code>.</li>
+<li><strong>Compatibility:</strong> UAR's compatibility policy keeps <em>normalized event profiles</em>
+  Stable during 1.x, while explicitly <strong>not</strong> guaranteeing the Rust library API.
+  Consequence for KnowMe: integrate at the <strong>event-profile boundary</strong>, never by
+  reaching into UAR internals — this is the same discipline as the sidecar rule
+  in the agents doc (§2.1 there) and it is what makes UAR upgrades reviewable.</li>
+<li>Custom agent/skill signals arrive as <code>CUSTOM</code> events with a <code>name</code> (e.g.
+  <code>uar.skill.activated</code>) and a <code>value</code> payload; the profile is deliberately
+  extensible there and only there.</li>
+</ul></article><article id="S23-004" class="source-clause"><h4>S23-004 · 3. What exists in this repo today (verified 2026-07-19)</h4><p class="source-note">Governing revision: <a href="../index.html#api">API-01–06</a> · source requirement, not release evidence.</p><h2>3. What exists in this repo today (verified 2026-07-19)</h2>
+<p>The projection seam is already built and unit-tested; the live connection is not.</p>
+<table>
+<thead>
+<tr>
+<th>Piece</th>
+<th>Where</th>
+<th>State</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Provider-neutral internal contract <code>StreamEvent</code> (text/thinking deltas, tool-call lifecycle, skill activation, custom, done/error)</td>
+<td><code>rust/crates/gen_ui_types</code></td>
+<td>Working</td>
+</tr>
+<tr>
+<td>UI envelope <code>A2uiEvent</code> (run_started, run_phase_changed, block, run_finished, run_cancelled, run_error, context_telemetry)</td>
+<td><code>gen_ui_types</code>; Dart mirror <code>mobile/lib/bridge/a2ui/a2ui_event.dart</code></td>
+<td>Working</td>
+</tr>
+<tr>
+<td><strong>UAR ingress seam</strong> <code>normalize_uar_agui_event</code> — maps <code>uar.agui/1</code> → <code>StreamEvent</code>, incl. <code>REASONING_MESSAGE_CONTENT</code> → <code>ThinkingDelta</code>, full <code>TOOL_CALL_*</code> lifecycle, <code>CUSTOM uar.skill.activated</code> → <code>SkillActivation</code>, unknown → <code>StreamEvent::Custom</code></td>
+<td><code>rust/crates/gen_ui_protocol/src/lib.rs</code></td>
+<td>Working, unit-tested offline</td>
+</tr>
+<tr>
+<td><code>A2uiAdapter</code> — <code>StreamEvent</code> → <code>A2uiEvent</code>; cross-token <code>&lt;think&gt;</code> state machine (boundary-tested at every split point), tool-argument fragment accumulation, unclosed-reasoning protocol error, unknown events → <code>ArtifactBlock("provider_event")</code></td>
+<td><code>gen_ui_protocol</code></td>
+<td>Working, unit-tested</td>
+</tr>
+<tr>
+<td><code>AguiAdapter</code> — <code>A2uiEvent</code> → <code>AguiEvent</code> (bidirectional seam)</td>
+<td><code>gen_ui_protocol</code></td>
+<td>Working for run start/finish/cancel/error, text, reasoning, tool use/result, skill activation, telemetry, and fallback content/artifact custom events</td>
+</tr>
+<tr>
+<td><code>UarLocalProviderEventBridge</code> + <code>inference_request_to_uar_llm_payload</code> — converts KnowMe local-provider requests/events into UAR-compatible driver payloads/AG-UI events without linking UAR on mobile</td>
+<td><code>gen_ui_protocol</code></td>
+<td>Working, unit-tested offline; embedded UAR provider registration remains future work</td>
+</tr>
+<tr>
+<td><strong>Service-mode facade</strong> <code>UarServiceRuntime</code> — creates UAR runs over the UAR HTTP SDK, consumes SSE, projects through the shared adapter (<code>UarEventProjector</code>) preserving order; submits A2UI artifact responses back to <code>/api/uar/runs/{run_id}/artifact-response</code>; <code>UarRuntimeStatus</code> exposed over FFI/Tauri (<code>embedded</code>/<code>service</code>/<code>cloud</code> mode + integration state, local-provider bridge availability, service/A2UI-response availability, embedded-kernel blocker, submodule commit)</td>
+<td><code>rust/crates/gen_ui_agent/src/uar.rs</code></td>
+<td>Working at the Rust seam (non-mobile builds); the desktop/web <code>uar</code> lane can route chat and A2UI action responses through a configured service, but live-service runtime certification remains open</td>
+</tr>
+<tr>
+<td>FFI event stream to Flutter (JSON envelopes) + <code>ChatNotifier.streamBlock</code> + PEM persistence of messages/blocks</td>
+<td><code>gen_ui_ffi</code>, <code>mobile/lib/features/chat</code></td>
+<td>Working</td>
+</tr>
+<tr>
+<td>Certified end-to-end proof on physical Android (embedded <code>knowme_diagnostics</code> MCP namespace → visible ordered blocks, persisted, restored)</td>
+<td>see <code>docs/strategies/local-models/android-litert-lm-six-gates-roadmap.md</code></td>
+<td>Working for the MCP path</td>
+</tr>
+</tbody>
+</table></article><article id="S23-005" class="source-clause"><h4>S23-005 · 4. The gaps (what &quot;AG-UI implementation&quot; still means)</h4><p class="source-note">Governing revision: <a href="../index.html#api">API-01–06</a> · source requirement, not release evidence.</p><h2>4. The gaps (what "AG-UI implementation" still means)</h2>
+<ol>
+<li><strong>No production certification yet; embedded mode missing.</strong> The submodule is
+   excluded from the workspace build (<code>rust/Cargo.toml</code>) and linked through the
+   HTTP SDK only. The <em>service-mode</em> facade exists at the Rust seam
+   (<code>UarServiceRuntime</code>, <code>UarEventProjector</code> — <code>gen_ui_agent::uar</code>), and
+   desktop/web can select the <code>uar</code> lane when <code>uar_service_url</code> plus a compiled
+   <code>uar_agent_artifact</code> are configured. The projection is proven against
+   fixtures and the SDK stream shape; it is not yet certified against a running
+   UAR service. What remains: the <strong>embedded/mobile kernel</strong> (UAR-2 in the
+   future-release roadmap; Phase 2 of the integration doc), production
+   defaulting, and live service-mode certification.</li>
+<li><strong>Envelope identity is dropped.</strong> <code>eventId</code>, <code>sequence</code>, and <code>threadId</code> do
+   not survive normalization; <code>StreamEvent</code>/<code>A2uiEvent</code> carry <code>run_id</code> only.
+   Dedupe, ordering, replay, and the inspector's timeline (UIX-001 §10.6) all
+   need them.</li>
+<li><strong>Unmapped families.</strong> <code>STEP_STARTED/FINISHED</code> (→ lifecycle named phases),
+   <code>STATE_SNAPSHOT</code>/<code>STATE_DELTA</code> and <code>MESSAGES_SNAPSHOT</code> (→ inspector events /
+   <code>ArtifactBlock</code> <code>agui_*</code> renderers, which already exist in
+   <code>gen_ui_widgets</code>), <code>TEXT_MESSAGE_START/END</code> (block boundaries), and <code>RAW</code>
+   (pass-through with provenance) have no mapping today.</li>
+<li><strong>Bidirectional path incomplete.</strong> Client→runtime traffic (user actions,
+   confirmations, cancellations) needs the rest of <code>AguiAdapter</code>, or an
+   explicit command channel — one of the two, documented (§5.4).</li>
+<li><strong>Append-only event record.</strong> The design standard (§7.5) requires the raw
+   stream persisted for replay/audit; PEM stores materialized blocks today, not
+   the raw envelopes.</li>
+</ol></article><article id="S23-006" class="source-clause"><h4>S23-006 · 5. Decisions and completion plan</h4><p class="source-note">Governing revision: <a href="../index.html#api">API-01–06</a> · source requirement, not release evidence.</p><h2>5. Decisions and completion plan</h2></article><article id="S23-007" class="source-clause"><h4>S23-007 · 5.1 Adopt `uar.agui/1` as the wire profile; keep three-layer normalization</h4><p class="source-note">Governing revision: <a href="../index.html#api">API-01–06</a> · source requirement, not release evidence.</p><h3>5.1 Adopt <code>uar.agui/1</code> as the wire profile; keep three-layer normalization</h3>
+<p><code>uar.agui/1</code> (wire) → <code>StreamEvent</code> (internal, provider-neutral) → <code>A2uiEvent</code>
+(UI envelope) → <code>ContentBlock</code> projection. No layer is skipped and no layer
+leaks upward: Flutter never sees AG-UI; UAR never sees <code>ContentBlock</code>. Extend
+<code>normalize_uar_agui_event</code> in place — it is the canonical seam, with fixture
+tests per event family. Other providers (llama.cpp direct, LiteRT-LM, cloud)
+keep emitting <code>StreamEvent</code> natively; AG-UI is the <em>UAR</em> wire, not a
+lowest-common-denominator rewrite of everything else.</p></article><article id="S23-008" class="source-clause"><h4>S23-008 · 5.2 Envelope preservation (release with the facade)</h4><p class="source-note">Governing revision: <a href="../index.html#api">API-01–06</a> · source requirement, not release evidence.</p><h3>5.2 Envelope preservation (release with the facade)</h3>
+<p>Add a <code>RunEnvelope { event_id, sequence, thread_id, run_id, message_id? }</code>
+alongside <code>StreamEvent</code> in <code>gen_ui_types</code>, populated at ingress, carried to the
+FFI envelope, and persisted with the raw record. Rules: <code>eventId</code> dedupes
+(exactly-once projection), <code>sequence</code> orders (gap detection = protocol error,
+never silent reorder), <code>threadId</code> scopes the run to a conversation.</p></article><article id="S23-009" class="source-clause"><h4>S23-009 · 5.3 Family mappings to land</h4><p class="source-note">Governing revision: <a href="../index.html#api">API-01–06</a> · source requirement, not release evidence.</p><h3>5.3 Family mappings to land</h3>
+<table>
+<thead>
+<tr>
+<th>UAR family</th>
+<th>KnowMe mapping</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>STEP_STARTED/FINISHED</code></td>
+<td>Lifecycle named phase on <code>A2uiEvent::RunPhaseChanged</code> (the UIX-001 §6.4 strip)</td>
+</tr>
+<tr>
+<td><code>TEXT_MESSAGE_START/END</code></td>
+<td>Block boundary markers for the coalescing driver (semantic checkpoint triggers)</td>
+</tr>
+<tr>
+<td><code>STATE_SNAPSHOT</code> / <code>STATE_DELTA</code> / <code>MESSAGES_SNAPSHOT</code></td>
+<td>Inspector event records + existing <code>agui_*</code> ArtifactBlock renderers; never raw JSON into the answer bubble</td>
+</tr>
+<tr>
+<td><code>RAW</code></td>
+<td><code>ArtifactBlock("provider_event")</code> with source/name/payload (existing path)</td>
+</tr>
+<tr>
+<td><code>CUSTOM</code></td>
+<td>Named registry of known customs (<code>uar.skill.activated</code>, …); unknown names → <code>ArtifactBlock("provider_event")</code>, never dropped</td>
+</tr>
+</tbody>
+</table></article><article id="S23-010" class="source-clause"><h4>S23-010 · 5.4 Bidirectional: complete the command channel, not the adapter</h4><p class="source-note">Governing revision: <a href="../index.html#api">API-01–06</a> · source requirement, not release evidence.</p><h3>5.4 Bidirectional: complete the command channel, not the adapter</h3>
+<p>Client→runtime intents (send message, cancel run, resolve confirmation, submit
+A2UI action) are <strong>commands</strong>, not events. Keep <code>AguiAdapter</code> for the
+event-shaped residue (thread state echoes), but route intents through typed
+FFI/HTTP calls into the UAR facade — mirroring the sidecar rule: the same
+command surface works embedded (mobile) and over HTTP (desktop/web).</p></article><article id="S23-011" class="source-clause"><h4>S23-011 · 5.5 Append-only event record</h4><p class="source-note">Governing revision: <a href="../index.html#api">API-01–06</a> · source requirement, not release evidence.</p><h3>5.5 Append-only event record</h3>
+<p>Persist raw envelopes (PEM <code>agui_events</code>: eventId, sequence, runId, threadId,
+family, payload, timestamp) beside the materialized message blocks. Replay
+rebuilds the thread from the record without contacting the model (UIX-001
+§10.6). Checkpoints stay at semantic boundaries (<code>TEXT_MESSAGE_END</code>, tool
+result, phase change) plus the existing debounce.</p></article><article id="S23-012" class="source-clause"><h4>S23-012 · 5.6 Test gates</h4><p class="source-note">Governing revision: <a href="../index.html#api">API-01–06</a> · source requirement, not release evidence.</p><h3>5.6 Test gates</h3>
+<ul>
+<li>Fixture tests per family against the UAR JSON Schema (including malformed
+  envelopes → typed protocol error, never a panic).</li>
+<li>Property test: arbitrary interleavings of reasoning/text/tool fragments never
+  leak reasoning into answer blocks and never drop unknown events (extends the
+  existing <code>gen_ui_protocol</code> test suite).</li>
+<li>Dedupe/order tests: replayed, duplicated, and gap'd envelopes.</li>
+<li>Physical certification rides the agent-skills roadmap's Release C (real
+  installed AgentSkill emitting the full ordered block sequence).</li>
+</ul></article><article id="S23-013" class="source-clause"><h4>S23-013 · 6. Invariants (do not regress)</h4><p class="source-note">Governing revision: <a href="../index.html#api">API-01–06</a> · source requirement, not release evidence.</p><h2>6. Invariants (do not regress)</h2>
+<ul>
+<li>The 11-variant <code>ContentBlock</code> union stays closed; new AG-UI families map to
+  envelope/lifecycle/artifact channels, never to new block variants.</li>
+<li>Unknown payloads are preserved as <code>ArtifactBlock</code> records with provider,
+  event name, and original payload — the protocol never silently drops.</li>
+<li>Reasoning quarantine: <code>REASONING_*</code> becomes <code>Thinking</code> blocks, displayed and
+  persisted but excluded from future prompts, summarization, and fact
+  extraction.</li>
+<li>Envelope fields are observability data, not user prose; the inspector
+  renders them, the answer bubble never does.</li>
+</ul></article></main></body></html>

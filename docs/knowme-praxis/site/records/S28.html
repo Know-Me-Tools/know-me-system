@@ -1,0 +1,138 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>S28 · README.md</title><link rel="stylesheet" href="../records.css"><body><main><a href="../index.html">KnowMe Praxis</a><h1>S28 · README.md</h1><p>Complete technical source record. Historical names and requirements remain visible for audit. Revised clauses and explicit corrections govern their application.</p><p><a href="S28.txt">Download complete technical text</a></p><article id="S28-001" class="source-clause"><h4>S28-001 · Conversation UX Strategy — Decision Record and Completion Scope</h4><p class="source-note">Governing revision: <a href="../index.html#workspace">WS-01–07</a> · source requirement, not release evidence.</p><h1>Conversation UX Strategy — Decision Record and Completion Scope</h1>
+<p><strong>Scope:</strong> the conversation surface (chat thread, composer, models surfaces,
+settings, inspector) — the resolved product decisions for the Flutter UI/UX
+spec and the remaining implementation areas. The full component-level contract
+lives in <strong>PAGS-SPEC-KM-UIX-001</strong> (<code>docs/knowme-flutter-uiux-spec.md</code>); this
+document records the decisions that govern it and tracks the spec's own
+reconciliation needs.</p>
+<p><strong>Status:</strong> v1.0, 2026-07-19. Companions: PAGS-SPEC-KM-CTX-001 (context
+fabric), <code>docs/strategies/ag-ui/README.md</code> (event stream), <code>docs/strategies/a2ui/README.md</code>
+(declarative surfaces), <code>docs/strategies/model-configuration/README.md</code>
+(resolution levels), <code>docs/strategies/local-models/</code> (Android runtime direction).</p>
+<hr/></article><article id="S28-002" class="source-clause"><h4>S28-002 · 1. Resolved decisions (2026-07-19, product-approved)</h4><p class="source-note">Governing revision: <a href="../index.html#workspace">WS-01–07</a> · source requirement, not release evidence.</p><h2>1. Resolved decisions (2026-07-19, product-approved)</h2>
+<p>These resolve the open questions raised in UIX-001 §17. They are binding on
+the next revision of that spec and on implementation.</p>
+<ol>
+<li><strong>Navigation: fold Models into Settings → Model &amp; Inference.</strong> The shell
+   keeps five destinations (Home, Chat, Hands, Memory, Settings) — inside the
+   <code>mobile-navigation</code> cap — and the Models surfaces (UIX-001 §8) become a
+   Settings section, still deep-linked from the chat model banner. There is no
+   sixth bottom-bar destination.</li>
+<li><strong>16K extended context: Developer-flag-only in v1.</strong> The trusted ceiling
+   ships at 8K everywhere; the 16K toggle appears only with Developer mode on
+   (UIX-001 §13.4/§13.6). Inherits CTX-001 §15.5.</li>
+<li><strong>Fact extraction: per-assistant opt-in, default off.</strong> No global default.
+   Each assistant's enrollment toggle, the review-and-delete surface, and the
+   provenance requirements stand as specced (UIX-001 §13.3; CTX-001 §8.5).</li>
+<li><strong>Citation adjacency: presentation-only re-flow.</strong> <code>citation</code> blocks keep
+   their recorded stream order; at finalization the presentation layer moves
+   their rendering to chips adjacent to the supported answer run (UIX-001
+   §6.3). Persistence order never changes.</li>
+<li><strong>Mermaid: keep the WebView-class renderer.</strong> <code>flutter_mermaid</code> stays,
+   with the source view and accessible-description fallback (UIX-001 §17.5);
+   pure-Dart rendering is revisited only when a mature renderer exists.</li>
+<li><strong>Benchmark runner: in the Models surface, with a cooldown.</strong> Self-serve
+   re-certification (the ≥15% acceleration gate) ships in the Models section
+   with an explanation and a cooldown, mirrored read-only in Developer
+   (UIX-001 §8.1, §13.6).</li>
+</ol></article><article id="S28-003" class="source-clause"><h4>S28-003 · 2. Flag: Android runtime stance needs one reconciliation pass</h4><p class="source-note">Governing revision: <a href="../index.html#workspace">WS-01–07</a> · source requirement, not release evidence.</p><h2>2. Flag: Android runtime stance needs one reconciliation pass</h2>
+<p>UIX-001 was written against the Unified Inference Recovery and Context Fabric
+Plan's Android stance (Qwen3-4B Q5_K_M, llama.cpp, OpenCL/Adreno behind the
+≥15% gate). The in-repo Android direction — <code>docs/strategies/local-models/android-litert-lm-six-gates-roadmap.md</code>
+and <code>android-native-inference-future-release-roadmap.md</code> (both 2026-07-19) —
+records the <strong>supersession of the Vulkan/OpenCL plan</strong>: the production Android
+lane is <strong>LiteRT-LM with Gemma 4 E2B, CPU as the universal correctness floor,
+optional device-specific acceleration only after physical proof</strong>, with
+llama.cpp retained as an optional CPU/GGUF fallback and desktop/server lane.
+<code>docs/strategies/uar-future-release-roadmap.md</code> makes the same call a standing
+non-goal ("do not reintroduce Android llama.cpp/OpenCL/Vulkan as the default
+path"), so this is settled direction, not an open question.</p>
+<p>Consequence: UIX-001's backend-honesty copy (§6.7 backend chip, §8.1 backend
+row, §8.4 capability figures, §13.2 sampling display) names the llama.cpp
+stack and must be re-worded to the delegate/provider language of the LiteRT-LM
+lane (CPU baseline; GPU/NPU delegates as gated variants; Gemma 4 E2B as the
+default model) in the spec's next revision. The <em>structure</em> of those surfaces
+(active-backend honesty, certification gate visibility, fallback reasons,
+nominal-vs-trusted context) is runtime-neutral and stands. <strong>Action: one
+targeted revision pass on <code>docs/knowme-flutter-uiux-spec.md</code> sections 6.7,
+8.1, 8.4, 13.2, 15–16</strong> when the spec is next edited; not a rewrite.</p></article><article id="S28-004" class="source-clause"><h4>S28-004 · 3. Completion scope for this area</h4><p class="source-note">Governing revision: <a href="../index.html#workspace">WS-01–07</a> · source requirement, not release evidence.</p><h2>3. Completion scope for this area</h2>
+<p>Per the verified current-state inventory (UIX-001 §3), the conversation area
+is complete <strong>except</strong> the following, which constitute its implementation
+backlog (no code authorized here — scope tracking only):</p>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>State</th>
+<th>Spec section</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Named-phase lifecycle strip (replaces generic spinner)</td>
+<td>Missing</td>
+<td>UIX-001 §6.4</td>
+</tr>
+<tr>
+<td>Context inspector (profile/estimator/slices/drops/degradation/escalation + prompt plan + events)</td>
+<td>Missing</td>
+<td>§10</td>
+</tr>
+<tr>
+<td>Branch navigation (<code>‹ n/m ›</code>, branch badges)</td>
+<td>Missing</td>
+<td>§7.2</td>
+</tr>
+<tr>
+<td>Conversation documents panel (scoped docs, promote-to-knowledge)</td>
+<td>Missing</td>
+<td>§9.3</td>
+</tr>
+<tr>
+<td>Settings sections (Model &amp; Inference, Context &amp; Memory, Budget, Developer)</td>
+<td>Missing</td>
+<td>§13</td>
+</tr>
+<tr>
+<td>Models surfaces (library, download states, certification gate) — now under Settings per §1.1</td>
+<td>Missing</td>
+<td>§8</td>
+</tr>
+<tr>
+<td>Attachment extraction states (Xberg/OCR per-chip)</td>
+<td>Partial</td>
+<td>§9.1</td>
+</tr>
+<tr>
+<td>Startup lazy-init status surface</td>
+<td>Partial</td>
+<td>§12</td>
+</tr>
+<tr>
+<td>Thinking cyan tint + duration metadata</td>
+<td>Delta</td>
+<td>§6.2</td>
+</tr>
+<tr>
+<td>Turn anatomy, actions, error/cancelled bubbles, tool confirmation</td>
+<td><strong>Exists — formalize only</strong></td>
+<td>§6–§7</td>
+</tr>
+</tbody>
+</table>
+<p>Dependencies: the lifecycle strip and inspector consume the AG-UI envelope
+work (<code>docs/strategies/ag-ui/README.md</code> §5.2–5.3); settings forms ride the
+A2UI settings generator (<code>docs/strategies/a2ui/README.md</code> §4); models
+surfaces follow the Android LiteRT-LM lane's certification scripts
+(<code>docs/strategies/local-models/</code>).</p></article><article id="S28-005" class="source-clause"><h4>S28-005 · 4. Invariants carried into every change here</h4><p class="source-note">Governing revision: <a href="../index.html#workspace">WS-01–07</a> · source requirement, not release evidence.</p><h2>4. Invariants carried into every change here</h2>
+<ul>
+<li>Flat 2.0, token-sourced styling, both themes (design standard; skills).</li>
+<li>The 11-variant ContentBlock union stays closed; lifecycle and telemetry
+  travel in the run-event envelope.</li>
+<li>Layering: Widget → @riverpod provider → Repository → FFI (Rust core);
+  blocks mutate only via <code>ChatNotifier.streamBlock</code>.</li>
+<li>Reasoning is displayed, persisted, and excluded from future prompts.</li>
+<li>Mutating tools always confirm; destructive actions are branch-scoped and
+  confirmed; nothing destructive is enabled while its branch has an active
+  run.</li>
+</ul></article></main></body></html>

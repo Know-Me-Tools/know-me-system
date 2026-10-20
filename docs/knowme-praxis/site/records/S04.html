@@ -1,0 +1,746 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>S04 · KnowMe.dc.html</title><link rel="stylesheet" href="../records.css"><body><main><a href="../index.html">KnowMe Praxis</a><h1>S04 · KnowMe.dc.html</h1><p>Complete technical source record. Historical names and requirements remain visible for audit. Revised clauses and explicit corrections govern their application.</p><p><a href="S04.txt">Download complete technical text</a></p><article id="S04-001" class="source-clause"><h4>S04-001 · Interactive design specimen — complete HTML, styles and behavior</h4><p class="source-note">Governing revision: <a href="../index.html#home">HOME-01–10</a> · source requirement, not release evidence.</p><pre class="retained-text">&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+&lt;meta charset=&quot;utf-8&quot;&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
+&lt;script src=&quot;./support.js&quot;&gt;&lt;/script&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;x-dc&gt;
+&lt;helmet&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot; /&gt;
+&lt;title&gt;KnowMe&lt;/title&gt;
+&lt;link rel=&quot;preconnect&quot; href=&quot;https://fonts.googleapis.com&quot; /&gt;
+&lt;link href=&quot;https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&amp;family=Inter:wght@500;600;700&amp;family=Roboto:wght@400&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap&quot; rel=&quot;stylesheet&quot; /&gt;
+&lt;style&gt;
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  a { color: #FF6A3D; text-decoration: none; }
+  a:hover { color: #FF8B65; }
+  textarea:focus, input:focus { outline: none; }
+  ::placeholder { color: #6B7280; }
+  @keyframes km-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: #253044; border-radius: 999px; }
+&lt;/style&gt;
+&lt;/helmet&gt;
+
+&lt;div style=&quot;position:fixed;inset:0;background:{{ t.chrome }};display:flex;align-items:center;justify-content:center;overflow:hidden;font-family:&#x27;Inter&#x27;,sans-serif&quot;&gt;
+
+  &lt;div style=&quot;position:absolute;top:16px;right:16px;display:flex;gap:8px;z-index:80&quot;&gt;
+    &lt;button title=&quot;Toggle device frame&quot; onClick=&quot;{{ toggleFormFactor }}&quot; style=&quot;display:flex;align-items:center;gap:6px;background:{{ t.raised }};color:{{ t.textSecondary }};border:none;border-radius:999px;padding:8px 12px;font-family:&#x27;Inter&#x27;,sans-serif;font-size:12px;font-weight:600;cursor:pointer&quot; style-hover=&quot;background:{{ t.hover }}&quot;&gt;
+      &lt;svg width=&quot;14&quot; height=&quot;14&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot;&gt;&lt;rect x=&quot;4&quot; y=&quot;2&quot; width=&quot;16&quot; height=&quot;20&quot; rx=&quot;2&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;line x1=&quot;10&quot; y1=&quot;19&quot; x2=&quot;14&quot; y2=&quot;19&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.8&quot; stroke-linecap=&quot;round&quot;/&gt;&lt;/svg&gt;
+      {{ formFactorLabel }}
+    &lt;/button&gt;
+    &lt;button title=&quot;Toggle appearance&quot; onClick=&quot;{{ toggleTheme }}&quot; style=&quot;display:flex;align-items:center;gap:6px;background:{{ t.raised }};color:{{ t.textSecondary }};border:none;border-radius:999px;padding:8px 12px;font-family:&#x27;Inter&#x27;,sans-serif;font-size:12px;font-weight:600;cursor:pointer&quot; style-hover=&quot;background:{{ t.hover }}&quot;&gt;
+      &lt;svg width=&quot;14&quot; height=&quot;14&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot;&gt;&lt;circle cx=&quot;12&quot; cy=&quot;12&quot; r=&quot;4&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;line x1=&quot;12&quot; y1=&quot;2&quot; x2=&quot;12&quot; y2=&quot;4&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.8&quot; stroke-linecap=&quot;round&quot;/&gt;&lt;line x1=&quot;12&quot; y1=&quot;20&quot; x2=&quot;12&quot; y2=&quot;22&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.8&quot; stroke-linecap=&quot;round&quot;/&gt;&lt;line x1=&quot;4&quot; y1=&quot;12&quot; x2=&quot;2&quot; y2=&quot;12&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.8&quot; stroke-linecap=&quot;round&quot;/&gt;&lt;line x1=&quot;22&quot; y1=&quot;12&quot; x2=&quot;20&quot; y2=&quot;12&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.8&quot; stroke-linecap=&quot;round&quot;/&gt;&lt;/svg&gt;
+      {{ themeLabel }}
+    &lt;/button&gt;
+  &lt;/div&gt;
+
+  &lt;div style=&quot;width:{{ frameWidth }};height:{{ frameHeight }};max-width:100%;max-height:100%;background:{{ t.canvas }};border-radius:{{ frameRadius }};overflow:hidden;display:flex;flex-direction:column;box-shadow:{{ frameShadow }}&quot;&gt;
+
+    &lt;div style=&quot;height:44px;flex-shrink:0;background:{{ t.chrome }};display:flex;align-items:center;gap:12px;padding:0 16px&quot;&gt;
+      &lt;div style=&quot;display:{{ trafficDisplay }};gap:7px&quot;&gt;
+        &lt;div style=&quot;width:11px;height:11px;border-radius:999px;background:{{ t.error }}&quot;&gt;&lt;/div&gt;
+        &lt;div style=&quot;width:11px;height:11px;border-radius:999px;background:{{ t.warning }}&quot;&gt;&lt;/div&gt;
+        &lt;div style=&quot;width:11px;height:11px;border-radius:999px;background:{{ t.success }}&quot;&gt;&lt;/div&gt;
+      &lt;/div&gt;
+      &lt;div style=&quot;display:flex;align-items:center;gap:7px;margin-left:{{ logoMargin }}&quot;&gt;
+        &lt;svg width=&quot;18&quot; height=&quot;18&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot;&gt;&lt;path d=&quot;M5 3v18&quot; stroke=&quot;{{ t.text }}&quot; stroke-width=&quot;3&quot; stroke-linecap=&quot;round&quot;/&gt;&lt;path d=&quot;M5 12 15 3M5 12l10 9&quot; stroke=&quot;{{ t.text }}&quot; stroke-width=&quot;3&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot;/&gt;&lt;circle cx=&quot;10&quot; cy=&quot;12&quot; r=&quot;2.1&quot; fill=&quot;{{ t.ember }}&quot;/&gt;&lt;/svg&gt;
+        &lt;span style=&quot;font-family:&#x27;Space Grotesk&#x27;,sans-serif;font-weight:700;font-size:15px;color:{{ t.text }}&quot;&gt;Know&lt;span style=&quot;color:{{ t.ember }}&quot;&gt;Me&lt;/span&gt;&lt;/span&gt;
+      &lt;/div&gt;
+      &lt;div style=&quot;flex:1&quot;&gt;&lt;/div&gt;
+      &lt;div style=&quot;display:flex;align-items:center;gap:6px;background:{{ t.surface }};border-radius:999px;padding:5px 12px&quot;&gt;
+        &lt;div style=&quot;width:7px;height:7px;border-radius:999px;background:{{ t.success }}&quot;&gt;&lt;/div&gt;
+        &lt;span style=&quot;font-family:&#x27;JetBrains Mono&#x27;,monospace;font-size:11px;color:{{ t.textSecondary }}&quot;&gt;Ready&lt;/span&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+
+    &lt;div style=&quot;flex:1;display:flex;flex-direction:row;min-height:0;overflow:hidden&quot;&gt;
+
+      &lt;div style=&quot;display:{{ railDisplay }};width:208px;flex-shrink:0;background:{{ t.chrome }};flex-direction:column;padding:14px 10px;gap:2px;overflow-y:auto&quot;&gt;
+        &lt;sc-for list=&quot;{{ navItems }}&quot; as=&quot;item&quot; hint-placeholder-count=&quot;6&quot;&gt;
+          &lt;div onClick=&quot;{{ item.onClick }}&quot; style=&quot;display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;cursor:pointer;background:{{ item.bg }}&quot; style-hover=&quot;background:{{ t.hover }}&quot;&gt;
+            &lt;sc-if value=&quot;{{ item.iconIsHome }}&quot;&gt;&lt;svg width=&quot;18&quot; height=&quot;18&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot;&gt;&lt;rect x=&quot;3&quot; y=&quot;3&quot; width=&quot;7&quot; height=&quot;9&quot; rx=&quot;1.5&quot; stroke=&quot;{{ item.color }}&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;rect x=&quot;14&quot; y=&quot;3&quot; width=&quot;7&quot; height=&quot;5&quot; rx=&quot;1.5&quot; stroke=&quot;{{ item.color }}&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;rect x=&quot;14&quot; y=&quot;12&quot; width=&quot;7&quot; height=&quot;9&quot; rx=&quot;1.5&quot; stroke=&quot;{{ item.color }}&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;rect x=&quot;3&quot; y=&quot;16&quot; width=&quot;7&quot; height=&quot;5&quot; rx=&quot;1.5&quot; stroke=&quot;{{ item.color }}&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;/svg&gt;&lt;/sc-if&gt;
+            &lt;sc-if value=&quot;{{ item.iconIsChat }}&quot;&gt;&lt;svg width=&quot;18&quot; height=&quot;18&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot;&gt;&lt;path d=&quot;M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z&quot; stroke=&quot;{{ item.color }}&quot; stroke-width=&quot;1.8&quot; stroke-linejoin=&quot;round&quot;/&gt;&lt;/svg&gt;&lt;/sc-if&gt;
+            &lt;sc-if value=&quot;{{ item.iconIsHands }}&quot;&gt;&lt;svg width=&quot;18&quot; height=&quot;18&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot;&gt;&lt;path d=&quot;M13 2 3 14h7l-1 8 10-12h-7l1-8z&quot; stroke=&quot;{{ item.color }}&quot; stroke-width=&quot;1.8&quot; stroke-linejoin=&quot;round&quot;/&gt;&lt;/svg&gt;&lt;/sc-if&gt;
+            &lt;sc-if value=&quot;{{ item.iconIsMemory }}&quot;&gt;&lt;svg width=&quot;18&quot; height=&quot;18&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot;&gt;&lt;circle cx=&quot;6&quot; cy=&quot;6&quot; r=&quot;2&quot; stroke=&quot;{{ item.color }}&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;circle cx=&quot;18&quot; cy=&quot;6&quot; r=&quot;2&quot; stroke=&quot;{{ item.color }}&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;circle cx=&quot;12&quot; cy=&quot;13&quot; r=&quot;2&quot; stroke=&quot;{{ item.color }}&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;circle cx=&quot;6&quot; cy=&quot;19&quot; r=&quot;2&quot; stroke=&quot;{{ item.color }}&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;circle cx=&quot;18&quot; cy=&quot;19&quot; r=&quot;2&quot; stroke=&quot;{{ item.color }}&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;line x1=&quot;7.5&quot; y1=&quot;7.5&quot; x2=&quot;10.5&quot; y2=&quot;11.5&quot; stroke=&quot;{{ item.color }}&quot; stroke-width=&quot;1.6&quot;/&gt;&lt;line x1=&quot;16.5&quot; y1=&quot;7.5&quot; x2=&quot;13.5&quot; y2=&quot;11.5&quot; stroke=&quot;{{ item.color }}&quot; stroke-width=&quot;1.6&quot;/&gt;&lt;line x1=&quot;10.5&quot; y1=&quot;14.5&quot; x2=&quot;7.5&quot; y2=&quot;17.5&quot; stroke=&quot;{{ item.color }}&quot; stroke-width=&quot;1.6&quot;/&gt;&lt;line x1=&quot;13.5&quot; y1=&quot;14.5&quot; x2=&quot;16.5&quot; y2=&quot;17.5&quot; stroke=&quot;{{ item.color }}&quot; stroke-width=&quot;1.6&quot;/&gt;&lt;/svg&gt;&lt;/sc-if&gt;
+            &lt;sc-if value=&quot;{{ item.iconIsModels }}&quot;&gt;&lt;svg width=&quot;18&quot; height=&quot;18&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot;&gt;&lt;path d=&quot;M12 2 2 7l10 5 10-5-10-5z&quot; stroke=&quot;{{ item.color }}&quot; stroke-width=&quot;1.8&quot; stroke-linejoin=&quot;round&quot;/&gt;&lt;path d=&quot;M2 17l10 5 10-5&quot; stroke=&quot;{{ item.color }}&quot; stroke-width=&quot;1.8&quot; stroke-linejoin=&quot;round&quot;/&gt;&lt;path d=&quot;M2 12l10 5 10-5&quot; stroke=&quot;{{ item.color }}&quot; stroke-width=&quot;1.8&quot; stroke-linejoin=&quot;round&quot;/&gt;&lt;/svg&gt;&lt;/sc-if&gt;
+            &lt;sc-if value=&quot;{{ item.iconIsSettings }}&quot;&gt;&lt;svg width=&quot;18&quot; height=&quot;18&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot;&gt;&lt;line x1=&quot;4&quot; y1=&quot;6&quot; x2=&quot;20&quot; y2=&quot;6&quot; stroke=&quot;{{ item.color }}&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;circle cx=&quot;9&quot; cy=&quot;6&quot; r=&quot;2&quot; fill=&quot;{{ t.chrome }}&quot; stroke=&quot;{{ item.color }}&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;line x1=&quot;4&quot; y1=&quot;12&quot; x2=&quot;20&quot; y2=&quot;12&quot; stroke=&quot;{{ item.color }}&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;circle cx=&quot;15&quot; cy=&quot;12&quot; r=&quot;2&quot; fill=&quot;{{ t.chrome }}&quot; stroke=&quot;{{ item.color }}&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;line x1=&quot;4&quot; y1=&quot;18&quot; x2=&quot;20&quot; y2=&quot;18&quot; stroke=&quot;{{ item.color }}&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;circle cx=&quot;7&quot; cy=&quot;18&quot; r=&quot;2&quot; fill=&quot;{{ t.chrome }}&quot; stroke=&quot;{{ item.color }}&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;/svg&gt;&lt;/sc-if&gt;
+            &lt;span style=&quot;font-family:&#x27;Inter&#x27;,sans-serif;font-size:13px;font-weight:600;color:{{ item.color }}&quot;&gt;{{ item.label }}&lt;/span&gt;
+            &lt;sc-if value=&quot;{{ item.badge }}&quot; hint-placeholder-val=&quot;{{ false }}&quot;&gt;&lt;div style=&quot;width:6px;height:6px;border-radius:999px;background:{{ t.ember }};margin-left:auto&quot;&gt;&lt;/div&gt;&lt;/sc-if&gt;
+          &lt;/div&gt;
+        &lt;/sc-for&gt;
+      &lt;/div&gt;
+
+      &lt;div style=&quot;flex:1;min-width:0;overflow:hidden;display:flex;flex-direction:column;background:{{ t.canvas }}&quot;&gt;
+
+        &lt;sc-if value=&quot;{{ isHome }}&quot;&gt;
+        &lt;div style=&quot;flex:1;overflow-y:auto;padding:32px 40px;display:flex;flex-direction:column;gap:26px;max-width:1000px&quot;&gt;
+          &lt;div&gt;
+            &lt;div style=&quot;font-family:&#x27;JetBrains Mono&#x27;,monospace;font-size:11px;letter-spacing:0.06em;color:{{ t.textFaint }};margin-bottom:8px&quot;&gt;// KnowMe · Tuesday, Jul 17&lt;/div&gt;
+            &lt;div style=&quot;font-family:&#x27;Space Grotesk&#x27;,sans-serif;font-weight:700;font-size:32px;color:{{ t.text }};letter-spacing:-0.02em&quot;&gt;Good afternoon.&lt;/div&gt;
+            &lt;div style=&quot;font-family:&#x27;Roboto&#x27;,sans-serif;font-size:15px;color:{{ t.textSecondary }};margin-top:6px&quot;&gt;Here&#x27;s where things stand.&lt;/div&gt;
+          &lt;/div&gt;
+          &lt;div style=&quot;display:flex;gap:16px;flex-wrap:wrap&quot;&gt;
+            &lt;div style=&quot;flex:1;min-width:220px;background:{{ t.surface }};border-radius:12px;padding:20px&quot;&gt;
+              &lt;div style=&quot;font-family:&#x27;JetBrains Mono&#x27;,monospace;font-size:11px;color:{{ t.textFaint }}&quot;&gt;ACTIVE MODEL&lt;/div&gt;
+              &lt;div style=&quot;font-family:&#x27;Space Grotesk&#x27;,sans-serif;font-weight:700;font-size:19px;color:{{ t.text }};margin-top:6px&quot;&gt;Llama 3.2 8B&lt;/div&gt;
+              &lt;div style=&quot;display:flex;align-items:center;gap:6px;margin-top:8px&quot;&gt;
+                &lt;div style=&quot;width:6px;height:6px;border-radius:999px;background:{{ t.success }}&quot;&gt;&lt;/div&gt;
+                &lt;span style=&quot;font-family:&#x27;Inter&#x27;,sans-serif;font-size:12px;color:{{ t.textSecondary }}&quot;&gt;On-device · Metal · 38 tok/s&lt;/span&gt;
+              &lt;/div&gt;
+            &lt;/div&gt;
+            &lt;div style=&quot;flex:1;min-width:220px;background:{{ t.surface }};border-radius:12px;padding:20px&quot;&gt;
+              &lt;div style=&quot;font-family:&#x27;JetBrains Mono&#x27;,monospace;font-size:11px;color:{{ t.textFaint }}&quot;&gt;MEMORY&lt;/div&gt;
+              &lt;div style=&quot;font-family:&#x27;Space Grotesk&#x27;,sans-serif;font-weight:700;font-size:19px;color:{{ t.text }};margin-top:6px&quot;&gt;1,204 entities&lt;/div&gt;
+              &lt;div style=&quot;font-family:&#x27;Inter&#x27;,sans-serif;font-size:12px;color:{{ t.textSecondary }};margin-top:8px&quot;&gt;Synced 6 minutes ago&lt;/div&gt;
+            &lt;/div&gt;
+            &lt;div style=&quot;flex:1;min-width:220px;background:{{ t.surface }};border-radius:12px;padding:20px&quot;&gt;
+              &lt;div style=&quot;font-family:&#x27;JetBrains Mono&#x27;,monospace;font-size:11px;color:{{ t.textFaint }}&quot;&gt;DEVICES&lt;/div&gt;
+              &lt;div style=&quot;font-family:&#x27;Space Grotesk&#x27;,sans-serif;font-weight:700;font-size:19px;color:{{ t.text }};margin-top:6px&quot;&gt;3 online&lt;/div&gt;
+              &lt;div style=&quot;font-family:&#x27;Inter&#x27;,sans-serif;font-size:12px;color:{{ t.textSecondary }};margin-top:8px&quot;&gt;This Mac · iPhone · Home server&lt;/div&gt;
+            &lt;/div&gt;
+          &lt;/div&gt;
+          &lt;div&gt;
+            &lt;div style=&quot;font-family:&#x27;Inter&#x27;,sans-serif;font-weight:700;font-size:15px;color:{{ t.text }};margin-bottom:12px&quot;&gt;Capabilities&lt;/div&gt;
+            &lt;div style=&quot;display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px&quot;&gt;
+              &lt;sc-for list=&quot;{{ capTiles }}&quot; as=&quot;tile&quot; hint-placeholder-count=&quot;5&quot;&gt;
+                &lt;div onClick=&quot;{{ tile.onClick }}&quot; style=&quot;background:{{ t.surface }};border-radius:12px;padding:18px;cursor:pointer;display:flex;flex-direction:column;gap:8px&quot; style-hover=&quot;background:{{ t.hover }}&quot;&gt;
+                  &lt;span style=&quot;font-family:&#x27;Inter&#x27;,sans-serif;font-weight:700;font-size:14px;color:{{ t.text }}&quot;&gt;{{ tile.label }}&lt;/span&gt;
+                  &lt;span style=&quot;font-family:&#x27;Roboto&#x27;,sans-serif;font-size:12.5px;color:{{ t.textSecondary }};line-height:1.5&quot;&gt;{{ tile.desc }}&lt;/span&gt;
+                &lt;/div&gt;
+              &lt;/sc-for&gt;
+            &lt;/div&gt;
+          &lt;/div&gt;
+          &lt;div&gt;
+            &lt;div style=&quot;font-family:&#x27;Inter&#x27;,sans-serif;font-weight:700;font-size:15px;color:{{ t.text }};margin-bottom:12px&quot;&gt;Recent activity&lt;/div&gt;
+            &lt;div style=&quot;background:{{ t.surface }};border-radius:12px;display:flex;flex-direction:column&quot;&gt;
+              &lt;sc-for list=&quot;{{ activity }}&quot; as=&quot;row&quot; hint-placeholder-count=&quot;4&quot;&gt;
+                &lt;div style=&quot;display:flex;align-items:center;gap:12px;padding:14px 18px&quot;&gt;
+                  &lt;div style=&quot;width:6px;height:6px;border-radius:999px;background:{{ row.color }};flex-shrink:0&quot;&gt;&lt;/div&gt;
+                  &lt;span style=&quot;font-family:&#x27;Roboto&#x27;,sans-serif;font-size:13.5px;color:{{ t.text }};flex:1&quot;&gt;{{ row.text }}&lt;/span&gt;
+                  &lt;span style=&quot;font-family:&#x27;JetBrains Mono&#x27;,monospace;font-size:11px;color:{{ t.textFaint }}&quot;&gt;{{ row.time }}&lt;/span&gt;
+                &lt;/div&gt;
+              &lt;/sc-for&gt;
+            &lt;/div&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+        &lt;/sc-if&gt;
+
+        &lt;sc-if value=&quot;{{ isChat }}&quot;&gt;
+        &lt;div style=&quot;flex:1;display:flex;flex-direction:row;min-height:0;overflow:hidden&quot;&gt;
+          &lt;div style=&quot;display:{{ libraryDisplay }};width:260px;flex-shrink:0;background:{{ t.surface }};flex-direction:column;padding:16px;gap:10px;overflow-y:auto&quot;&gt;
+            &lt;div style=&quot;display:flex;align-items:center;gap:8px;background:{{ t.muted }};border-radius:8px;padding:8px 10px&quot;&gt;
+              &lt;svg width=&quot;14&quot; height=&quot;14&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot;&gt;&lt;circle cx=&quot;11&quot; cy=&quot;11&quot; r=&quot;7&quot; stroke=&quot;{{ t.textFaint }}&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;line x1=&quot;21&quot; y1=&quot;21&quot; x2=&quot;16.65&quot; y2=&quot;16.65&quot; stroke=&quot;{{ t.textFaint }}&quot; stroke-width=&quot;1.8&quot; stroke-linecap=&quot;round&quot;/&gt;&lt;/svg&gt;
+              &lt;span style=&quot;font-family:&#x27;Inter&#x27;,sans-serif;font-size:12.5px;color:{{ t.textFaint }}&quot;&gt;Search conversations&lt;/span&gt;
+            &lt;/div&gt;
+            &lt;div onClick=&quot;{{ newConversation }}&quot; style=&quot;display:flex;align-items:center;gap:8px;background:{{ t.emberTint }};color:{{ t.ember }};border-radius:8px;padding:9px 10px;cursor:pointer;font-family:&#x27;Inter&#x27;,sans-serif;font-size:12.5px;font-weight:700&quot; style-hover=&quot;background:{{ t.emberTintHover }}&quot;&gt;
+              &lt;svg width=&quot;14&quot; height=&quot;14&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot;&gt;&lt;line x1=&quot;12&quot; y1=&quot;5&quot; x2=&quot;12&quot; y2=&quot;19&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2&quot; stroke-linecap=&quot;round&quot;/&gt;&lt;line x1=&quot;5&quot; y1=&quot;12&quot; x2=&quot;19&quot; y2=&quot;12&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2&quot; stroke-linecap=&quot;round&quot;/&gt;&lt;/svg&gt;
+              New conversation
+            &lt;/div&gt;
+            &lt;div style=&quot;font-family:&#x27;JetBrains Mono&#x27;,monospace;font-size:10.5px;letter-spacing:0.06em;color:{{ t.textFaint }};margin-top:6px&quot;&gt;TODAY&lt;/div&gt;
+            &lt;sc-for list=&quot;{{ todayConvs }}&quot; as=&quot;c&quot; hint-placeholder-count=&quot;2&quot;&gt;
+              &lt;div onClick=&quot;{{ c.onClick }}&quot; style=&quot;background:{{ c.bg }};border-radius:10px;padding:10px 12px;cursor:pointer;display:flex;flex-direction:column;gap:3px&quot; style-hover=&quot;background:{{ t.hover }}&quot;&gt;
+                &lt;span style=&quot;font-family:&#x27;Inter&#x27;,sans-serif;font-size:13px;font-weight:600;color:{{ t.text }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis&quot;&gt;{{ c.title }}&lt;/span&gt;
+                &lt;span style=&quot;font-family:&#x27;Roboto&#x27;,sans-serif;font-size:12px;color:{{ t.textSecondary }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis&quot;&gt;{{ c.preview }}&lt;/span&gt;
+              &lt;/div&gt;
+            &lt;/sc-for&gt;
+            &lt;div style=&quot;font-family:&#x27;JetBrains Mono&#x27;,monospace;font-size:10.5px;letter-spacing:0.06em;color:{{ t.textFaint }};margin-top:6px&quot;&gt;PREVIOUS 7 DAYS&lt;/div&gt;
+            &lt;sc-for list=&quot;{{ olderConvs }}&quot; as=&quot;c&quot; hint-placeholder-count=&quot;1&quot;&gt;
+              &lt;div onClick=&quot;{{ c.onClick }}&quot; style=&quot;background:{{ c.bg }};border-radius:10px;padding:10px 12px;cursor:pointer;display:flex;flex-direction:column;gap:3px&quot; style-hover=&quot;background:{{ t.hover }}&quot;&gt;
+                &lt;span style=&quot;font-family:&#x27;Inter&#x27;,sans-serif;font-size:13px;font-weight:600;color:{{ t.text }}&quot;&gt;{{ c.title }}&lt;/span&gt;
+                &lt;span style=&quot;font-family:&#x27;Roboto&#x27;,sans-serif;font-size:12px;color:{{ t.textSecondary }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis&quot;&gt;{{ c.preview }}&lt;/span&gt;
+              &lt;/div&gt;
+            &lt;/sc-for&gt;
+          &lt;/div&gt;
+
+          &lt;div style=&quot;flex:1;min-width:0;display:flex;flex-direction:column&quot;&gt;
+            &lt;div style=&quot;height:58px;flex-shrink:0;padding:0 24px;display:flex;align-items:center;gap:12px;position:relative&quot;&gt;
+              &lt;span style=&quot;font-family:&#x27;Space Grotesk&#x27;,sans-serif;font-weight:700;font-size:15.5px;color:{{ t.text }}&quot;&gt;{{ activeConvTitle }}&lt;/span&gt;
+              &lt;div style=&quot;flex:1&quot;&gt;&lt;/div&gt;
+              &lt;div onClick=&quot;{{ toggleLanePicker }}&quot; style=&quot;display:flex;align-items:center;gap:6px;background:{{ t.muted }};border-radius:999px;padding:6px 12px;cursor:pointer&quot; style-hover=&quot;background:{{ t.hover }}&quot;&gt;
+                &lt;div style=&quot;width:6px;height:6px;border-radius:999px;background:{{ activeLaneColor }}&quot;&gt;&lt;/div&gt;
+                &lt;span style=&quot;font-family:&#x27;Inter&#x27;,sans-serif;font-size:12px;font-weight:600;color:{{ t.text }}&quot;&gt;{{ activeLaneLabel }} · {{ activeModelShortName }}&lt;/span&gt;
+                &lt;svg width=&quot;12&quot; height=&quot;12&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot;&gt;&lt;path d=&quot;M6 9l6 6 6-6&quot; stroke=&quot;{{ t.textSecondary }}&quot; stroke-width=&quot;2&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot;/&gt;&lt;/svg&gt;
+              &lt;/div&gt;
+              &lt;sc-if value=&quot;{{ laneOpen }}&quot;&gt;
+                &lt;div style=&quot;position:absolute;top:52px;right:24px;width:280px;background:{{ t.raised }};border-radius:12px;padding:8px;z-index:40;display:flex;flex-direction:column;gap:2px&quot;&gt;
+                  &lt;sc-for list=&quot;{{ laneOptions }}&quot; as=&quot;lane&quot; hint-placeholder-count=&quot;3&quot;&gt;
+                    &lt;div onClick=&quot;{{ lane.onClick }}&quot; style=&quot;padding:10px 12px;border-radius:8px;cursor:pointer;background:{{ lane.bg }}&quot; style-hover=&quot;background:{{ t.hover }}&quot;&gt;
+                      &lt;div style=&quot;display:flex;align-items:center;gap:8px&quot;&gt;
+                        &lt;div style=&quot;width:7px;height:7px;border-radius:999px;background:{{ lane.color }}&quot;&gt;&lt;/div&gt;
+                        &lt;span style=&quot;font-family:&#x27;Inter&#x27;,sans-serif;font-size:13px;font-weight:700;color:{{ t.text }}&quot;&gt;{{ lane.label }}&lt;/span&gt;
+                      &lt;/div&gt;
+                      &lt;div style=&quot;font-family:&#x27;Roboto&#x27;,sans-serif;font-size:12px;color:{{ t.textSecondary }};margin-top:3px;margin-left:15px&quot;&gt;{{ lane.desc }}&lt;/div&gt;
+                    &lt;/div&gt;
+                  &lt;/sc-for&gt;
+                &lt;/div&gt;
+              &lt;/sc-if&gt;
+            &lt;/div&gt;
+
+            &lt;div style=&quot;flex:1;overflow-y:auto;padding:8px 32px 24px;display:flex;flex-direction:column;gap:18px&quot;&gt;
+              &lt;sc-for list=&quot;{{ messages }}&quot; as=&quot;m&quot; hint-placeholder-count=&quot;2&quot;&gt;
+                &lt;sc-if value=&quot;{{ m.isUser }}&quot;&gt;
+                  &lt;div style=&quot;display:flex;justify-content:flex-end&quot;&gt;
+                    &lt;div style=&quot;background:{{ t.emberTint }};color:{{ t.text }};border-radius:16px 16px 4px 16px;padding:10px 16px;max-width:70%;font-family:&#x27;Roboto&#x27;,sans-serif;font-size:14.5px;line-height:1.6&quot;&gt;{{ m.text }}&lt;/div&gt;
+                  &lt;/div&gt;
+                &lt;/sc-if&gt;
+                &lt;sc-if value=&quot;{{ m.isAssistant }}&quot;&gt;
+                  &lt;div style=&quot;display:flex;flex-direction:column;gap:10px;max-width:78%&quot;&gt;
+                    &lt;sc-for list=&quot;{{ m.blocks }}&quot; as=&quot;b&quot; hint-placeholder-count=&quot;1&quot;&gt;
+                      &lt;sc-if value=&quot;{{ b.isThinking }}&quot;&gt;
+                        &lt;div onClick=&quot;{{ b.onToggle }}&quot; style=&quot;background:{{ t.cyanTint }};border-radius:10px;padding:10px 14px;cursor:pointer&quot;&gt;
+                          &lt;div style=&quot;display:flex;align-items:center;gap:8px&quot;&gt;
+                            &lt;svg width=&quot;14&quot; height=&quot;14&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; style=&quot;{{ b.pulseStyle }}&quot;&gt;&lt;path d=&quot;M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18&quot; stroke=&quot;{{ t.cyan }}&quot; stroke-width=&quot;1.8&quot; stroke-linecap=&quot;round&quot;/&gt;&lt;/svg&gt;
+                            &lt;span style=&quot;font-family:&#x27;JetBrains Mono&#x27;,monospace;font-size:11.5px;font-weight:600;color:{{ t.cyan }}&quot;&gt;Thinking&lt;/span&gt;
+                            &lt;span style=&quot;font-family:&#x27;JetBrains Mono&#x27;,monospace;font-size:11px;color:{{ t.textFaint }}&quot;&gt;{{ b.statusText }}&lt;/span&gt;
+                            &lt;div style=&quot;flex:1&quot;&gt;&lt;/div&gt;
+                            &lt;svg width=&quot;12&quot; height=&quot;12&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot;&gt;&lt;path d=&quot;{{ b.chevronPath }}&quot; stroke=&quot;{{ t.textSecondary }}&quot; stroke-width=&quot;2&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot;/&gt;&lt;/svg&gt;
+                          &lt;/div&gt;
+                          &lt;sc-if value=&quot;{{ b.showContent }}&quot;&gt;&lt;div style=&quot;font-family:&#x27;Roboto&#x27;,sans-serif;font-size:13px;color:{{ t.textSecondary }};margin-top:8px;line-height:1.5&quot;&gt;{{ b.content }}&lt;/div&gt;&lt;/sc-if&gt;
+                        &lt;/div&gt;
+                      &lt;/sc-if&gt;
+                      &lt;sc-if value=&quot;{{ b.isTool }}&quot;&gt;
+                        &lt;div onClick=&quot;{{ b.onToggle }}&quot; style=&quot;background:{{ t.surface }};border-radius:10px;padding:10px 14px;cursor:pointer&quot;&gt;
+                          &lt;div style=&quot;display:flex;align-items:center;gap:8px&quot;&gt;
+                            &lt;svg width=&quot;14&quot; height=&quot;14&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot;&gt;&lt;path d=&quot;M14.7 6.3a4 4 0 1 1-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 1 5.4-5.4z&quot; stroke=&quot;{{ t.textSecondary }}&quot; stroke-width=&quot;1.6&quot; stroke-linejoin=&quot;round&quot;/&gt;&lt;/svg&gt;
+                            &lt;span style=&quot;font-family:&#x27;Inter&#x27;,sans-serif;font-size:12.5px;font-weight:700;color:{{ t.text }}&quot;&gt;{{ b.name }}&lt;/span&gt;
+                            &lt;span style=&quot;font-family:&#x27;JetBrains Mono&#x27;,monospace;font-size:10.5px;color:{{ b.statusColor }};{{ b.pulseStyle }}&quot;&gt;{{ b.statusText }}&lt;/span&gt;
+                          &lt;/div&gt;
+                          &lt;sc-if value=&quot;{{ b.showContent }}&quot;&gt;
+                            &lt;div style=&quot;font-family:&#x27;JetBrains Mono&#x27;,monospace;font-size:11.5px;color:{{ t.textFaint }};margin-top:8px&quot;&gt;{{ b.input }}&lt;/div&gt;
+                            &lt;div style=&quot;font-family:&#x27;JetBrains Mono&#x27;,monospace;font-size:11.5px;color:{{ t.textSecondary }};margin-top:3px&quot;&gt;{{ b.result }}&lt;/div&gt;
+                          &lt;/sc-if&gt;
+                        &lt;/div&gt;
+                      &lt;/sc-if&gt;
+                      &lt;sc-if value=&quot;{{ b.isCitation }}&quot;&gt;
+                        &lt;div style=&quot;background:{{ t.surface }};border-radius:10px;padding:10px 14px&quot;&gt;
+                          &lt;div style=&quot;display:flex;align-items:center;gap:8px;margin-bottom:8px&quot;&gt;
+                            &lt;svg width=&quot;14&quot; height=&quot;14&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot;&gt;&lt;path d=&quot;M6 3h12a1 1 0 0 1 1 1v16l-7-4-7 4V4a1 1 0 0 1 1-1z&quot; stroke=&quot;{{ t.textSecondary }}&quot; stroke-width=&quot;1.6&quot; stroke-linejoin=&quot;round&quot;/&gt;&lt;/svg&gt;
+                            &lt;span style=&quot;font-family:&#x27;Inter&#x27;,sans-serif;font-size:12.5px;font-weight:700;color:{{ t.text }}&quot;&gt;Sources&lt;/span&gt;
+                          &lt;/div&gt;
+                          &lt;sc-for list=&quot;{{ b.sources }}&quot; as=&quot;src&quot; hint-placeholder-count=&quot;1&quot;&gt;
+                            &lt;div style=&quot;background:{{ t.muted }};border-radius:8px;padding:10px;margin-top:6px&quot;&gt;
+                              &lt;div style=&quot;font-family:&#x27;Space Grotesk&#x27;,sans-serif;font-weight:700;font-size:12.5px;color:{{ t.text }}&quot;&gt;{{ src.title }}&lt;/div&gt;
+                              &lt;div style=&quot;font-family:&#x27;JetBrains Mono&#x27;,monospace;font-size:10.5px;color:{{ t.textFaint }};margin-top:2px&quot;&gt;{{ src.source }}&lt;/div&gt;
+                              &lt;div style=&quot;font-family:&#x27;Roboto&#x27;,sans-serif;font-size:12px;color:{{ t.textSecondary }};margin-top:4px&quot;&gt;{{ src.excerpt }}&lt;/div&gt;
+                            &lt;/div&gt;
+                          &lt;/sc-for&gt;
+                        &lt;/div&gt;
+                      &lt;/sc-if&gt;
+                      &lt;sc-if value=&quot;{{ b.isMemory }}&quot;&gt;
+                        &lt;div style=&quot;background:{{ t.muted }};border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px&quot;&gt;
+                          &lt;svg width=&quot;14&quot; height=&quot;14&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; style=&quot;flex-shrink:0&quot;&gt;&lt;circle cx=&quot;12&quot; cy=&quot;12&quot; r=&quot;9&quot; stroke=&quot;{{ t.ember }}&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;line x1=&quot;12&quot; y1=&quot;8&quot; x2=&quot;12&quot; y2=&quot;16&quot; stroke=&quot;{{ t.ember }}&quot; stroke-width=&quot;1.8&quot; stroke-linecap=&quot;round&quot;/&gt;&lt;line x1=&quot;8&quot; y1=&quot;12&quot; x2=&quot;16&quot; y2=&quot;12&quot; stroke=&quot;{{ t.ember }}&quot; stroke-width=&quot;1.8&quot; stroke-linecap=&quot;round&quot;/&gt;&lt;/svg&gt;
+                          &lt;span style=&quot;font-family:&#x27;Roboto&#x27;,sans-serif;font-size:12.5px;color:{{ t.textSecondary }};flex:1&quot;&gt;{{ b.text }}&lt;/span&gt;
+                          &lt;sc-if value=&quot;{{ b.showActions }}&quot;&gt;
+                            &lt;div style=&quot;display:flex;gap:6px;flex-shrink:0&quot;&gt;
+                              &lt;button onClick=&quot;{{ b.onAccept }}&quot; style=&quot;background:{{ t.ember }};color:#fff;border:none;border-radius:6px;padding:5px 10px;font-family:&#x27;Inter&#x27;,sans-serif;font-size:11.5px;font-weight:700;cursor:pointer&quot;&gt;Accept&lt;/button&gt;
+                              &lt;button onClick=&quot;{{ b.onReject }}&quot; style=&quot;background:transparent;color:{{ t.textSecondary }};border:none;border-radius:6px;padding:5px 10px;font-family:&#x27;Inter&#x27;,sans-serif;font-size:11.5px;font-weight:700;cursor:pointer&quot; style-hover=&quot;background:{{ t.hover }}&quot;&gt;Dismiss&lt;/button&gt;
+                            &lt;/div&gt;
+                          &lt;/sc-if&gt;
+                          &lt;sc-if value=&quot;{{ b.resolvedText }}&quot; hint-placeholder-val=&quot;&quot;&gt;&lt;span style=&quot;font-family:&#x27;JetBrains Mono&#x27;,monospace;font-size:10.5px;color:{{ t.textFaint }};flex-shrink:0&quot;&gt;{{ b.resolvedText }}&lt;/span&gt;&lt;/sc-if&gt;
+                        &lt;/div&gt;
+                      &lt;/sc-if&gt;
+                      &lt;sc-if value=&quot;{{ b.isText }}&quot;&gt;
+                        &lt;div style=&quot;font-family:&#x27;Roboto&#x27;,sans-serif;font-size:14.5px;line-height:1.7;color:{{ t.text }};white-space:pre-wrap&quot;&gt;{{ b.text }}&lt;/div&gt;
+                      &lt;/sc-if&gt;
+                    &lt;/sc-for&gt;
+                  &lt;/div&gt;
+                &lt;/sc-if&gt;
+              &lt;/sc-for&gt;
+            &lt;/div&gt;
+
+            &lt;div style=&quot;flex-shrink:0;background:{{ t.surface }};padding:14px 24px 16px;display:flex;flex-direction:column;gap:8px&quot;&gt;
+              &lt;textarea value=&quot;{{ draft }}&quot; onChange=&quot;{{ onDraftChange }}&quot; onKeyDown=&quot;{{ onComposerKeyDown }}&quot; placeholder=&quot;Ask KnowMe anything…&quot; rows=&quot;2&quot; style=&quot;width:100%;background:{{ t.muted }};color:{{ t.text }};border:none;border-radius:12px;padding:10px 14px;font-family:&#x27;Roboto&#x27;,sans-serif;font-size:14px;resize:none&quot;&gt;&lt;/textarea&gt;
+              &lt;div style=&quot;display:flex;align-items:center;gap:10px&quot;&gt;
+                &lt;button title=&quot;Voice note&quot; style=&quot;background:transparent;border:none;color:{{ t.textSecondary }};cursor:pointer;padding:4px&quot; style-hover=&quot;color:{{ t.text }}&quot;&gt;&lt;svg width=&quot;17&quot; height=&quot;17&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot;&gt;&lt;rect x=&quot;9&quot; y=&quot;2&quot; width=&quot;6&quot; height=&quot;11&quot; rx=&quot;3&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;path d=&quot;M5 10a7 7 0 0 0 14 0&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;line x1=&quot;12&quot; y1=&quot;17&quot; x2=&quot;12&quot; y2=&quot;21&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.8&quot; stroke-linecap=&quot;round&quot;/&gt;&lt;/svg&gt;&lt;/button&gt;
+                &lt;button title=&quot;Attach&quot; style=&quot;background:transparent;border:none;color:{{ t.textSecondary }};cursor:pointer;padding:4px&quot; style-hover=&quot;color:{{ t.text }}&quot;&gt;&lt;svg width=&quot;17&quot; height=&quot;17&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot;&gt;&lt;path d=&quot;M21 12.5 12.5 21a5 5 0 0 1-7-7L14 5.5a3.5 3.5 0 1 1 5 5L10.5 19a1.5 1.5 0 1 1-2-2L16 9.5&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.7&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot;/&gt;&lt;/svg&gt;&lt;/button&gt;
+                &lt;div style=&quot;flex:1&quot;&gt;&lt;/div&gt;
+                &lt;button onClick=&quot;{{ onComposerAction }}&quot; disabled=&quot;{{ sendDisabled }}&quot; style=&quot;background:{{ sendBg }};color:#fff;border:none;border-radius:999px;width:38px;height:38px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0&quot;&gt;
+                  &lt;sc-if value=&quot;{{ streaming }}&quot;&gt;&lt;svg width=&quot;13&quot; height=&quot;13&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;currentColor&quot;&gt;&lt;rect x=&quot;6&quot; y=&quot;6&quot; width=&quot;12&quot; height=&quot;12&quot; rx=&quot;2&quot;/&gt;&lt;/svg&gt;&lt;/sc-if&gt;
+                  &lt;sc-if value=&quot;{{ notStreaming }}&quot;&gt;&lt;svg width=&quot;16&quot; height=&quot;16&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot;&gt;&lt;line x1=&quot;22&quot; y1=&quot;2&quot; x2=&quot;11&quot; y2=&quot;13&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2&quot; stroke-linecap=&quot;round&quot;/&gt;&lt;path d=&quot;M22 2 15 22l-4-9-9-4 20-7z&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2&quot; stroke-linejoin=&quot;round&quot;/&gt;&lt;/svg&gt;&lt;/sc-if&gt;
+                &lt;/button&gt;
+              &lt;/div&gt;
+            &lt;/div&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+        &lt;/sc-if&gt;
+
+        &lt;sc-if value=&quot;{{ isHands }}&quot;&gt;
+        &lt;div style=&quot;flex:1;overflow-y:auto;padding:32px 40px;display:flex;flex-direction:column;gap:20px;max-width:900px&quot;&gt;
+          &lt;div style=&quot;display:flex;align-items:center;gap:16px&quot;&gt;
+            &lt;div&gt;
+              &lt;div style=&quot;font-family:&#x27;Space Grotesk&#x27;,sans-serif;font-weight:700;font-size:26px;color:{{ t.text }}&quot;&gt;Hands&lt;/div&gt;
+              &lt;div style=&quot;font-family:&#x27;Roboto&#x27;,sans-serif;font-size:14px;color:{{ t.textSecondary }};margin-top:4px&quot;&gt;Reliable staff, not scripts.&lt;/div&gt;
+            &lt;/div&gt;
+            &lt;div style=&quot;flex:1&quot;&gt;&lt;/div&gt;
+            &lt;button style=&quot;background:{{ t.ember }};color:#fff;border:none;border-radius:8px;padding:10px 16px;font-family:&#x27;Inter&#x27;,sans-serif;font-size:13px;font-weight:700;cursor:pointer&quot;&gt;New hand&lt;/button&gt;
+          &lt;/div&gt;
+          &lt;sc-for list=&quot;{{ hands }}&quot; as=&quot;h&quot; hint-placeholder-count=&quot;3&quot;&gt;
+            &lt;div style=&quot;background:{{ t.surface }};border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:8px&quot;&gt;
+              &lt;div style=&quot;display:flex;align-items:center;gap:10px&quot;&gt;
+                &lt;span style=&quot;font-family:&#x27;Space Grotesk&#x27;,sans-serif;font-weight:700;font-size:16px;color:{{ t.text }}&quot;&gt;{{ h.name }}&lt;/span&gt;
+                &lt;span style=&quot;font-family:&#x27;JetBrains Mono&#x27;,monospace;font-size:10.5px;font-weight:600;color:{{ h.statusColor }};background:{{ h.statusBg }};padding:3px 9px;border-radius:999px;{{ h.pulseStyle }}&quot;&gt;{{ h.statusLabel }}&lt;/span&gt;
+              &lt;/div&gt;
+              &lt;div style=&quot;font-family:&#x27;Roboto&#x27;,sans-serif;font-size:13.5px;color:{{ t.textSecondary }}&quot;&gt;{{ h.purpose }}&lt;/div&gt;
+              &lt;div style=&quot;display:flex;gap:16px;font-family:&#x27;JetBrains Mono&#x27;,monospace;font-size:11px;color:{{ t.textFaint }}&quot;&gt;
+                &lt;span&gt;{{ h.nextRun }}&lt;/span&gt;&lt;span&gt;{{ h.runsWeek }}&lt;/span&gt;&lt;span&gt;{{ h.lane }}&lt;/span&gt;
+              &lt;/div&gt;
+              &lt;div onClick=&quot;{{ h.onToggle }}&quot; style=&quot;cursor:pointer;margin-top:4px&quot;&gt;
+                &lt;div style=&quot;font-family:&#x27;Roboto&#x27;,sans-serif;font-size:12.5px;color:{{ t.textFaint }};font-style:italic&quot;&gt;{{ h.lastOutputPreview }}&lt;/div&gt;
+                &lt;sc-if value=&quot;{{ h.expanded }}&quot;&gt;&lt;div style=&quot;font-family:&#x27;Roboto&#x27;,sans-serif;font-size:13px;color:{{ t.textSecondary }};background:{{ t.muted }};border-radius:8px;padding:10px;margin-top:8px&quot;&gt;{{ h.lastOutputFull }}&lt;/div&gt;&lt;/sc-if&gt;
+              &lt;/div&gt;
+            &lt;/div&gt;
+          &lt;/sc-for&gt;
+        &lt;/div&gt;
+        &lt;/sc-if&gt;
+
+        &lt;sc-if value=&quot;{{ isModels }}&quot;&gt;
+        &lt;div style=&quot;flex:1;overflow-y:auto;padding:32px 40px;display:flex;flex-direction:column;gap:20px;max-width:900px&quot;&gt;
+          &lt;div&gt;
+            &lt;div style=&quot;font-family:&#x27;Space Grotesk&#x27;,sans-serif;font-weight:700;font-size:26px;color:{{ t.text }}&quot;&gt;Models&lt;/div&gt;
+            &lt;div style=&quot;font-family:&#x27;Roboto&#x27;,sans-serif;font-size:14px;color:{{ t.textSecondary }};margin-top:4px&quot;&gt;Your model library, not a storefront.&lt;/div&gt;
+          &lt;/div&gt;
+          &lt;sc-for list=&quot;{{ models }}&quot; as=&quot;mo&quot; hint-placeholder-count=&quot;4&quot;&gt;
+            &lt;div style=&quot;background:{{ mo.bg }};border-radius:12px;padding:18px 20px;display:flex;align-items:center;gap:16px&quot;&gt;
+              &lt;div style=&quot;flex:1&quot;&gt;
+                &lt;div style=&quot;font-family:&#x27;Space Grotesk&#x27;,sans-serif;font-weight:700;font-size:15px;color:{{ t.text }}&quot;&gt;{{ mo.name }}&lt;/div&gt;
+                &lt;div style=&quot;display:flex;gap:6px;margin-top:8px;flex-wrap:wrap&quot;&gt;
+                  &lt;sc-for list=&quot;{{ mo.tags }}&quot; as=&quot;tag&quot; hint-placeholder-count=&quot;3&quot;&gt;
+                    &lt;span style=&quot;background:{{ t.muted }};color:{{ t.textSecondary }};font-family:&#x27;JetBrains Mono&#x27;,monospace;font-size:10.5px;padding:3px 8px;border-radius:999px&quot;&gt;{{ tag }}&lt;/span&gt;
+                  &lt;/sc-for&gt;
+                &lt;/div&gt;
+              &lt;/div&gt;
+              &lt;sc-if value=&quot;{{ mo.isActive }}&quot;&gt;
+                &lt;div style=&quot;display:flex;align-items:center;gap:6px;flex-shrink:0&quot;&gt;
+                  &lt;div style=&quot;width:7px;height:7px;border-radius:999px;background:{{ t.ember }}&quot;&gt;&lt;/div&gt;
+                  &lt;span style=&quot;font-family:&#x27;Inter&#x27;,sans-serif;font-size:12px;font-weight:700;color:{{ t.ember }}&quot;&gt;Active&lt;/span&gt;
+                &lt;/div&gt;
+              &lt;/sc-if&gt;
+              &lt;sc-if value=&quot;{{ mo.showAction }}&quot;&gt;
+                &lt;button onClick=&quot;{{ mo.onAction }}&quot; style=&quot;background:{{ t.muted }};color:{{ t.text }};border:none;border-radius:8px;padding:8px 14px;font-family:&#x27;Inter&#x27;,sans-serif;font-size:12.5px;font-weight:700;cursor:pointer;flex-shrink:0&quot; style-hover=&quot;background:{{ t.hover }}&quot;&gt;{{ mo.actionLabel }}&lt;/button&gt;
+              &lt;/sc-if&gt;
+            &lt;/div&gt;
+          &lt;/sc-for&gt;
+        &lt;/div&gt;
+        &lt;/sc-if&gt;
+
+        &lt;sc-if value=&quot;{{ isMemory }}&quot;&gt;
+        &lt;div style=&quot;flex:1;overflow-y:auto;padding:32px 40px;display:flex;flex-direction:column;gap:20px;max-width:900px&quot;&gt;
+          &lt;div&gt;
+            &lt;div style=&quot;font-family:&#x27;Space Grotesk&#x27;,sans-serif;font-weight:700;font-size:26px;color:{{ t.text }}&quot;&gt;Memory&lt;/div&gt;
+            &lt;div style=&quot;font-family:&#x27;Roboto&#x27;,sans-serif;font-size:14px;color:{{ t.textSecondary }};margin-top:4px&quot;&gt;What KnowMe remembers about you.&lt;/div&gt;
+          &lt;/div&gt;
+          &lt;div style=&quot;display:flex;align-items:center;gap:8px;background:{{ t.surface }};border-radius:8px;padding:9px 12px;max-width:360px&quot;&gt;
+            &lt;svg width=&quot;14&quot; height=&quot;14&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot;&gt;&lt;circle cx=&quot;11&quot; cy=&quot;11&quot; r=&quot;7&quot; stroke=&quot;{{ t.textFaint }}&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;line x1=&quot;21&quot; y1=&quot;21&quot; x2=&quot;16.65&quot; y2=&quot;16.65&quot; stroke=&quot;{{ t.textFaint }}&quot; stroke-width=&quot;1.8&quot; stroke-linecap=&quot;round&quot;/&gt;&lt;/svg&gt;
+            &lt;span style=&quot;font-family:&#x27;Inter&#x27;,sans-serif;font-size:12.5px;color:{{ t.textFaint }}&quot;&gt;Search memory…&lt;/span&gt;
+          &lt;/div&gt;
+          &lt;div style=&quot;display:flex;gap:8px;flex-wrap:wrap&quot;&gt;
+            &lt;sc-for list=&quot;{{ memFilters }}&quot; as=&quot;f&quot; hint-placeholder-count=&quot;4&quot;&gt;
+              &lt;div onClick=&quot;{{ f.onClick }}&quot; style=&quot;background:{{ f.bg }};color:{{ f.color }};font-family:&#x27;Inter&#x27;,sans-serif;font-size:12.5px;font-weight:600;padding:7px 14px;border-radius:999px;cursor:pointer&quot;&gt;{{ f.label }}&lt;/div&gt;
+            &lt;/sc-for&gt;
+          &lt;/div&gt;
+          &lt;sc-if value=&quot;{{ hasPendingProposals }}&quot;&gt;
+          &lt;div&gt;
+            &lt;div style=&quot;font-family:&#x27;Inter&#x27;,sans-serif;font-weight:700;font-size:14px;color:{{ t.text }};margin-bottom:10px&quot;&gt;Pending review&lt;/div&gt;
+            &lt;sc-for list=&quot;{{ proposalRows }}&quot; as=&quot;p&quot; hint-placeholder-count=&quot;1&quot;&gt;
+              &lt;div style=&quot;background:{{ t.cyanTint }};border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:12px;margin-bottom:8px&quot;&gt;
+                &lt;span style=&quot;font-family:&#x27;Roboto&#x27;,sans-serif;font-size:13.5px;color:{{ t.text }};flex:1&quot;&gt;{{ p.text }}&lt;/span&gt;
+                &lt;button onClick=&quot;{{ p.onAccept }}&quot; style=&quot;background:{{ t.ember }};color:#fff;border:none;border-radius:6px;padding:6px 12px;font-family:&#x27;Inter&#x27;,sans-serif;font-size:12px;font-weight:700;cursor:pointer&quot;&gt;Accept&lt;/button&gt;
+                &lt;button onClick=&quot;{{ p.onReject }}&quot; style=&quot;background:transparent;color:{{ t.textSecondary }};border:none;border-radius:6px;padding:6px 12px;font-family:&#x27;Inter&#x27;,sans-serif;font-size:12px;font-weight:700;cursor:pointer&quot;&gt;Dismiss&lt;/button&gt;
+              &lt;/div&gt;
+            &lt;/sc-for&gt;
+          &lt;/div&gt;
+          &lt;/sc-if&gt;
+          &lt;div style=&quot;display:flex;flex-direction:column;gap:10px&quot;&gt;
+            &lt;sc-for list=&quot;{{ memEntries }}&quot; as=&quot;e&quot; hint-placeholder-count=&quot;4&quot;&gt;
+              &lt;div style=&quot;background:{{ t.surface }};border-radius:12px;padding:16px 18px&quot;&gt;
+                &lt;div style=&quot;font-family:&#x27;Space Grotesk&#x27;,sans-serif;font-weight:700;font-size:14.5px;color:{{ t.text }}&quot;&gt;{{ e.title }}&lt;/div&gt;
+                &lt;div style=&quot;font-family:&#x27;Roboto&#x27;,sans-serif;font-size:13px;color:{{ t.textSecondary }};margin-top:5px&quot;&gt;{{ e.excerpt }}&lt;/div&gt;
+                &lt;div style=&quot;display:flex;gap:14px;align-items:center;margin-top:9px;flex-wrap:wrap&quot;&gt;
+                  &lt;span style=&quot;font-family:&#x27;JetBrains Mono&#x27;,monospace;font-size:10.5px;color:{{ t.textFaint }}&quot;&gt;{{ e.meta }}&lt;/span&gt;
+                  &lt;sc-for list=&quot;{{ e.tags }}&quot; as=&quot;tag&quot; hint-placeholder-count=&quot;2&quot;&gt;
+                    &lt;span style=&quot;background:{{ t.muted }};color:{{ t.textSecondary }};font-family:&#x27;Inter&#x27;,sans-serif;font-size:11px;padding:3px 9px;border-radius:999px&quot;&gt;{{ tag }}&lt;/span&gt;
+                  &lt;/sc-for&gt;
+                &lt;/div&gt;
+              &lt;/div&gt;
+            &lt;/sc-for&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+        &lt;/sc-if&gt;
+
+        &lt;sc-if value=&quot;{{ isSettings }}&quot;&gt;
+        &lt;div style=&quot;flex:1;overflow-y:auto;padding:32px 40px;display:flex;flex-direction:column;gap:28px;max-width:820px&quot;&gt;
+          &lt;div style=&quot;font-family:&#x27;Space Grotesk&#x27;,sans-serif;font-weight:700;font-size:26px;color:{{ t.text }}&quot;&gt;Settings&lt;/div&gt;
+
+          &lt;div&gt;
+            &lt;div style=&quot;font-family:&#x27;Inter&#x27;,sans-serif;font-weight:700;font-size:14px;color:{{ t.text }};margin-bottom:10px&quot;&gt;Appearance&lt;/div&gt;
+            &lt;div style=&quot;background:{{ t.surface }};border-radius:12px;padding:16px 18px;display:flex;align-items:center;justify-content:space-between&quot;&gt;
+              &lt;span style=&quot;font-family:&#x27;Roboto&#x27;,sans-serif;font-size:13.5px;color:{{ t.text }}&quot;&gt;Theme&lt;/span&gt;
+              &lt;div onClick=&quot;{{ toggleTheme }}&quot; style=&quot;width:44px;height:24px;border-radius:999px;background:{{ themeSwitchBg }};position:relative;cursor:pointer;flex-shrink:0&quot;&gt;
+                &lt;div style=&quot;position:absolute;top:2px;left:{{ themeSwitchLeft }};width:20px;height:20px;border-radius:999px;background:#fff&quot;&gt;&lt;/div&gt;
+              &lt;/div&gt;
+            &lt;/div&gt;
+          &lt;/div&gt;
+
+          &lt;div&gt;
+            &lt;div style=&quot;font-family:&#x27;Inter&#x27;,sans-serif;font-weight:700;font-size:14px;color:{{ t.text }};margin-bottom:10px&quot;&gt;Devices &amp;amp; sync&lt;/div&gt;
+            &lt;div style=&quot;display:flex;flex-direction:column;gap:8px&quot;&gt;
+              &lt;sc-for list=&quot;{{ devices }}&quot; as=&quot;d&quot; hint-placeholder-count=&quot;3&quot;&gt;
+                &lt;div style=&quot;background:{{ t.surface }};border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:12px&quot;&gt;
+                  &lt;div style=&quot;width:7px;height:7px;border-radius:999px;background:{{ d.statusColor }};flex-shrink:0&quot;&gt;&lt;/div&gt;
+                  &lt;div style=&quot;flex:1&quot;&gt;
+                    &lt;div style=&quot;font-family:&#x27;Inter&#x27;,sans-serif;font-weight:600;font-size:13.5px;color:{{ t.text }}&quot;&gt;{{ d.name }}&lt;/div&gt;
+                    &lt;div style=&quot;font-family:&#x27;Roboto&#x27;,sans-serif;font-size:12px;color:{{ t.textSecondary }};margin-top:2px&quot;&gt;{{ d.role }}&lt;/div&gt;
+                  &lt;/div&gt;
+                  &lt;span style=&quot;font-family:&#x27;JetBrains Mono&#x27;,monospace;font-size:11px;color:{{ t.textFaint }}&quot;&gt;{{ d.status }}&lt;/span&gt;
+                &lt;/div&gt;
+              &lt;/sc-for&gt;
+            &lt;/div&gt;
+          &lt;/div&gt;
+
+          &lt;div&gt;
+            &lt;div style=&quot;font-family:&#x27;Inter&#x27;,sans-serif;font-weight:700;font-size:14px;color:{{ t.text }};margin-bottom:10px&quot;&gt;Privacy &amp;amp; data&lt;/div&gt;
+            &lt;div style=&quot;display:flex;flex-direction:column;gap:8px&quot;&gt;
+              &lt;sc-for list=&quot;{{ settingsToggles }}&quot; as=&quot;s&quot; hint-placeholder-count=&quot;3&quot;&gt;
+                &lt;div style=&quot;background:{{ t.surface }};border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:14px&quot;&gt;
+                  &lt;div style=&quot;flex:1&quot;&gt;
+                    &lt;div style=&quot;font-family:&#x27;Inter&#x27;,sans-serif;font-weight:600;font-size:13.5px;color:{{ t.text }}&quot;&gt;{{ s.label }}&lt;/div&gt;
+                    &lt;div style=&quot;font-family:&#x27;Roboto&#x27;,sans-serif;font-size:12px;color:{{ t.textSecondary }};margin-top:3px;line-height:1.5&quot;&gt;{{ s.caption }}&lt;/div&gt;
+                  &lt;/div&gt;
+                  &lt;div onClick=&quot;{{ s.onToggle }}&quot; style=&quot;width:40px;height:22px;border-radius:999px;background:{{ s.bg }};position:relative;cursor:pointer;flex-shrink:0&quot;&gt;
+                    &lt;div style=&quot;position:absolute;top:2px;left:{{ s.knobLeft }};width:18px;height:18px;border-radius:999px;background:#fff&quot;&gt;&lt;/div&gt;
+                  &lt;/div&gt;
+                &lt;/div&gt;
+              &lt;/sc-for&gt;
+            &lt;/div&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+        &lt;/sc-if&gt;
+
+      &lt;/div&gt;
+    &lt;/div&gt;
+
+    &lt;div style=&quot;display:{{ bottomNavDisplay }};height:64px;flex-shrink:0;background:{{ t.chrome }};align-items:center;justify-content:space-around;padding:0 4px&quot;&gt;
+      &lt;sc-for list=&quot;{{ navItems }}&quot; as=&quot;item2&quot; hint-placeholder-count=&quot;6&quot;&gt;
+        &lt;div onClick=&quot;{{ item2.onClick }}&quot; style=&quot;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:6px 10px;border-radius:10px;background:{{ item2.bg }}&quot;&gt;
+          &lt;sc-if value=&quot;{{ item2.iconIsHome }}&quot;&gt;&lt;svg width=&quot;18&quot; height=&quot;18&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot;&gt;&lt;rect x=&quot;3&quot; y=&quot;3&quot; width=&quot;7&quot; height=&quot;9&quot; rx=&quot;1.5&quot; stroke=&quot;{{ item2.color }}&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;rect x=&quot;14&quot; y=&quot;3&quot; width=&quot;7&quot; height=&quot;5&quot; rx=&quot;1.5&quot; stroke=&quot;{{ item2.color }}&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;rect x=&quot;14&quot; y=&quot;12&quot; width=&quot;7&quot; height=&quot;9&quot; rx=&quot;1.5&quot; stroke=&quot;{{ item2.color }}&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;rect x=&quot;3&quot; y=&quot;16&quot; width=&quot;7&quot; height=&quot;5&quot; rx=&quot;1.5&quot; stroke=&quot;{{ item2.color }}&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;/svg&gt;&lt;/sc-if&gt;
+          &lt;sc-if value=&quot;{{ item2.iconIsChat }}&quot;&gt;&lt;svg width=&quot;18&quot; height=&quot;18&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot;&gt;&lt;path d=&quot;M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z&quot; stroke=&quot;{{ item2.color }}&quot; stroke-width=&quot;1.8&quot; stroke-linejoin=&quot;round&quot;/&gt;&lt;/svg&gt;&lt;/sc-if&gt;
+          &lt;sc-if value=&quot;{{ item2.iconIsHands }}&quot;&gt;&lt;svg width=&quot;18&quot; height=&quot;18&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot;&gt;&lt;path d=&quot;M13 2 3 14h7l-1 8 10-12h-7l1-8z&quot; stroke=&quot;{{ item2.color }}&quot; stroke-width=&quot;1.8&quot; stroke-linejoin=&quot;round&quot;/&gt;&lt;/svg&gt;&lt;/sc-if&gt;
+          &lt;sc-if value=&quot;{{ item2.iconIsMemory }}&quot;&gt;&lt;svg width=&quot;18&quot; height=&quot;18&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot;&gt;&lt;circle cx=&quot;6&quot; cy=&quot;6&quot; r=&quot;2&quot; stroke=&quot;{{ item2.color }}&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;circle cx=&quot;18&quot; cy=&quot;6&quot; r=&quot;2&quot; stroke=&quot;{{ item2.color }}&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;circle cx=&quot;12&quot; cy=&quot;13&quot; r=&quot;2&quot; stroke=&quot;{{ item2.color }}&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;circle cx=&quot;6&quot; cy=&quot;19&quot; r=&quot;2&quot; stroke=&quot;{{ item2.color }}&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;circle cx=&quot;18&quot; cy=&quot;19&quot; r=&quot;2&quot; stroke=&quot;{{ item2.color }}&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;/svg&gt;&lt;/sc-if&gt;
+          &lt;sc-if value=&quot;{{ item2.iconIsModels }}&quot;&gt;&lt;svg width=&quot;18&quot; height=&quot;18&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot;&gt;&lt;path d=&quot;M12 2 2 7l10 5 10-5-10-5z&quot; stroke=&quot;{{ item2.color }}&quot; stroke-width=&quot;1.8&quot; stroke-linejoin=&quot;round&quot;/&gt;&lt;path d=&quot;M2 17l10 5 10-5&quot; stroke=&quot;{{ item2.color }}&quot; stroke-width=&quot;1.8&quot; stroke-linejoin=&quot;round&quot;/&gt;&lt;/svg&gt;&lt;/sc-if&gt;
+          &lt;sc-if value=&quot;{{ item2.iconIsSettings }}&quot;&gt;&lt;svg width=&quot;18&quot; height=&quot;18&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot;&gt;&lt;line x1=&quot;4&quot; y1=&quot;6&quot; x2=&quot;20&quot; y2=&quot;6&quot; stroke=&quot;{{ item2.color }}&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;circle cx=&quot;9&quot; cy=&quot;6&quot; r=&quot;2&quot; fill=&quot;{{ t.chrome }}&quot; stroke=&quot;{{ item2.color }}&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;line x1=&quot;4&quot; y1=&quot;18&quot; x2=&quot;20&quot; y2=&quot;18&quot; stroke=&quot;{{ item2.color }}&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;circle cx=&quot;15&quot; cy=&quot;18&quot; r=&quot;2&quot; fill=&quot;{{ t.chrome }}&quot; stroke=&quot;{{ item2.color }}&quot; stroke-width=&quot;1.8&quot;/&gt;&lt;/svg&gt;&lt;/sc-if&gt;
+          &lt;span style=&quot;font-family:&#x27;Inter&#x27;,sans-serif;font-size:10px;font-weight:600;color:{{ item2.color }}&quot;&gt;{{ item2.label }}&lt;/span&gt;
+        &lt;/div&gt;
+      &lt;/sc-for&gt;
+    &lt;/div&gt;
+
+  &lt;/div&gt;
+&lt;/div&gt;
+
+&lt;/x-dc&gt;
+&lt;script type=&quot;text/x-dc&quot; data-dc-script&gt;
+const DARK = {
+  canvas:&#x27;#0B0F14&#x27;, chrome:&#x27;#111620&#x27;, surface:&#x27;#161D29&#x27;, raised:&#x27;#1C2535&#x27;, hover:&#x27;#202B40&#x27;, muted:&#x27;#253044&#x27;,
+  text:&#x27;#E8EDF3&#x27;, textSecondary:&#x27;#A7B0BC&#x27;, textFaint:&#x27;#6B7280&#x27;,
+  ember:&#x27;#FF6A3D&#x27;, emberTint:&#x27;rgba(255,106,61,0.14)&#x27;, emberTintHover:&#x27;rgba(255,106,61,0.22)&#x27;,
+  cyan:&#x27;#00C2DC&#x27;, cyanTint:&#x27;rgba(0,194,220,0.12)&#x27;,
+  success:&#x27;#22C55E&#x27;, warning:&#x27;#F59E0B&#x27;, error:&#x27;#EF4444&#x27;
+};
+const LIGHT = {
+  canvas:&#x27;#F7F7F8&#x27;, chrome:&#x27;#FFFFFF&#x27;, surface:&#x27;#FAFBFC&#x27;, raised:&#x27;#FFFFFF&#x27;, hover:&#x27;#F2F4F7&#x27;, muted:&#x27;#EEF0F3&#x27;,
+  text:&#x27;#0B0F14&#x27;, textSecondary:&#x27;#4B5563&#x27;, textFaint:&#x27;#6B7280&#x27;,
+  ember:&#x27;#E04E28&#x27;, emberTint:&#x27;rgba(224,78,40,0.10)&#x27;, emberTintHover:&#x27;rgba(224,78,40,0.18)&#x27;,
+  cyan:&#x27;#0891B2&#x27;, cyanTint:&#x27;rgba(8,145,178,0.10)&#x27;,
+  success:&#x27;#16A34A&#x27;, warning:&#x27;#D97706&#x27;, error:&#x27;#DC2626&#x27;
+};
+
+const NAV_DEFS = [
+  {id:&#x27;home&#x27;, label:&#x27;Home&#x27;, key:&#x27;iconIsHome&#x27;},
+  {id:&#x27;chat&#x27;, label:&#x27;Chat&#x27;, key:&#x27;iconIsChat&#x27;},
+  {id:&#x27;hands&#x27;, label:&#x27;Hands&#x27;, key:&#x27;iconIsHands&#x27;},
+  {id:&#x27;memory&#x27;, label:&#x27;Memory&#x27;, key:&#x27;iconIsMemory&#x27;},
+  {id:&#x27;models&#x27;, label:&#x27;Models&#x27;, key:&#x27;iconIsModels&#x27;},
+  {id:&#x27;settings&#x27;, label:&#x27;Settings&#x27;, key:&#x27;iconIsSettings&#x27;}
+];
+
+class Component extends DCLogic {
+  state = {
+    theme: &#x27;dark&#x27;,
+    formFactor: &#x27;desktop&#x27;,
+    screen: &#x27;home&#x27;,
+    laneOpen: false,
+    activeLane: &#x27;device&#x27;,
+    activeModel: &#x27;llama-3.2-8b&#x27;,
+    activeConvId: &#x27;c1&#x27;,
+    draft: &#x27;&#x27;,
+    streaming: false,
+    expanded: {},
+    resolvedMemory: {},
+    memFilter: &#x27;all&#x27;,
+    settings: { syncConversations: true, cloudFallback: false, diagnostics: false },
+    proposals: [
+      { id: &#x27;p1&#x27;, text: &#x27;Log &quot;prefers async written updates over live standups&quot; under Preferences&#x27;, status: &#x27;pending&#x27; }
+    ],
+    conversations: [
+      {
+        id: &#x27;c1&#x27;, title: &#x27;Sync status &amp; memory ingest&#x27;, group: &#x27;Today&#x27;, preview: &#x27;What changed since last sync?&#x27;,
+        messages: [
+          { id: &#x27;m1&#x27;, role: &#x27;user&#x27;, blocks: [{ type: &#x27;text&#x27;, id: &#x27;m1t&#x27;, text: &#x27;What changed in my memory since the last sync?&#x27; }] },
+          { id: &#x27;m2&#x27;, role: &#x27;assistant&#x27;, blocks: [
+            { type: &#x27;thinking&#x27;, id: &#x27;m2think&#x27;, status: &#x27;done&#x27;, duration: &#x27;1.2s&#x27;, content: &#x27;Checking the sync log for new memory writes since the last successful sync, then cross-referencing entities touched in the last 24 hours.&#x27; },
+            { type: &#x27;tool&#x27;, id: &#x27;m2tool&#x27;, name: &#x27;Check sync status&#x27;, status: &#x27;done&#x27;, input: &#x27;device: this-mac · since: 18:00&#x27;, result: &#x27;3 devices synced · last sync 6 minutes ago&#x27; },
+            { type: &#x27;citation&#x27;, id: &#x27;m2cite&#x27;, sources: [{ title: &#x27;Sync log — knowme-sync&#x27;, source: &#x27;Local sync ledger&#x27;, excerpt: &#x27;186 entities written, 4 conflicts auto-resolved by last-write-wins.&#x27; }] },
+            { type: &#x27;memory&#x27;, id: &#x27;m2mem&#x27;, action: &#x27;written&#x27;, text: &#x27;Logged: &quot;prefers async standups&quot; — written to Preferences&#x27; },
+            { type: &#x27;text&#x27;, id: &#x27;m2text&#x27;, text: &#x27;Since your last sync 6 minutes ago, 3 devices reconciled cleanly. 186 memory entities were written, with 4 conflicts auto-resolved by last-write-wins. One new preference was captured from this conversation: you prefer async written updates over live standups — filed under Preferences.&#x27; }
+          ]}
+        ]
+      },
+      { id: &#x27;c2&#x27;, title: &#x27;Voice memo — product roadmap&#x27;, group: &#x27;Today&#x27;, preview: &#x27;Transcribed a 4-minute memo about Q3 scope…&#x27;, messages: [
+        { id: &#x27;n1&#x27;, role: &#x27;user&#x27;, blocks: [{ type: &#x27;text&#x27;, id: &#x27;n1t&#x27;, text: &#x27;Transcribe the voice memo I just recorded and pull out action items.&#x27; }] },
+        { id: &#x27;n2&#x27;, role: &#x27;assistant&#x27;, blocks: [
+          { type: &#x27;tool&#x27;, id: &#x27;n2tool&#x27;, name: &#x27;Transcribe audio (on-device whisper)&#x27;, status: &#x27;done&#x27;, input: &#x27;memo-2026-07-17.m4a · 4m12s&#x27;, result: &#x27;Transcript ready · 612 words&#x27; },
+          { type: &#x27;text&#x27;, id: &#x27;n2text&#x27;, text: &#x27;Three action items surfaced: finalize the Q3 roadmap brief, schedule the graph-RAG ingest test, and confirm the offline-edit conflict policy before the sync demo.&#x27; }
+        ]}
+      ]},
+      { id: &#x27;c3&#x27;, title: &#x27;Client onboarding checklist&#x27;, group: &#x27;Previous 7 Days&#x27;, preview: &#x27;Draft the checklist for new clients…&#x27;, messages: [
+        { id: &#x27;o1&#x27;, role: &#x27;user&#x27;, blocks: [{ type: &#x27;text&#x27;, id: &#x27;o1t&#x27;, text: &#x27;Draft an onboarding checklist for new clients.&#x27; }] },
+        { id: &#x27;o2&#x27;, role: &#x27;assistant&#x27;, blocks: [{ type: &#x27;text&#x27;, id: &#x27;o2text&#x27;, text: &#x27;Here is a five-step checklist: account provisioning, device pairing, memory import, model selection, and a 15-minute walkthrough call.&#x27; }] }
+      ]}
+    ],
+    hands: [
+      { id: &#x27;h1&#x27;, name: &#x27;Morning brief&#x27;, purpose: &#x27;Summarizes overnight memory writes and calendar into one note at 6am.&#x27;, status: &#x27;idle&#x27;, nextRun: &#x27;Next run: 6:00 AM tomorrow&#x27;, runsWeek: &#x27;12 runs this week&#x27;, lane: &#x27;On-device&#x27;, lastOutputPreview: &#x27;&quot;3 memory writes overnight, no calendar conflicts…&quot;&#x27;, lastOutputFull: &#x27;3 memory writes overnight, no calendar conflicts. Q3 roadmap brief is still awaiting your review — flagged for today.&#x27; },
+      { id: &#x27;h2&#x27;, name: &#x27;Sync watchdog&#x27;, purpose: &#x27;Runs every 15 minutes, resolves conflicts, and pings if a device falls behind.&#x27;, status: &#x27;running&#x27;, nextRun: &#x27;Running now&#x27;, runsWeek: &#x27;640 runs this week&#x27;, lane: &#x27;On-device&#x27;, lastOutputPreview: &#x27;&quot;All 3 devices within sync window…&quot;&#x27;, lastOutputFull: &#x27;All 3 devices within sync window. Home server latency 340ms, within threshold.&#x27; },
+      { id: &#x27;h3&#x27;, name: &#x27;Weekly roadmap digest&#x27;, purpose: &#x27;Compiles project memory into a written update for async standups.&#x27;, status: &#x27;scheduled&#x27;, nextRun: &#x27;Next run: Friday 9:00 AM&#x27;, runsWeek: &#x27;1 run this week&#x27;, lane: &#x27;My server&#x27;, lastOutputPreview: &#x27;&quot;Draft ready for review, 4 citations attached…&quot;&#x27;, lastOutputFull: &#x27;Draft ready for review, 4 citations attached from the Projects memory graph.&#x27; }
+    ],
+    models: [
+      { id: &#x27;llama-3.2-8b&#x27;, name: &#x27;Llama 3.2 8B Instruct&#x27;, tags: [&#x27;On-device&#x27;, &#x27;Metal&#x27;, &#x27;4.7 GB&#x27;], status: &#x27;active&#x27; },
+      { id: &#x27;qwen-14b&#x27;, name: &#x27;Qwen2.5 14B&#x27;, tags: [&#x27;On-device&#x27;, &#x27;Metal&#x27;, &#x27;8.1 GB&#x27;], status: &#x27;available&#x27; },
+      { id: &#x27;whisper-small&#x27;, name: &#x27;Whisper Small&#x27;, tags: [&#x27;On-device&#x27;, &#x27;Transcription&#x27;, &#x27;0.5 GB&#x27;], status: &#x27;loaded&#x27; },
+      { id: &#x27;claude-sonnet&#x27;, name: &#x27;Claude Sonnet&#x27;, tags: [&#x27;Cloud provider&#x27;, &#x27;Optional fallback&#x27;], status: &#x27;connect&#x27; }
+    ],
+    memEntries: [
+      { id: &#x27;e1&#x27;, title: &#x27;Prefers async written updates&#x27;, excerpt: &#x27;Captured during sync conversation — avoids live standups where possible.&#x27;, meta: &#x27;Preferences · 96% relevance · 6m ago&#x27;, tags: [&#x27;Preferences&#x27;, &#x27;Work style&#x27;] },
+      { id: &#x27;e2&#x27;, title: &#x27;Q3 roadmap brief&#x27;, excerpt: &#x27;Async-first team, weekly written updates replace standups.&#x27;, meta: &#x27;Projects · 88% relevance · 2h ago&#x27;, tags: [&#x27;Projects&#x27;, &#x27;Roadmap&#x27;] },
+      { id: &#x27;e3&#x27;, title: &#x27;Home server as sync anchor&#x27;, excerpt: &#x27;Home server treated as the owner for conflict resolution.&#x27;, meta: &#x27;Devices · 74% relevance · 1d ago&#x27;, tags: [&#x27;Devices&#x27;, &#x27;Sync&#x27;] },
+      { id: &#x27;e4&#x27;, title: &#x27;Client onboarding checklist v1&#x27;, excerpt: &#x27;Five-step flow: provisioning, pairing, import, model, walkthrough.&#x27;, meta: &#x27;Projects · 61% relevance · 5d ago&#x27;, tags: [&#x27;Projects&#x27;] }
+    ]
+  };
+
+  toggleFormFactor = () =&gt; this.setState(s =&gt; ({ formFactor: s.formFactor === &#x27;desktop&#x27; ? &#x27;phone&#x27; : &#x27;desktop&#x27; }));
+  toggleTheme = () =&gt; this.setState(s =&gt; ({ theme: s.theme === &#x27;dark&#x27; ? &#x27;light&#x27; : &#x27;dark&#x27; }));
+  navigate = (screen) =&gt; this.setState({ screen, laneOpen: false });
+  toggleLanePicker = () =&gt; this.setState(s =&gt; ({ laneOpen: !s.laneOpen }));
+  selectLane = (id) =&gt; this.setState({ activeLane: id, laneOpen: false });
+  selectConversation = (id) =&gt; this.setState({ activeConvId: id });
+  toggleExpand = (id) =&gt; this.setState(s =&gt; ({ expanded: { ...s.expanded, [id]: !s.expanded[id] } }));
+  toggleSetting = (key) =&gt; this.setState(s =&gt; ({ settings: { ...s.settings, [key]: !s.settings[key] } }));
+  setMemFilter = (f) =&gt; this.setState({ memFilter: f });
+  setActiveModel = (id) =&gt; this.setState({ activeModel: id });
+  acceptProposal = (id) =&gt; this.setState(s =&gt; ({ proposals: s.proposals.map(p =&gt; p.id === id ? { ...p, status: &#x27;accepted&#x27; } : p) }));
+  rejectProposal = (id) =&gt; this.setState(s =&gt; ({ proposals: s.proposals.map(p =&gt; p.id === id ? { ...p, status: &#x27;rejected&#x27; } : p) }));
+  resolveMemBlock = (blockId, decision) =&gt; this.setState(s =&gt; ({ resolvedMemory: { ...s.resolvedMemory, [blockId]: decision } }));
+  onDraftChange = (e) =&gt; this.setState({ draft: e.target.value });
+  onComposerKeyDown = (e) =&gt; { if (e.key === &#x27;Enter&#x27; &amp;&amp; !e.shiftKey) { e.preventDefault(); this.handleSend(); } };
+  onComposerAction = () =&gt; { if (this.state.streaming) { this.stopStreaming(); } else { this.handleSend(); } };
+
+  stopStreaming = () =&gt; {
+    clearInterval(this.streamInterval);
+    clearTimeout(this.t1); clearTimeout(this.t2); clearTimeout(this.t3);
+    this.setState({ streaming: false });
+  };
+
+  newConversation = () =&gt; {
+    const id = &#x27;c&#x27; + Date.now();
+    this.setState(s =&gt; ({
+      conversations: [{ id, title: &#x27;New conversation&#x27;, group: &#x27;Today&#x27;, preview: &#x27;Just started…&#x27;, messages: [] }, ...s.conversations],
+      activeConvId: id
+    }));
+  };
+
+  handleSend = () =&gt; {
+    const text = this.state.draft.trim();
+    if (!text || this.state.streaming) return;
+    const convId = this.state.activeConvId;
+    const uid = &#x27;u&#x27; + Date.now();
+    const aid = &#x27;a&#x27; + Date.now();
+    this.setState(s =&gt; ({
+      draft: &#x27;&#x27;, streaming: true,
+      conversations: s.conversations.map(c =&gt; c.id !== convId ? c : {
+        ...c, messages: [...c.messages,
+          { id: uid, role: &#x27;user&#x27;, blocks: [{ type: &#x27;text&#x27;, id: uid + &#x27;t&#x27;, text }] },
+          { id: aid, role: &#x27;assistant&#x27;, blocks: [] }
+        ]
+      })
+    }));
+    this.runDemoReply(convId, aid, text);
+  };
+
+  updateBlocks = (convId, aid, fn) =&gt; {
+    this.setState(s =&gt; ({
+      conversations: s.conversations.map(c =&gt; c.id !== convId ? c : {
+        ...c, messages: c.messages.map(m =&gt; m.id !== aid ? m : { ...m, blocks: fn(m.blocks) })
+      })
+    }));
+  };
+
+  runDemoReply(convId, aid, userText) {
+    const thinkId = aid + &#x27;-think&#x27;, toolId = aid + &#x27;-tool&#x27;, citeId = aid + &#x27;-cite&#x27;, memId = aid + &#x27;-mem&#x27;, textId = aid + &#x27;-text&#x27;;
+    this.updateBlocks(convId, aid, b =&gt; [...b, { type: &#x27;thinking&#x27;, id: thinkId, status: &#x27;running&#x27;, content: &#x27;Weighing whether this needs a memory lookup or general reasoning.&#x27; }]);
+    this.t1 = setTimeout(() =&gt; {
+      this.updateBlocks(convId, aid, b =&gt; b.map(x =&gt; x.id === thinkId ? { ...x, status: &#x27;done&#x27;, duration: &#x27;1.4s&#x27; } : x));
+      this.updateBlocks(convId, aid, b =&gt; [...b, { type: &#x27;tool&#x27;, id: toolId, name: &#x27;Search memory&#x27;, status: &#x27;running&#x27;, input: &#x27;query: &quot;&#x27; + userText.slice(0, 44) + &#x27;&quot;&#x27; }]);
+      this.t2 = setTimeout(() =&gt; {
+        this.updateBlocks(convId, aid, b =&gt; b.map(x =&gt; x.id === toolId ? { ...x, status: &#x27;done&#x27;, result: &#x27;4 relevant entities found · 0.3s&#x27; } : x));
+        this.updateBlocks(convId, aid, b =&gt; [...b, { type: &#x27;citation&#x27;, id: citeId, sources: [{ title: &#x27;Q3 roadmap brief&#x27;, source: &#x27;Memory · Projects&#x27;, excerpt: &#x27;Async-first team, weekly written updates replace standups.&#x27; }] }]);
+        this.updateBlocks(convId, aid, b =&gt; [...b, { type: &#x27;memory&#x27;, id: memId, action: &#x27;proposed&#x27;, text: &#x27;Propose logging this question under Projects for future recall.&#x27; }]);
+        this.t3 = setTimeout(() =&gt; {
+          const full = &#x27;Running this on your on-device Llama 3.2 8B model via Metal, so nothing left this machine. Based on the Q3 roadmap brief in memory, I would fold this into the async written update rather than a live meeting, since it keeps the answer searchable later.&#x27;;
+          const words = full.split(&#x27; &#x27;);
+          this.updateBlocks(convId, aid, b =&gt; [...b, { type: &#x27;text&#x27;, id: textId, text: &#x27;&#x27; }]);
+          let i = 0;
+          this.streamInterval = setInterval(() =&gt; {
+            i++;
+            const partial = words.slice(0, i).join(&#x27; &#x27;);
+            this.updateBlocks(convId, aid, b =&gt; b.map(x =&gt; x.id === textId ? { ...x, text: partial } : x));
+            if (i &gt;= words.length) { clearInterval(this.streamInterval); this.setState({ streaming: false }); }
+          }, 45);
+        }, 700);
+      }, 750);
+    }, 900);
+  }
+
+  renderVals() {
+    const s = this.state;
+    const t = s.theme === &#x27;dark&#x27; ? DARK : LIGHT;
+    const isPhone = s.formFactor === &#x27;phone&#x27;;
+    const pendingCount = s.proposals.filter(p =&gt; p.status === &#x27;pending&#x27;).length;
+
+    const navItems = NAV_DEFS.map(n =&gt; {
+      const active = s.screen === n.id;
+      const o = { id: n.id, label: n.label, onClick: () =&gt; this.navigate(n.id), color: active ? t.ember : t.textSecondary, bg: active ? t.emberTint : &#x27;transparent&#x27;, badge: n.id === &#x27;memory&#x27; &amp;&amp; pendingCount &gt; 0 };
+      o.iconIsHome = n.key === &#x27;iconIsHome&#x27;; o.iconIsChat = n.key === &#x27;iconIsChat&#x27;; o.iconIsHands = n.key === &#x27;iconIsHands&#x27;;
+      o.iconIsMemory = n.key === &#x27;iconIsMemory&#x27;; o.iconIsModels = n.key === &#x27;iconIsModels&#x27;; o.iconIsSettings = n.key === &#x27;iconIsSettings&#x27;;
+      return o;
+    });
+
+    const capTiles = [
+      { label: &#x27;Chat&#x27;, desc: &#x27;Ask anything, with citations and memory.&#x27;, onClick: () =&gt; this.navigate(&#x27;chat&#x27;) },
+      { label: &#x27;Hands&#x27;, desc: &#x27;Reliable automations that run for you.&#x27;, onClick: () =&gt; this.navigate(&#x27;hands&#x27;) },
+      { label: &#x27;Memory&#x27;, desc: &#x27;Inspect what KnowMe remembers.&#x27;, onClick: () =&gt; this.navigate(&#x27;memory&#x27;) },
+      { label: &#x27;Models&#x27;, desc: &#x27;Your on-device and cloud model library.&#x27;, onClick: () =&gt; this.navigate(&#x27;models&#x27;) },
+      { label: &#x27;Settings&#x27;, desc: &#x27;Control sync, privacy, and devices.&#x27;, onClick: () =&gt; this.navigate(&#x27;settings&#x27;) }
+    ];
+
+    const activity = [
+      { text: &#x27;Synced 186 memory entities across 3 devices&#x27;, time: &#x27;6m ago&#x27;, color: t.success },
+      { text: &quot;Hand &#x27;Morning brief&#x27; completed&quot;, time: &#x27;42m ago&#x27;, color: t.cyan },
+      { text: &#x27;Logged new preference: prefers async standups&#x27;, time: &#x27;1h ago&#x27;, color: t.ember },
+      { text: &#x27;Qwen2.5 14B download finished&#x27;, time: &#x27;3h ago&#x27;, color: t.textFaint }
+    ];
+
+    const activeConv = s.conversations.find(c =&gt; c.id === s.activeConvId) || s.conversations[0];
+    const todayConvs = s.conversations.filter(c =&gt; c.group === &#x27;Today&#x27;).map(c =&gt; ({ id: c.id, title: c.title, preview: c.preview, onClick: () =&gt; this.selectConversation(c.id), bg: c.id === s.activeConvId ? t.raised : &#x27;transparent&#x27; }));
+    const olderConvs = s.conversations.filter(c =&gt; c.group === &#x27;Previous 7 Days&#x27;).map(c =&gt; ({ id: c.id, title: c.title, preview: c.preview, onClick: () =&gt; this.selectConversation(c.id), bg: c.id === s.activeConvId ? t.raised : &#x27;transparent&#x27; }));
+
+    const laneMeta = {
+      device: { label: &#x27;On-device&#x27;, desc: &#x27;Local Llama 3.2 8B via Metal. Nothing leaves this machine.&#x27;, color: t.success },
+      server: { label: &#x27;My server&#x27;, desc: &#x27;Your self-hosted inference box on the home network.&#x27;, color: t.cyan },
+      cloud: { label: &#x27;Cloud provider&#x27;, desc: &#x27;Optional cloud fallback. Off by default.&#x27;, color: t.textFaint }
+    };
+    const laneOptions = Object.keys(laneMeta).map(id =&gt; ({ id, label: laneMeta[id].label, desc: laneMeta[id].desc, color: laneMeta[id].color, bg: id === s.activeLane ? t.emberTint : &#x27;transparent&#x27;, onClick: () =&gt; this.selectLane(id) }));
+
+    const messages = activeConv.messages.map(m =&gt; ({
+      id: m.id, isUser: m.role === &#x27;user&#x27;, isAssistant: m.role === &#x27;assistant&#x27;,
+      text: m.role === &#x27;user&#x27; ? m.blocks[0].text : &#x27;&#x27;,
+      blocks: m.blocks.map(b =&gt; {
+        const expanded = !!s.expanded[b.id];
+        if (b.type === &#x27;thinking&#x27;) {
+          return { key: b.id, isThinking: true, statusText: b.status === &#x27;running&#x27; ? &#x27;running…&#x27; : &#x27;done · &#x27; + b.duration, pulseStyle: b.status === &#x27;running&#x27; ? &#x27;animation:km-pulse 1.4s ease-in-out infinite&#x27; : &#x27;&#x27;, onToggle: () =&gt; this.toggleExpand(b.id), showContent: expanded &amp;&amp; b.status === &#x27;done&#x27;, content: b.content, chevronPath: expanded ? &#x27;M6 15l6-6 6 6&#x27; : &#x27;M6 9l6 6 6-6&#x27; };
+        }
+        if (b.type === &#x27;tool&#x27;) {
+          return { key: b.id, isTool: true, name: b.name, statusText: b.status === &#x27;running&#x27; ? &#x27;running…&#x27; : &#x27;done&#x27;, statusColor: b.status === &#x27;running&#x27; ? t.warning : t.success, pulseStyle: b.status === &#x27;running&#x27; ? &#x27;animation:km-pulse 1.4s ease-in-out infinite&#x27; : &#x27;&#x27;, onToggle: () =&gt; this.toggleExpand(b.id), showContent: expanded, input: b.input, result: b.result };
+        }
+        if (b.type === &#x27;citation&#x27;) return { key: b.id, isCitation: true, sources: b.sources };
+        if (b.type === &#x27;memory&#x27;) {
+          const resolved = s.resolvedMemory[b.id];
+          return { key: b.id, isMemory: true, text: b.text, showActions: b.action === &#x27;proposed&#x27; &amp;&amp; !resolved, resolvedText: resolved ? (resolved === &#x27;accept&#x27; ? &#x27;Accepted&#x27; : &#x27;Dismissed&#x27;) : &#x27;&#x27;, onAccept: () =&gt; this.resolveMemBlock(b.id, &#x27;accept&#x27;), onReject: () =&gt; this.resolveMemBlock(b.id, &#x27;reject&#x27;) };
+        }
+        return { key: b.id, isText: true, text: b.text };
+      })
+    }));
+
+    const modelActive = s.models.find(m =&gt; m.id === s.activeModel);
+    const models = s.models.map(m =&gt; ({
+      id: m.id, name: m.name, tags: m.tags, isActive: m.id === s.activeModel,
+      bg: m.id === s.activeModel ? t.emberTint : t.surface,
+      showAction: m.id !== s.activeModel,
+      actionLabel: m.status === &#x27;connect&#x27; ? &#x27;Connect&#x27; : m.status === &#x27;loaded&#x27; ? &#x27;Use&#x27; : &#x27;Load&#x27;,
+      onAction: () =&gt; this.setActiveModel(m.id)
+    }));
+
+    const memFilterDefs = [&#x27;All&#x27;, &#x27;Preferences&#x27;, &#x27;Projects&#x27;, &#x27;Devices&#x27;];
+    const memFilters = memFilterDefs.map(f =&gt; {
+      const id = f.toLowerCase();
+      const active = s.memFilter === id;
+      return { label: f, onClick: () =&gt; this.setMemFilter(id), bg: active ? t.ember : t.muted, color: active ? &#x27;#fff&#x27; : t.textSecondary };
+    });
+    const memEntries = s.memEntries.filter(e =&gt; s.memFilter === &#x27;all&#x27; || e.tags.some(tag =&gt; tag.toLowerCase() === s.memFilter));
+
+    const proposalRows = s.proposals.filter(p =&gt; p.status === &#x27;pending&#x27;).map(p =&gt; ({ text: p.text, onAccept: () =&gt; this.acceptProposal(p.id), onReject: () =&gt; this.rejectProposal(p.id) }));
+
+    const devices = [
+      { name: &#x27;This Mac&#x27;, role: &#x27;Owner&#x27;, status: &#x27;Synced&#x27;, statusColor: t.success },
+      { name: &#x27;iPhone 16 Pro&#x27;, role: &#x27;Member&#x27;, status: &#x27;Synced 6m ago&#x27;, statusColor: t.success },
+      { name: &#x27;Home server&#x27;, role: &#x27;Owner · sync anchor&#x27;, status: &#x27;Reachable&#x27;, statusColor: t.cyan }
+    ];
+
+    const settingsToggleDefs = [
+      { key: &#x27;syncConversations&#x27;, label: &#x27;Sync conversations to my server&#x27;, caption: &#x27;Keeps every message synced to your self-hosted server on the home network.&#x27; },
+      { key: &#x27;cloudFallback&#x27;, label: &#x27;Allow cloud provider fallback&#x27;, caption: &#x27;Only used if you explicitly pick a cloud model. Off by default.&#x27; },
+      { key: &#x27;diagnostics&#x27;, label: &#x27;Share anonymous diagnostics&#x27;, caption: &#x27;Crash and performance signals only — never conversation content.&#x27; }
+    ];
+    const settingsToggles = settingsToggleDefs.map(d =&gt; {
+      const on = s.settings[d.key];
+      return { ...d, onToggle: () =&gt; this.toggleSetting(d.key), bg: on ? t.ember : t.muted, knobLeft: on ? &#x27;22px&#x27; : &#x27;2px&#x27; };
+    });
+
+    return {
+      t, isHome: s.screen === &#x27;home&#x27;, isChat: s.screen === &#x27;chat&#x27;, isHands: s.screen === &#x27;hands&#x27;,
+      isModels: s.screen === &#x27;models&#x27;, isMemory: s.screen === &#x27;memory&#x27;, isSettings: s.screen === &#x27;settings&#x27;,
+      navItems, capTiles, activity,
+      frameWidth: isPhone ? &#x27;390px&#x27; : &#x27;100%&#x27;, frameHeight: isPhone ? &#x27;844px&#x27; : &#x27;100%&#x27;, frameRadius: isPhone ? &#x27;40px&#x27; : &#x27;0px&#x27;,
+      frameShadow: isPhone ? &#x27;0 30px 70px rgba(0,0,0,0.45)&#x27; : &#x27;none&#x27;,
+      trafficDisplay: isPhone ? &#x27;none&#x27; : &#x27;flex&#x27;, logoMargin: isPhone ? &#x27;0&#x27; : &#x27;2px&#x27;,
+      railDisplay: isPhone ? &#x27;none&#x27; : &#x27;flex&#x27;, bottomNavDisplay: isPhone ? &#x27;flex&#x27; : &#x27;none&#x27;, libraryDisplay: isPhone ? &#x27;none&#x27; : &#x27;flex&#x27;,
+      formFactorLabel: isPhone ? &#x27;Desktop&#x27; : &#x27;Phone&#x27;, themeLabel: s.theme === &#x27;dark&#x27; ? &#x27;Light&#x27; : &#x27;Dark&#x27;,
+      toggleFormFactor: this.toggleFormFactor, toggleTheme: this.toggleTheme,
+      todayConvs, olderConvs, newConversation: this.newConversation,
+      activeConvTitle: activeConv.title, messages,
+      laneOpen: s.laneOpen, toggleLanePicker: this.toggleLanePicker, laneOptions,
+      activeLaneColor: laneMeta[s.activeLane].color, activeLaneLabel: laneMeta[s.activeLane].label,
+      activeModelShortName: modelActive ? modelActive.name.split(&#x27; &#x27;).slice(0, 2).join(&#x27; &#x27;) : &#x27;&#x27;,
+      draft: s.draft, onDraftChange: this.onDraftChange, onComposerKeyDown: this.onComposerKeyDown, onComposerAction: this.onComposerAction,
+      streaming: s.streaming, notStreaming: !s.streaming, sendDisabled: !s.streaming &amp;&amp; !s.draft.trim(),
+      sendBg: s.streaming ? t.error : (s.draft.trim() ? t.ember : t.muted),
+      hands: s.hands.map(h =&gt; ({
+        ...h, expanded: !!s.expanded[h.id], onToggle: () =&gt; this.toggleExpand(h.id),
+        statusLabel: h.status === &#x27;running&#x27; ? &#x27;Running&#x27; : h.status === &#x27;scheduled&#x27; ? &#x27;Scheduled&#x27; : &#x27;Idle&#x27;,
+        statusColor: h.status === &#x27;running&#x27; ? t.warning : h.status === &#x27;scheduled&#x27; ? t.cyan : t.textSecondary,
+        statusBg: h.status === &#x27;running&#x27; ? t.cyanTint : t.muted,
+        pulseStyle: h.status === &#x27;running&#x27; ? &#x27;animation:km-pulse 1.4s ease-in-out infinite&#x27; : &#x27;&#x27;
+      })),
+      models,
+      memFilters, memEntries, hasPendingProposals: proposalRows.length &gt; 0, proposalRows,
+      devices, settingsToggles,
+      themeSwitchBg: s.theme === &#x27;dark&#x27; ? t.ember : t.muted, themeSwitchLeft: s.theme === &#x27;dark&#x27; ? &#x27;22px&#x27; : &#x27;2px&#x27;
+    };
+  }
+}
+
+&lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</pre></article></main></body></html>

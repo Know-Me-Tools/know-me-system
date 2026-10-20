@@ -1,0 +1,322 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>S29 · uar-knowme-runtime-integration.md</title><link rel="stylesheet" href="../records.css"><body><main><a href="../index.html">KnowMe Praxis</a><h1>S29 · uar-knowme-runtime-integration.md</h1><p>Complete technical source record. Historical names and requirements remain visible for audit. Revised clauses and explicit corrections govern their application.</p><p><a href="S29.txt">Download complete technical text</a></p><article id="S29-001" class="source-clause"><h4>S29-001 · KnowMe ↔ Universal Agent Runtime Integration Strategy</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h1>KnowMe ↔ Universal Agent Runtime Integration Strategy</h1>
+<p>Date: 2026-07-19</p>
+<p>This supersedes any plan that implied KnowMe mobile would implement real agent
+definition/execution, skill definition/storage, A2UI registry management, or
+general LLM access independently. Those capabilities belong to Universal Agent
+Runtime (UAR). KnowMe owns the product UI, mobile shell, local-device model
+provider bridge, persistence projection, and platform-specific certification
+evidence.</p></article><article id="S29-002" class="source-clause"><h4>S29-002 · Runtime ownership</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h2>Runtime ownership</h2>
+<table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Owner</th>
+<th>KnowMe responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Agent definitions and execution</td>
+<td>UAR</td>
+<td>Render, select, configure, and invoke through the Rust boundary</td>
+</tr>
+<tr>
+<td>Skill definitions, storage, routing, and eval fixtures</td>
+<td>UAR</td>
+<td>Surface activations as <code>ContentBlock::Skill</code> and persist projected blocks</td>
+</tr>
+<tr>
+<td>A2UI execution loop, component catalog, and registry</td>
+<td>UAR</td>
+<td>Render approved surfaces, preserve source-run provenance, and return typed user actions</td>
+</tr>
+<tr>
+<td>General LLM/provider access</td>
+<td>UAR</td>
+<td>Offer local-device providers and expose user-safe backend status</td>
+</tr>
+<tr>
+<td>Tool governance and approvals</td>
+<td>UAR policy/runtime</td>
+<td>Preserve visible approval/cancellation/error semantics in chat</td>
+</tr>
+<tr>
+<td>Mobile local inference</td>
+<td>KnowMe local provider, exposed to UAR</td>
+<td>LiteRT-LM/Gemma 4 E2B on Android; iOS local lane separately certified</td>
+</tr>
+<tr>
+<td>Conversation UI and on-device projection</td>
+<td>KnowMe</td>
+<td>AG-UI/A2UI/content-block rendering, branch actions, local cache, UX</td>
+</tr>
+</tbody>
+</table></article><article id="S29-003" class="source-clause"><h4>S29-003 · Deployment modes</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h2>Deployment modes</h2></article><article id="S29-004" class="source-clause"><h4>S29-004 · Flutter mobile</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h3>Flutter mobile</h3>
+<p>Mobile cannot depend on BossFang/LibreFang as a local sidecar. UAR must be used
+as a library behind KnowMe's Rust FFI boundary.</p>
+<p>Target shape:</p>
+<pre><code class="language-text">Flutter UI
+  → Riverpod/repository
+  → gen_ui_ffi
+  → KnowMe Rust runtime facade
+  → embedded UAR kernel
+  → KnowMe local provider adapter
+  → LiteRT-LM / platform local model
+</code></pre>
+<p>The UAR Rust SDK already exposes an <code>embedded</code> feature, but it currently links
+the full AGPL runtime. Before mobile production, extract or stabilize a narrow
+dependency-light embedded kernel profile with:</p>
+<ul>
+<li>no HTTP server startup requirement;</li>
+<li>no local sidecar process;</li>
+<li>mobile-safe persistence/config hooks;</li>
+<li>callbacks or traits for local LLM providers;</li>
+<li>typed UAR stream events available in-process;</li>
+<li>cancellation and checkpoint hooks compatible with app lifecycle.</li>
+</ul></article><article id="S29-005" class="source-clause"><h4>S29-005 · Desktop</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h3>Desktop</h3>
+<p>Desktop may use UAR either as:</p>
+<ul>
+<li>a supervised sidecar/service over HTTP/SSE; or</li>
+<li>a linked library after the same embedded-kernel boundary is stable.</li>
+</ul>
+<p>BossFang/LibreFang may supervise or call UAR out-of-process on desktop, but
+KnowMe should still consume UAR through typed Rust contracts rather than letting
+React own provider/tool/prompt orchestration.</p></article><article id="S29-006" class="source-clause"><h4>S29-006 · Web</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h3>Web</h3>
+<p>Browser clients use UAR through HTTP/service access. They do not embed UAR.
+Browser/PGlite state remains a local projection/cache of UAR events and
+KnowMe-visible conversation entities.</p></article><article id="S29-007" class="source-clause"><h4>S29-007 · Cloud</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h3>Cloud</h3>
+<p>Cloud UAR is the authoritative service for hosted agents, skills, tools, A2UI
+catalog management, provider credentials, and governance. Mobile uses cloud UAR
+when remote execution is selected or when a capability cannot run locally.</p></article><article id="S29-008" class="source-clause"><h4>S29-008 · Local model bridge into UAR</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h2>Local model bridge into UAR</h2>
+<p>The Android LiteRT-LM work is not a competing agent runtime. It becomes a UAR
+provider/backend:</p>
+<pre><code class="language-text">UAR agent/run manager
+  → provider routing
+  → KnowMeLocalProvider
+  → gen_ui_inference::LiteRtLmProvider
+  → Android LiteRT-LM SDK/JNI
+</code></pre>
+<p>Provider bridge requirements:</p>
+<ul>
+<li>Accept UAR structured messages, tool declarations, tool results, structured
+  output constraints, sampling settings, cancellation tokens, and optional
+  attachments/extracted text.</li>
+<li>Return UAR-compatible stream events for text, reasoning, tool calls,
+  lifecycle, errors, cancellation, usage, and raw provider payloads.</li>
+<li>Preserve the KnowMe local-model lifecycle states:
+  <code>notInstalled</code>, <code>downloading</code>, <code>verifying</code>, <code>loading</code>, <code>ready</code>,
+  <code>cancelling</code>, <code>cancelled</code>, <code>failed</code>.</li>
+<li>Keep Android CPU LiteRT-LM as the universal correctness floor; GPU/NPU remain
+  optional device-specific UAR provider variants only after certification.</li>
+<li>Expose local backend diagnostics to UAR so routing can decide whether a run
+  should stay local, fall back to cloud, or ask the user.</li>
+</ul>
+<p>Implementation status: <code>gen_ui_protocol</code> now contains a dependency-free
+bidirectional local-provider bridge. It converts KnowMe <code>InferenceRequest</code>
+values into UAR-compatible driver payloads, converts UAR <code>LlmRequest</code>-shaped
+payloads back into structured KnowMe <code>InferenceRequest</code> values, and projects
+local <code>StreamEvent</code>s into both AG-UI events and UAR <code>NormalizedEvent</code>-shaped
+payloads. Tool-call streaming uses a stateful outbound adapter so final UAR tool
+completion events preserve the exact tool name and accumulated JSON arguments.
+<code>gen_ui_agent::uar::UarLocalInferenceDriverBridge</code> now wraps that protocol seam
+around a real <code>InferenceProvider</code> trait object: it loads the selected local
+model spec, calls the local provider with the structured request, and streams
+UAR <code>NormalizedEvent</code>-shaped payloads back out. This does not wire embedded
+mobile UAR yet; it makes the future UAR <code>ExternalLlmDriver</code> provider
+registration a closure-level adapter instead of a prompt-flattening rewrite.
+UAR itself now also exposes the matching opt-in runtime hook:
+<code>Orchestrator::from_driver(...)</code> and <code>RunManager::with_llm_driver(...)</code>. The
+default service path still constructs <code>LiterLlmDriver</code>; embedded/mobile hosts
+can inject an <code>ExternalLlmDriver</code> without changing provider routing for cloud
+or desktop service deployments.</p></article><article id="S29-009" class="source-clause"><h4>S29-009 · Event and block mapping</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h2>Event and block mapping</h2>
+<p>KnowMe's content-block work remains valuable as the cross-platform projection
+layer for UAR events.</p>
+<table>
+<thead>
+<tr>
+<th>UAR / AG-UI event</th>
+<th>KnowMe projection</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>reasoning events</td>
+<td><code>ThinkingBlock</code> outside answer bubble</td>
+</tr>
+<tr>
+<td>text deltas</td>
+<td>Markdown/text answer blocks</td>
+</tr>
+<tr>
+<td>tool call lifecycle/result</td>
+<td><code>ToolUseBlock</code> / <code>ToolResultBlock</code></td>
+</tr>
+<tr>
+<td><code>uar.skill.activated</code> and process lifecycle</td>
+<td><code>SkillBlock</code> outside the answer bubble, parallel to thinking/citation chunks</td>
+</tr>
+<tr>
+<td>memory/retrieval/citation events</td>
+<td><code>MemoryBlock</code> / <code>CitationBlock</code>; RAG citation arrays expand into ordered citation blocks and memory recall items remain inspectable as recall blocks</td>
+</tr>
+<tr>
+<td>A2UI surface/state events</td>
+<td><code>ArtifactBlock(type: a2ui)</code> rendered through A2UI</td>
+</tr>
+<tr>
+<td>unknown/custom provider payloads</td>
+<td><code>ArtifactBlock</code> with source/event/payload</td>
+</tr>
+<tr>
+<td>cancellation/error</td>
+<td>terminal run status bubbles, not fake assistant prose</td>
+</tr>
+</tbody>
+</table>
+<p>The rule stays strict: no UAR event is silently dropped. Unknown payloads become
+inspectable artifacts.</p></article><article id="S29-010" class="source-clause"><h4>S29-010 · AG-UI/A2UI execution ownership</h4><p class="source-note">Governing revision: <a href="../index.html#surfaces">UI-01–11</a> · source requirement, not release evidence.</p><h2>AG-UI/A2UI execution ownership</h2>
+<p>UAR owns the complete live artifact loop, not only the component registry. For
+every A2UI-producing turn UAR must:</p>
+<ul>
+<li>create and persist the source run;</li>
+<li>emit the official AG-UI run, step, text, reasoning, tool, state, artifact,
+  error, cancellation, and completion events;</li>
+<li>validate and publish A2UI surface messages and state patches;</li>
+<li>retain surface replay data for reconnect/restart recovery;</li>
+<li>accept typed A2UI actions against the durable source run;</li>
+<li>merge the submitted client data model and action context under UAR policy;</li>
+<li>create and stream the continuation run through the same AG-UI protocol; and</li>
+<li>own component-library promotion, versioning, and governance.</li>
+</ul>
+<p>React and Flutter are deliberately thin clients in this loop. They render the
+approved catalog, maintain only transient form state, persist the projected
+conversation blocks, and send a typed action envelope containing
+<code>sourceRunId</code>, <code>surfaceId</code>, <code>sourceComponentId</code>, action name/context, timestamp,
+and the client data model. They do not synthesize continuation prompts, execute
+agent logic, or guess which UAR run owns a restored surface.</p>
+<p>The acceptance gate is an actual prompt → UAR run → A2UI surface → client
+restart/reload → restored surface → typed action → UAR continuation → AG-UI
+completion sequence. A display-only fixture or client-local callback does not
+qualify.</p></article><article id="S29-011" class="source-clause"><h4>S29-011 · A2UI catalog integration</h4><p class="source-note">Governing revision: <a href="../index.html#surfaces">UI-01–11</a> · source requirement, not release evidence.</p><h2>A2UI catalog integration</h2>
+<p>UAR owns the catalog registry and supported component profiles. KnowMe owns
+rendering conformance:</p>
+<ul>
+<li>Flutter must implement the approved UAR/A2UI catalog components needed by the
+  mobile experience.</li>
+<li>Unknown catalog ids or component names fail closed.</li>
+<li>Component registry updates come from UAR, but mobile can cache approved
+  profiles for offline rendering.</li>
+<li>A component action always targets the persisted UAR source run; an ephemeral
+  client run map may be used only as a same-session fallback.</li>
+<li>Renderer tests should use UAR golden fixtures where available, not
+  hand-authored one-off examples only.</li>
+</ul></article><article id="S29-012" class="source-clause"><h4>S29-012 · Persistence policy</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h2>Persistence policy</h2>
+<p>UAR is the source of truth for agent/skill/run definitions. KnowMe persists a
+local projection for UX and recovery:</p>
+<ul>
+<li>conversation messages and ordered content blocks;</li>
+<li>run id, parent message id, branch id;</li>
+<li>terminal run state/error/cancellation;</li>
+<li>model/backend diagnostics;</li>
+<li>selected UAR agent/skill ids and event provenance;</li>
+<li>local-only model installation state.</li>
+</ul>
+<p>When online sync is enabled, UAR run/checkpoint state reconciles with KnowMe's
+local projection. Reasoning and skill process notes remain visible/persisted as
+conversation artifacts but are excluded from future prompt context unless UAR
+policy explicitly includes them.</p></article><article id="S29-013" class="source-clause"><h4>S29-013 · Phased implementation</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h2>Phased implementation</h2></article><article id="S29-014" class="source-clause"><h4>S29-014 · Phase 1 — Contract alignment</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h3>Phase 1 — Contract alignment</h3>
+<ul>
+<li>Add the UAR submodule as a pinned dependency reference.</li>
+<li>Define a KnowMe <code>UarRuntimeFacade</code> trait with two implementations:</li>
+<li>embedded/mobile;</li>
+<li>HTTP/service. <strong>Service facade exists at the Rust seam level through
+    <code>UarServiceRuntime</code>; embedded/mobile remains future work.</strong></li>
+<li>Expose typed desktop/web service configuration and the non-default <code>uar</code> chat
+  lane. <strong>Done:</strong> the Tauri command surface can save a UAR service URL,
+  keychain-backed API key reference, compiled agent artifact, and optional
+  session id; <code>gen_ui_agent::chat</code> routes that lane through <code>UarServiceRuntime</code>
+  and submits A2UI action responses back through UAR's artifact-response
+  endpoint. The Tauri UAR runtime-status command now reports <code>service_runtime</code>
+  once the effective service config can load. The React desktop Settings screen
+  now saves this config, while the Chat lane switcher and Models screen expose
+  the <code>uar</code> lane only as a visible, guarded option until the service is runnable.
+  Settings can also run a non-destructive <code>/health</code> probe against the saved UAR
+  service config and show the result before a chat run is attempted.</li>
+<li>Define event mapping tests from UAR stream payloads to KnowMe <code>ContentBlock</code>
+  variants.</li>
+<li>Keep the existing local LiteRT-LM path active while the facade is introduced.</li>
+</ul></article><article id="S29-015" class="source-clause"><h4>S29-015 · Phase 2 — Mobile embedded kernel</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h3>Phase 2 — Mobile embedded kernel</h3>
+<ul>
+<li>Build or extract the UAR embedded kernel profile needed by Flutter mobile.</li>
+<li>Wire KnowMe's local LiteRT-LM provider as a UAR provider.</li>
+<li>Route one local Android chat turn through UAR while preserving the already
+  certified LiteRT-LM prompt/tool/skill/cancellation semantics.</li>
+</ul></article><article id="S29-016" class="source-clause"><h4>S29-016 · Phase 3 — Real skills and A2UI registry</h4><p class="source-note">Governing revision: <a href="../index.html#surfaces">UI-01–11</a> · source requirement, not release evidence.</p><h3>Phase 3 — Real skills and A2UI registry</h3>
+<ul>
+<li>Register a real UAR skill fixture in mobile.</li>
+<li>Certify visible <code>SkillBlock</code> lifecycle from UAR, not only MCP namespace
+  derivation.</li>
+<li>Render a UAR-managed A2UI surface from the approved catalog.</li>
+<li>Persist and restore the UAR skill/A2UI blocks from <code>entity-records.sqlite3</code>.</li>
+<li>Keep UAR skill activation chunks first-class: selectable/copyable, ordered in
+  the turn timeline, persisted separately from answer Markdown, and excluded
+  from future prompt context by default unless UAR policy opts in.</li>
+</ul></article><article id="S29-017" class="source-clause"><h4>S29-017 · Phase 4 — Cross-platform convergence</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h3>Phase 4 — Cross-platform convergence</h3>
+<ul>
+<li>Desktop/web use HTTP/service UAR.</li>
+<li>Mobile uses embedded UAR with cloud fallback.</li>
+<li>All platforms share the same UAR event mapping and KnowMe projection tests.</li>
+<li>Fleet certification reports include UAR runtime mode:
+  <code>embedded</code>, <code>service</code>, <code>cloud</code>, or <code>hybrid</code>.</li>
+</ul></article><article id="S29-018" class="source-clause"><h4>S29-018 · Immediate next gate</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h2>Immediate next gate</h2>
+<p>Before replacing the current Android local-chat path, prove the seam in a
+non-invasive way:</p>
+<ol>
+<li>Commit the UAR submodule pin. <strong>Done:</strong> KnowMe pins UAR under
+   <code>rust/vendor/universal-agent-runtime</code>.</li>
+<li>Add a compile-time/offline contract test fixture that maps representative
+   UAR stream events into KnowMe content blocks. <strong>Done:</strong> <code>gen_ui_protocol</code>
+   normalizes UAR <code>uar.agui/1</code> reasoning, skill activation, tool lifecycle,
+   direct citations, RAG citation arrays, memory updates, memory recall, and
+   unknown custom events into KnowMe stream/content blocks.
+   <code>gen_ui_agent::uar</code> also projects UAR SDK SSE stream events, including direct
+   <code>agui.rag_citations</code>, <code>agui.custom</code> envelopes, and native normalized SSE
+   events, through the same adapter while preserving order.</li>
+<li>Add the inverse local-provider driver seam. <strong>Done:</strong> UAR <code>LlmRequest</code>-shaped
+   message/tool/settings payloads convert into KnowMe <code>InferenceRequest</code>, and
+   local provider <code>StreamEvent</code>s convert back into UAR <code>NormalizedEvent</code>-shaped
+   payloads with stateful tool-call argument preservation.</li>
+<li>Add the host-side local provider bridge. <strong>Done:</strong>
+<code>UarLocalInferenceDriverBridge</code> can call any platform-selected
+   <code>InferenceProvider</code>, including Android LiteRT-LM, from a UAR payload and
+   return UAR normalized-event payloads.</li>
+<li>Add the UAR injected-driver run hook. <strong>Done:</strong> UAR supports
+   <code>Orchestrator::from_driver(...)</code> and <code>RunManager::with_llm_driver(...)</code>, so
+   a host-provided <code>ExternalLlmDriver</code> can become the primary model stream for
+   a run.</li>
+<li>Exercise the desktop/web service facade against a deterministic
+   UAR-compatible HTTP/SSE surface. <strong>Done:</strong> the local harness creates a run,
+   streams events through the UAR SDK, projects them into KnowMe A2UI events,
+   submits an artifact response to the UAR artifact-response endpoint, and
+   verifies the UAR cancel endpoint.</li>
+<li>Add a React desktop artifact-response bridge. <strong>Done minimally:</strong> A2UI/input
+   artifacts can collect a JSON object response and submit it through the chat
+   hook/store layer to the typed Tauri interaction command. Full UAR
+   component-registry rendering remains future work owned by the UAR integration.</li>
+<li>Add Android certification report fields for <code>uarRuntimeMode</code> and
+   <code>uarSubmoduleCommit</code>. <strong>Done:</strong> the local certification report records UAR
+   authority, target modes, current integration state, and submodule metadata.</li>
+<li>Keep physical local-model gates green.</li>
+</ol>
+<p>This preserves current Android progress while moving the architecture toward
+UAR as the real agent runtime authority.</p>
+<p>The next implementation checkpoint is the future-release roadmap in
+<code>docs/strategies/uar-future-release-roadmap.md</code>: certify the desktop/web <code>uar</code>
+lane against a live UAR service from the React UI, starting with the saved
+service health probe, then lane switching, streaming, cancellation, and A2UI
+artifact responses. The deterministic local HTTP/SSE harness has already proven
+the KnowMe protocol path, including cancellation and the minimal React artifact
+response bridge, so the remaining work is external service/runtime
+certification, more UAR golden fixtures, the final UAR component-registry
+renderer, and then the mobile embedded UAR kernel as the owner of real
+chat/agent execution.</p></article></main></body></html>

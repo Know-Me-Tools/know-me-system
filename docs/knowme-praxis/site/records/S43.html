@@ -1,0 +1,63 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>S43 · spec.md</title><link rel="stylesheet" href="../records.css"><body><main><a href="../index.html">KnowMe Praxis</a><h1>S43 · spec.md</h1><p>Complete technical source record. Historical names and requirements remain visible for audit. Revised clauses and explicit corrections govern their application.</p><p><a href="S43.txt">Download complete technical text</a></p><article id="S43-001" class="source-clause"><h4>S43-001 · ADDED Requirements</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h2>ADDED Requirements</h2></article><article id="S43-002" class="source-clause"><h4>S43-002 · Requirement: Reproducible workspace image</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h3>Requirement: Reproducible workspace image</h3>
+<p>The project SHALL build one <code>linux/amd64</code> image containing the compiled Axum BFF
+and the matching React distribution from the same source revision.</p></article><article id="S43-003" class="source-clause"><h4>S43-003 · Scenario: Image is built</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h4>Scenario: Image is built</h4>
+<ul>
+<li><strong>WHEN</strong> the workspace image build completes</li>
+<li><strong>THEN</strong> the image starts the Axum binary and serves the compiled SPA</li>
+<li><strong>AND</strong> the recorded source SHA and image digest identify the exact build</li>
+</ul></article><article id="S43-004" class="source-clause"><h4>S43-004 · Scenario: Runtime architecture is inspected</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h4>Scenario: Runtime architecture is inspected</h4>
+<ul>
+<li><strong>WHEN</strong> the image manifest is inspected</li>
+<li><strong>THEN</strong> it contains <code>linux/amd64</code>, matching the observed AKS nodes</li>
+</ul></article><article id="S43-005" class="source-clause"><h4>S43-005 · Requirement: Runtime is non-root and secret-free</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h3>Requirement: Runtime is non-root and secret-free</h3>
+<p>The final image MUST run as a non-root user and MUST NOT contain <code>.env</code> files,
+private keys, tokens, cookies, database passwords, or model credentials.</p></article><article id="S43-006" class="source-clause"><h4>S43-006 · Scenario: Image metadata and layers are inspected</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h4>Scenario: Image metadata and layers are inspected</h4>
+<ul>
+<li><strong>WHEN</strong> image configuration and layers are scanned</li>
+<li><strong>THEN</strong> the configured user is non-root</li>
+<li><strong>AND</strong> no forbidden secret material or source <code>.env</code> file is present</li>
+</ul></article><article id="S43-007" class="source-clause"><h4>S43-007 · Scenario: Secret is required at runtime</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h4>Scenario: Secret is required at runtime</h4>
+<ul>
+<li><strong>WHEN</strong> a required credential is absent</li>
+<li><strong>THEN</strong> the process fails closed with the missing configuration key name</li>
+<li><strong>AND</strong> the credential value is never logged</li>
+</ul></article><article id="S43-008" class="source-clause"><h4>S43-008 · Requirement: Kubernetes-compatible health contract</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h3>Requirement: Kubernetes-compatible health contract</h3>
+<p>The BFF SHALL expose distinct startup/liveness and readiness behavior.</p></article><article id="S43-009" class="source-clause"><h4>S43-009 · Scenario: Process is alive but required configuration is invalid</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h4>Scenario: Process is alive but required configuration is invalid</h4>
+<ul>
+<li><strong>WHEN</strong> the event loop is running and required configuration cannot be loaded</li>
+<li><strong>THEN</strong> liveness remains successful</li>
+<li><strong>AND</strong> readiness fails with a non-secret reason</li>
+</ul></article><article id="S43-010" class="source-clause"><h4>S43-010 · Scenario: Optional UAR is unavailable</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h4>Scenario: Optional UAR is unavailable</h4>
+<ul>
+<li><strong>WHEN</strong> the protected POC uses the document-agent adapter and UAR is unavailable</li>
+<li><strong>THEN</strong> workspace readiness remains successful</li>
+<li><strong>AND</strong> the UAR conformance status reports unavailable separately</li>
+</ul></article><article id="S43-011" class="source-clause"><h4>S43-011 · Requirement: Profiled local runtime</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h3>Requirement: Profiled local runtime</h3>
+<p><code>docker-compose.yml</code> SHALL provide a core protected-POC profile and an additive UAR
+conformance profile with health-based dependency ordering.</p></article><article id="S43-012" class="source-clause"><h4>S43-012 · Scenario: Core profile starts</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h4>Scenario: Core profile starts</h4>
+<ul>
+<li><strong>WHEN</strong> an operator starts the core profile with valid local configuration</li>
+<li><strong>THEN</strong> the workspace reaches readiness using the existing document-agent path</li>
+<li><strong>AND</strong> UAR is not required</li>
+</ul></article><article id="S43-013" class="source-clause"><h4>S43-013 · Scenario: UAR profile starts</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h4>Scenario: UAR profile starts</h4>
+<ul>
+<li><strong>WHEN</strong> an operator enables the UAR profile</li>
+<li><strong>THEN</strong> UAR is built or pulled from the pinned source contract</li>
+<li><strong>AND</strong> its health endpoint becomes ready before conformance calls run</li>
+<li><strong>AND</strong> the protected BFF adapter is unchanged</li>
+</ul></article><article id="S43-014" class="source-clause"><h4>S43-014 · Requirement: Workspace Kubernetes backend is renderable before edge attachment</h4><p class="source-note">Governing revision: <a href="../index.html#surfaces">UI-01–11</a> · source requirement, not release evidence.</p><h3>Requirement: Workspace Kubernetes backend is renderable before edge attachment</h3>
+<p>The project SHALL provide one workspace Deployment/Service component with a stable
+namespace, Service name, port, selector, probes, resource bounds, non-root security
+context, and Secret name/key references. This change MUST NOT apply the component
+to the cluster.</p></article><article id="S43-015" class="source-clause"><h4>S43-015 · Scenario: Workspace component is rendered</h4><p class="source-note">Governing revision: <a href="../index.html#surfaces">UI-01–11</a> · source requirement, not release evidence.</p><h4>Scenario: Workspace component is rendered</h4>
+<ul>
+<li><strong>WHEN</strong> the component is built and server-side dry-run</li>
+<li><strong>THEN</strong> the Service selector matches the Deployment pod labels</li>
+<li><strong>AND</strong> the Service targetPort matches the BFF container port</li>
+<li><strong>AND</strong> no Secret value or generated signing identity is rendered</li>
+</ul></article><article id="S43-016" class="source-clause"><h4>S43-016 · Scenario: Edge release references the workspace</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h4>Scenario: Edge release references the workspace</h4>
+<ul>
+<li><strong>WHEN</strong> the shared edge and umbrella release are composed later</li>
+<li><strong>THEN</strong> they reference this stable Service contract</li>
+<li><strong>AND</strong> the first live apply remains owned by the <code>sansaba-release</code> workflow</li>
+</ul></article></main></body></html>

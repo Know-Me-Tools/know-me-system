@@ -1,0 +1,168 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>S22 · README.md</title><link rel="stylesheet" href="../records.css"><body><main><a href="../index.html">KnowMe Praxis</a><h1>S22 · README.md</h1><p>Complete technical source record. Historical names and requirements remain visible for audit. Revised clauses and explicit corrections govern their application.</p><p><a href="S22.txt">Download complete technical text</a></p><article id="S22-001" class="source-clause"><h4>S22-001 · A2UI Strategy — Component Registry, Definition, Storage, and Selection</h4><p class="source-note">Governing revision: <a href="../index.html#surfaces">UI-01–11</a> · source requirement, not release evidence.</p><h1>A2UI Strategy — Component Registry, Definition, Storage, and Selection</h1>
+<p><strong>Scope:</strong> A2UI as KnowMe's single declarative UI plane — the component catalog
+(vocabulary governance), where component/surface definitions live (definition),
+how they persist and roam (storage), how a run picks and renders one
+(selection), and the renderer conformance gate. This is the completion plan for
+the "A2UI registry and component definition/storage/selection" gap.</p>
+<p><strong>Status:</strong> v1.1 strategy, 2026-07-19 (v1.1 aligns ownership with the integration
+doc: UAR owns the catalog; KnowMe owns rendering conformance). Grounded in the vendored UAR submodule
+(<code>rust/vendor/universal-agent-runtime</code> v1.0.0, <code>src/uar/a2ui/</code>) and the existing
+Flutter renderer (<code>flutter_packages/gen_ui_widgets</code>). The governing ownership split
+is <code>docs/strategies/uar-knowme-runtime-integration.md</code> ("A2UI catalog
+integration"). Companions:
+<code>docs/strategies/ag-ui/README.md</code> (the event transport that carries A2UI
+traffic), <code>docs/strategies/plugins/README.md</code> §4 (<code>knowme:ui-library</code>
+capability cards), <code>docs/strategies/agents/README.md</code> (agent UI surfaces),
+PAGS-SPEC-KM-UIX-001 (turn-level rendering).</p>
+<hr/></article><article id="S22-002" class="source-clause"><h4>S22-002 · 1. Terminology and the standing rule</h4><p class="source-note">Governing revision: <a href="../index.html#surfaces">UI-01–11</a> · source requirement, not release evidence.</p><h2>1. Terminology and the standing rule</h2>
+<p><strong>AG-UI is the event transport vocabulary; A2UI is the validated declarative
+rendering contract</strong> (UAR README). The standing security rule, from both UAR
+and the plugins doc: <strong>A2UI artifacts map to an approved component catalog and
+never execute model-provided or plugin-provided HTML/JavaScript.</strong> The
+component vocabulary <em>is</em> the sandbox.</p></article><article id="S22-003" class="source-clause"><h4>S22-003 · 2. What exists today (verified 2026-07-19)</h4><p class="source-note">Governing revision: <a href="../index.html#surfaces">UI-01–11</a> · source requirement, not release evidence.</p><h2>2. What exists today (verified 2026-07-19)</h2></article><article id="S22-004" class="source-clause"><h4>S22-004 · In UAR (`src/uar/a2ui/`)</h4><p class="source-note">Governing revision: <a href="../index.html#surfaces">UI-01–11</a> · source requirement, not release evidence.</p><h3>In UAR (<code>src/uar/a2ui/</code>)</h3>
+<ul>
+<li><code>protocol.rs</code> — the validated production profile: <strong><code>uar.a2ui/1</code> over Google
+  A2UI <code>v0.9.1</code></strong>, catalog id <strong><code>urn:uar:a2ui:catalog:1</code></strong>. Serde DTOs with
+  <code>deny_unknown_fields</code>: <code>A2uiMessage</code> (<code>Create</code> / <code>Components</code> / <code>Data</code> /
+  <code>Delete</code>) and a <code>Component</code> enum (<code>Text</code>, <code>Button</code>, <code>TextField</code>, <code>CheckBox</code>,
+  <code>ChoicePicker</code>, …) — the enum <em>is</em> the approved catalog, enforced at
+  deserialization.</li>
+<li><code>schema.rs</code> — <code>ArtifactSchema</code>: the definition of one A2UI surface type.</li>
+<li><code>registry.rs</code> — <code>A2uiRegistry</code>: resolves <code>a2ui_schema_id</code> → schema.
+  <strong>In-memory only.</strong></li>
+<li><code>routes.rs</code> — REST: schema listing + user-response ingestion.</li>
+<li>Runtime flow: an agent declares UI surfaces in its UAR-AGENT-MD (§06); the
+  runtime emits <code>agui.artifact_input_request</code> SSE events; the frontend renders
+  form/confirm/select widgets; the user's response re-enters the paused run as
+  a tool result.</li>
+<li>Reference renderers (React): <code>uar/frontend/packages/a2ui-core</code> (vendored
+  Google <code>@a2ui/web_core</code>, version-pinned v0.8/v0.9), <code>a2ui-react</code>, <code>-lit</code>,
+  <code>-svelte</code>, <code>-inspector</code>, <code>-uar</code>.</li>
+</ul></article><article id="S22-005" class="source-clause"><h4>S22-005 · In KnowMe</h4><p class="source-note">Governing revision: <a href="../index.html#surfaces">UI-01–11</a> · source requirement, not release evidence.</p><h3>In KnowMe</h3>
+<ul>
+<li><strong>Flutter renderer exists:</strong> <code>gen_ui_widgets</code>' <code>A2uiSurfaceView</code> renders
+  Google A2UI v0.9 JSONL through Flutter's official GenUI SDK (<code>package:genui</code>)
+  — protocol state machine, surface lifecycle, schema validation, reactive data
+  binding included — and emits a typed <code>A2uiAction</code> (<code>surfaceId</code>, <code>name</code>,
+  <code>sourceComponentId</code>, <code>timestamp</code>, <code>context</code>, optional <code>clientDataModel</code>). It
+  is wired into the thread as the <code>artifact</code> block kinds <code>a2ui</code> /
+  <code>application/a2ui+json</code>, with actions forwarded through
+  Riverpod → Repository → FFI (layering intact).</li>
+<li><strong>No KnowMe-side registry, storage, or selection logic yet</strong> — the renderer
+  consumes whatever a block hands it; nothing owns the catalog, validates a
+  surface against a registered schema, or records which components exist.</li>
+</ul></article><article id="S22-006" class="source-clause"><h4>S22-006 · 3. The four open problems</h4><p class="source-note">Governing revision: <a href="../index.html#surfaces">UI-01–11</a> · source requirement, not release evidence.</p><h2>3. The four open problems</h2></article><article id="S22-007" class="source-clause"><h4>S22-007 · 3.1 Definition — one catalog of record, three producers</h4><p class="source-note">Governing revision: <a href="../index.html#surfaces">UI-01–11</a> · source requirement, not release evidence.</p><h3>3.1 Definition — one catalog of record, three producers</h3>
+<p>Components and surfaces come from three producers: the <strong>UAR catalog</strong>
+(first-party vocabulary, UAR-owned, base = <code>urn:uar:a2ui:catalog:1</code> at the pinned
+submodule version), <strong>agent artifacts</strong> (UAR-AGENT-MD §06 surface
+declarations), and <strong>plugin <code>ui-library</code> cards</strong> (plugins doc §4). One schema
+format governs all three: the UAR <code>ArtifactSchema</code> shape, extended with a
+namespaced <code>id</code> (<code>knowme:a2ui:*</code> first-party; reverse-DNS for plugins, same
+rule as capability ids) and a semver <code>version</code>. Authoring new first-party
+components means extending the catalog URN with a version bump — vocabulary
+governance per plugins doc §4.2.1, never ad-hoc per-producer shapes.</p></article><article id="S22-008" class="source-clause"><h4>S22-008 · 3.2 Storage — UAR owns the catalog; KnowMe persists a cache plus contributions</h4><p class="source-note">Governing revision: <a href="../index.html#surfaces">UI-01–11</a> · source requirement, not release evidence.</p><h3>3.2 Storage — UAR owns the catalog; KnowMe persists a cache plus contributions</h3>
+<p>The ownership line (integration doc): <strong>UAR owns the catalog registry and the
+supported component profiles; KnowMe owns rendering conformance.</strong> Storage falls
+into two classes accordingly:</p>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Contents</th>
+<th>Store</th>
+<th>Lifecycle</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Catalog cache</strong></td>
+<td>The approved UAR catalog profiles (<code>urn:uar:a2ui:catalog:1</code> at the pinned submodule version, plus later UAR-issued updates)</td>
+<td>Reproducible from the pinned artifact at boot; optionally persisted as an <strong>offline-rendering cache</strong> on mobile (the integration doc's "cache approved profiles for offline rendering")</td>
+<td>Refreshed only with a submodule/catalog update; version surfaced in diagnostics</td>
+</tr>
+<tr>
+<td><strong>Contributed schemas</strong></td>
+<td>Plugin <code>ui-library</code> components, installed agent surfaces</td>
+<td><strong>SurrealDB <code>a2ui_schema</code> records</strong>: <code>{id, version, schema_json, source (plugin/agent id), content_hash, installed_at}</code></td>
+<td>Persist across restart; sync with the plugin/agent definition they arrived with (definitions travel, grants don't — plugins doc §10); removed on uninstall</td>
+</tr>
+</tbody>
+</table>
+<p>KnowMe's registry module (behind FFI, not a Flutter construct) resolves
+<code>a2ui_schema_id</code> across both classes, catalog first, then contributed, with
+exact-version then compatible-minor semantics. It is a <strong>conformance cache and
+contribution store, never a competing catalog authority</strong>: components whose ids
+are not in the UAR catalog or an installed contribution are rejected (fail
+closed, §3.3). The embedded UAR instance keeps its own in-memory registry for
+its own surfaces; the two are synchronized at agent/plugin install time, never
+merged ad hoc.</p></article><article id="S22-009" class="source-clause"><h4>S22-009 · 3.3 Selection — deterministic resolve-then-negotiate</h4><p class="source-note">Governing revision: <a href="../index.html#surfaces">UI-01–11</a> · source requirement, not release evidence.</p><h3>3.3 Selection — deterministic resolve-then-negotiate</h3>
+<p>When a run wants to show a surface:</p>
+<ol>
+<li><strong>Declare</strong> — the agent artifact or skill carries <code>a2ui_schema_id</code> +
+   minimum vocabulary version (UAR-AGENT-MD §06 / capability card <code>ui</code>).</li>
+<li><strong>Resolve</strong> — the registry returns the schema (§3.2) or a typed
+   <code>schema_not_found</code> (which renders as an honest fallback panel, never a
+   crash).</li>
+<li><strong>Negotiate</strong> — the renderer on <em>this</em> platform checks the schema's
+   component set against its supported vocabulary: full support → render;
+   partial → render supported components + labeled fallback for the rest
+   (plugins doc §4.2.1: "a labeled fallback, never a crash or a blank");
+   below minimum vocabulary → labeled fallback with an upgrade hint.
+   <strong>Fail closed on the unknown:</strong> a component id outside the UAR catalog and
+   all installed contributions is never executed or rendered as an interactive
+   element — the labeled fallback <em>is</em> the closed failure surface, and the
+   rejection is logged with the run's provenance (integration doc: "unknown
+   catalog ids or component names fail closed").</li>
+<li><strong>Interact</strong> — user gestures produce typed <code>A2uiAction</code>s (Flutter: the
+   existing <code>A2uiSurfaceView</code> callback) routed Riverpod → Repository → FFI →
+   the paused run as its tool result (UAR's <code>routes.rs</code> ingestion in server
+   placements; KnowMe's service-mode facade now calls the same
+   <code>/api/uar/runs/{run_id}/artifact-response</code> seam; embedded mobile remains
+   the future in-process equivalent). Local interaction stays local: inputs
+   echo and validate on-device; the bus sees semantic events ("form
+   submitted"), never keystrokes (plugins doc §4.2.3).</li>
+</ol></article><article id="S22-010" class="source-clause"><h4>S22-010 · 3.4 Conformance — parity is a gate, not an intention</h4><p class="source-note">Governing revision: <a href="../index.html#surfaces">UI-01–11</a> · source requirement, not release evidence.</p><h3>3.4 Conformance — parity is a gate, not an intention</h3>
+<p>Per plugins doc §4.2.2: one schema source generates both platforms' types; a
+conformance suite of golden renderings runs on <strong>both</strong> renderers per catalog
+version. Concretely: fixture surfaces exercising every catalog component ×
+light/dark × phone/wide, golden-tested in Flutter (<code>flutter-golden-ui</code>
+harness, Alchemist) and screenshot-tested in React; divergence is a bug with
+an owner. The Flutter renderer's GenUI SDK pins Google A2UI v0.9 — track the
+UAR profile's <code>v0.9.1</code> patchline deliberately; a profile bump is a reviewed
+submodule + catalog update, not a background drift.</p></article><article id="S22-011" class="source-clause"><h4>S22-011 · 4. Settings surfaces are the first consumer</h4><p class="source-note">Governing revision: <a href="../index.html#surfaces">UI-01–11</a> · source requirement, not release evidence.</p><h2>4. Settings surfaces are the first consumer</h2>
+<p>The generic settings engine (plugins doc §11) generates A2UI forms from
+<code>settings_definition.schema</code> + <code>ui_hints</code> — every plugin, agent, and provider
+gets a settings page on every platform for free, rendered through exactly this
+registry/selection path. That makes settings the proving ground for §3 before
+agent-authored surfaces arrive: same schema format, same negotiation, same
+fallback rules, zero bespoke settings UI.</p></article><article id="S22-012" class="source-clause"><h4>S22-012 · 5. Completion plan (releases)</h4><p class="source-note">Governing revision: <a href="../index.html#surfaces">UI-01–11</a> · source requirement, not release evidence.</p><h2>5. Completion plan (releases)</h2>
+<ul>
+<li><strong>A2UI-R1 — Registry + storage.</strong> <code>a2ui_schema</code> SurrealDB table; KnowMe
+  registry module behind FFI with the two-class resolution; catalog cache load
+  at boot; <code>schema_not_found</code> fallback panel (both renderers).</li>
+<li><strong>A2UI-R2 — Selection + negotiation.</strong> Vocabulary-version capability check
+  per platform; labeled partial/fallback rendering; <code>A2uiAction</code> → run-resume
+  wired through the UAR service facade and <code>routes.rs</code> for server placements,
+  with embedded mobile as the remaining in-process lane.</li>
+<li><strong>A2UI-R3 — Settings-form generator.</strong> <code>schema</code> + <code>ui_hints</code> → A2UI form
+  surfaces for plugin/agent/provider settings (consumes R1+R2).</li>
+<li><strong>A2UI-R4 — Conformance gate.</strong> Shared fixture set; Flutter goldens + React
+  screenshots per catalog version in CI; divergence blocking.</li>
+<li><strong>A2UI-R5 — Agent/plugin surfaces.</strong> <code>ui-library</code> card installation into the
+  contributed store; UAR-AGENT-MD §06 surfaces flowing through embedded UAR;
+  <code>agui.artifact_input_request</code> end-to-end on mobile (rides the agent-skills
+  roadmap's Release C certification).</li>
+</ul></article><article id="S22-013" class="source-clause"><h4>S22-013 · 6. Invariants (do not regress)</h4><p class="source-note">Governing revision: <a href="../index.html#surfaces">UI-01–11</a> · source requirement, not release evidence.</p><h2>6. Invariants (do not regress)</h2>
+<ul>
+<li>No model- or plugin-provided HTML/JS ever executes; unknown components
+  degrade to labeled fallbacks.</li>
+<li>A2UI traffic rides the AG-UI stream and the ContentBlock projection
+  (<code>artifact</code> blocks) — no parallel UI channel.</li>
+<li>Renderers inherit design tokens and Flat 2.0 from the host theme; plugins
+  cannot go off-brand by construction (plugins doc §4.1).</li>
+<li>The component vocabulary is versioned registry data; renderer parity per
+  version is tested, not aspirational.</li>
+<li>Actions crossing the bus are semantic, typed, and audited like any tool
+  result — including the confirmation surfaces for mutating tools (UIX-001
+  §6.6), which are A2UI forms with <code>AlwaysConfirm</code> policy, not a special case.</li>
+</ul></article></main></body></html>

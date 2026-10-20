@@ -1,0 +1,37 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>S40 · operating-philosophy.md</title><link rel="stylesheet" href="../records.css"><body><main><a href="../index.html">KnowMe Praxis</a><h1>S40 · operating-philosophy.md</h1><p>Complete technical source record. Historical names and requirements remain visible for audit. Revised clauses and explicit corrections govern their application.</p><p><a href="S40.txt">Download complete technical text</a></p><article id="S40-001" class="source-clause"><h4>S40-001 · Sansaba Workspace — Shell Operating Philosophy (validated)</h4><p class="source-note">Governing revision: <a href="../index.html#workspace">WS-01–07</a> · source requirement, not release evidence.</p><div class="source-note"><strong>Explicit amendments:</strong><ul><li>Legacy module kind/embed routes require the independent placement/protection/surface and registry migration in PL/IM clauses.</li></ul></div><h1>Sansaba Workspace — Shell Operating Philosophy (validated)</h1>
+<p><strong>Status:</strong> validated design theory · <strong>Date:</strong> 2026-07-26 · <strong>Author:</strong> Travis James / Prometheus AGS
+<strong>Grounding:</strong> flint-forge (A2UI registry + surface assembler), flint-realtime-fabric (AG-UI/A2A agent bus, Loro CRDT sync, entity watch), Flint Platform Agent, plus AG-UI/A2UI public protocol docs.</p>
+<blockquote>
+<p>Canonical copy also stored in the Claude project as <code>claude/sansaba-shell-operating-philosophy.md</code>. See <code>SSW-ARCH-001-architecture-spec-and-plan.md</code> for the full architecture, functional spec, and project plan that builds on this.</p>
+<p><strong>Vocabulary note.</strong> The theory below is current. Its terms map onto the
+<code>prometheusags.ai/v1alpha1</code> manifest as: Embedded App -&gt; <code>surface.kind:
+embedded-app</code> (framed from a registry-resolved <code>embed.ref</code>, not a <code>/embed/</code>
+proxy); Agentic Module -&gt; <code>surface.kind: a2ui-surface</code>; sidebar placement -&gt;
+<code>navSection</code>, which is independent of what renders.</p>
+</blockquote>
+<hr/></article><article id="S40-002" class="source-clause"><h4>S40-002 · 1. The question validated</h4><p class="source-note">Governing revision: <a href="../index.html#workspace">WS-01–07</a> · source requirement, not release evidence.</p><h2>1. The question validated</h2>
+<p>Three planes: left navigation, center content area, right chat sidebar. The claim under test: the center content area should be an A2UI-defined view driven by an AG-UI agent programmatically (not chat-driven), distinct from the chat sidebar (the conversational AG-UI surface). <strong>Verdict: sound, and already the intended composition in the Flint platform</strong> — it is the correct use of AG-UI as a transport/state channel rather than a chat protocol.</p></article><article id="S40-003" class="source-clause"><h4>S40-003 · 2. Evidence</h4><p class="source-note">Governing revision: <a href="../index.html#workspace">WS-01–07</a> · source requirement, not release evidence.</p><h2>2. Evidence</h2>
+<ul>
+<li>AG-UI input is a structured RunAgentInput (state, tools, context, messages) — a chat message is one possible input, not a requirement.</li>
+<li>AG-UI carries STATE_SNAPSHOT / STATE_DELTA (JSON-Patch, RFC 6902) for bidirectional shared state — no chat message involved.</li>
+<li>A2UI is the UI payload; AG-UI is the runtime channel — complementary layers.</li>
+<li>flint-forge POST /a2ui/v1/surfaces/assemble assembles a surface into layout regions (region:"main") from a non-chat event_type ("mount"/"navigate"). Data-bound to tables.</li>
+<li>Flint Platform Agent: A2UI Button binds to Action -&gt; A2A task; AG-UI streams state back.</li>
+<li>flint-realtime-fabric: AgentService.RunAgent (AG-UI/A2A), Loro CRDT SyncService, EntityService.WatchEntity, and verified-claim tenant filtering.</li>
+</ul></article><article id="S40-004" class="source-clause"><h4>S40-004 · 3. The reframe</h4><p class="source-note">Governing revision: <a href="../index.html#workspace">WS-01–07</a> · source requirement, not release evidence.</p><h2>3. The reframe</h2>
+<p>One agent channel (AG-UI) with two presentation surfaces differing only in trigger and presentation:
+- Conversation (right): trigger = user message; presentation = text/ContentBlock stream + inline A2UI; episodic.
+- Application (center): trigger = mount / navigate / Button-&gt;Action-&gt;A2A task; presentation = assembled A2UI surface in layout regions; durable.
+Same transport, same A2UI catalog, same renderers.</p></article><article id="S40-005" class="source-clause"><h4>S40-005 · 4. Caveats to design around</h4><p class="source-note">Governing revision: <a href="../index.html#workspace">WS-01–07</a> · source requirement, not release evidence.</p><h2>4. Caveats to design around</h2>
+<ol>
+<li>Single source of truth for shared state (one durable store; no divergent local copies).</li>
+<li>Bind the surface to state, not to a single run (runs are episodic writers).</li>
+<li>Trigger idempotency / no render loops (assemble on mount/navigate; patch on STATE_DELTA; debounce).</li>
+<li>Authenticate every Sansaba trigger uniformly. Gate verifies the <code>admin</code> or
+   <code>user</code> role; all authenticated users have equal non-user-admin application
+   rights. Tenant isolation comes from verified claims and PostgreSQL RLS. No
+   Cedar or Ory Keto service is deployed for Sansaba.</li>
+<li>Keep A2UI to declarative composition of catalog primitives + Actions; push imperative logic to the agent/A2A side.</li>
+<li>Name both content occupants: Embedded App (iframe + postMessage) vs Agentic Module surface (A2UI). Frozen/third-party -&gt; iframe; net-new agentic -&gt; A2UI surface.</li>
+</ol></article><article id="S40-006" class="source-clause"><h4>S40-006 · 5. Philosophy (for the spec)</h4><p class="source-note">Governing revision: <a href="../index.html#workspace">WS-01–07</a> · source requirement, not release evidence.</p><h2>5. Philosophy (for the spec)</h2>
+<p>One shell, three planes. A Mini App is either an Embedded App (iframe + versioned postMessage bridge) or an Agentic Module (one-to-many agents + optional A2UI surface). One agent channel (AG-UI). One durable state layer (the entity graph, reconciled by the realtime fabric). One app authorization boundary (verified <code>admin</code>/<code>user</code> authentication), with claim-derived tenant isolation and PostgreSQL RLS. In one breath: the shell shows apps in the middle and an assistant on the right; new modules can paint the middle with agent-driven building blocks (A2UI) or embed an existing app; either way the same agent, state, and policy plumbing runs underneath.</p></article></main></body></html>

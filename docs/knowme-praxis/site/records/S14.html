@@ -1,0 +1,127 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>S14 · implementation-roadmap.md</title><link rel="stylesheet" href="../records.css"><body><main><a href="../index.html">KnowMe Praxis</a><h1>S14 · implementation-roadmap.md</h1><p>Complete technical source record. Historical names and requirements remain visible for audit. Revised clauses and explicit corrections govern their application.</p><p><a href="S14.txt">Download complete technical text</a></p><article id="S14-001" class="source-clause"><h4>S14-001 · KnowMe — Implementation Roadmap (spec → module map)</h4><p class="source-note">Governing revision: <a href="../index.html#implementation">IM-01–04</a> · source requirement, not release evidence.</p><h1>KnowMe — Implementation Roadmap (spec → module map)</h1>
+<p><strong>Repo:</strong> <code>know-me-system</code> · <strong>Source spec:</strong> <code>docs/knowme-functional-spec.html</code> (FUNC-SPEC v1.0)
+and <code>docs/knowme-moodboard-user-journeys.html</code> (UX-MOOD v1.0).
+This document maps every spec subsystem to where it lives (or will live) in the
+monorepo, and orders the gap-closure work. The starter code is the
+<code>knowme-poc</code> reference application from <code>hybrid-mobile-architecture-src</code>,
+migrated here with build-critical relative paths preserved.</p></article><article id="S14-002" class="source-clause"><h4>S14-002 · Current state: what the POC already gives us</h4><p class="source-note">Governing revision: <a href="../index.html#implementation">IM-01–04</a> · source requirement, not release evidence.</p><h2>Current state: what the POC already gives us</h2>
+<table>
+<thead>
+<tr>
+<th>Spec subsystem</th>
+<th>Status</th>
+<th>Where</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Rust core (7-layer arch, FUNC-SPEC §05)</td>
+<td><strong>Working</strong></td>
+<td><code>rust/crates/gen_ui_*</code> — types, runtime, protocol, client, mcp, db, db_graph (SurrealDB), inference, audio (whisper-rs), agent (UAR/PMPO, Cedar-adjacent tools), host, ffi, tauri plugin, wasm, axum server, <code>knowme-web-server</code></td>
+</tr>
+<tr>
+<td>Desktop app (Tauri 2 · React 19 · Zustand 5 · Tailwind 4)</td>
+<td><strong>Working</strong></td>
+<td><code>desktop/</code> — features: home, chat, hands, entities, memory, models, settings, startup</td>
+</tr>
+<tr>
+<td>Mobile app (Flutter · Riverpod · FRB 2.12)</td>
+<td><strong>Working</strong></td>
+<td><code>mobile/</code> — features: chat, memory, notes, overview, startup</td>
+</tr>
+<tr>
+<td>Publishable packages</td>
+<td><strong>Working</strong></td>
+<td><code>packages/</code> (gen-ui-react, gen-ui-wasm), <code>flutter_packages/</code> (gen_ui_flutter, gen_ui_widgets, prometheus_entity_management)</td>
+</tr>
+<tr>
+<td>Infra / deploy</td>
+<td><strong>Working</strong></td>
+<td><code>infra/</code>, <code>deploy/</code> (k8s, flint-gate, keto, postgres), <code>Dockerfile</code>, <code>docker-compose.yaml</code></td>
+</tr>
+<tr>
+<td>AI Chat tile (§04.1)</td>
+<td><strong>Working</strong></td>
+<td><code>desktop/src/features/chat</code>, <code>mobile/lib/features/chat</code>, <code>rust/crates/gen_ui_agent</code></td>
+</tr>
+<tr>
+<td>Hands tile UI (§04.2)</td>
+<td><strong>Partial</strong></td>
+<td><code>desktop/src/features/hands</code> exists; scheduler/policy execution not wired</td>
+</tr>
+<tr>
+<td>Models tile (§04.7)</td>
+<td><strong>Partial</strong></td>
+<td><code>desktop/src/features/models</code>; benchmark + remote BossFang linking open</td>
+</tr>
+<tr>
+<td>Memory / knowledge graph</td>
+<td><strong>Working</strong></td>
+<td><code>gen_ui_db_graph</code> (SurrealDB 3.x) + memory features</td>
+</tr>
+</tbody>
+</table></article><article id="S14-003" class="source-clause"><h4>S14-003 · New skeletons added in this reorganization</h4><p class="source-note">Governing revision: <a href="../index.html#implementation">IM-01–04</a> · source requirement, not release evidence.</p><div class="source-note"><strong>Explicit amendments:</strong><ul><li>Implementation status is qualified by code inspection in EV-01; runtime release certification remains unproven.</li></ul></div><h2>New skeletons added in this reorganization</h2>
+<table>
+<thead>
+<tr>
+<th>Spec subsystem</th>
+<th>Skeleton</th>
+<th>What is real / what is stubbed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hands system (§06)</td>
+<td><code>rust/crates/knowme_hands</code></td>
+<td>Domain model (6 templates, 3-step flow, schedules, runs, Cedar decisions) real; UAR scheduler wiring stubbed</td>
+</tr>
+<tr>
+<td>BossFang / OFP sync (§07)</td>
+<td><code>rust/crates/knowme_ofp</code></td>
+<td>Instance kinds, peer roles, per-entity sync defaults, Lamport clocks real; QUIC gossip + CRDT merge stubbed</td>
+</tr>
+<tr>
+<td>Plugin system (§08)</td>
+<td><code>rust/crates/knowme_plugin_host</code> + <code>wit/knowme-plugin.wit</code> + <code>plugins/</code></td>
+<td>Manifest/permission model + v0.1 WIT contract real; Wasmtime host, IPFS fetcher, Ed25519 verify stubbed</td>
+</tr>
+<tr>
+<td>Missing tiles (§04.3–.6)</td>
+<td><code>desktop/src/features/{ask-image,audio-scribe,prompt-lab,skills}</code> · <code>mobile/lib/features/{hands,ask_image,audio_scribe,prompt_lab,skills,models,settings}</code></td>
+<td>Per-feature blueprint READMEs; deliberately not wired into routers so all existing builds stay green</td>
+</tr>
+</tbody>
+</table></article><article id="S14-004" class="source-clause"><h4>S14-004 · Milestones</h4><p class="source-note">Governing revision: <a href="../index.html#implementation">IM-01–04</a> · source requirement, not release evidence.</p><h2>Milestones</h2></article><article id="S14-005" class="source-clause"><h4>S14-005 · M1 — Hands become real (§06)</h4><p class="source-note">Governing revision: <a href="../index.html#implementation">IM-01–04</a> · source requirement, not release evidence.</p><h3>M1 — Hands become real (§06)</h3>
+<p>Wire <code>knowme_hands::HandDefinition</code> into the UAR scheduler in <code>gen_ui_agent</code>;
+enforce Cedar per skill invocation (deny-by-default, first-use consent);
+persist <code>HandRun</code> + audit log to SurrealDB; expose Tauri commands; connect the
+existing <code>desktop/src/features/hands</code> UI; 3-step wizard per UX-MOOD Screen 04.</p></article><article id="S14-006" class="source-clause"><h4>S14-006 · M2 — OFP peer sync (§07)</h4><p class="source-note">Governing revision: <a href="../index.html#implementation">IM-01–04</a> · source requirement, not release evidence.</p><div class="source-note"><strong>Explicit amendments:</strong><ul><li>Key control does not establish reverse-DNS namespace ownership; separate registry proof is required.</li></ul></div><h3>M2 — OFP peer sync (§07)</h3>
+<p>QUIC transport + gossip rounds in <code>knowme_ofp</code>; entity envelopes over
+<code>gen_ui_types::sync</code>; CRDT merge into <code>gen_ui_db_graph</code>; <code>did:key:</code> payload
+encryption + mutual TLS; Settings → Instances/Sync panels (UX-MOOD 05–06)
+driven by <code>PeerInstance</code> / <code>GossipRoundSummary</code>. Conservative defaults are
+already encoded in <code>SyncEntityKind::default_enabled()</code>.</p></article><article id="S14-007" class="source-clause"><h4>S14-007 · M3 — Plugin host (§08)</h4><p class="source-note">Governing revision: <a href="../index.html#implementation">IM-01–04</a> · source requirement, not release evidence.</p><h3>M3 — Plugin host (§08)</h3>
+<p><code>wasmtime::component::bindgen!()</code> against <code>knowme-plugin.wit</code>; sandbox limits
+(64 MiB / 30 s epoch) from <code>SandboxLimits</code>; IPFS fetch with gateway fallback +
+SHA-256 verify; Ed25519 manifest verification; installer dialog (UX-MOOD 07);
+build <code>plugins/examples/hello-knowme</code> end-to-end as the acceptance test.</p></article><article id="S14-008" class="source-clause"><h4>S14-008 · M4 — Remaining tiles: Ask Image, Audio Scribe, Prompt Lab (§04.3–.5)</h4><p class="source-note">Governing revision: <a href="../index.html#implementation">IM-01–04</a> · source requirement, not release evidence.</p><h3>M4 — Remaining tiles: Ask Image, Audio Scribe, Prompt Lab (§04.3–.5)</h3>
+<p>Vision path through <code>gen_ui_inference</code>; scribe UI over <code>gen_ui_audio</code>
+(engine already compiles whisper-rs + cpal); Prompt Lab as ephemeral
+inference reusing the Chat path. Wire routes into <code>app/navigation.ts</code> as each
+screen lands.</p></article><article id="S14-009" class="source-clause"><h4>S14-009 · M5 — Skills tile + audit surface (§04.6, §09)</h4><p class="source-note">Governing revision: <a href="../index.html#implementation">IM-01–04</a> · source requirement, not release evidence.</p><h3>M5 — Skills tile + audit surface (§04.6, §09)</h3>
+<p>Registry/grants UI over <code>gen_ui_mcp</code> + <code>gen_ui_agent::tools</code>; hash-chained
+append-only audit log; signed audit-bundle export.</p></article><article id="S14-010" class="source-clause"><h4>S14-010 · M6 — Mobile parity</h4><p class="source-note">Governing revision: <a href="../index.html#implementation">IM-01–04</a> · source requirement, not release evidence.</p><h3>M6 — Mobile parity</h3>
+<p>Bring hands, ask_image, audio_scribe, prompt_lab, skills, models, settings to
+Flutter; extend <code>rust/flutter_rust_bridge.yaml</code> <code>rust_input</code> as new FFI
+surfaces land (knowme_hands, knowme_ofp types).</p></article><article id="S14-011" class="source-clause"><h4>S14-011 · M7 — Tiers &amp; packaging (§10–§11)</h4><p class="source-note">Governing revision: <a href="../index.html#implementation">IM-01–04</a> · source requirement, not release evidence.</p><h3>M7 — Tiers &amp; packaging (§10–§11)</h3>
+<p>Free/$20/$200 gating (no tier ever reduces local sovereignty), licensed
+Qwen-35B path, air-gap ("on-device-only" Cedar lockdown) verification.</p></article><article id="S14-012" class="source-clause"><h4>S14-012 · Housekeeping notes</h4><p class="source-note">Governing revision: <a href="../index.html#implementation">IM-01–04</a> · source requirement, not release evidence.</p><h2>Housekeeping notes</h2>
+<ul>
+<li>New crates are workspace members; run <code>cargo hakari generate</code> if hakari
+  checks complain about <code>workspace-hack</code> coverage.</li>
+<li><code>plugins/examples/hello-knowme</code> is intentionally <strong>outside</strong> the rust/
+  workspace (wasm32-wasip2 target, own profile).</li>
+<li>The full functional spec is also pinned at
+  <code>https://ipfs.prometheusags.ai/ipfs/QmXFPBMvNw6jgbTmtt6TZszouJWxERbnDF7XpDfkkTUcFf</code>
+  (verified identical in structure to <code>docs/knowme-functional-spec.html</code>).</li>
+</ul></article></main></body></html>

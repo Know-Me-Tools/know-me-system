@@ -1,0 +1,224 @@
+{
+  "realtime": [
+    [
+      "Rooms, participants and tracks",
+      "https://docs.livekit.io/intro/basics/rooms-participants-tracks/"
+    ],
+    [
+      "AgentSession and RoomIO",
+      "https://docs.livekit.io/agents/logic/sessions/"
+    ],
+    [
+      "Explicit agent dispatch",
+      "https://docs.livekit.io/agents/server/agent-dispatch/"
+    ],
+    [
+      "Turn detection and interruption",
+      "https://docs.livekit.io/agents/logic/turns/"
+    ],
+    [
+      "Video sampling",
+      "https://docs.livekit.io/agents/multimodality/vision/video/"
+    ],
+    [
+      "Token grants",
+      "https://docs.livekit.io/frontends/reference/tokens-grants/"
+    ],
+    [
+      "RPC bounds",
+      "https://docs.livekit.io/transport/data/rpc/"
+    ],
+    [
+      "Text streams",
+      "https://docs.livekit.io/transport/data/text-streams/"
+    ],
+    [
+      "Data packets",
+      "https://docs.livekit.io/transport/data/packets/"
+    ],
+    [
+      "Encryption",
+      "https://docs.livekit.io/transport/encryption/"
+    ],
+    [
+      "Agent encryption",
+      "https://docs.livekit.io/transport/encryption/agents/"
+    ],
+    [
+      "Recording options",
+      "https://docs.livekit.io/reference/agents/session-recording-options/"
+    ],
+    [
+      "PII redaction",
+      "https://docs.livekit.io/testing/observability/pii-redaction/"
+    ],
+    [
+      "Flutter SDK",
+      "https://github.com/livekit/client-sdk-flutter"
+    ],
+    [
+      "Flutter audio",
+      "https://github.com/livekit/client-sdk-flutter/blob/main/doc/audio.md"
+    ],
+    [
+      "Rust SDK",
+      "https://github.com/livekit/rust-sdks"
+    ],
+    [
+      "Webhooks",
+      "https://docs.livekit.io/intro/basics/rooms-participants-tracks/webhooks-events/"
+    ],
+    [
+      "Quota limits",
+      "https://docs.livekit.io/deploy/admin/quotas-and-limits/"
+    ],
+    [
+      "Unit tests",
+      "https://docs.livekit.io/testing/unit-tests/"
+    ],
+    [
+      "Simulations",
+      "https://docs.livekit.io/testing/simulations/"
+    ],
+    [
+      "OpenAI realtime conversations",
+      "https://developers.openai.com/api/docs/guides/realtime-conversations"
+    ]
+  ],
+  "runtimes": [
+    [
+      "Wasmtime platform support",
+      "https://docs.wasmtime.dev/stability-platform-support.html"
+    ],
+    [
+      "Support tiers",
+      "https://docs.wasmtime.dev/stability-tiers.html"
+    ],
+    [
+      "Wasmtime security",
+      "https://docs.wasmtime.dev/security.html"
+    ],
+    [
+      "Interruption",
+      "https://docs.wasmtime.dev/examples-interrupting-wasm.html"
+    ],
+    [
+      "WASI 0.3",
+      "https://bytecodealliance.org/articles/WASI-0.3"
+    ],
+    [
+      "Component WIT",
+      "https://component-model.bytecodealliance.org/design/wit.html"
+    ],
+    [
+      "jco transpilation",
+      "https://bytecodealliance.github.io/jco/transpiling.html"
+    ],
+    [
+      "Flutter Rust Bridge",
+      "https://cjycode.com/flutter_rust_bridge/guides/cross-platform/overview"
+    ],
+    [
+      "Flutter native code",
+      "https://docs.flutter.dev/platform-integration/bind-native-code"
+    ],
+    [
+      "Apple review guidelines",
+      "https://developer.apple.com/app-store/review/guidelines/"
+    ],
+    [
+      "Android dynamic loading risks",
+      "https://developer.android.com/privacy-and-security/risks/dynamic-code-loading"
+    ],
+    [
+      "Google Play executable code policy",
+      "https://support.google.com/googleplay/android-developer/answer/16559646?hl=en"
+    ]
+  ],
+  "surfaces": [
+    [
+      "A2UI protocol",
+      "https://a2ui.org/specification/v0.9.1-a2ui/"
+    ],
+    [
+      "Catalogs",
+      "https://a2ui.org/concepts/catalogs/"
+    ],
+    [
+      "Renderers",
+      "https://a2ui.org/reference/renderers/"
+    ],
+    [
+      "Flutter GenUI",
+      "https://docs.flutter.dev/ai/genui/get-started"
+    ],
+    [
+      "Universal components",
+      "https://a2ui.org/guides/authoring-universal-components/"
+    ],
+    [
+      "MCP apps in A2UI",
+      "https://a2ui.org/guides/mcp-apps-in-a2ui/"
+    ],
+    [
+      "HTMX security",
+      "https://htmx.org/docs/#security"
+    ],
+    [
+      "HTMX request synchronization",
+      "https://htmx.org/attributes/hx-sync/"
+    ],
+    [
+      "HTMX history",
+      "https://htmx.org/attributes/hx-history/"
+    ],
+    [
+      "Flutter responsive design",
+      "https://docs.flutter.dev/ui/adaptive-responsive"
+    ],
+    [
+      "Flutter offline-first",
+      "https://docs.flutter.dev/app-architecture/design-patterns/offline-first"
+    ],
+    [
+      "Flutter push delivery",
+      "https://firebase.google.com/docs/cloud-messaging/flutter/receive"
+    ],
+    [
+      "WCAG 2.2",
+      "https://www.w3.org/TR/WCAG22/"
+    ],
+    [
+      "Accessible dialog pattern",
+      "https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/"
+    ]
+  ],
+  "api": [
+    [
+      "AG-UI HTTP+SSE",
+      "https://docs.ag-ui.com/spec/1.0/basic/transports/http-sse"
+    ],
+    [
+      "AG-UI interrupt/resume",
+      "https://docs.ag-ui.com/spec/1.0/basic/patterns/interrupt-resume"
+    ],
+    [
+      "AG-UI Activity events",
+      "https://docs.ag-ui.com/spec/1.0/events/activity"
+    ]
+  ],
+  "plugins": [
+    [
+      "MCP specification",
+      "https://modelcontextprotocol.io/specification/2026-07-28"
+    ],
+    [
+      "MCP authorization",
+      "https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization"
+    ],
+    [
+      "A2A specification",
+      "https://a2a-protocol.org/v1.0.0/specification"
+    ]
+  ]
+}

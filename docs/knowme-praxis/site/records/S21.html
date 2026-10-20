@@ -1,0 +1,275 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>S21 · README.md</title><link rel="stylesheet" href="../records.css"><body><main><a href="../index.html">KnowMe Praxis</a><h1>S21 · README.md</h1><p>Complete technical source record. Historical names and requirements remain visible for audit. Revised clauses and explicit corrections govern their application.</p><p><a href="S21.txt">Download complete technical text</a></p><article id="S21-001" class="source-clause"><h4>S21-001 · Agent Execution Strategy — Placements, Hooks, and WASM Agents</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h1>Agent Execution Strategy — Placements, Hooks, and WASM Agents</h1>
+<p><strong>Scope:</strong> how agents execute in every KnowMe environment (web, mobile, desktop, peers);
+the hook mechanism that lets plugins participate in prompt processing and context
+assembly; and native WASM agents with an A2A-shaped WIT contract and host inference
+callbacks.</p>
+<p><strong>Status:</strong> v1.1 strategy, 2026-07-19 (v1.1 adds §7: grounding in the vendored UAR
+submodule — where this doc's "UAR (<code>gen_ui_agent</code>)" references land concretely).
+Companion to
+<code>docs/knowme-builder-extensibility-spec.md</code> (§4 agents, §5 component model),
+<code>docs/strategies/model-configuration/README.md</code> (§4 resolution, used by every callback
+here), and <code>docs/knowme-functional-spec.html</code> (§06 Hands, §08 plugins, §09 privacy).</p>
+<hr/></article><article id="S21-002" class="source-clause"><h4>S21-002 · 1. The organizing principle: one contract, many placements</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>1. The organizing principle: one contract, many placements</h2>
+<p>Agent definitions are <strong>text</strong>. A Hand — identity, configuration, schedule, skill
+grants, Cedar policy (<code>rust/crates/knowme_hands::HandDefinition</code>) — carries no code, so
+<em>where</em> it executes is a runtime decision, not an authoring decision. We exploit that
+fully: there is <strong>one AgentService contract</strong> (the FRF Agent service proto /
+<code>frf-agentproto</code> ContentBlocks, with OFP as its personal-mesh profile) and several
+<strong>placements</strong> that implement it:</p>
+<table>
+<thead>
+<tr>
+<th>Placement</th>
+<th>What it is</th>
+<th>Where available</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>embedded</code></td>
+<td>UAR (vendored submodule — §7) linked into the app process, reached via FFI/IPC</td>
+<td>Everywhere — the universal baseline; the only option on mobile</td>
+</tr>
+<tr>
+<td><code>sidecar</code></td>
+<td>UAR in its own OS process on the same machine, speaking AgentService over localhost</td>
+<td>Desktop (macOS/Windows/Linux)</td>
+</tr>
+<tr>
+<td><code>peer</code></td>
+<td>A BossFang instance (home server, personal cloud, team)</td>
+<td>Anywhere reachable</td>
+</tr>
+<tr>
+<td><code>kiln</code></td>
+<td>Flint Kiln edge function (server-side WASM)</td>
+<td>flint-forge deployments</td>
+</tr>
+</tbody>
+</table>
+<p>The Hands wizard's Step 3 (Deployment) picks among these; the §4.3 model resolver runs
+<em>at the placement</em>, against that placement's providers. Nothing else about the Hand
+changes. This is the whole strategy in one sentence: <strong>placement is configuration.</strong></p></article><article id="S21-003" class="source-clause"><h4>S21-003 · 2. Client-side agents per environment</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>2. Client-side agents per environment</h2></article><article id="S21-004" class="source-clause"><h4>S21-004 · 2.1 Desktop — embedded baseline, sidecar promotion</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>2.1 Desktop — embedded baseline, sidecar promotion</h3>
+<p>The POC already embeds UAR in the Tauri core; that remains the default. The <strong>sidecar</strong>
+is an opt-in promotion with three concrete wins:</p>
+<ul>
+<li><strong>Lifecycle independence</strong> — Hands keep running when the window closes; "run at
+  login" makes the machine an always-on Hands node without the UI open.</li>
+<li><strong>Crash + resource isolation</strong> — a wedged agent run cannot take down the UI;
+  OS-level memory/CPU limits apply to the sidecar process, and the sidecar can host
+  its own inference engine instance so agent inference doesn't contend with the
+  interactive Engine Card session.</li>
+<li><strong>Structural honesty</strong> — a sidecar speaking AgentService on localhost <em>is</em> a minimal
+  local BossFang. It appears in Settings → Instances as "This device" with a
+  <code>sidecar</code> pill; promoting it to a full always-on peer later (OFP-visible to your
+  other devices) is a toggle, not a migration.</li>
+</ul>
+<p>Implementation: Tauri sidecar API for the app-scoped mode; launchd agent / systemd
+user unit / Windows service for run-at-login. The app talks to it exactly as it talks
+to a remote peer — same client code path, <code>localhost</code> transport. <strong>Rule: the sidecar
+never gets a private API.</strong> If the app needs something from the sidecar, a remote peer
+needs it too; that discipline is what keeps the placement table true.</p></article><article id="S21-005" class="source-clause"><h4>S21-005 · 2.2 Mobile — embedded only, honest about background limits</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>2.2 Mobile — embedded only, honest about background limits</h3>
+<p>iOS forbids child processes and long-running background execution; Android is looser
+but WorkManager-shaped. So: UAR embedded via FRB/FFI, and Hands on mobile run in one
+of three modes, surfaced honestly in the wizard:</p>
+<ul>
+<li><strong>Foreground/opportunistic</strong> — runs when the app is open or in short
+  <code>BGTaskScheduler</code>/WorkManager windows (best-effort cadence; the wizard says
+  "runs about daily, when iOS allows" instead of promising 9:00 AM);</li>
+<li><strong>Delegated</strong> — the default recommendation when any peer exists: the Hand deploys to
+  a peer, the phone gets results via sync (this is the moodboard's "On: Home Mac"
+  pattern);</li>
+<li><strong>Triggered</strong> — event-driven runs on capture/share-sheet actions, which iOS does
+  permit.</li>
+</ul>
+<p>The anti-pattern we refuse: pretending a phone can host cron. The wizard's Step 3
+shows real semantics per placement.</p></article><article id="S21-006" class="source-clause"><h4>S21-006 · 2.3 Web — session agents, delegated Hands</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>2.3 Web — session agents, delegated Hands</h3>
+<p>The browser runs UAR-in-WASM (<code>gen_ui_wasm</code> + <code>frf-wasm::agent</code>): full chat-agent and
+tool-call capability inside the session, skills limited to browser-safe surfaces
+(web-fetch via host, memory, no shell/fs). Scheduled Hands don't exist in a tab —
+service workers are not a scheduler — so the web tier authors and monitors Hands but
+always deploys them to a peer. A PWA with a reachable peer is a full KnowMe; a PWA
+alone is a chat client with session agents, and says so.</p></article><article id="S21-007" class="source-clause"><h4>S21-007 · 3. The hook pipeline (context factory extensibility)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>3. The hook pipeline (context factory extensibility)</h2></article><article id="S21-008" class="source-clause"><h4>S21-008 · 3.1 The pipeline</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>3.1 The pipeline</h3>
+<p>Every agent turn — chat or Hand — flows through named stages in UAR's orchestration
+loop:</p>
+<pre><code>ingress → intent-classify → route → context-assemble → prompt-build
+        → [inference] → tool-gate → tool-execute → post-process → egress
+</code></pre>
+<p>Plugins (<code>.pxt</code> components) may hook stages, but under two structural rules that keep
+the pipeline sane:</p>
+<p><strong>Declared, not discovered.</strong> The manifest announces every hook: stage, the <em>data
+classes</em> it reads (<code>intent</code>, <code>prompt-text</code>, <code>retrieval-query</code>, <code>tool-results</code>, …), and
+what it contributes. Install-time review renders this as permissions — a hook reading
+<code>prompt-text</code> is an amber, explicitly-consented grant, same visual grammar as every
+other trust surface. No runtime hook registration; what a plugin can see is knowable
+before it runs.</p>
+<p><strong>Contribute, don't mutate.</strong> Hooks return <strong>typed, provenance-tagged contributions</strong>,
+not modified pipelines:</p>
+<ul>
+<li><code>intent-classify</code>: additional intent labels with confidence (the router may use
+  them; base classification is never overwritten);</li>
+<li><code>route</code>: routing <em>criteria</em> (e.g. "this looks like a <code>com.acme.crm</code> task —
+  prefer the CRM plugin's toolset");</li>
+<li><code>context-assemble</code>: context fragments with a declared <strong>token budget request</strong>,
+  source attribution, and relevance score — the context factory allocates the real
+  budget across competing contributions deterministically (score × grant, then
+  truncate); a plugin can enrich context, it cannot crowd out the user's memory;</li>
+<li><code>tool-gate</code>: advisory annotations only — Cedar remains the sole authority on
+  allow/deny;</li>
+<li><code>post-process</code>: renderable artifacts (AG-UI events / HTMX fragments per the
+  extensibility spec), never silent rewrites of model output.</li>
+</ul>
+<p>Ordering is deterministic (manifest priority, then plugin id); every hook runs in the
+plugin's own WASM sandbox with a per-stage epoch budget (default 200 ms; a slow hook is
+skipped and logged, never blocks the turn); every invocation lands in the audit trail
+with its contribution. Hooks compose with skills rather than replacing them: a hook
+that wants data fetched still calls <code>uar-invoke</code> under its allow-list.</p></article><article id="S21-009" class="source-clause"><h4>S21-009 · 3.2 Why this shape</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>3.2 Why this shape</h3>
+<p>Free-form middleware ("here's the prompt, return a new prompt") is the classic
+extensibility trap: order-dependent, un-reviewable, and two plugins deep it becomes
+un-debuggable. Contributions with budgets and provenance keep the context factory
+<strong>auditable</strong> — the audit log can show exactly which plugin added what to any prompt —
+which is the same property the FUNC-SPEC demands of skills and sync. The hook system is
+KnowMe's prompt-processing story <em>and</em> its prompt-injection containment story: a
+malicious contribution is visible, attributed, budget-capped, and revocable.</p></article><article id="S21-010" class="source-clause"><h4>S21-010 · 4. Native WASM agents</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>4. Native WASM agents</h2></article><article id="S21-011" class="source-clause"><h4>S21-011 · 4.1 The `agent` world</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>4.1 The <code>agent</code> world</h3>
+<p>A third capability in the <code>prometheus:component/*</code> family (extensibility spec §5.1) —
+sketch:</p>
+<pre><code class="language-wit">package prometheus:component@0.1.0;
+
+interface agent-host {
+  record model-info { ref: string, capabilities: list&lt;string&gt;,
+                      ctx-len: u32, placement: string }
+  /// Capability- and Cedar-filtered view of the container's registry —
+  /// resolved by the model-configuration resolver; never exposes keys.
+  list-models: func(required-capabilities: list&lt;string&gt;) -&gt; list&lt;model-info&gt;;
+
+  record infer-request { model-ref: option&lt;string&gt;,   // none = resolve for me
+                         messages-json: string, params-json: string,
+                         tools-json: option&lt;string&gt; }
+  /// Host executes against container providers under the agent's Cedar policy
+  /// and token budget. Streaming: chunk polling in 0.1 (WASI 0.2 has no async
+  /// exports); the shape is chosen so WASI 0.3 futures make it native later.
+  infer-start: func(req: infer-request) -&gt; result&lt;string, string&gt;;   // handle
+  infer-poll:  func(handle: string) -&gt; result&lt;option&lt;string&gt;, string&gt;; // chunk
+  infer-cancel: func(handle: string);
+}
+
+interface agent {
+  /// A2A-shaped lifecycle: tasks with messages in, status + artifacts out.
+  record task-request { task-id: string, messages-json: string,
+                        metadata-json: string }
+  start-task: func(req: task-request) -&gt; result&lt;_, string&gt;;
+  poll-task:  func(task-id: string) -&gt; result&lt;string, string&gt;;  // status+artifacts
+  cancel-task: func(task-id: string);
+}
+</code></pre>
+<p>plus the core imports every component gets (log, kv, emit-event, uar-invoke).</p></article><article id="S21-012" class="source-clause"><h4>S21-012 · 4.2 The three deliberate properties</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>4.2 The three deliberate properties</h3>
+<ul>
+<li><strong>Inference by callback, never by key.</strong> The agent asks <em>for inference</em>, not <em>for a
+  provider</em>; the host resolves via the model-configuration resolution order (§4.3
+  there), enforces Cedar ("this agent may use local models and <code>home-mac</code>, not cloud"),
+  meters tokens against the agent's budget, and records the call in the audit trail.
+  Provider credentials never cross the sandbox boundary. <code>list-models</code> returns the
+  filtered view so an agent can <em>prefer</em> ("give me something with <code>tools</code> and 32k
+  ctx") without ever holding secrets.</li>
+<li><strong>A2A-shaped on purpose.</strong> Using the <a href="https://github.com/google/A2A">A2A protocol</a>
+  vocabulary (tasks, messages, artifacts, status; an AgentCard derived from the <code>.pxt</code>
+  manifest) means a WASM agent can be <em>exposed</em> as a real A2A endpoint by BossFang or
+  Kiln with a thin adapter, and remote A2A agents slot into the placement table as
+  just another executor. Interop both directions for free.</li>
+<li><strong>Same lifecycle as Hands.</strong> A WASM agent is not a fourth kind of thing: it is the
+  <code>agent_impl</code> of a Hand. The wizard, Cedar policy, consent prompts, run history,
+  audit trail, pause/resume, and placement choice are identical; the only difference
+  is that Step 1 references a component instead of a prompt template.</li>
+</ul></article><article id="S21-013" class="source-clause"><h4>S21-013 · 4.3 Two agent kinds, one lifecycle (the synthesis)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>4.3 Two agent kinds, one lifecycle (the synthesis)</h3>
+<blockquote>
+<p><strong>Framing update (see <code>docs/strategies/plugins/README.md</code>):</strong> a native agent is not
+a distinct package type — it is a plugin declaring the <code>knowme:agent</code> <strong>capability</strong>.
+Everything below about the component kind is the agent-capability view of that
+capability-centric model; the Hands wizard is the product surface that binds an
+agent-capability plugin into a Hand.</p>
+</blockquote>
+<pre><code>Hand ─┬─ declarative (text): prompt/skill/schedule metadata — the 90% case,
+      │    portable to every placement including web
+      └─ component (WASM):  exports prometheus:component/agent — logic-bearing
+           agents, portable to every placement with a Wasmtime host
+           (embedded desktop, sidecar, peer, Kiln; web pending a
+           JS-host shim — declarative-only there in v0.1)
+</code></pre>
+<p>Everything else in this document — placements (§1–2), hooks (§3), model callbacks
+(§4.1) — applies to both kinds identically. That identity is the design: no matter how
+an agent is implemented or where it runs, it is created, governed, audited, and
+observed the same way.</p></article><article id="S21-014" class="source-clause"><h4>S21-014 · 5. Risks and open questions</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>5. Risks and open questions</h2>
+<ol>
+<li><strong>Sidecar ops</strong> — packaging/signing a helper binary per OS, run-at-login UX,
+   single-instance locking, port/socket auth (localhost token). Solved problems, but
+   real work; budget it (roadmap M1.5).</li>
+<li><strong>Hook privacy optics</strong> — <code>prompt-text</code> hooks are powerful; the permission UI must
+   make them feel as weighty as they are. Consider a per-conversation "no plugin
+   hooks" toggle (mirrors on-device-only mode's spirit).</li>
+<li><strong>WASM streaming ergonomics</strong> — chunk polling is workable but clunky; revisit the
+   WIT when WASI 0.3 async lands (extensibility spec §9.6 tracks this).</li>
+<li><strong>Budget arbitration</strong> — the context factory's token-budget allocator across
+   plugin contributions needs a deterministic, documented policy from day one; it is
+   the piece users will ask "why did it include that?" about.</li>
+<li><strong>A2A drift</strong> — track the A2A spec's evolution; keep our vocabulary an adapter
+   away, not a fork.</li>
+</ol></article><article id="S21-015" class="source-clause"><h4>S21-015 · 6. Implementation map (this repo)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>6. Implementation map (this repo)</h2>
+<ul>
+<li><code>rust/crates/gen_ui_agent</code>: name the pipeline stages (§3.1) as an explicit typed
+  enum; contribution types + budget allocator; hook dispatch to the plugin host.</li>
+<li><code>rust/crates/knowme_plugin_host</code>: <code>agent-host</code>/<code>agent</code> worlds added to the WIT
+  family; hook declarations parsed from the <code>.pxt</code> manifest (extends the existing
+  <code>PluginManifest</code>).</li>
+<li><code>rust/crates/knowme_hands</code>: <code>agent_impl: Declarative | Component{ref}</code> on
+  <code>HandDefinition</code>; placement enum gains <code>Sidecar</code>.</li>
+<li>New <code>knowme-sidecar</code> binary crate: thin main() around UAR + AgentService server +
+  localhost auth; Tauri sidecar config in <code>desktop/src-tauri</code>.</li>
+<li><code>mobile/</code>: BGTaskScheduler/WorkManager adapters reporting into the same run-history
+  tables; wizard copy for the three mobile modes (§2.2).</li>
+<li>Audit: hook invocations and infer-callback records join the existing per-Hand audit
+  log (FUNC-SPEC §06).</li>
+</ul></article><article id="S21-016" class="source-clause"><h4>S21-016 · 7. UAR grounding (2026-07-19): the submodule is real — map to it</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>7. UAR grounding (2026-07-19): the submodule is real — map to it</h2>
+<p>The Universal Agent Runtime is now vendored at <strong><code>rust/vendor/universal-agent-runtime</code></strong>
+(v1.0.0; a single root crate <code>universal-agent-runtime</code> with <code>[lib]</code> plus the
+<code>universal-agent-runtime</code> and <code>uar-sidecar</code> binaries; excluded from the host
+workspace build). Every "UAR" reference above now has a concrete target, and three
+corrections fall out:</p>
+<ol>
+<li><strong>Placements map to UAR consumption modes, not to new code.</strong>
+   - <code>embedded</code> (mobile, the only phone option) = UAR <strong>as a Rust library</strong>, behind a
+     facade in <code>gen_ui_agent</code>. The facade boundary already exists:
+     <code>gen_ui_agent::uar</code> (<code>UarServiceRuntime</code>, <code>UarEventProjector</code>,
+     <code>UarRuntimeStatus</code>) serves the <strong>service mode</strong> over the UAR HTTP SDK today
+     (non-mobile builds, integration state <code>ProjectionOnly</code>); the <strong>embedded
+     kernel</strong> is UAR-2 in <code>docs/strategies/uar-future-release-roadmap.md</code> /
+     Phase 2 of <code>docs/strategies/uar-knowme-runtime-integration.md</code>.
+     UAR's compatibility policy explicitly does <strong>not</strong> guarantee its Rust API during
+     1.x — the supported surface is sidecar HTTP/SSE. Mobile has no sidecar option,
+     so: pin the submodule SHA, keep the facade the <em>only</em> touchpoint, and treat
+     every UAR bump as a reviewed migration.
+   - <code>sidecar</code> (desktop) = the <strong><code>uar-sidecar</code> binary</strong> — the lifecycle-isolation
+     story of §2.1 is a shipped binary, not a new crate to write.
+   - <code>peer</code> = BossFang serving the UAR <strong><code>server-full</code></strong> bundle (HTTP/SSE — the
+     integration surface UAR actually supports; see the BossFang doc).
+   - <code>kiln</code> = unchanged (server-side WASM).</li>
+<li><strong>Agent definition is compiled, and there are two artifacts with one owner.</strong>
+<code>HandDefinition</code> stays KnowMe's authoring/governance surface (identity, schedule,
+   grants, Cedar). The <em>execution</em> artifact is UAR's <strong>UAR-AGENT-MD → compiler →
+   <code>AgentArtifact</code></strong> (<code>src/uar/domain/artifact.rs</code>, <code>src/uar/compiler/</code>, with
+   ed25519 signing and a conformance suite); A2A exposure uses UAR's
+   <code>AgentCard</code>/<code>AgentSkill</code> (<code>src/uar/api/a2a/</code>). The mapping rule: a declarative
+   Hand <em>compiles to</em> a UAR-AGENT-MD artifact; a component (WASM) Hand binds to one
+   — §4.3's "two agent kinds, one lifecycle" survives with UAR's artifact as the
+   shared execution form. Execution itself is UAR's <code>RunManager</code>
+   (<code>src/uar/runtime/manager.rs</code>) over <code>ractor</code> agent actors and <code>AgentGraph</code>.</li>
+<li><strong>The "one AgentService contract" is realized as protocols, not a proto.</strong> The
+   frf-agentproto framing of §1 is superseded by UAR's actual surface: the
+   <strong>AG-UI event profile <code>uar.agui/1</code></strong> (see <code>docs/strategies/ag-ui/README.md</code>),
+   the <strong>A2A task vocabulary</strong>, and OpenAI-compatible endpoints in server mode.
+   "Placement is configuration" still holds — the client speaks the same AG-UI +
+   task contract to an embedded runtime (in-proc) or a peer (HTTP/SSE).</li>
+</ol>
+<p>Skill definition/execution grounds the same way (UAR <code>src/uar/domain/skills.rs</code> +
+the <code>prometheus-skill-system</code> content repo): see <code>docs/strategies/skill-support/README.md</code>
+§8. A2UI surfaces declared by agents (UAR-AGENT-MD §06) resolve through
+<code>docs/strategies/a2ui/README.md</code>.</p></article></main></body></html>

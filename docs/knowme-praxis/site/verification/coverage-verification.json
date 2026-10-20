@@ -1,0 +1,10 @@
+{
+  "sources": 45,
+  "sections": 811,
+  "technical_characters": 806921,
+  "explicit_requirement_occurrences": 219,
+  "discarded_technical_characters": 0,
+  "original_article_sha256": "990b86b99d794e541258910a239b1a72c2290275cea4d5c2ae524f456f64bb89",
+  "source_text_reconstruction": "all sources exact",
+  "note": "Technical extraction policy in coverage.json; zero loss is relative to that declared corpus, not raw presentation bytes."
+}

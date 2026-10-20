@@ -1,0 +1,43 @@
+{
+  "name": "KnowMe Praxis",
+  "short_name": "Praxis",
+  "description": "The Sovereign Agentic Workspace: complete architecture, functional requirements, native Flutter, Rust, portable plugins, private dots and LiveKit realtime.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "minimal-ui"
+  ],
+  "orientation": "any",
+  "background_color": "#F7F7F8",
+  "theme_color": "#0B0F14",
+  "categories": [
+    "business",
+    "productivity",
+    "education"
+  ],
+  "lang": "en-US",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

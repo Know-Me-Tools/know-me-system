@@ -1,0 +1,107 @@
+PART IV · 08
+Sources, gaps and disclosures
+Every external number in this document is dated. Where a figure is vendor-published or secondhand it is marked. The gaps below are the ones the pilot must close before any claim about completion rates or cost is published.
+Primary sources
+James, T.
+The Persistent Operator-Coach
+, 18 Oct 2026 (companion paper; protocol and case study).
+James, T.
+The Operator Model
+operating paper, Oct 2026; briefs KM-BRIEF-OM-001 to OM-005, 3 Oct 2026 (IPFS, prometheusags.ai gateway).
+know-me-system repository, 18 Oct 2026: README;
+docs/strategies/bossfang/README.md
+(v1.0, 18 Jul 2026);
+docs/strategies/uar-knowme-runtime-integration.md
+(19 Jul 2026);
+docs/knowme-ui-ux-standard.md
+(17 Jul 2026);
+.kbd-orchestrator/
+(project.json, constraints.md, current-waypoint.md); vendored
+universal-agent-runtime
+1.0.0 Cargo.toml and
+librefang
+crate list (31 crates at the vendored commit).
+OpenAI,
+Introducing dots
+, 29 Sep 2026 —
+openai.com
+; Help Center: dots privacy, security and safety FAQs; getting started with your dot; ChatGPT release notes.
+Smyth, Mantilla-Ramos et al.,
+OverclaimBench
+, arXiv 2609.20812 v3, 22 Sep 2026 —
+arxiv.org
+.
+Yagubyan, arXiv 2606.13685, Apr 2026; Zhao, Esmaeili, Fard, arXiv 2604.16790, Apr 2026;
+(Im)Paired Programming
+, arXiv 2607.26375.
+Mündler et al., ETH SRI Lab,
+Coding Agents Are "Fixing" Correct Code
+, blog 23 Mar 2026; arXiv 2605.07769.
+Chen and Stratton (Harvard),
+Artificial Intelligence in the Firm: Bottlenecks in Software Production
+, working paper, 4 Aug 2026.
+LangChain,
+Improving Deep Agents with harness engineering
+, Feb 2026.
+Peng et al., arXiv 2302.06590; METR, Jul 2025 and 24 Feb 2026 update; Cemri et al., MAST, arXiv 2503.13657; Huang et al., arXiv 2310.01798; Anthropic,
+Effective harnesses for long-running agents
+(26 Nov 2025) and
+Harness design for long-running application development
+(24 Mar 2026).
+Protocols: AG-UI spec 1.0 —
+docs.ag-ui.com
+; A2A v1.0 (Linux Foundation / Agentic AI Foundation); MCP 2026-07-28 (Tasks extension, elicitation); Apache Iggy 0.9.0 release, 21 Sep 2026 —
+iggy.apache.org
+; OpenMLS 0.9.1, 7 Oct 2026; W3C VC 2.0 (15 May 2025), DID 1.1 CR (5 Mar 2026), DID Resolution CR (6 Aug 2026); LiveKit Agents 1.8.8 (15 Oct 2026).
+LibreFang:
+librefang/librefang
+;
+GQAdonis/librefang
+(BossFang); lib.rs crate page (2026.7.31).
+Pricing: Alibaba Cloud Model Studio Coding Plan documentation; secondary pricing guides for ChatGPT Pro/Business (Oct 2026), Kimi, MiniMax M Plan, Claude Max, LangSmith, Langfuse, Braintrust (vendor docs), Arize, Helicone, W&B Weave, Galileo.
+Compliance: Cooley, Hunton, Eckert Seamans client notes on the EU Digital Omnibus and Colorado SB 26-189 (2026).
+Gaps to disclose
+Gap
+Status
+Closes in
+Persistent cross-session supervisor vs per-task review
+No study found. The three-arm evaluation is novel.
+Phase 5 pilot
+Coach cost versus yield
+Unmeasured; the case study had no counterfactual and no total-effort accounting
+Phase 0 logs, Phase 5 ledger
+Dot terms on automation and sharing; post-launch dot pricing
+Unpublished as of 18 Oct 2026
+Quarterly terms review
+Analogues not verified
+Gemini Agent/Mariner, Microsoft Copilot agents, Devin, Factory, OpenCode/Kimi session models, GitHub Copilot pricing and PR gates
+Before external publication
+Practices not verified
+SpecKit, OpenSpec (used in-repo, not surveyed), LangGraph interrupts, Temporal, OpenAI Agents SDK guardrails
+Before external publication
+Market data
+Thomson Reuters adoption figures, SMB ROI, AI-coach pricing, behavior-change efficacy not re-verified in this pass
+OM-004 revision
+Version conflicts
+A2A v1.0 date (12 Mar vs Apr 2026); librefang crate count (14 / 24 / 30 / 31 / 34 across versions; 31 at the vendored commit)
+Cite commit hashes in the spec
+Observability prices
+Largely secondhand
+Re-check before quoting to a customer
+Secondhand overclaim statistics
+Tang et al. (22.58%) and Su et al. (75.5%) taken from citing documents, not primaries
+Read primaries before citing in sales material
+Open design questions
+Should the coach's model family always differ from the executor's? Cross-model review is an active 2026 topic (arXiv 2607.21656); ADR-PD-04 says yes by default and the ablation measures it.
+How to measure false blocking in single-operator pilots without a blinded assessor. Proposal: a second operator adjudicates named blockers weekly from the audit chain alone.
+Whether Phase Exit classification should ever run on the executor's plan. Current answer: no; it is coach inference and metered as such.
+Channel placement for the coach's owner surface on mobile when the owner is away from the workstation: Slack bridge first, LiveKit voice later, in that order.
+Status of this document: research-grounded design and plan. It claims no experiment run, no product shipped, and no change to any active KBD phase contract. The next evidence is Phase 0's ten logged interventions.
+
+Source link and image-reference ledger
+Reference: openai.com — https://openai.com/index/introducing-dots/
+Reference: arxiv.org — https://arxiv.org/abs/2609.20812
+Reference: docs.ag-ui.com — https://docs.ag-ui.com/spec/1.0
+Reference: iggy.apache.org — https://iggy.apache.org/blogs/2026/09/21/release-0.9.0/
+Reference: librefang/librefang — https://github.com/librefang/librefang
+Reference: GQAdonis/librefang — https://github.com/GQAdonis/librefang

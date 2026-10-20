@@ -1,0 +1,74 @@
+{
+  "views": [
+    {
+      "name": "desktop",
+      "width": 1440,
+      "scheme": "light",
+      "horizontal_overflow": false,
+      "expanded_horizontal_overflow": false,
+      "retained_sections": 811,
+      "htmx_fragment_loaded": true,
+      "page_errors": [],
+      "http_errors": []
+    },
+    {
+      "name": "desktop-dark",
+      "width": 1440,
+      "scheme": "dark",
+      "horizontal_overflow": false,
+      "expanded_horizontal_overflow": false,
+      "retained_sections": 811,
+      "htmx_fragment_loaded": true,
+      "page_errors": [],
+      "http_errors": []
+    },
+    {
+      "name": "mobile",
+      "width": 390,
+      "scheme": "light",
+      "horizontal_overflow": false,
+      "expanded_horizontal_overflow": false,
+      "retained_sections": 811,
+      "htmx_fragment_loaded": true,
+      "page_errors": [],
+      "http_errors": []
+    },
+    {
+      "name": "mobile-dark",
+      "width": 390,
+      "scheme": "dark",
+      "horizontal_overflow": false,
+      "expanded_horizontal_overflow": false,
+      "retained_sections": 811,
+      "htmx_fragment_loaded": true,
+      "page_errors": [],
+      "http_errors": []
+    },
+    {
+      "name": "compact",
+      "width": 320,
+      "scheme": "light",
+      "horizontal_overflow": false,
+      "expanded_horizontal_overflow": false,
+      "retained_sections": 811,
+      "htmx_fragment_loaded": true,
+      "page_errors": [],
+      "http_errors": []
+    },
+    {
+      "name": "tablet",
+      "width": 768,
+      "scheme": "light",
+      "horizontal_overflow": false,
+      "expanded_horizontal_overflow": false,
+      "retained_sections": 811,
+      "htmx_fragment_loaded": true,
+      "page_errors": [],
+      "http_errors": []
+    }
+  ],
+  "link_errors": [],
+  "privacy_findings": [],
+  "coverage_search_visible": 13,
+  "ok": true
+}

@@ -1,0 +1,205 @@
+The Agentic Triptych
+Why every serious AI workspace is converging on three panels, and how to design yours.
+Travis James · Draft for publication · 2026-10-05
+Open ChatGPT, Claude, Kimi or Gemini on a desktop today and you'll find the same shape. There's a list of your work on the left and a conversation in the middle. When the conversation produces something worth keeping, a panel slides in on the right to hold it.
+None of the vendors call it the same thing:
+OpenAI and Google call the right-hand panel
+Canvas
+.
+Anthropic calls it
+Artifacts
+.
+Microsoft calls it a "persistent canvas" that opens "side-by-side the chat".
+The AI UX Playground catalogue files the pattern as
+Chat Artifacts
+and defines a canvas as "a dedicated side surface, panel, tab, or split view."
+I call the whole arrangement the
+Agentic Triptych
+. A triptych is three hinged panels whose two wings fold open and shut around a central one. That is how these workspaces behave: the side panels open and close, and the conversation stays put in the middle. The name is mine, not an industry standard, but the pattern underneath it is everywhere.
+Why the chat box wasn't enough
+A chat transcript is a good record of intent and a poor place to keep work. A contract, a spreadsheet or a running app scrolls away as soon as you ask the next question.
+AI UX Playground's description of the pattern puts it well: use it for "dual-pane layouts where conversation stays the control plane and the artifact is the payload."
+That split is the whole idea:
+The conversation
+is where you direct the work and see the reasoning.
+The canvas
+is where the work lives, gets edited, and survives.
+Here is how the vendors described the shift when they shipped it:
+Anthropic (June 2024)
+said Artifacts "appear in a dedicated window alongside their conversation", and called it "Claude's evolution from a conversational AI to a collaborative work environment."
+OpenAI (October 2024)
+said Canvas "opens in a separate window" for "creating and refining ideas side by side." It called it "the first major update to ChatGPT's visual interface since we launched two years ago."
+The three panels
+1. The navigator (left).
+This is the list of containers your work lives in: projects, chats, sessions, and in our case deals. It answers "what am I working on?" Choosing a container changes everything to its right.
+2. The thread (centre).
+This is the control plane. You state intent here, the agent shows its reasoning and progress here, and approvals happen here. It is also the record: what was asked, what was done, and who agreed.
+3. The canvas (right).
+This is the payload: a document, a code file, a preview, a table. More and more often it is a whole embedded application. It opens on demand, can be resized or expanded, and can be closed.
+Most mature versions add a fourth, quieter element:
+a rail
+of tools along the edge. OpenAI's own Canvas launch image shows a vertical toolbar with controls like "Reading Level" running down the side of the canvas.
+A field guide
+ChatGPT (OpenAI)
+ChatGPT's canvas, from OpenAI's announcement (October 2024). Image: OpenAI.
+What it shows:
+Canvas
+introduced the side-by-side document and code editor in October 2024. It can open on its own when ChatGPT detects a suitable task, and you can restore previous versions.
+Projects
+live in the left-hand menu.
+On macOS,
+Work with Apps
+lets ChatGPT read from and edit other apps on the desktop.
+The current desktop app
+calls itself "your command center for complex work". It opens documents, spreadsheets and images "in the same workspace", with a toggle above the composer to choose Chat or Work.
+A counter-example worth noting.
+AI UX Playground's comparison points out that ChatGPT keeps formatted prose in the thread rather than in a side pane. Not everything belongs in the canvas. Short answers should stay in the conversation.
+Claude (Anthropic)
+Claude's artifact pane. Screenshot: AI UX Playground teardown of Claude Artifacts.
+AI UX Playground's teardown sums up Claude's design: "Split pane is Claude's core bet: thread as reasoning trail, right pane as the product of the session."
+The shape has spread across Anthropic's products:
+In the chat app,
+an artifact "opens beside your conversation". A Publish control warns that the artifact becomes public while the chat stays private.
+In Claude Code on desktop,
+the work area is "built around panes you can arrange in any layout: chat, diff, browser, terminal, file, plan, tasks, and subagent."
+Cowork, now merged into chat,
+puts "files Claude creates … alongside the conversation."
+Kimi (Moonshot AI)
+Kimi's agent ("Kimi's Computer") showing every step of a website build. Image: Kimi help centre.
+What it shows:
+Kimi's agent mode
+launched on 26 September 2025 as
+OK Computer
+. It makes the work visible: you can watch "the types of tools called", "the websites visited" and the intermediate steps, then preview, download or share what it delivers.
+Choosing an outcome reshapes the composer.
+AI UX Playground's teardown notes that picking Websites, Docs, Slides or Swarm "rewrite[s] the composer into a job workspace."
+Kimi Work
+takes the same idea to a desktop app ("AI for Knowledge Work, Built for Desktop"). It works with local files and scheduled tasks, and has an
+Ask before acting
+setting.
+Kimi's Websites mode. Screenshot: AI UX Playground teardown of the Kimi composer.
+Everyone else
+Google Gemini.
+Canvas launched in March 2025 as "a new interactive space for refining your documents and code," with live HTML and React previews. A later release added apps that save data between sessions. That makes Gemini an early sign that the canvas can hold
+software
+, not just documents.
+Microsoft Copilot Pages
+(September 2024) is a "dynamic, persistent canvas in Copilot chat." "Edit in Pages" opens it side by side with the chat.
+Cursor's
+agents window lists agents in the sidebar. Its browser tool can appear inline as a pane.
+Replit Agent
+runs generated apps "live in a preview pane alongside the agent conversation". AI UX Playground cites it as evidence for the Chat Artifacts pattern.
+Cherry Studio
+runs mini apps (web services or local packages) inside the client in their own sandbox. That's the triptych's canvas used as an app host.
+Seven rules for designing your own
+1. Let the container decide the navigator.
+In a coding tool the container is a project or session; in a legal tool, a matter; in a deal business, the deal. Pick the noun your users already use for "the file", and make it exist from the first moment of work, not the moment a form is filled in.
+2. Treat the thread as the record.
+Every action the agent takes, and every decision a person makes, should land in the thread with a name and a time. If the agent changed something in the canvas, the thread should say so.
+3. Open the canvas on demand, and let it resize and close.
+AI UX Playground lists "panels that cannot resize or collapse" among the pattern's common mistakes. Give the canvas three sizes:
+docked beside the thread;
+expanded;
+full width for wide work like spreadsheets.
+4. Give artifacts states, and show them.
+The catalogue's Chat Artifacts pattern names six: requested, generating, published, previewing, iterating, exported. Users need to know which version is current, and, for anything legal, which one was signed.
+5. Approvals live in the thread, and the agent never approves itself.
+Anything that sends, signs, pays or publishes should stop for a named person in the thread. Claude warns before publishing; Kimi Work asks before acting. Make that the default, not a setting.
+6. Show what the agent can see.
+The canvas that is open, the record selected, any files attached: show them as visible, removable context. Hidden context is how a confident answer ends up about the wrong customer.
+7. On a phone, the wings become sheets.
+On a small screen, the navigator becomes a drawer and the canvas a full-screen sheet with a back button. The thread stays home.
+A worked example: one record per deal
+At Prometheus we are applying the triptych to a mineral-rights acquisition business. Today a deal begins life as a phone call and a folder on a shared drive. It's tracked on a paper checklist that one of the team described simply:
+the checklist is the deal.
+In the triptych version:
+The navigator
+lists deals by stage, from the first call onward.
+The thread
+is the deal's running record: notes, hand-offs, pre-checks the assistant runs before a document is generated, and partner approval before any payment.
+The canvas
+holds the deal file: checklist, versioned documents, units with prices and net royalty acres. It also holds the company's existing Mineral Rights Manager application, embedded as a mini app.
+Rather than give that legacy app a full screen of its own, we adapted its layout to the pane. It already responds to its own width, so the same work that makes it usable on a phone makes it usable in the canvas. When a person confirms a value in the workspace, the embedded form fills it in but doesn't save it. The person still saves it in the app.
+Where the pattern goes wrong
+A canvas you can't close
+turns a workspace into a cockpit. Let it collapse.
+Silent changes.
+If the agent edits the canvas without a line in the thread, nobody can reconstruct what happened.
+Approval by accident.
+A button that sends, pays or signs in one click from an agent's suggestion is a liability, not a convenience.
+Invisible context.
+The answer is only as good as what the agent was looking at. Show it.
+Agents that pretend to be people.
+In the US, the FCC ruled in 2024 that AI-generated voices count as "artificial" voices under the TCPA, which brings consent and disclosure obligations. Workspaces that reach outside the building should say clearly when an AI is speaking.
+Credits and sources
+Pattern definitions and teardowns:
+AI UX Playground
+, maintained by Bestfolios.com:
+Chat Artifacts
+Canvas (glossary)
+Claude Artifacts teardown
+Kimi composer teardown
+Output comparison
+OpenAI:
+Introducing canvas
+Work with Apps on macOS
+Projects in ChatGPT
+ChatGPT desktop app
+Anthropic:
+Claude 3.5 Sonnet and Artifacts
+Artifacts help
+Cowork and chat
+Claude Code desktop
+Moonshot AI:
+Kimi agent overview
+Kimi Work
+Others:
+Google,
+Gemini collaboration features
+Microsoft,
+Copilot Pages
+Cursor,
+Cursor 3
+and
+browser tool
+Cherry Studio,
+mini apps
+FCC,
+Declaratory Ruling 24-17
+Before publishing (remove this section)
+Image rights.
+— The ChatGPT image is OpenAI's announcement image, and the Kimi agent image is from Kimi's help centre. — The Claude and Kimi Websites screenshots come from AI UX Playground. Its terms allow citing and linking but don't explicitly grant re-hosting its screenshots, which show third-party products. — Confirm permission, or replace them with your own screenshots, before publishing.
+Recheck vendor details.
+Help pages for ChatGPT's desktop app, Claude Cowork and Kimi Work change often. The details above were checked on 5 October 2026.
+The name.
+"Agentic Triptych" is our name for the pattern. The vendors' terms are Canvas, Artifacts and side by side.
+Prometheus AGS for San Saba Royalty · draft article
+Source: article/agentic-triptych.md · page generated by site/build-article.py
+
+Source link and image-reference ledger
+Reference: AI UX Playground — https://aiuxplayground.com/
+Reference: Chat Artifacts — https://aiuxplayground.com/pattern/chat-artifact
+Reference: Canvas (glossary) — https://aiuxplayground.com/glossary/canvas
+Reference: Claude Artifacts teardown — https://aiuxplayground.com/teardowns/claude/artifacts
+Reference: Kimi composer teardown — https://aiuxplayground.com/teardowns/kimi/composer
+Reference: Output comparison — https://aiuxplayground.com/teardowns/compare/output-artifacts-refinement
+Reference: Introducing canvas — https://openai.com/index/introducing-canvas/
+Reference: Work with Apps on macOS — https://help.openai.com/en/articles/10119604-work-with-apps-on-macos
+Reference: Projects in ChatGPT — https://help.openai.com/en/articles/10169521-projects-in-chatgpt
+Reference: ChatGPT desktop app — https://learn.chatgpt.com/docs/app
+Reference: Claude 3.5 Sonnet and Artifacts — https://www.anthropic.com/news/claude-3-5-sonnet
+Reference: Artifacts help — https://support.claude.com/en/articles/9487310
+Reference: Cowork and chat — https://support.claude.com/en/articles/16761823
+Reference: Claude Code desktop — https://code.claude.com/docs/en/desktop
+Reference: Kimi agent overview — https://www.kimi.com/en/help/agent/agent-overview
+Reference: Kimi Work — https://www.kimi.com/en/products/kimi-work
+Reference: Gemini collaboration features — https://blog.google/products-and-platforms/products/gemini/gemini-collaboration-features/
+Reference: Copilot Pages — https://techcommunity.microsoft.com/blog/microsoft-copilot-blog/announcing-copilot-pages-for-multiplayer-collaboration/4242701
+Reference: Cursor 3 — https://cursor.com/blog/cursor-3
+Reference: browser tool — https://cursor.com/docs/agent/tools/browser
+Reference: mini apps — https://docs.cherryai.com.cn/cherry-studio/preview/app
+Reference: Declaratory Ruling 24-17 — https://docs.fcc.gov/public/attachments/FCC-24-17A1.pdf
+Source image reference: ChatGPT with canvas: the conversation on the left, an editable "Design notes" document on the right, with an inline "make it more creative" edit prompt. — article/img/chatgpt-canvas.webp
+Source image reference: Claude with an artifact open: the chat on the left with an "Interactive artifact" card, and a live calculator in the right-hand pane with Copy and Publish controls. — article/img/claude-split-pane.webp
+Source image reference: Kimi's agent mode showing "Kimi's Computer" with progress 9/9 and a checklist of completed build steps. — article/img/kimi-agent-task.png
+Source image reference: Kimi with the Websites mode selected: the composer reads "Beautiful design, real backend. Just describe your site", with a project selector and templates below. — article/img/kimi-websites-mode.webp

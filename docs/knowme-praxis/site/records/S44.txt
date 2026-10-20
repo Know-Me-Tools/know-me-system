@@ -1,0 +1,13 @@
+## ADDED Requirements
+
+### Requirement: Declared-but-unbuilt modules ship as data
+Sourcing, Reports Intelligence, and Curative Tracker SHALL appear as manifests
+marked unavailable, with no component changes.
+
+#### Scenario: The three modules appear
+- **WHEN** the sidebar renders
+- **THEN** all three appear under AGENTIC MODULES as unavailable
+
+#### Scenario: The module list is genuinely additive
+- **WHEN** one manifest file is deleted and the app is rebuilt
+- **THEN** that module disappears from the sidebar with no code change

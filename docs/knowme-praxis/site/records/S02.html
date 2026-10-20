@@ -1,0 +1,614 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>S02 · tj-arch-mob-001.html</title><link rel="stylesheet" href="../records.css"><body><main><a href="../index.html">KnowMe Praxis</a><h1>S02 · tj-arch-mob-001.html</h1><p>Complete technical source record. Historical names and requirements remain visible for audit. Revised clauses and explicit corrections govern their application.</p><p><a href="S02.txt">Download complete technical text</a></p><article id="S02-001" class="source-clause"><h4>S02-001 · Preamble</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><pre class="retained-text">travisjames.ai · Prometheus AGS · KnowMe, LLC · Architecture Standards
+</pre></article><article id="S02-002" class="source-clause"><h4>S02-002 · Mobile Platform architecture standard.</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><div class="source-note"><strong>Explicit amendments:</strong><ul><li>Mobile presentation is native Flutter; shared Rust semantics remain. See RT-01–11.</li></ul></div><pre class="retained-text">Mobile Platform
+architecture standard.
+Two stacks, one Rust core, a clear decision boundary. This document establishes the architectural standard for selecting between Flutter + Rust FFI and Tauri + React 19 when building mobile and native desktop applications across the KnowMe and Prometheus AGS portfolios. The decision is not religious — it is structural, driven by rendering model, distribution target, and product context.
+Doc
+·
+TJ-ARCH-MOB-001
+Version
+·
+1.0 · March 2026
+Applies to
+·
+KnowMe · Prometheus AGS · TribeHealth.ai
+Stacks
+·
+Flutter · Tauri · Rust · React 19
+Author
+·
+Travis James
+Scope — what this document governs
+Platform selection criteria for iOS, Android, macOS, Windows, and Linux application targets
+Rust core sharing strategy — gen_ui_core as the invariant infrastructure substrate for both stacks
+Product-specific verdicts for KnowMe (consumer AI tools) and Prometheus AGS (enterprise consulting platform)
+The recommended hybrid architecture — write the infrastructure once, optimize each platform&#x27;s rendering layer independently
+01
+The architectural question
+What we are actually deciding — and why it is a platform question, not a preference question
+Both Flutter + Rust FFI and Tauri + React 19 share an identical Rust infrastructure core. The Tokio runtime, A2UI/AG-UI protocol pipeline, local inference engine (candle GGUF), SurrealDB embedded graph and vector store, MCP client, and Universal Agent Runtime are the same crate regardless of which UI framework sits above it.
+The decision concerns only the rendering layer and the IPC boundary between Dart/JavaScript and Rust.
+That boundary has profound downstream consequences for mobile distribution, touch fidelity, streaming performance, UI component richness, and developer velocity. This document makes those consequences explicit so the decision at each product layer is principled, not habitual.
+The fundamental divide
+Flutter renders every pixel itself using a custom engine (Impeller on mobile, Skia on desktop). It does not use native platform widgets. Tauri renders through the OS WebView — WKWebView on iOS/macOS, the system WebView on Android, Chromium on Windows/Linux. This single architectural difference explains most of the downstream advantages and disadvantages of each approach across the mobile and desktop contexts.
+FL
+Flutter + Rust FFI
+mobile-first
+Custom rendering engine — every pixel is Flutter&#x27;s canvas
+Zero-copy FFI bridge via flutter_rust_bridge v2
+Native gesture recognizer — no WebView event mediation
+StreamSink → Riverpod: direct Rust→UI event path
+Metal-accelerated inference on iOS/macOS out of the box
+Pixel-identical rendering across all platforms
+TR
+Tauri + React 19
+desktop-first
+WebView rendering — WKWebView on macOS/iOS, Chromium on desktop
+JSON IPC boundary — invoke() + emit() for Rust↔JS
+Full web ecosystem: assistant-ui, shadcn/ui, Prometheus Entity Management 3.x, TanStack Router/Table
+Vite 7 HMR — submillisecond UI development cycle
+3–10 MB installer vs 15–30 MB Flutter desktop bundle
+Native accessibility via OS WebView accessibility tree
+02
+The shared Rust core
+gen_ui_core — the infrastructure substrate that does not change regardless of UI framework
+The most important architectural fact: everything below the rendering layer is identical. The
+gen_ui_core
+Rust crate compiles to
+cdylib
+(Android
+.so
+) and
+staticlib
+(iOS
+.a
+/ XCFramework) for Flutter, and to a Tauri sidecar or direct Tauri plugin for desktop. The business logic, inference, memory, and agent runtime are written once.
+Flutter / Dart
+Riverpod · ContentBlock widgets
+React 19 / TypeScript
+Zustand · assistant-ui · shadcn/ui
+flutter_rust_bridge v2
+zero-copy FFI · StreamSink · async
+Tauri IPC
+invoke() · emit() · JSON serialization
+gen_ui_core (Rust)
+shared across both rendering strategies
+Tokio runtime
+runtime.rs
+A2UI/AG-UI
+protocol/
+Inference
+candle GGUF
+SurrealDB
+db/
+MCP Client
+mcp/
+Agent Runtime
+agent/ (PMPO)
+iOS · Android · macOS
+macOS · Windows · Linux · (mobile)
+← shared Rust infrastructure →
+Figure 1 — Shared Rust Core: gen_ui_core is invariant · only the rendering layer and IPC boundary change
+Invariant — both stacks
+gen_ui_core: runtime, protocols, inference, memory, MCP, agent loop
+Every module below the FFI/IPC boundary compiles unchanged regardless of which UI framework is above it. The Tokio runtime, streaming SSE parser, A2UI/AG-UI protocol adapters, candle inference engine, SurrealDB embedded stores, MCP client registry, and PMPO agent loop are written once, tested once, deployed to both targets.
+Compilation targets
+Flutter: cdylib → .so (Android JNI) · staticlib → .a (iOS XCFramework)
+Tauri: cdylib → .dylib / .dll (desktop plugin) · cargo build --target
+Variable — rendering layer only
+UI framework, state management, component library, IPC/FFI boundary
+Everything above the Rust boundary is substitutable. Dart + Riverpod + custom widgets on the Flutter path. TypeScript + Zustand 5 + React 19 + shadcn/ui on the Tauri path. The ContentBlock model and A2UI event routing are re-expressed in each language using the same structural logic — sealed unions in Dart, discriminated unions in TypeScript.
+03
+The rendering philosophy divide
+Custom canvas vs. platform WebView — why this single choice explains most downstream trade-offs
+Flutter and Tauri make fundamentally opposite bets about where rendering authority should live. Understanding this divide explains almost every advantage and disadvantage that follows in platform-specific analysis.
+Flutter
+Dart widget tree (Riverpod reactive)
+Impeller / Skia rendering engine
+Custom canvas — owns every pixel
+Metal (iOS/macOS)
+OpenGL ES (Android)
+iOS UIKit · Android SurfaceView (host only)
+Tauri
+React 19 DOM tree (Zustand reactive)
+JavaScript V8 / JavaScriptCore runtime
+Platform WebView (OS-provided)
+WKWebView
+macOS · iOS
+Android System WebView
+version varies by device
+iOS UIKit · Android Activity (host shell)
+KEY
+SPLIT
+consistent · no OS dependency · owns gestures
+OS-dependent · web ecosystem · standards-native
+Figure 2 — Rendering Stack Comparison: Flutter custom canvas vs. Tauri platform WebView
+The consequence of this divide on mobile
+On mobile, the WebView inconsistency between iOS WKWebView and Android System WebView is real and persistent. Android device fragmentation means the system WebView version varies significantly across the install base. Flutter eliminates this problem entirely — its engine is bundled with every app. For a consumer product like KnowMe serving a general audience across all Android versions and device tiers, Flutter&#x27;s rendering independence is a meaningful operational advantage.
+The consequence of this divide on desktop
+On macOS and Windows, the WebView story inverts. WKWebView on macOS is fast, standards-compliant, and deeply integrated with the OS. Chromium on Windows is consistent and high-performance. The fragmentation problem disappears, and Tauri gains the full web component ecosystem without the platform risk that makes it problematic on mobile.
+04
+Mobile platform analysis
+iOS and Android — where Flutter + Rust FFI wins decisively, and why
+For iOS and Android distribution, Flutter + Rust FFI is the correct architecture. The analysis across five critical dimensions — IPC latency, gesture fidelity, WebView fragmentation, streaming performance, and rendering consistency — all break in Flutter&#x27;s favour on mobile. These are structural advantages, not stylistic preferences.
+Dimension 01 · IPC vs FFI
+Every Rust→UI event crosses a different kind of boundary
+In Flutter, an A2UI streaming event emitted from the Rust protocol pipeline reaches Riverpod state via a direct FFI call through flutter_rust_bridge — essentially a typed function call with zero-copy value transfer where possible. In Tauri, the same event must be serialized to JSON, dispatched via
+app.emit()
+, cross the JavaScript bridge, and be deserialized on the React side. For an AI chat interface emitting hundreds of streaming tokens per second, that serialization cost compounds across the run. The bounded
+mpsc::channel(256)
+back-pressure model is architecturally cleaner over FFI than over IPC.
+Impact on gen_ui
+ThinkingDelta, TextDelta, ToolCallInputDelta — high-frequency streaming events — are most affected. Each crosses the boundary potentially 50–200 times per second during active inference. FFI is measurably faster for sustained high-frequency event delivery.
+Dimension 02 · Gesture handling
+Flutter&#x27;s gesture recognizer owns the touch event stack entirely
+Flutter intercepts touch events at the platform embedding layer before they reach any native OS handler. Its gesture recognizer competes directly with the OS recognizer and wins reliably. A Tauri app&#x27;s touch handling is mediated by the WebView&#x27;s DOM event system, which introduces latency on swipe velocity, rubber-band scroll physics, and long-press detection. For a chat application with scrollable message lists, artifact expand/collapse, and swipe-to-dismiss — all interaction-heavy patterns in gen_ui — the Flutter touch model is perceptibly more responsive.
+Dimension 03 · WebView fragmentation (Tauri mobile risk)
+Android System WebView version varies wildly across the install base
+Tauri 2.x supports mobile via WebView embedding. On iOS, WKWebView is consistent across supported iOS versions. On Android, Tauri relies on the Android System WebView, which is updated via Google Play but version uptake is slow on older or budget devices. CSS features, Web APIs, and JavaScript runtime behaviour differ between WebView versions. Tauri bundles no WebView of its own — it depends entirely on what the OS provides. For a consumer product targeting a broad Android audience, this is a support and QA burden that Flutter eliminates by bundling its own engine.
+Dimension 04 · Local inference pipeline
+Metal-accelerated candle runs natively regardless, but the streaming path matters
+The candle inference engine and Metal dispatch run in Rust on both stacks. The difference is in the token streaming path: in Flutter, tokens flow from the Rust blocking thread pool through
+StreamSink
+directly into a Riverpod stream that updates a
+TextBlock
+widget. In Tauri mobile, tokens flow through
+app.emit()
+, through the WebView JS bridge, into a React state update. Both work; the FFI path has lower and more predictable latency for the streaming cursor animation that makes the UI feel live.
+Dimension 05 · App store distribution
+Flutter has a mature, production-tested mobile distribution story
+Flutter has shipped in production at scale on iOS App Store and Google Play since 2018. The toolchain, code signing, entitlements, and binary size optimization paths are well-documented and stable. Tauri mobile (v2) is significantly newer. It works, but the community surface area, edge case documentation, and production war stories are thinner. For a product going to general consumer distribution in 2026, Flutter mobile is the lower-risk choice.
+✓ Do — Flutter mobile
+Use Flutter + Rust FFI for all iOS and Android primary targets
+Connect Rust streaming via flutter_rust_bridge StreamSink → Riverpod
+Use Riverpod&#x27;s
+.autoDispose
+providers to manage streaming subscription lifecycle
+Keep all inference, MCP, and agent logic in Rust — never re-implement in Dart
+Use the ContentBlock sealed union as the single source of truth for UI state
+✗ Do not — Flutter mobile
+Do not use Tauri as the primary mobile distribution strategy for consumer apps
+Do not implement business logic in Dart — it belongs in gen_ui_core
+Do not bypass the ContentBlock system with ad-hoc widget state
+Do not block the Tokio worker pool with inference — always use spawn_blocking
+Do not assume WebView performance parity on Android across device tiers
+05
+Desktop platform analysis
+macOS, Windows, Linux — where Tauri + React 19 wins significantly, and why
+On macOS, Windows, and Linux, the calculation inverts. The WebView fragmentation problem that plagues Tauri mobile is largely absent on desktop. WKWebView on macOS is fast and standards-compliant. Chromium on Windows and Linux is consistent. Meanwhile, the web ecosystem&#x27;s advantages — component richness, tooling, developer velocity — compound dramatically on desktop where screen space and interface complexity grow.
+Dimension 01 · UI component ecosystem
+React 19 + the web ecosystem is the richest native desktop UI toolkit that exists
+Every shadcn/ui component, Radix primitive, Prometheus Entity Management 3.x entity/query primitive, TanStack Router/Table/Virtual utility, Recharts, Sandpack for artifact previews, and assistant-ui streaming primitive is available immediately. The gen_ui
+ArtifactBlock
+viewer in Flutter required building a custom data table, document renderer, and code viewer from first principles. In React, those are
+@tanstack/react-table
+,
+react-markdown
+, and Sandpack respectively — three imports and a day of integration work versus several days of custom widget construction.
+Specific advantage for gen_ui
+assistant-ui ships streaming ContentPart components that map directly to A2UI events. The gen_ui ContentBlock system would be composed from assistant-ui primitives rather than built from scratch in Dart.
+Dimension 02 · Developer experience
+Vite 7 HMR is submillisecond. Flutter hot reload is fast but not the same.
+Vite 7 hot module replacement is effectively instantaneous — the time from saving a component to seeing the result in the browser is under 100ms for most changes, with no loss of component state. Flutter hot reload is impressive for a compiled language but involves recompilation of affected widgets and loses state on full hot restarts. For a UI-heavy development workflow building complex chat interfaces with animated content blocks, the React development cycle is faster by a meaningful margin. Browser DevTools, React DevTools, and the WebView inspector all work inside the Tauri window.
+Dimension 03 · Binary and distribution size
+Tauri apps are 3–10 MB. Flutter desktop apps start at 15–30 MB before application code.
+A Tauri app on macOS or Windows is the Rust binary plus the system WebView. The total installer is typically 3–10 MB. Flutter desktop apps bundle the Flutter engine (libflutter, Skia/Impeller, Dart runtime) — installers start at 15–30 MB before application code is included. For a developer tool distributed via direct download or auto-update, the difference affects both distribution bandwidth costs and user perception. For enterprise distribution (Prometheus AGS consulting platform), smaller installers reduce friction in managed environments.
+Dimension 04 · Native platform integration
+On desktop, Tauri apps feel native because they use the same rendering engine as the OS browser
+On macOS, WKWebView uses the same font rendering, system font stack, color profile, and accessibility infrastructure as Safari and every other Cocoa application. System font scaling respects user preferences automatically. The OS accessibility engine works without any additional integration. On Windows, Tauri apps using WebView2 (Chromium-based) are indistinguishable from native Electron-class applications — which is what users expect from developer tools. Flutter on Windows is visually distinct from native Win32/WinUI applications in ways that attentive users notice.
+Dimension 05 · Sandpack and artifact rendering
+The ArtifactBlock generative UI story is dramatically stronger on Tauri desktop
+The
+ArtifactBlock
+in gen_ui can render code, data tables, documents, and UI components generated by the agent. In Tauri, Sandpack runs natively in the WebView — you can render full React component previews inside the artifact viewer, exactly as Claude.ai does. In Flutter, there is no equivalent to Sandpack. Rendering interactive web components requires a WebView plugin inside Flutter, which reintroduces all the WebView consistency problems at a component level, while adding significant integration complexity.
+The IPC overhead argument disappears on desktop
+The JSON serialization cost of Tauri&#x27;s IPC boundary — a concern on mobile where you&#x27;re emitting hundreds of tokens per second into a constrained battery-managed CPU — is irrelevant on desktop. Desktop CPUs serialize hundreds of thousands of JSON objects per second. The
+invoke()
+round-trip is microseconds. The IPC performance argument that favours Flutter on mobile does not transfer to desktop hardware.
+✓ Do — Tauri desktop
+Use Tauri + React 19 for macOS, Windows, and Linux primary targets
+Leverage assistant-ui&#x27;s streaming ContentPart components for A2UI rendering
+Use Sandpack for ArtifactBlock code and UI component previews
+Connect Rust via Tauri commands for request/response and events for streaming
+Use Zustand 5 for client/UI state and Prometheus Entity Management 3.x for normalized server, async, and entity state
+✗ Do not — Tauri desktop
+Do not rebuild assistant-ui or shadcn/ui from scratch — consume them as dependencies
+Do not add TanStack Query — Prometheus Entity Management 3.x is the required replacement
+Do not implement Rust business logic in TypeScript — maintain the core boundary
+Do not use Tauri&#x27;s window.webview for custom WebView panels inside the app — prefer Sandpack&#x27;s session isolation
+Do not try to achieve pixel parity with the Flutter mobile app — optimize each platform&#x27;s UI independently
+06
+gen_ui specific analysis
+How each sub-system of the gen_ui architecture maps to the two stacks
+The gen_ui architecture was designed to make this comparison concrete. Every major sub-system has a clear position in the Flutter vs. Tauri comparison. The following analysis is a system-by-system translation of the gen_ui spec into platform-specific terms.
+gen_ui sub-system
+Flutter + Rust FFI
+Tauri + React 19
+Better on mobile
+ContentBlock sealed union
+Freezed sealed class · exhaustive switch · compiler-enforced
+TypeScript discriminated union · switch · compiler-enforced
+Parity
+A2UI event pipeline
+Dart sealed A2uiEvent · A2uiContentDriver · direct FFI
+TS discriminated AguiEvent · event listener · IPC JSON
+Flutter
+AG-UI bidirectional
+AguiClient Riverpod notifier · confirm() via FFI
+Zustand store · invoke() · useAgui() hook
+Parity
+Streaming text / markdown
+StreamingTextWidget → GenUIMarkdown · Lora serif
+assistant-ui StreamText → react-markdown · Tailwind prose
+Flutter
+Thinking block (animated)
+ThinkingBlockWidget · AnimationController · collapsible
+ThinkingPart (assistant-ui) · CSS animation · details element
+Parity
+Code block (highlight)
+CodeBlockWidget · flutter_highlight · 30+ languages
+CodeMirror 6 / Shiki · Sandpack for live preview
+Tauri (Sandpack)
+Artifact block (generative UI)
+ArtifactBlockWidget · custom table/doc/code viewers
+Sandpack · @tanstack/react-table · react-markdown · native
+Tauri (significantly)
+Skill activation block
+SkillBlockWidget · orbit icon · progress bar · flutter_animate
+Custom React component · Framer Motion · CSS progress
+Parity
+Memory block
+MemoryBlockWidget · type icon · namespace display
+Custom React component · Lucide icons · Tailwind
+Parity
+Local inference streaming
+StreamSink&lt;String&gt; → Riverpod stream → widget
+Tauri emit() → React state → component
+Flutter
+SurrealDB integration
+FFI → MemoryStore / ToolCache / EntityGraph
+invoke() → same Rust MemoryStore / ToolCache
+Parity (Rust layer)
+MCP tool calling
+FFI → McpRegistry::call_tool() → StreamEvent
+invoke() → McpRegistry::call_tool() → emit()
+Parity (Rust layer)
+Input bar (multi-line)
+Flutter TextField · natural expand · gesture-native
+HTML textarea · CSS resize · contenteditable option
+Flutter
+Empty state / starter chips
+Custom Flutter widgets · Wrap layout
+React components · Flexbox/Grid · shadcn/ui Button
+Parity
+Design system (tokens)
+tokens.dart (T.ember, T.violet, etc.) · Google Fonts
+Tailwind 4 CSS variables · shadcn/ui design tokens
+Parity
+Confirmation overlay (HITL)
+AguiConfirmationOverlay · showDialog() · AlertDialog
+shadcn/ui AlertDialog · React portal · Radix primitives
+Parity
+07
+Full decision matrix
+Quantified comparison across all architectural dimensions for mobile, desktop, and the hybrid strategy
+Architectural Dimension
+Flutter + FFI
+Tauri + React
+Hybrid
+iOS / Android polish
+★★★★★
+★★★
+★★★★★
+macOS / Windows / Linux
+★★★★
+★★★★★
+★★★★★
+Gesture handling (mobile)
+★★★★★
+★★★
+★★★★★
+Streaming performance (mobile)
+★★★★★
+★★★★
+★★★★★
+UI component richness
+★★★
+★★★★★
+★★★★★
+Developer velocity (UI)
+★★★
+★★★★★
+★★★★★
+Rust integration depth
+★★★★★
+★★★★
+★★★★★
+Binary / install size
+★★★
+★★★★★
+★★★★
+WebView fragmentation risk (mobile)
+None
+Significant
+None on mobile
+Artifact / generative UI rendering
+★★★
+★★★★★
+★★★★★
+Accessibility (native)
+★★★★
+★★★★★
+★★★★★
+Local inference pipeline
+★★★★★
+★★★★★
+★★★★★
+Production mobile distribution maturity
+★★★★★
+★★★
+★★★★★
+Enterprise Windows support
+★★★
+★★★★★
+★★★★★
+The matrix conclusion
+Flutter + Rust FFI wins on mobile-specific dimensions (gesture, streaming, distribution maturity, fragmentation immunity). Tauri + React 19 wins on desktop-specific dimensions (component richness, developer velocity, artifact rendering, binary size, enterprise Windows integration). The hybrid architecture wins everywhere — because it assigns each rendering layer to the context where it excels, while the Rust core remains invariant beneath both.
+08
+Product-specific verdicts
+KnowMe, LLC and Prometheus AGS — what the analysis means for each product context
+The architectural analysis is product-agnostic. Applying it to specific products requires accounting for the target audience, distribution model, feature priorities, and competitive context of each entity in the portfolio.
+KnowMe, LLC · know-me.tools
+KnowMe — AI Personal Manager
+Mobile: Flutter + Rust FFI · Desktop: Tauri + React 19
+KnowMe is a direct-to-consumer AI personal management tool serving a general public audience — diverse devices, Android fragmentation, consumer app store distribution, and gestural touch UX are primary concerns. The core interaction model is conversational AI with streaming responses and rich agent output (memory recall, tool results, skill activation). This is exactly the profile where Flutter&#x27;s mobile advantages matter most. For the desktop companion (power user workflow, enterprise integrations), Tauri delivers far richer interface density with lower effort.
+Consumer audience
+App Store / Play Store
+Streaming AI UX primary
+Gestural touch patterns
+Desktop companion use case
+Flutter mobile · Tauri desktop
+Prometheus AGS · prometheusags.ai
+Prometheus AGS — Enterprise AI Consulting Platform
+Desktop: Tauri + React 19 primary · Mobile: Flutter for field access
+Prometheus AGS serves enterprise clients and consultants. The primary interface is a desktop workspace — multi-panel layouts, data visualization, document generation, and agent orchestration tooling. This is Tauri&#x27;s natural domain: information-dense interfaces, Windows enterprise compatibility, Sandpack-powered artifact generation, and the full React component ecosystem for rapid enterprise UI assembly. Mobile Flutter provides field access for consultants and client-facing demos — a secondary but important channel where Flutter&#x27;s polished native mobile experience outperforms a Tauri mobile shell.
+Enterprise desktop primary
+Windows compatibility required
+Information-dense layouts
+Artifact generation (Sandpack)
+Flutter for field mobile
+Tauri desktop · Flutter field mobile
+TribeHealth.ai — supplemental guidance
+TribeHealth.ai — Flutter mobile, no exceptions
+Healthcare AI applications face additional regulatory and performance constraints beyond standard consumer products. Flutter&#x27;s deterministic rendering, absence of WebView version dependencies, and well-established accessibility compliance story make it the only appropriate choice for TribeHealth.ai&#x27;s patient-facing mobile interfaces. The WebView fragmentation risk in Tauri is a liability in healthcare distribution where you cannot control the OS environment. Desktop clinical tools (provider-facing) may consider Tauri for its Windows enterprise integration advantages.
+09
+The recommended architecture
+One Rust core · Flutter mobile · Tauri desktop — write infrastructure once, optimize rendering per platform
+The correct architecture is not a choice between Flutter and Tauri — it is both, organized as two rendering clients consuming one shared Rust infrastructure library. The gen_ui_core crate is the invariant. The UI framework is the variable. This is the same pattern used at scale by companies that ship across platform boundaries: the business logic is a library, the UI is a consumer of that library.
+iOS
+App Store
+Android
+Play Store
+macOS
+Mac App Store
+Windows
+MSIX · direct
+Linux
+AppImage
+Flutter Application
+Dart · Riverpod · ContentBlock widgets
+A2uiContentDriver · AguiClient
+GenUIMarkdown · SkillBlock · ArtifactBlock
+Tauri Application
+React 19 · Zustand 5 · shadcn/ui · assistant-ui
+PEM 3.x · TanStack Router/Table · Sandpack
+A2UI/AG-UI TypeScript consumers · IPC bridge
+flutter_rust_bridge v2
+zero-copy FFI · StreamSink · async fn
+Tauri IPC + Plugin API
+invoke() commands · emit() events · JSON
+gen_ui_core (Rust) — shared invariant
+runtime.rs
+A2UI / AG-UI
+inference/
+mcp/
+db/ surreal
+agent/ PMPO
+Tokio · candle · SurrealDB RocksDB · reqwest · MCP JSON-RPC · A2UI/AG-UI protocol pipeline
+mobile boundary
+Figure 3 — Hybrid Architecture: Flutter mobile · Tauri desktop · gen_ui_core shared Rust infrastructure
+</pre></article><article id="S02-003" class="source-clause"><h4>S02-003 · The TypeScript translation of gen_ui for Tauri desktop</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><div class="source-note"><strong>Explicit amendments:</strong><ul><li>Mobile presentation is native Flutter; shared Rust semantics remain. See RT-01–11.</li></ul></div><pre class="retained-text">The TypeScript translation of gen_ui for Tauri desktop
+The gen_ui ContentBlock system, A2UI event pipeline, and AG-UI client all translate directly to TypeScript discriminated unions. The structural logic is identical — only the syntax changes. This is not a re-architecture; it is a re-expression.
+Rust → TypeScript translation · ContentBlock sealed union
+TypeScript
+// Dart (Flutter) — freezed sealed class
+// const factory ContentBlock.skill({required String skillId, ...}) = SkillBlock;
+// TypeScript (Tauri) — discriminated union
+type
+ContentBlock
+=
+  | {
+type
+:
+&#x27;text&#x27;
+;    text: string; isStreaming: boolean }
+  | {
+type
+:
+&#x27;thinking&#x27;
+; thinking: string; isStreaming: boolean }
+  | {
+type
+:
+&#x27;code&#x27;
+;    code: string; language: string; filename?: string }
+  | {
+type
+:
+&#x27;citation&#x27;
+; text: string; sources: CitationSource[] }
+  | {
+type
+:
+&#x27;memory&#x27;
+;   content: string; memoryType: MemoryType; key: string; isNew: boolean }
+  | {
+type
+:
+&#x27;toolUse&#x27;
+;  toolUseId: string; toolName: string; input: Record&lt;string, unknown&gt;; status: ToolStatus }
+  | {
+type
+:
+&#x27;toolResult&#x27;
+; toolUseId: string; content: unknown; isError: boolean; elapsedMs: number }
+  | {
+type
+:
+&#x27;skill&#x27;
+;    skillId: string; skillName: string; parameters: Record&lt;string, unknown&gt;; status: SkillStatus }
+  | {
+type
+:
+&#x27;artifact&#x27;
+; artifactId: string; artifactType: ArtifactType; title: string; contentJson: string }
+  | {
+type
+:
+&#x27;image&#x27;
+;    source: string; altText?: string }
+  | {
+type
+:
+&#x27;divider&#x27;
+};
+// MessageBubble dispatch — TypeScript exhaustive switch
+function
+renderBlock
+(block: ContentBlock): React.ReactNode {
+switch
+(block.type) {
+case
+&#x27;thinking&#x27;
+:
+return
+&lt;ThinkingBlock {...block} /&gt;;
+case
+&#x27;skill&#x27;
+:
+return
+&lt;SkillBlock {...block} /&gt;;
+case
+&#x27;artifact&#x27;
+:
+return
+&lt;ArtifactBlock {...block} /&gt;;
+// Sandpack inside
+// ... all cases required by TypeScript exhaustiveness check
+}
+}
+Tauri Rust→React streaming — replacing StreamSink with emit()
+Rust + TypeScript
+// Rust (Tauri) — emit A2UI events to React
+while let
+Ok(ev) = a2ui_rx.recv().await {
+    let done =
+matches!
+(ev, A2uiEvent::RunFinished { .. });
+    app.emit(
+&quot;a2ui_event&quot;
+, serde_json::to_value(&amp;ev)?)?;
+if
+done {
+break
+; }
+}
+// TypeScript (React) — listen and route to Zustand
+const
+{ streamBlock, finalizeMessage } = useChatStore();
+useEffect
+(() =&gt; {
+const
+unlisten = listen&lt;A2uiEvent&gt;(
+&#x27;a2ui_event&#x27;
+, ({ payload }) =&gt; {
+    applyA2uiEvent(payload, { streamBlock, finalizeMessage });
+  });
+return
+() =&gt; { unlisten.then(fn =&gt; fn()); };
+}, []);
+10
+Decision criteria reference
+Unambiguous rules for selecting the rendering stack on any new project
+When a new application project begins, the platform selection decision should be made using these criteria in order. If the project satisfies any mandatory criterion, that criterion governs the decision. If no mandatory criterion applies, the recommended guidance should be used.
+Criterion 01 · Mandatory
+Consumer mobile with general Android audience → Flutter, always
+Any application targeting the general public via Google Play — where you cannot control or guarantee the Android System WebView version across the install base — must use Flutter. This is a non-negotiable requirement for consumer products. KnowMe mobile, TribeHealth patient mobile, and any future consumer app in the portfolio fall under this criterion.
+Criterion 02 · Mandatory
+Healthcare / regulated industry mobile → Flutter, always
+Regulated industry applications have deterministic rendering requirements, well-documented accessibility compliance paths, and cannot accept WebView engine version variability as a variable in their QA surface. Flutter&#x27;s bundled engine eliminates this variability. TribeHealth.ai mobile interfaces fall under this criterion regardless of audience scope.
+Criterion 03 · Recommended
+Enterprise desktop with Windows as primary platform → Tauri
+Enterprise consulting tools, developer workspaces, and internal tooling targeting corporate Windows environments should use Tauri + React 19. Tauri&#x27;s WebView2 (Chromium-based) rendering on Windows is consistent, the binary size is acceptable for enterprise deployment, and the React component ecosystem for complex data-dense interfaces is unmatched. Prometheus AGS consulting platform falls under this criterion.
+Criterion 04 · Recommended
+New project requiring rich generative UI / artifact rendering → Tauri desktop
+Any project where the agent&#x27;s primary output is interactive UI components, code previews, or data visualizations — and where desktop is the primary distribution target — should use Tauri to access the Sandpack ecosystem and the full web rendering pipeline. The ArtifactBlock use case is an order of magnitude more capable on Tauri than Flutter for desktop.
+Criterion 05 · Default
+Any new mobile-first project not covered above → Flutter
+When none of the above criteria apply definitively, and the project is mobile-first, choose Flutter. The streaming AI performance advantage, gesture fidelity, and distribution maturity make it the safer default for new mobile projects where the use case is still being validated.
+The hybrid architecture is the correct long-term target for established products
+KnowMe and Prometheus AGS should each converge on the hybrid architecture as they mature: Flutter for their mobile surfaces, Tauri for their desktop surfaces, and gen_ui_core as the shared Rust library beneath both. This is not additional work — it is a different organizational principle for existing work. The gen_ui_core crate already compiles to both targets. What remains is building the Tauri React application that consumes it for desktop.
+11
+Integration roadmap
+Practical steps for activating the hybrid architecture from the current gen_ui baseline
+The gen_ui_core Rust crate already exists and compiles to both FFI targets. The Flutter mobile application is implemented. The remaining work is building the Tauri desktop surface and establishing the shared crate as a formal library dependency in both projects.
+Phase
+Task
+Effort
+Dependency
+Phase 1 — Crate extraction
+Extract gen_ui_core into a standalone published crate (private registry or path dependency) usable by both Flutter and Tauri projects independently
+1–2 days
+None
+Phase 2 — Tauri scaffold
+Create Tauri 2.10.3 project with React 19 + Vite 7 + Tailwind 4 + shadcn/ui + Zustand 5. Add gen_ui_core as a Tauri plugin. Wire Rust emit() events to React listen() handlers.
+2–3 days
+Phase 1
+Phase 3 — TypeScript ContentBlock system
+Implement the TypeScript discriminated union ContentBlock and the A2UI event driver. Wire assistant-ui&#x27;s streaming components as the text rendering layer.
+3–5 days
+Phase 2
+Phase 4 — Block components
+Build React equivalents of all 11 ContentBlock widget variants (ThinkingBlock, SkillBlock, ArtifactBlock with Sandpack, MemoryBlock, ToolBlock, CitationBlock, etc.)
+5–7 days
+Phase 3
+Phase 5 — AG-UI bidirectional
+Implement AguiClient Zustand store, ConfirmationDialog (shadcn/ui AlertDialog), RenderSlot generative UI registry, and interrupt/confirm client events.
+2–3 days
+Phase 4
+Phase 6 — Product wiring
+Fork the Tauri scaffold into KnowMe desktop and Prometheus AGS desktop applications. Apply respective brand systems. Wire product-specific MCP servers.
+Ongoing
+Phase 5
+Total time to hybrid architecture baseline: approximately 2–3 weeks
+The Rust infrastructure is already built. The Flutter mobile application is already built. The TypeScript translation of the ContentBlock system is mechanical — discriminated unions mirror sealed classes directly. The majority of the work is in Phase 4 (building the React block components) and Phase 3 (wiring the A2UI event stream). Phases 1–2 are infrastructure work that can be done in parallel with other ongoing development.
+12
+Enforcement and governance
+How this standard is maintained across projects and contributors
+✓ Standard compliance
+All new mobile projects reference this document at architecture review
+gen_ui_core is the mandatory infrastructure substrate — no business logic in Dart or TypeScript
+ContentBlock sealed union / discriminated union is the required state primitive for all AI output
+A2UI event pipeline is the required streaming architecture for all agent interactions
+Deviations from platform selection criteria require documented rationale in the project ADR
+✗ Non-compliant patterns
+Using Tauri as the primary iOS/Android distribution strategy for consumer applications
+Re-implementing inference, memory, or agent logic in Dart or TypeScript
+Using ad-hoc widget state to bypass the ContentBlock system
+Implementing separate LLM API clients in Dart/TypeScript that duplicate api_http.rs
+Mixing platform selection criteria (e.g., using Flutter for Windows-primary enterprise tools)
+The governing principle of this standard
+Mobile and desktop are different computing contexts with different interaction models, not just different screen sizes. The architecture that serves them best is the one that assigns each layer to the technology that has the structural advantage in that context. Flutter earns its place on mobile through rendering independence and gesture ownership. React earns its place on desktop through ecosystem richness and developer velocity. Rust earns its place at every layer beneath both through performance, safety, and the ability to express the same infrastructure once across every platform target.
+travis
+james
+.ai · Prometheus Agentic Growth Solutions
+TJ-ARCH-MOB-001 · v1.0 · March 2026 · Architecture Standards · Confidential</pre></article></main></body></html>

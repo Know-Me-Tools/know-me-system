@@ -1,0 +1,26 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>S15 · platform-support.md</title><link rel="stylesheet" href="../records.css"><body><main><a href="../index.html">KnowMe Praxis</a><h1>S15 · platform-support.md</h1><p>Complete technical source record. Historical names and requirements remain visible for audit. Revised clauses and explicit corrections govern their application.</p><p><a href="S15.txt">Download complete technical text</a></p><article id="S15-001" class="source-clause"><h4>S15-001 · Platform support policy</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h1>Platform support policy</h1>
+<p>KnowMe prioritizes high-impact native capabilities on current-generation phones
+over legacy device coverage. Minimum toolchain and OS versions may be raised
+whenever a current stable dependency, security control, accessibility feature,
+media capability, or materially better UX requires it.</p>
+<p>Current baseline:</p>
+<ul>
+<li>Dart: 3.13.0-0 or newer</li>
+<li>Flutter: 3.47.0-0.1.pre or newer</li>
+<li>Android: API 29 (Android 10) or newer</li>
+<li>Android native ABI: arm64-v8a</li>
+<li>iOS: 15.0 or newer</li>
+</ul>
+<p>Every baseline change must update the manifests, lockfiles, project guidance,
+and this note. Before release, verify analysis/tests and install the application
+on a current physical Android device; record the Flutter/Dart versions, Android
+API level, device model, and verification date in the relevant change record.</p></article><article id="S15-002" class="source-clause"><h4>S15-002 · Latest physical-device verification</h4><p class="source-note">Governing revision: <a href="../index.html#runtimes">RT-01–11</a> · source requirement, not release evidence.</p><h2>Latest physical-device verification</h2>
+<ul>
+<li>Date: 2026-07-18</li>
+<li>Device: Samsung SM-S936U, Android API 36, arm64-v8a</li>
+<li>Toolchain: Flutter 3.47.0-0.1.pre (beta), Dart 3.13.0-282.1.beta</li>
+<li>Result: debug APK built, installed, and launched successfully; WCAG light and
+  dark chat palettes, 80% message width, copy and upload controls, theme
+  switching, and theme persistence across a cold process restart were visually
+  verified on the device.</li>
+</ul></article></main></body></html>

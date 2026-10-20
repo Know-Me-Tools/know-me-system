@@ -1,0 +1,411 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>S18 · README.md</title><link rel="stylesheet" href="../records.css"><body><main><a href="../index.html">KnowMe Praxis</a><h1>S18 · README.md</h1><p>Complete technical source record. Historical names and requirements remain visible for audit. Revised clauses and explicit corrections govern their application.</p><p><a href="S18.txt">Download complete technical text</a></p><article id="S18-001" class="source-clause"><h4>S18-001 · Plugin Strategy — A Capability-Centric Open Model</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><div class="source-note"><strong>Explicit amendments:</strong><ul><li>Key control does not establish reverse-DNS namespace ownership; separate registry proof is required.</li></ul></div><h1>Plugin Strategy — A Capability-Centric Open Model</h1>
+<blockquote>
+<p><strong>AMENDMENT — 2026-08-04 (v1.4).</strong> Amended by <code>uar-plugin-system-research-2026-08-04.md</code>
+(this directory; canonical copy in <code>universal-agent-runtime/docs/plugins/</code>). Authoritative
+deltas over this document wherever they conflict:</p>
+<ul>
+<li><strong>Ownership split.</strong> The plugin <em>contract</em> layer (WIT family <code>uar:plugin@0.2.0</code>,
+  host interfaces seeded near-verbatim from <code>librefang:plugin@0.1.0</code>, capability-card
+  schema, manifest+signing, lifecycle, shared sandbox host crate, and the runtime-generic
+  recognized set renamed <code>uar:agent</code>/<code>uar:tool</code>/<code>uar:skill</code>/<code>uar:hook</code>/<code>uar:provider</code>/
+  <code>uar:entity-schema</code>/<code>uar:settings</code>) is owned and published by the <strong>Universal Agent
+  Runtime</strong>. This document remains authoritative for the <strong>KnowMe product layer</strong>:
+  <code>knowme:*</code> product capabilities (<code>knowme:theme</code>, app-shell chrome, Hands binding),
+  marketplace + entitlement VC issuance, trust pills, sharing/distribution UX, and
+  settings-form product behavior. Governance follows the A2UI precedent: UAR owns the
+  contract; KnowMe is the named reference implementation driving amendments.</li>
+<li><strong>Host profiles.</strong> <code>headless</code> vs <code>full-ui</code> conformance profiles are first-class;
+  capability cards declare <code>profile_required</code> and installers reject mechanically.</li>
+<li><strong>Card schema v2 additions:</strong> <code>profile_required</code>, <code>combination_risk</code> (risky permission
+  combinations surfaced at install), <code>namespace_proof</code> (did:web/DNS-TXT or transparency-log
+  receipt — <code>did:key</code> alone does not prevent reverse-DNS squatting).</li>
+<li><strong>Settings schema:</strong> JSON Schema <strong>2020-12</strong> is the single version (§11 stands; the
+  companion plan's draft-7 references are superseded).</li>
+<li><strong>Security fixes now normative</strong> (research doc SR-1…SR-12): signed advisory/revocation
+  blocklist + auto-quarantine, host-stamped event provenance with emit-allowlist and rate
+  caps, contributor reentrancy guard, generations/rollback, crash-loop circuit breaker,
+  universal action I/O validation, and honest mobile execution budgets (iOS = Pulley
+  interpretation; no <code>.cwasm</code> on iOS).</li>
+</ul>
+</blockquote>
+<p><strong>Scope:</strong> the plugin system as a <strong>wide-open capability vocabulary</strong>: what a
+capability is, the recognized set we publish, how plugins declare (or invent)
+capabilities, A2UI component libraries as the cross-platform UI plane, headless
+plugins, discovery/matching/routing via embedded capability cards, and the decisions
+we lock in now so a marketplace can exist later.</p>
+<p><strong>Status:</strong> v1.0 strategy, 2026-07-18. Supersedes the "plugin kinds" framing in
+<code>docs/knowme-builder-extensibility-spec.md</code> §5 (which becomes the <em>transport</em> layer for
+this model) and completes <code>docs/strategies/agents/README.md</code> §4: <strong>a native agent is a
+plugin carrying the <code>agent</code> capability — nothing more.</strong> Companions:
+<code>docs/strategies/model-configuration/README.md</code> (resolver used by callbacks),
+<code>docs/knowme-functional-spec.html</code> §08 (trust/distribution base).</p>
+<hr/></article><article id="S18-002" class="source-clause"><h4>S18-002 · 1. The inversion</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>1. The inversion</h2>
+<p>The previous framing enumerated extension kinds (skill, UI surface, settings, agent).
+This document inverts it:</p>
+<blockquote>
+<p><strong>We publish a vocabulary of capabilities. A plugin is a signed WASM package that
+declares which capabilities it provides — one, many, or ones we've never heard of.</strong></p>
+</blockquote>
+<p>Consequences, in order of importance:</p>
+<ol>
+<li><strong>Agents are not special.</strong> "Native agent" = a plugin declaring
+   <code>knowme:agent</code>. Same manifest, same signing, same sandbox, same installer, same
+   audit. (The Hands wizard remains the <em>product</em> surface that binds an
+   agent-capability plugin into a Hand — see agents doc §4.3.)</li>
+<li><strong>The system is open at the vocabulary level.</strong> Third parties can invent
+   capabilities we haven't defined. Recognized capabilities get first-class treatment;
+   unrecognized ones are carried, sandboxed, and discoverable — their ecosystems give
+   them meaning (§5).</li>
+<li><strong>Anything is expressible</strong>: an agent, a skill pack, a CRM connector, a theme, a
+   settings-only integration, a streaming filter, a UI component library, a data-type
+   provider — or combinations, in one package.</li>
+</ol></article><article id="S18-003" class="source-clause"><h4>S18-003 · 2. The capability declaration (&quot;capability card&quot;)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>2. The capability declaration ("capability card")</h2>
+<p>Every capability — recognized or invented — is declared with the same card shape.
+Recognized ones live in the <strong>signed capability registry</strong> (published alongside the
+model catalog, same Ed25519 discipline); invented ones ship only in the plugin's
+manifest.</p>
+<pre><code class="language-jsonc">{
+  "id": "knowme:agent",                 // namespaced; reverse-DNS for third-party
+  "version": "0.1.0",                   // 0.x semver: minor = breaking
+  "name": "Agent",
+  "description": "Autonomous task executor with A2A-style lifecycle …",
+  //   ^ name+description+tags are the EMBEDDABLE text — vectorized locally into the
+  //     capability index for search, matching, and routing (§7)
+  "tags": ["agent", "automation", "a2a"],
+
+  "settings_schema": { "$ref": "…" },   // JSON Schema 2020-12; rendered by the generic
+                                        // settings engine; scopes per extensibility spec §6
+  "actions": [                          // A2A-style tasks this capability exposes
+    { "id": "start-task", "input_schema": {…}, "output_schema": {…},
+      "streaming": true, "description": "…" }
+  ],
+  "events": {                           // bus topics, namespaced by capability id
+    "emits":    [ { "topic": "task-status", "payload_schema": {…} } ],
+    "consumes": [ { "topic": "knowme:context/assembled", "optional": true } ]
+  },
+  "chunks": [                           // stream-chunk types handled during hook
+    "text-delta", "tool-call", "thinking", "a2ui-patch",
+    { "id": "com.acme.chart-frame", "schema": {…} }        // custom chunk kinds allowed
+  ],
+  "ui": {                               // OPTIONAL — §4; absence = headless
+    "a2ui_components": [ { "id": "task-board", "schema": {…},
+                           "actions": ["start-task"], "events": ["task-status"] } ]
+  },
+  "requires":  [ "knowme:kv@0.1" ],     // capability dependencies (host must provide)
+  "enhances":  [ "knowme:agent@0.1" ]   // optional composition: adds to another
+                                        // capability's surface when both are present
+}
+</code></pre>
+<p><code>requires</code>/<code>enhances</code> are cheap now and load-bearing later: they are how a plugin
+extends <em>another plugin</em> without a new mechanism.</p></article><article id="S18-004" class="source-clause"><h4>S18-004 · 3. The recognized set (v0.1)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>3. The recognized set (v0.1)</h2>
+<p>Published, schema'd, first-class in UI and routing. Deliberately short; grown by
+evidence, per the same restraint the WIT contract already practices:</p>
+<table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>What declaring it means</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>knowme:agent</code></td>
+<td>A2A-shaped task lifecycle (agents doc §4); bindable into Hands; carries its own identity (§9)</td>
+</tr>
+<tr>
+<td><code>knowme:tool</code></td>
+<td>A single MCP-compatible callable: name, description, JSON-Schema input/output, annotations — the atomic spec-first unit (see <code>strategies/skill-support</code>)</td>
+</tr>
+<tr>
+<td><code>knowme:skill</code></td>
+<td>A packaged practice: one or more tools + instructions + policy defaults + settings, with a scope (<code>global</code> / <code>agent-private</code> / <code>agent-exposed</code>) — see <code>strategies/skill-support</code></td>
+</tr>
+<tr>
+<td><code>knowme:hook</code></td>
+<td>Declared participation in named pipeline stages (agents doc §3)</td>
+</tr>
+<tr>
+<td><code>knowme:provider</code></td>
+<td>An LLM/embedding provider kind + settings schema (model-config doc §2.2)</td>
+</tr>
+<tr>
+<td><code>knowme:ui-library</code></td>
+<td>A2UI component library (§4), no behavior of its own</td>
+</tr>
+<tr>
+<td><code>knowme:entity-schema</code></td>
+<td>Namespaced tables + sync classes (extensibility spec §5.4)</td>
+</tr>
+<tr>
+<td><code>knowme:settings</code></td>
+<td>Settings-only integration (config that other capabilities read)</td>
+</tr>
+<tr>
+<td><code>knowme:theme</code></td>
+<td>Design-token pack within the brand system's constraint envelope</td>
+</tr>
+</tbody>
+</table>
+<p>A plugin declares any subset. A "full extension" in the old framing is just
+<code>skill + ui-library + settings + entity-schema</code> in one package.</p></article><article id="S18-005" class="source-clause"><h4>S18-005 · 4. A2UI — the one UI plane</h4><p class="source-note">Governing revision: <a href="../index.html#surfaces">UI-01–11</a> · source requirement, not release evidence.</p><h2>4. A2UI — the one UI plane</h2>
+<p>Plugins never ship React or Flutter code. UI is <strong>A2UI components as data</strong>: declared
+in the capability card, rendered by the shared renderers — Flutter via the official
+GenUI SDK (<code>gen_ui_widgets</code>' <code>A2uiSurfaceView</code>, Google A2UI v0.9), React via UAR's
+<code>a2ui-*</code> packages — over the UAR production profile <code>uar.a2ui/1</code> (Google A2UI
+v0.9.1, catalog <code>urn:uar:a2ui:catalog:1</code>). The transport underneath is the AG-UI
+event stream (<code>docs/strategies/ag-ui/README.md</code>); <strong>AG-UI is the event vocabulary,
+A2UI the validated rendering contract</strong> — the two are never the same channel.
+Component definition, registry, storage, selection, and renderer conformance are
+specified in <strong><code>docs/strategies/a2ui/README.md</code></strong>, which governs wherever this
+section sketches. Wiring is declarative: a component binds to
+the capability's <strong>actions</strong> (user gesture → A2A task) and <strong>events</strong> (task status →
+component state), so interactivity round-trips through the same audited bus as
+everything else. A2UI is the normalization story: <strong>one component library per plugin,
+identical on every platform.</strong> Chunk type <code>a2ui-patch</code> is how streaming operations
+update live components mid-generation.</p></article><article id="S18-006" class="source-clause"><h4>S18-006 · 4.1 Why this is structurally correct (not just convenient)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>4.1 Why this is structurally correct (not just convenient)</h3>
+<p>The WASM sandbox already forbids platform code, so UI must cross the boundary as
+data; A2UI makes that constraint a feature. Compared to the iframe/webview model
+(Figma plugins, VS Code webviews): no per-plugin web runtime, no style divergence
+(plugins inherit design tokens and accessibility from the renderer and <strong>cannot go
+off-brand — the theme envelope is enforced by construction, not by review</strong>), and the
+security model collapses to "the component vocabulary <em>is</em> the sandbox" — no DOM
+access, no script injection surface. The deeper win: agent-generated UI and plugin UI
+are <strong>one pipeline</strong> — one renderer pair, three producers (app, agents, plugins) —
+which no webview approach can offer.</p></article><article id="S18-007" class="source-clause"><h4>S18-007 · 4.2 The four disciplines this stands on</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>4.2 The four disciplines this stands on</h3>
+<p>A2UI succeeds or fails on execution of exactly four things:</p>
+<ol>
+<li><strong>Vocabulary governance with an honest ceiling.</strong> The component vocabulary is
+   versioned registry data, like capabilities: additions ship as schema + renderer
+   updates on evidence of demand, never ad hoc. The expressiveness wall is planned
+   for, not denied: a rich standard library first; <em>declarative</em> escape hatches next
+   (e.g. a chart component that takes a spec, not a drawing surface); and the
+   webview/HTMX path retained <strong>only</strong> as an audited exception (§4.3). Unknown
+   components degrade gracefully: renderers below a plugin's declared vocabulary
+   minimum render a labeled fallback, never a crash or a blank.</li>
+<li><strong>Renderer parity as a tested contract.</strong> One schema source of truth generates
+   both renderers' types; a conformance suite of golden renderings runs on <em>both</em>
+   platforms per vocabulary version (the <code>flutter-golden-ui</code> harness skill covers
+   half of this today); divergence is a bug class with an owner, not a known
+   quirk. If parity is an intention rather than a gate, Flutter becomes the
+   second-class citizen within a year.</li>
+<li><strong>Local interaction semantics.</strong> Components are deliberately <em>stateful</em> where
+   interaction demands it: inputs with local echo, declarative validation,
+   optimistic toggles. The bus sees debounced <strong>semantic</strong> events ("field
+   committed", "form submitted"), never raw keystrokes. This is the difference
+   between SDUI that feels native and SDUI that feels like a survey iframe — and it
+   also keeps the audited bus signal-dense instead of noise-flooded.</li>
+<li><strong>Authoring experience, or no ecosystem.</strong> Ships <em>with</em> the vocabulary, not
+   after it: a hot-reloading A2UI playground fed by a running plugin, side-by-side
+   React/Flutter preview, and a <code>pxt-ui-surface</code> Builder skill that scaffolds
+   components and screenshots both renderers into the plugin's docs. Nobody builds
+   for a UI system they can't see.</li>
+</ol></article><article id="S18-008" class="source-clause"><h4>S18-008 · 4.3 The HTMX/webview path is an exception, not an alternative</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>4.3 The HTMX/webview path is an exception, not an alternative</h3>
+<p>Demoted explicitly: two first-class UI systems would fork the ecosystem and double
+the conformance budget. A capability may declare a webview/HTMX surface only with a
+<code>ui-escape-hatch</code> permission — amber at install, listed in the posture audit, and
+carrying its own sandbox terms (isolated webview, no host bridge beyond the standard
+<code>invoke</code>/<code>subscribe</code>). The expectation named in the card's review UI: escape-hatch
+surfaces are web/desktop-only and second-class on mobile. Every escape-hatch grant is
+a data point for what the A2UI vocabulary is missing — reviewed when considering
+vocabulary additions (§4.2.1).</p></article><article id="S18-009" class="source-clause"><h4>S18-009 · 5. Headless plugins and the open vocabulary</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><div class="source-note"><strong>Explicit amendments:</strong><ul><li>Key control does not establish reverse-DNS namespace ownership; separate registry proof is required.</li></ul></div><h2>5. Headless plugins and the open vocabulary</h2>
+<ul>
+<li><strong>No UI required, ever.</strong> A capability + events is a complete plugin (a silent CRM
+  sync, a log enricher, a webhook bridge). The installer and library UI treat headless
+  as normal, not as "missing UI."</li>
+<li><strong>Unrecognized capabilities</strong> are carried intact: permissions still declared and
+  enforced, sandbox identical, events namespaced under the capability id, settings
+  schema still rendered generically (it's just JSON Schema). What they <em>don't</em> get:
+  structured pipeline stages (hooks require recognized <code>knowme:hook</code> declarations),
+  first-class product surfaces, or our schema validation of their action payloads.
+  UI: a neutral <code>unrecognized</code> pill (distinct from trust pills — a <em>signed</em> plugin can
+  carry unrecognized capabilities; the two axes are independent).</li>
+<li><strong>Name integrity</strong>: reverse-DNS ids + publisher <code>did:key:</code> signatures prevent
+  squatting; the registry will refuse recognized-namespace (<code>knowme:*</code>) declarations
+  from unsigned or non-first-party publishers.</li>
+<li><strong>Promotion path</strong>: an invented capability that gains ecosystem traction can be
+  adopted into the recognized registry (with its incumbent implementations
+  grandfathered) — the vocabulary is versioned data, so recognition is a registry
+  publish, not an app release.</li>
+</ul></article><article id="S18-010" class="source-clause"><h4>S18-010 · 6. Manifest v2 (`.pxt`)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><div class="source-note"><strong>Explicit amendments:</strong><ul><li>Key control does not establish reverse-DNS namespace ownership; separate registry proof is required.</li></ul></div><h2>6. Manifest v2 (<code>.pxt</code>)</h2>
+<p>The extensibility spec's manifest gains <code>capabilities: [CapabilityCard]</code> and retires
+per-kind fields. Unchanged: content addressing (IPFS/OCI), SHA-256 per file, Ed25519 /
+<code>did:key:</code> signing, permission review at install, SBOM. Added now — dormant until the
+marketplace (§8): <code>publisher</code> (stable DID), <code>license</code> (SPDX or commercial ref), and an
+optional <code>entitlement</code> block (verification endpoint + public key) that v1 hosts ignore.</p></article><article id="S18-011" class="source-clause"><h4>S18-011 · 7. Discovery, matching, routing</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>7. Discovery, matching, routing</h2>
+<p>Capability cards are text, so they index like everything else:</p>
+<ul>
+<li><strong>Local capability index</strong> — on install, the device embeds each capability's
+  name/description/tags + action descriptions with the <em>device's own index binding</em>
+  (model-config doc §6 rules apply: the index stamps its embedding model+dim;
+  registry ships canonical text, never vectors — precomputed vectors would break the
+  moment a user changes embedding models).</li>
+<li><strong>Routing</strong> — the <code>route</code> pipeline stage queries this index: "user intent looks like
+  <code>com.acme.crm-sync</code>'s <code>import-contacts</code> action" arrives as a scored routing
+  contribution, same provenance/budget discipline as any hook contribution.
+  Unrecognized capabilities participate in this <em>semantic</em> matching fully; only
+  structured stage participation is gated on recognized declarations.</li>
+<li><strong>Marketplace search later = the same index server-side</strong> over the registry's
+  published cards. One mechanism, two deployments.</li>
+</ul></article><article id="S18-012" class="source-clause"><h4>S18-012 · 8. Marketplace-later (what we lock in now)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><div class="source-note"><strong>Explicit amendments:</strong><ul><li>Key control does not establish reverse-DNS namespace ownership; separate registry proof is required.</li></ul></div><h2>8. Marketplace-later (what we lock in now)</h2>
+<p>Business model explicitly deferred — critical mass first; distribution stays open,
+free, and sideload-friendly. But three things are cheap now and expensive to retrofit,
+so they land in manifest v2 immediately:</p>
+<ol>
+<li><strong>Stable publisher identity</strong> — the signing <code>did:key:</code> <em>is</em> the merchant identity
+   later; key rotation gets a documented procedure now.</li>
+<li><strong>License + entitlement fields</strong> — schema'd, ignored by v1 hosts. <strong>The
+   entitlement standard is W3C Verifiable Credentials</strong> (Data Model 2.0, SD-JWT/JOSE
+   securing): the trust plane is already DID-native on both ends — publishers sign
+   manifests with <code>did:key</code> (issuer), users hold <code>did:key</code> identity keys (holder) —
+   so a paid entitlement is a VC: issuer = author DID, subject = user DID, claims =
+   <code>{plugin_id, tier, version_range, type: perpetual|subscription|trial|seat,
+   expiry}</code>. Properties this buys:
+   - <strong>Offline, sovereign verification</strong> — pure signature-chain checking in the
+     container; no license server, works air-gapped (stronger than the license-key →
+     presigned-URL sketch in local-models §5.2, which remains the <em>download</em>-gating
+     transport; the VC is the <em>rights</em> object).
+   - <strong>Wallet sync for free</strong> — a VC is a small signed document; it syncs over OFP as
+     a user-scoped entity, so every instance's identity keystore is the wallet and
+     rights are presentable on any device without re-authentication.
+   - <strong>Enforcement at install/update/activation, never runtime</strong> — Cedar evaluates
+     the entitlement claim in the activation policy; a lapsed subscription blocks
+     updates, never bricks installed software.
+   - <strong>Revocation by lifetime, not lists</strong> — perpetual = long-lived VC, no
+     revocation (sold stays sold); subscription = short-lived VC (30–90 d) reissued
+     on renewal; Bitstring Status List available as an issuer-optional online
+     freshness check. Transfer/resale = reissuance under author policy, never bearer
+     passing. Teams = issue to org DID; members present membership + org entitlement
+     as a delegation chain through the existing org/personal Cedar layering.
+   - <strong>Honesty clause</strong> — client-side verification is friction-for-honesty, not DRM;
+     the paid value is signed authenticity, updates, support, and convenience. No
+     arms race.
+   - <strong>One credential shape for everything</strong> — Pro-tier licensed models, team
+     memberships, and future feature entitlements are the same VC with different
+     claim types: one wallet, one verifier, one Cedar integration.</li>
+<li><strong>Review-ready metadata</strong> — SBOM, permission declarations, and capability cards
+   are exactly what a curated storefront needs to render listings and diff permission
+   changes across versions. No extra work later; it's the same artifact.</li>
+</ol>
+<p>Revenue split, curation policy, refunds: out of scope until traction.</p></article><article id="S18-013" class="source-clause"><h4>S18-013 · 9. Governance and identity</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><div class="source-note"><strong>Explicit amendments:</strong><ul><li>Key control does not establish reverse-DNS namespace ownership; separate registry proof is required.</li></ul></div><h2>9. Governance and identity</h2>
+<p>Governance is <strong>part of the specification</strong>, not an afterthought bolted on at install:</p>
+<ul>
+<li><strong>Every capability card may carry a <code>governance</code> block</strong>: Cedar policy templates
+  (the plugin's proposed defaults, rendered and reviewed at install exactly like
+  permissions), resource budgets (tokens, invocations/hour, network destinations),
+  and the data classes touched. The host merges these <em>proposals</em> with the user's
+  policies; the plugin never grants itself anything.</li>
+<li><strong>Agents are principals.</strong> Each agent <em>instance</em> — a deployed Hand, whether
+  declarative or component-backed — is minted its own <code>did:key:</code> at creation and
+  registered with the container (and, when server-connected, with the identity plane:
+  Ory/flint-gate). Identity is <strong>per-instance, never per-definition</strong>: two
+  installations of the same shared agent are two principals.</li>
+<li><strong>Dual-identity resolution.</strong> Every governed action carries <em>user as subject</em> and
+  <em>agent as actor</em> — the RFC 8693 token-exchange pattern. Server-side, flint-gate
+  issues short-lived JWTs with <code>sub</code> = user, <code>act</code> = agent DID, plus claims:
+  capability set, hand id, placement, policy version. Because <code>flint_auth</code> (Anvil)
+  already injects JWT claims into Postgres GUCs, <strong>RLS can natively distinguish "the
+  user directly" from "the user via agent X"</strong> — no new database machinery. Locally,
+  Cedar evaluates with the agent as principal and the user in context; policies may
+  require either or both ("Inbox Triage may read mail <em>for Travis</em>; nothing may send
+  mail").</li>
+<li><strong>Audit keys on the pair.</strong> Every audit-trail entry records <code>(user, agent, capability,
+  action)</code> — the question "what did this agent do on my behalf" becomes a query, and
+  revoking one agent's access never touches the user's own.</li>
+</ul></article><article id="S18-014" class="source-clause"><h4>S18-014 · 10. Sharing</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>10. Sharing</h2>
+<p>Plugins, agents, Hands, and skills are <strong>sharable artifacts</strong> — they are signed text
+and WASM, so sharing is distribution, not replication of authority:</p>
+<ul>
+<li><strong>Channels</strong>: OFP peers (personal mesh, team instances), signed export bundles, or
+  published <code>.pxt</code> CIDs — same trust pipeline regardless of channel.</li>
+<li><strong>Definitions travel; identity and grants do not.</strong> A received agent is installed
+  like any plugin: fresh agent DID, permission review, first-use consent, its
+  proposed Cedar policy shown as a <em>proposal</em>. A shared artifact can never carry its
+  author's authority into your system.</li>
+<li><strong>Team semantics</strong> ride the team instance: an org publishes governed agents/skills
+  to its BossFang; members install with org Cedar policies layered over personal ones
+  (org policy can forbid what personal policy would allow, never the reverse).</li>
+</ul></article><article id="S18-015" class="source-clause"><h4>S18-015 · 11. The settings substrate</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>11. The settings substrate</h2>
+<p>Everything in this ecosystem has settings — plugins, capabilities, agents, skills,
+tools, indexes — and <strong>all of it stores in one metadata-driven substrate</strong> (aligned
+with the prometheus-entity-management metadata base-schema approach): two tables,
+JSON columns, schema-as-data.</p>
+<pre><code class="language-sql">-- identical shape in SurrealDB (client) and Postgres/flint-forge (server)
+settings_definition(
+  id, owner_kind,            -- capability | plugin | agent | index | container
+  owner_id, key,
+  schema JSONB,              -- JSON Schema 2020-12
+  scope,                     -- device | user | tenant | agent
+  sensitivity,               -- normal | secret (secret ⇒ keychain/Vault ref, never value)
+  sync_class, version, ui_hints JSONB )
+
+settings_value(
+  definition_id,
+  scope_key,                 -- e.g. user:did:… | device:… | tenant:… | agent:did:…
+  value JSONB,               -- validated against schema at write
+  clock JSONB,               -- CRDT/Lamport metadata for synced scopes
+  updated_at, updated_by )   -- updated_by is a (user, agent) pair — §9 audit rule
+</code></pre>
+<p>Consequences: <strong>one generic settings engine</strong> validates, stores, syncs (per scope and
+sync class), and audits every setting in the system regardless of complexity; <strong>A2UI
+settings components are generated from <code>schema</code> + <code>ui_hints</code></strong> — every plugin gets a
+settings page on every platform for free, and a plugin may <em>optionally</em> ship custom
+A2UI components for richer settings UX, bound to the same definitions; the <strong><code>agent</code>
+scope</strong> is the fourth scope — agent instances have their own settings resolved through
+the same tables; migrations are additive schema-version bumps on the definition row,
+with old values migrated lazily by the engine. Secrets are references into
+keychain/Flint Vault — the substrate never holds secret material, so the tables sync
+freely under their declared sync classes.</p></article><article id="S18-016" class="source-clause"><h4>S18-016 · 12. Open questions (defaults taken, flagged for decision)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>12. Open questions (defaults taken, flagged for decision)</h2>
+<ol>
+<li><strong>Card embedding ownership</strong> — default: registry ships text, devices embed locally
+   (taken in §7). Alternative rejected: registry-shipped vectors.</li>
+<li><strong>Unrecognized capabilities in routing</strong> — default: semantic matching yes,
+   structured stages no (taken in §7). Revisit if it proves too conservative.</li>
+<li><strong><code>enhances</code> composition semantics</strong> — v0.1 limits it to <em>additive</em> surface
+   (extra actions/components on the target capability); no interception of the target's
+   traffic. Interception, if ever, needs its own threat model.</li>
+<li><strong>Chunk-type governance</strong> — custom chunk kinds are namespaced and schema'd, but who
+   renders an unknown chunk? Default: hosts drop unknown chunks silently <em>except</em> into
+   consumers that declared them. Confirm.</li>
+<li>
+<p><strong><code>knowme:theme</code> envelope</strong> — <em>resolved (v1.1)</em>: the envelope is enforced by
+   construction (§4.1) — plugin UI renders only through the token-bound A2UI
+   renderers, so a theme capability can only rebind tokens within the design
+   system's constraint schema (single-accent restraint encoded as a validator on the
+   token set); it can never inject styling past the renderer.</p>
+</li>
+<li>
+<p><strong>Agent JWT lifetime &amp; refresh</strong> — default: short-lived (≤15 min) actor tokens
+   issued per run by the placement's gateway; long-running tasks refresh via the
+   placement, never hold long-lived credentials. Confirm against flint-gate's token
+   model.</p>
+</li>
+<li><strong>Org-over-personal policy layering</strong> (§10) — restrictive-only merge is the
+   default; confirm no legitimate case requires an org grant exceeding personal policy.</li>
+<li><strong>Entitlement-VC issuance topology</strong> — author-issued directly, marketplace as
+   co-issuer/broker (revenue split needs the marketplace in the flow), or both?
+   Default: schema supports either issuer; topology decided with the marketplace.
+   Related: author key rotation/compromise procedure for the issuer DID must be
+   documented before any paid issuance begins.</li>
+</ol></article><article id="S18-017" class="source-clause"><h4>S18-017 · 13. Implementation map (this repo)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>13. Implementation map (this repo)</h2>
+<ul>
+<li><code>rust/crates/knowme_plugin_host</code>: <code>CapabilityCard</code> types + manifest v2 parsing;
+  capability registry fetch/verify; per-capability WIT world binding (agent world per
+  agents doc §4.1, skill/hook worlds per extensibility spec §5.1).</li>
+<li><code>gen_ui_agent</code>: routing-stage query against the capability index; event bus topic
+  namespacing by capability id.</li>
+<li><code>gen_ui_db_graph</code>: capability index tables with <code>{model_ref, dim}</code> stamps.</li>
+<li>gen_ui renderers (React + Flutter): A2UI component registration from <code>ui-library</code>
+  cards; <code>a2ui-patch</code> chunk handling in the stream renderer.</li>
+<li>Registry publishing job: capability registry as a second signed document beside the
+  model catalog, same origin (local-models doc §5.2).</li>
+<li>Identity: agent-DID minting in <code>knowme_hands</code> (creation flow); actor-token issuance
+  in the sidecar/BossFang gateway (flint-gate RFC 8693 exchange); <code>flint_auth</code> claim
+  mapping for the <code>act</code> claim; Cedar entity schema gains the agent principal type.</li>
+<li>Settings substrate: <code>settings_definition</code>/<code>settings_value</code> repositories in
+  <code>gen_ui_db</code> (SurrealDB) and a matching flint-forge migration; generic validation +
+  scope resolution in one Rust module shared via FFI/WASM; A2UI settings-form
+  generator in the gen_ui renderers.</li>
+<li>Docs cross-updates: agents doc §4.3 notes agents-are-plugins (done); skills/tools
+  split defined in <code>docs/strategies/skill-support/README.md</code>; extensibility
+  spec §5 re-scoped as transport under this vocabulary at next revision.</li>
+</ul></article></main></body></html>

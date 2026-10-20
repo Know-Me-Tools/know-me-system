@@ -1,0 +1,837 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>S19 · universal-plugin-system-plan.md</title><link rel="stylesheet" href="../records.css"><body><main><a href="../index.html">KnowMe Praxis</a><h1>S19 · universal-plugin-system-plan.md</h1><p>Complete technical source record. Historical names and requirements remain visible for audit. Revised clauses and explicit corrections govern their application.</p><p><a href="S19.txt">Download complete technical text</a></p><article id="S19-001" class="source-clause"><h4>S19-001 · KnowMe Universal Plugin System — Recommendation, Architecture, Functional Specification &amp; Project Plan</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h1>KnowMe Universal Plugin System — Recommendation, Architecture, Functional Specification &amp; Project Plan</h1>
+<blockquote>
+<p><strong>AMENDMENT — 2026-08-04 (v1.1, authoritative deltas).</strong> This plan is amended by
+<code>uar-plugin-system-research-2026-08-04.md</code> (this directory; canonical copy in
+<code>universal-agent-runtime/docs/plugins/</code>). The following supersede the corresponding
+sections below wherever they conflict:</p>
+<ol>
+<li><strong>Contract ownership moved to UAR.</strong> The plugin <em>contract</em> (WIT family, host
+   interfaces, capability-card schema, manifest+signing, lifecycle, shared sandbox
+   host crate, runtime-generic recognized set) is owned by the Universal Agent
+   Runtime and published from the UAR repo. KnowMe retains the <em>product</em> layer:
+   <code>knowme:*</code> capabilities (theme, app-shell chrome, Hands binding), marketplace,
+   entitlement VC issuance, trust-pill/review UX, distribution channels, and the
+   container-inversion roadmap. <code>knowme_plugin_host</code> remains the product host
+   wrapping the UAR-owned shared host crate (D3 unchanged in structure).</li>
+<li><strong>D1 target renamed:</strong> <code>knowme:plugin@1.0.0</code> → <strong><code>uar:plugin@0.2.0</code></strong> (version
+   humility: 1.0.0 only after real plugins across ≥3 kinds and ≥2 hosts). The
+   convergence now has <strong>four</strong> inputs, not three: <code>knowme:plugin@0.1.0</code>,
+   <code>librefang:plugin@0.1.0</code>, <code>uar-plugin.wit</code>, <strong>and <code>prometheus:component@0.1.0</code></strong>
+   (skill pack) — adjudicated in one UAR ADR (skill-task world).</li>
+<li><strong>Host profiles introduced:</strong> <code>headless</code> (base host + skill-task + hook —
+   librefang/BossFang nodes) and <code>full-ui</code> (+ events/a2ui/settings/app-shell/
+   provider — KnowMe). Cards declare <code>profile_required</code>; installers reject
+   mechanically at install, not at runtime.</li>
+<li><strong>Performance claims corrected (§2.2/D2):</strong> no "zero-cost"/"1–5 ms" blanket
+   claims. Honest budgets: Cranelift ≈1.45–1.6× native on real workloads; <strong>iOS
+   runs Pulley interpretation (~order of magnitude slower; <code>.cwasm</code> AOT native
+   code cannot be loaded on iOS)</strong>; JS components carry ~8 MB engine each;
+   browser host is jco-transpiled (not wasmtime) with a host-parity conformance
+   seam. Bundled-vs-synced distribution split for App Store 3.3.2.</li>
+<li><strong>Settings substrate unified:</strong> JSON Schema <strong>2020-12</strong> everywhere (the
+   draft-7 references in §2.9/§3.4 are superseded); one scope enum to be emitted
+   from the Rust types (docs-from-code) — the README/plan scope-vocabulary
+   divergence is a known defect.</li>
+<li><strong>Twelve review holes have normative fixes</strong> (research doc Part 3 SR-1…SR-12):
+   namespace proof (did:web/DNS-TXT or transparency log), signed advisory/
+   revocation blocklist with auto-quarantine, permission <strong>combination</strong> risk
+   surfacing at install, host-stamped event provenance + emit-allowlist + rate
+   caps, contributor reentrancy guard (no <code>infer</code> in pipeline stages), sidecar
+   OS-fence + UDS broker, content-addressed generations with atomic
+   payload+registry+catalog+settings swap and rollback, crash-loop circuit
+   breaker, contribution ordering/aggregate budgets, universal action I/O schema
+   validation, mobile execution reality (Pulley), and 0.2.0 versioning.</li>
+<li><strong>app-shell / service / workflow worlds stay 0.x</strong> until proven; skill-task +
+   hook ship first (evidence order).</li>
+</ol>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Version</td>
+<td>1.1 (v1.0 amended 2026-08-04 per banner above)</td>
+</tr>
+<tr>
+<td>Date</td>
+<td>2026-07-22 (amended 2026-08-04)</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Proposed — extends <code>docs/strategies/plugins/README.md</code>; contract layer re-homed to UAR per amendment</td>
+</tr>
+<tr>
+<td>Audience</td>
+<td>AI build agents (primary), human reviewers</td>
+</tr>
+<tr>
+<td>Execution model</td>
+<td>This plan assumes an AI agent performs the implementation</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Related documents (must be read before building):</strong>
+- <code>docs/strategies/plugins/README.md</code> v1.0 — capability-centric plugin model (base model this document finalizes)
+- <code>docs/strategies/agents/README.md</code> v1.1 — placements, hook pipeline §3, WASM <code>agent</code> world sketch §4.1
+- <code>docs/strategies/a2ui/README.md</code> v1.1 — A2UI component registry / catalog ownership
+- <code>docs/strategies/ag-ui/README.md</code> v1.1 — <code>uar.agui/1</code> event profile and KnowMe seams
+- <code>docs/strategies/skill-support/README.md</code> v1.1 — <code>knowme:tool</code> vs <code>knowme:skill</code>, scopes, MCP interop
+- <code>docs/strategies/bossfang/README.md</code> v1.0 and <code>docs/strategies/bossfang/hands-sidecar-architecture-spec-plan.md</code> — BossFang roles, sidecar supply chain
+- <code>docs/knowme-builder-extensibility-spec.md</code> v0.1 — older extension-kind framing (superseded as model; retained as transport reference)</p>
+<hr/></article><article id="S19-002" class="source-clause"><h4>S19-002 · Part 1 — Recommendation</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h1>Part 1 — Recommendation</h1></article><article id="S19-003" class="source-clause"><h4>S19-003 · 1.1 The thesis</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>1.1 The thesis</h2>
+<p>KnowMe stops being "an app with features" and becomes <strong>a container whose only job is to provide the resources every AI application needs</strong>: identity, storage, settings, inference, memory, event transport (AG-UI), rendering contract (A2UI), tool interoperability (MCP), agent interoperability (A2A), policy (Cedar), and lifecycle supervision. Everything the user touches — chat, settings, memory, hands, every future feature — is a <strong>plugin</strong> against this container. Core features are simply <em>first-party, pre-installed, pre-trusted plugins</em>. The user must be unable to tell the difference.</p>
+<p>This is the same inversion the industry has converged on: MCP standardizes agent→tool, A2A standardizes agent→agent, AG-UI standardizes agent→application event streams, and Google's A2UI (v0.9.1 current, v1.0 candidate) standardizes agent→rendered-UI. KnowMe's container requirement is exactly: <em>understand AG-UI and A2UI, host WASM components, and get out of the way.</em></p></article><article id="S19-004" class="source-clause"><h4>S19-004 · 1.2 Decisions (each with rationale)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><div class="source-note"><strong>Explicit amendments:</strong><ul><li>Key control does not establish reverse-DNS namespace ownership; separate registry proof is required.</li></ul></div><h2>1.2 Decisions (each with rationale)</h2>
+<p><strong>D1 — One component model, one WIT family: <code>uar:plugin@0.2.0</code> <em>(amended 2026-08-04; was <code>knowme:plugin@1.0.0</code> — see banner: UAR-owned, four-dialect convergence incl. <code>prometheus:component</code>)</em>.</strong>
+Today there are three divergent WIT dialects in the repo: <code>knowme:plugin@0.1.0</code> (<code>rust/crates/knowme_plugin_host/wit/knowme-plugin.wit</code>), <code>librefang:plugin@0.1.0</code> (<code>rust/vendor/librefang/crates/librefang-skills/wit/</code>), and <code>uar-plugin.wit</code> (vendored UAR). We converge them into a single <code>knowme:plugin</code> WIT package with multiple <em>worlds</em> (one per plugin kind: <code>hook</code>, <code>service-contributor</code>, <code>agent</code>, <code>provider</code>, <code>app-shell</code>). librefang's host interface set (<code>fs</code>, <code>net</code> SSRF-guarded, <code>kv</code>, <code>agent</code>, <code>env</code>, <code>time</code>) is the most mature and is adopted as the substrate of <code>knowme:plugin/host</code>; UAR's <code>embedded-mobile</code> profile becomes the <code>mobile</code> world variant. The builder-extensibility spec already flagged this convergence ("one extension component model… instead of two WIT dialects") — this plan executes it.</p>
+<p><strong>D2 — Wasmtime 46 everywhere; component model + WASI P2 only.</strong>
+<code>knowme_plugin_host/Cargo.toml</code> still references wasmtime 41 (commented out); both vendored hosts use wasmtime 46. Standardize on wasmtime 46, <code>wasmtime::component::{Component, Linker, ResourceTable}</code>, deny-by-default <code>WasiCtx</code>, and <code>.cwasm</code> precompiled caching (already in UAR's <code>plugin_loader.rs</code>). Rationale: component model gives language-agnostic plugins (Rust, TinyGo, Python via componentize-py, JS via ComponentizeJS/StarlingMonkey — the last already proven in librefang's <code>wasmtime-wasi-http</code> support), deny-by-default capability security, and 1–5 ms instantiation with precompiled cache. Core (non-component) modules are accepted only behind a compatibility shim for legacy skills.</p>
+<p><strong>D3 — Reuse librefang's <code>sandbox_component.rs</code> as the reference host; build <code>knowme_plugin_host</code> as the product host that wraps it.</strong>
+<code>rust/vendor/librefang/crates/librefang-runtime/src/sandbox_component.rs</code> is the most complete component host in the repo (capability subset wired at instantiation, undeclared imports → <code>MissingCapability</code>, typed <code>host-error</code> variants, additive-only semver policy). Do not write a third host. Extract/generalize that pattern into <code>knowme_plugin_host</code> behind a <code>PluginHost</code> trait so BossFang, UAR, and KnowMe mobile/desktop share one sandbox implementation.</p>
+<p><strong>D4 — Capability cards are the unit of advertisement; the manifest (<code>.pxt</code>, manifest v2) is the unit of distribution.</strong>
+Adopt the capability-card model from <code>docs/strategies/plugins/README.md</code> as-is: a plugin is a bundle that <em>advertises</em> capabilities (<code>knowme:agent</code>, <code>knowme:tool</code>, <code>knowme:skill</code>, <code>knowme:hook</code>, <code>knowme:provider</code>, <code>knowme:ui-library</code>, <code>knowme:entity-schema</code>, <code>knowme:settings</code>, <code>knowme:theme</code>) and is granted entitlements. Extend the recognized set v1.0 with three new capabilities required by the goals below: <code>knowme:app-shell</code> (full-application A2UI container), <code>knowme:service</code> (OpenAPI/HTTP service on an allocated port), and <code>knowme:workflow</code> (BossFang-orchestratable workflow).</p>
+<p><strong>D5 — AG-UI is the event bus; A2UI is the rendering contract; A2A/MCP are the interop surfaces.</strong>
+Terminology rule (already enforced in the strategy docs, restated because everything depends on it):
+- <strong>AG-UI (<code>uar.agui/1</code> profile)</strong> — the event transport vocabulary. Every plugin that participates in a run emits/consumes AG-UI events through the existing, unit-tested seam <code>gen_ui_protocol::{normalize_uar_agui_event, A2uiAdapter, AguiAdapter}</code>. Plugins never invent their own event protocol.
+- <strong>A2UI (Google A2UI v0.9.1, <code>uar.a2ui/1</code> profile)</strong> — the rendering contract. Every piece of UI a plugin shows — a settings form, a confirmation, a full application shell — is an A2UI surface rendered by the host's catalog (<code>A2uiSurfaceView</code> on Flutter, <code>a2ui-{core,react,lit}</code> on web/desktop).
+- <strong>MCP</strong> — tool exposure both directions (plugin tools appear in <code>gen_ui_mcp</code>'s registry with <code>McpServerTrust</code> tiers; a plugin may itself mount an MCP server).
+- <strong>A2A</strong> — agent exposure (a plugin agent publishes an AgentCard and is reachable via the existing UAR A2A dispatcher/registry pattern).</p>
+<p><strong>D6 — Prompt-processing hooks are a typed pipeline, not scattered callbacks.</strong>
+Implement the hook pipeline already specified in <code>docs/strategies/agents/README.md</code> §3.1: <code>ingress → intent-classify → route → context-assemble → prompt-build → [inference] → tool-gate → tool-execute → post-process → egress</code>, as an explicit typed enum in <code>gen_ui_agent</code>. Rules carried from that doc, unchanged: <em>declared not discovered</em> (manifest announces stage + data classes), <em>contribute don't mutate</em> (typed, provenance-tagged, budget-capped contributions; 200 ms per-stage epoch budget; Cedar is sole authority at tool-gate). This is what makes the "context builder pattern" (scenario 1) work identically across system core, UAR core, and BossFang core.</p>
+<p><strong>D7 — Settings are a substrate, not per-plugin tables.</strong>
+Generalize UAR's existing <code>SettingsManager.register_extension()</code> (schema-as-data, JSON-Schema-validated writes) into a two-table <code>settings_definition</code> / <code>settings_value</code> substrate with scopes <code>system | device | user | agent</code>, exactly as specified in <code>docs/strategies/plugins/README.md</code> §11. Ownership levels: system core owns system scope, UAR core owns agent scope, BossFang core owns node scope; sensitivity <code>secret</code> ⇒ keychain/Vault reference, never inline value. A2UI settings forms are generated from <code>schema</code> + <code>ui_hints</code>, so a plugin's settings appear in the same Settings UI as core settings with zero per-plugin UI code.</p>
+<p><strong>D8 — Services get supervised sidecars with allocated ports, not in-process servers.</strong>
+A plugin that is "a web application or service exposing an OpenAPI spec on a unique port" runs as a <strong>supervised sidecar process</strong> (or WASM component with <code>wasi:http</code>), managed by a new <code>ServiceBroker</code> in <code>knowme_plugin_host</code>: port allocation from a per-instance range, health checks, lifecycle tied to plugin activation, OpenAPI spec ingestion at registration (operations become <code>knowme:tool</code> entries in the MCP registry, trust-tiered). Supply chain per the BossFang sidecar plan: cosign/SLSA/OCI verification before first spawn. The sidecar never gets a private API — all traffic from the container goes through the broker.</p>
+<p><strong>D9 — Plugins are first-class on mobile. No private APIs, no desktop-only features.</strong>
+The embedded UAR kernel (<code>uar.a2ui/1</code>, <code>EmbeddedLibrary</code> mode) and the Flutter <code>A2uiSurfaceView</code> renderer are already mobile-operational. WASM components run on mobile through the same wasmtime host (mobile world: reduced host imports, no <code>wasi:http</code> server sockets; sidecars disallowed on iOS, replaced by in-component service worlds). If a capability cannot be honored on a platform, the manifest says so and the UI degrades explicitly — the capability card carries a <code>platforms</code> field.</p>
+<p><strong>D10 — Distribution is content-addressed and signed.</strong>
+Keep <code>knowme_plugin_host</code>'s existing model: <code>WasmRef { cid, sha256 }</code> (IPFS content addressing), <code>ManifestSignature { publisher_did, signature_b64 }</code> (Ed25519, <code>did:key:</code>), <code>SignatureStatus { Verified, Unsigned, Invalid }</code>, <code>SandboxLimits</code> (default 64 MiB / 30 s). Unsigned plugins install only into a <code>developer</code> trust tier with explicit user consent, mirroring <code>gen_ui_mcp</code>'s <code>McpServerTrust::{Untrusted, TrustedLocal}</code> pattern.</p></article><article id="S19-005" class="source-clause"><h4>S19-005 · 1.3 What this recommendation deliberately does NOT do</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>1.3 What this recommendation deliberately does NOT do</h2>
+<ul>
+<li>Does not invent a new event protocol (AG-UI profile exists and is tested).</li>
+<li>Does not invent a new UI spec (A2UI is adopted, <code>uar.a2ui/1</code> profile already in code).</li>
+<li>Does not write a third WASM host (librefang's is generalized).</li>
+<li>Does not give plugins direct network access (network flows through Cedar-gated host functions — <code>net</code> import with SSRF guard — or through <code>uar-invoke("web-fetch", …)</code>).</li>
+<li>Does not allow plugins to render raw HTML/JS in the container (A2UI only; iframe embedding is available only inside an <code>app-shell</code> plugin's own surface and is catalog-mediated).</li>
+</ul>
+<hr/></article><article id="S19-006" class="source-clause"><h4>S19-006 · Part 2 — Architecture</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h1>Part 2 — Architecture</h1></article><article id="S19-007" class="source-clause"><h4>S19-007 · 2.1 System context</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>2.1 System context</h2>
+<pre><code>┌──────────────────────────────────────────────────────────────────────┐
+│  CONTAINERS (any of: Flutter mobile · Tauri desktop · web ·          │
+│  BossFang node · UAR service)                                        │
+│                                                                      │
+│  ┌────────────────────────────────────────────────────────────────┐  │
+│  │ SHELL — navigation, chrome, surface host                        │  │
+│  │  renders A2UI surfaces from core and plugins identically        │  │
+│  └──────────────┬─────────────────────────────────────────────────┘  │
+│                 │ A2UI surfaces / A2uiAction events                   │
+│  ┌──────────────▼─────────────────────────────────────────────────┐  │
+│  │ AG-UI EVENT FABRIC (`uar.agui/1`)                               │  │
+│  │  gen_ui_protocol::{A2uiAdapter, AguiAdapter,                    │  │
+│  │   normalize_uar_agui_event}  ← existing, tested                 │  │
+│  └──────┬───────────────┬──────────────────┬─────────────────────┘  │
+│         │               │                  │                        │
+│  ┌──────▼─────┐  ┌──────▼───────┐  ┌───────▼────────┐               │
+│  │ RUNTIME    │  │ HOOK         │  │ SERVICE        │               │
+│  │ (UAR       │  │ PIPELINE     │  │ BROKER         │               │
+│  │  kernel,   │  │ (typed stages│  │ (ports, health,│               │
+│  │  embedded) │  │  in gen_ui_  │  │  OpenAPI ingest│               │
+│  │            │  │  agent)      │  │  sidecar sup.) │               │
+│  └──────┬─────┘  └──────┬───────┘  └───────┬────────┘               │
+│         │               │                  │                        │
+│  ┌──────▼───────────────▼──────────────────▼─────────────────────┐  │
+│  │ PLUGIN HOST (`knowme_plugin_host`)                             │  │
+│  │  wasmtime 46 component sandbox (generalized librefang host)    │  │
+│  │  manifest v2 (.pxt) · capability cards · entitlements (Cedar)  │  │
+│  │  lifecycle: install → verify → activate → deactivate → remove  │  │
+│  └──────┬───────────────┬──────────────────┬─────────────────────┘  │
+│         │ WIT host imports (capability-subset per plugin)           │
+│  ┌──────▼─────┐  ┌──────▼───────┐  ┌───────▼────────┐               │
+│  │ SETTINGS   │  │ STORAGE      │  │ POLICY         │               │
+│  │ SUBSTRATE  │  │ (gen_ui_db,  │  │ (Cedar; sole   │               │
+│  │ (def/value │  │  SurrealDB,  │  │  authority at  │               │
+│  │  + scopes) │  │  kv, secret) │  │  tool-gate)    │               │
+│  └────────────┘  └──────────────┘  └────────────────┘               │
+└──────────────────────────────────────────────────────────────────────┘
+        ▲ MCP (gen_ui_mcp, trust tiers)   ▲ A2A (AgentCard, registry)
+        ▲ OpenAPI (broker-ingested)       ▲ IPFS/OCI distribution
+</code></pre></article><article id="S19-008" class="source-clause"><h4>S19-008 · 2.2 Plugin kinds — how each required scenario maps</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>2.2 Plugin kinds — how each required scenario maps</h2>
+<p>All plugins share: manifest v2, capability cards, signed WASM component (or supervised sidecar), settings namespace, lifecycle. They differ in which WIT world they target and which capabilities they advertise.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Scenario (from requirements)</th>
+<th>Plugin kind</th>
+<th>WIT world</th>
+<th>Advertised capabilities</th>
+<th>Execution model</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>System component: settings + network + reacts during prompt processing (system prompt, memory recall, RAG recall, skills activation) — the portable <strong>context builder</strong></td>
+<td><strong>Contributor</strong></td>
+<td><code>knowme:plugin/contributor</code></td>
+<td><code>knowme:hook</code> (stage list), <code>knowme:settings</code>, <code>knowme:provider</code> (optional)</td>
+<td>Host calls <code>contribute(stage, context-in) → contribution</code> at each declared pipeline stage; network only via <code>net</code> import (SSRF-guarded) or <code>uar-invoke</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>Full application semantics: own A2UI component acts as an <strong>application shell container</strong>, composing other A2UI components/views across web/mobile/desktop</td>
+<td><strong>App</strong></td>
+<td><code>knowme:plugin/app-shell</code></td>
+<td><code>knowme:app-shell</code>, <code>knowme:ui-library</code>, <code>knowme:settings</code>, optionally <code>knowme:agent</code></td>
+<td>Registered as a navigation root; receives a root A2UI surface + catalog token; emits <code>surfaceUpdate</code>/<code>dataModelUpdate</code>; child surfaces resolve through catalog-first-then-contributed registry</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Hooks only — called only on specific events</td>
+<td><strong>Hook</strong></td>
+<td><code>knowme:plugin/hook</code></td>
+<td><code>knowme:hook</code></td>
+<td>Event-subscription table in manifest (<code>on: [run.started, tool.confirmation.requested, …]</code>); invoked with epoch budget; no UI, no settings unless declared</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Web app/service exposing OpenAPI on a unique port</td>
+<td><strong>Service</strong></td>
+<td>sidecar process <em>or</em> <code>knowme:plugin/service</code> (wasi:http component)</td>
+<td><code>knowme:service</code> (openapi URL, port request), <code>knowme:tool</code> (generated)</td>
+<td>ServiceBroker allocates port, supervises process, ingests OpenAPI → MCP tools; health-checked; killed on deactivate</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Image-inference provider (adds image support when the active model lacks it)</td>
+<td><strong>Provider</strong></td>
+<td><code>knowme:plugin/provider</code></td>
+<td><code>knowme:provider</code> with <code>modality: image-inference</code></td>
+<td>Registered in the inference router as a modality fallback; the local/UAR lane consults it when a request carries image input the primary engine rejects</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Workflow referenceable by BossFang orchestration</td>
+<td><strong>Workflow</strong></td>
+<td><code>knowme:plugin/workflow</code></td>
+<td><code>knowme:workflow</code> (graph ref)</td>
+<td>Declarative workflow document (nodes = capability invocations); executed by BossFang harness; progress streams as AG-UI events</td>
+</tr>
+</tbody>
+</table>
+<p>A single <code>.pxt</code> bundle may combine kinds (e.g., an App that is also a Workflow and exposes an MCP server).</p></article><article id="S19-009" class="source-clause"><h4>S19-009 · 2.3 The WIT family — `uar:plugin@0.2.0` *(amended 2026-08-04; authored in the UAR repo, consumed here)*</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>2.3 The WIT family — <code>uar:plugin@0.2.0</code> <em>(amended 2026-08-04; authored in the UAR repo, consumed here)</em></h2>
+<p>One package; host imports shared; worlds per kind. (Sketch — authoritative WIT lives in <code>rust/crates/knowme_plugin_host/wit/</code>.)</p>
+<pre><code class="language-wit">package uar:plugin@0.2.0;
+
+// ---- shared host imports (capability subset granted at instantiation) ----
+interface host-log     { log: func(level: level, msg: string); }
+interface host-kv      { get: func(ns: string, key: string) -&gt; option&lt;list&lt;u8&gt;&gt;;
+                         set: func(ns: string, key: string, val: list&lt;u8&gt;) -&gt; result&lt;_, host-error&gt;;
+                         delete: func(ns: string, key: string) -&gt; result&lt;_, host-error&gt;; }
+interface host-settings{ get: func(key: string) -&gt; option&lt;json&gt;;
+                         set-own: func(key: string, val: json) -&gt; result&lt;_, host-error&gt;; } // own namespace only
+interface host-net     { fetch: func(req: http-request) -&gt; result&lt;http-response, host-error&gt;; } // SSRF-guarded, Cedar-checked
+interface host-events  { emit: func(evt: agui-event) -&gt; result&lt;_, host-error&gt;;
+                         subscribe: func(patterns: list&lt;string&gt;) -&gt; result&lt;subscription, host-error&gt;; }
+interface host-infer   { complete: func(req: inference-request) -&gt; result&lt;stream&lt;inference-event&gt;, host-error&gt;; }
+interface host-memory  { recall: func(query: string, k: u8) -&gt; list&lt;memory-hit&gt;; } // Cedar-gated, provenance-tagged
+interface host-a2ui    { push-surface: func(surface-id: string, msgs: list&lt;a2ui-message&gt;) -&gt; result&lt;_, host-error&gt;; }
+interface host-time / host-env / host-random  // as in librefang host.wit
+interface host-error   { variant host-error { capability-denied(string), path-denied(string),
+                         ssrf-denied(string), policy-denied(string), budget-exceeded, internal(string) } }
+
+// ---- exports per world ----
+world hook {
+  include base-host;
+  export handle-event: func(evt: agui-event) -&gt; result&lt;option&lt;agui-event&gt;, host-error&gt;;
+}
+world contributor {
+  include base-host;
+  export contribute: func(stage: pipeline-stage, input: contribution-input)
+                     -&gt; result&lt;contribution, host-error&gt;; // typed, provenance-tagged, budget-capped
+}
+world agent {
+  include base-host;
+  export start-task: func(task: a2a-task) -&gt; result&lt;task-handle, host-error&gt;;
+  export poll-task / cancel-task;   // A2A-shaped, per agents doc §4.1
+}
+world provider {
+  include base-host;
+  export capabilities: func() -&gt; provider-capabilities; // modalities, limits
+  export infer: func(req: inference-request) -&gt; result&lt;stream&lt;inference-event&gt;, host-error&gt;;
+}
+world app-shell {
+  include base-host-with-a2ui;
+  export init-shell: func(config: shell-config) -&gt; result&lt;_, host-error&gt;;
+  export on-action: func(action: a2ui-action) -&gt; result&lt;_, host-error&gt;;
+  export on-navigate / on-resume / on-suspend;
+}
+world service { // WASM-native service alternative to a sidecar
+  include base-host;
+  export handle: func(req: http-request) -&gt; result&lt;http-response, host-error&gt;; // wasi:http aligned
+}
+world workflow {
+  include base-host;
+  export definition: func() -&gt; workflow-document;
+  export on-signal: func(signal: workflow-signal) -&gt; result&lt;_, host-error&gt;;
+}
+</code></pre>
+<p>Versioning policy (adopted from librefang): <strong>additive-only within a major version</strong>; undeclared imports fail at instantiation with <code>MissingCapability</code>; the host resolves compatibility ranges, not exact pins (per wasmCloud's <code>VersionReq</code> lesson).</p></article><article id="S19-010" class="source-clause"><h4>S19-010 · 2.4 Manifest v2 (`.pxt` bundle)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><div class="source-note"><strong>Explicit amendments:</strong><ul><li>Key control does not establish reverse-DNS namespace ownership; separate registry proof is required.</li></ul></div><h2>2.4 Manifest v2 (<code>.pxt</code> bundle)</h2>
+<p>Extends <code>knowme_plugin_host</code>'s existing <code>PluginManifest</code> (lib.rs:64) — new fields in <strong>bold</strong>:</p>
+<pre><code class="language-json">{
+  "id": "com.acme.travel-suite",
+  "name": "Travel Suite",
+  "version": "1.2.0",
+  "description": "…",
+  "wasm": { "cid": "bafy…", "sha256": "…" },
+  "worlds": ["app-shell", "contributor", "service"],
+  "capabilities": [
+    { "kind": "knowme:app-shell", "navigation": { "icon": "globe", "title": "Travel", "route": "/travel" },
+      "catalog": "urn:acme:a2ui:catalog:1", "platforms": ["ios","android","desktop","web"] },
+    { "kind": "knowme:hook", "stages": ["context-assemble","prompt-build"],
+      "data-classes": ["memory.recall","rag.recall"], "epoch-budget-ms": 150 },
+    { "kind": "knowme:service", "openapi": "components/service/openapi.json",
+      "port": { "request": "ephemeral" }, "health": "/healthz" },
+    { "kind": "knowme:settings", "schema": "settings/schema.json", "ui-hints": "settings/ui.json",
+      "scope": "user" }
+  ],
+  "permissions": ["storage", "net:api.acme.com", "memory:read"],
+  "uar-skill-allowlist": ["web-fetch"],
+  "entitlements": { "vc": "…optional verifiable credential…" },
+  "signature": { "publisher-did": "did:key:z6Mk…", "signature-b64": "…" }
+}
+</code></pre>
+<p>The bundle is a content-addressed archive: <code>manifest.json</code>, WASM component(s), OpenAPI specs, settings schemas, A2UI catalog contributions, workflow documents.</p></article><article id="S19-011" class="source-clause"><h4>S19-011 · 2.5 Lifecycle</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>2.5 Lifecycle</h2>
+<pre><code>install → verify (signature → cid/sha256 → WIT world check → capability grant vs policy)
+        → register (capability cards → registry; settings schema → substrate;
+                    OpenAPI → broker ingest; A2UI catalog → registry merge)
+        → activate (instantiate component w/ capability subset; allocate ports;
+                    subscribe hooks; mount navigation)
+        → deactivate (drain runs; kill sidecars; unsubscribe; keep data)
+        → upgrade (verify new bundle; migrate settings values via schema versioning; atomic swap)
+        → remove (deactivate + delete namespace data after user confirmation; audit record)
+</code></pre>
+<p>Every transition emits an AG-UI <code>CUSTOM</code> lifecycle event (<code>knowme.plugin.*</code>) and writes a Cedar-audited record.</p></article><article id="S19-012" class="source-clause"><h4>S19-012 · 2.6 The hook pipeline (context-builder substrate)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>2.6 The hook pipeline (context-builder substrate)</h2>
+<p>Implementation target: <code>rust/crates/gen_ui_agent/src/pipeline.rs</code> (new). Stages as a typed enum per agents doc §3.1:</p>
+<pre><code class="language-rust">pub enum PipelineStage {
+    Ingress, IntentClassify, Route, ContextAssemble, PromptBuild,
+    Inference, ToolGate, ToolExecute, PostProcess, Egress,
+}
+</code></pre>
+<ul>
+<li>Contributors declare stages + data classes in the manifest; the pipeline <strong>never</strong> reflects over plugins to discover hooks.</li>
+<li><code>contribute()</code> returns <code>Contribution { items: Vec&lt;ContributionItem&gt; }</code> where each item is typed (<code>SystemPromptFragment | MemoryHit | RagSlice | SkillRef | GuardrailRule</code>), provenance-tagged (<code>plugin-id</code>, <code>cid</code>), and budget-capped (tokens + 200 ms epoch; over-budget ⇒ contribution dropped, telemetry emitted, pipeline continues).</li>
+<li>The existing <code>gen_ui_context</code> factory (<code>BudgetPlan</code>, <code>SliceKind</code>, <code>AssembleRequest</code>) consumes contributions at <code>ContextAssemble</code>/<code>PromptBuild</code>; memory/RAG/skills activations become contribution <em>inputs</em> so a contributor can reshape recall across system core, UAR core, and BossFang core identically.</li>
+<li>Cedar remains sole authority at <code>ToolGate</code>; hooks may <em>propose</em> guardrail rules, never grant.</li>
+</ul></article><article id="S19-013" class="source-clause"><h4>S19-013 · 2.7 A2UI app-shell model</h4><p class="source-note">Governing revision: <a href="../index.html#surfaces">UI-01–11</a> · source requirement, not release evidence.</p><h2>2.7 A2UI app-shell model</h2>
+<ul>
+<li>An <code>app-shell</code> plugin receives a <strong>root surface</strong> and the host catalog token (<code>urn:uar:a2ui:catalog:1</code> base + its own contributed catalog, resolved <strong>catalog-first-then-contributed</strong>, fail-closed — per the A2UI strategy doc).</li>
+<li>The host shell mounts it as a navigation peer of Chat/Settings/Memory; the plugin composes views by emitting <code>surfaceUpdate</code> / <code>dataModelUpdate</code> / <code>beginRendering</code> messages (A2UI v0.9.1; adopt v1.0's <code>actionResponse</code> RPC when finalized).</li>
+<li>User interactions return as typed <code>A2uiAction</code>s (already implemented end-to-end: <code>A2uiSurfaceView</code> → Riverpod → Repository → FFI on Flutter; <code>a2ui-react</code> on web/desktop).</li>
+<li>Core features migrate to the same model (Part 4, P4) — this is what makes "user cannot tell core from plugin" true rather than aspirational.</li>
+<li>A2UI registries may be <em>served by</em> plugins (flint-forge already exposes an A2UI registry as MCP at <code>/mcp/v1/a2ui</code> — the pattern to generalize).</li>
+</ul></article><article id="S19-014" class="source-clause"><h4>S19-014 · 2.8 Service broker</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>2.8 Service broker</h2>
+<p>New module <code>knowme_plugin_host::service_broker</code>:</p>
+<ul>
+<li><strong>Port allocation</strong>: per-instance ephemeral range (default 43100–43199), leased on activate, released on deactivate; leases persisted so restarts are stable.</li>
+<li><strong>Supervision</strong>: sidecar process spawn/monitor/restart (max N restarts, backoff) reusing librefang's <code>librefang-channels/src/sidecar.rs</code> supervisor pattern and frozen sidecar protocol v1 (NDJSON-over-stdio) for control; WASM-native services instead run in the component host with <code>wasi:http</code>.</li>
+<li><strong>OpenAPI ingestion</strong>: at registration, fetch <code>capabilities[knowme:service].openapi</code>, validate (3.0/3.1), and generate <code>knowme:tool</code> entries into <code>gen_ui_mcp</code>'s registry with <code>McpServerTrust</code> derived from the plugin's signature status; operations inherit the plugin's Cedar policy.</li>
+<li><strong>No private APIs</strong>: container↔service traffic goes through the broker's loopback proxy with per-plugin auth tokens injected by the broker; the service cannot be reached except through the broker.</li>
+</ul></article><article id="S19-015" class="source-clause"><h4>S19-015 · 2.9 Settings substrate</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>2.9 Settings substrate</h2>
+<p>Two tables, identical in SurrealDB (embedded) and Postgres (server), generalized from UAR's <code>SettingsManager.register_extension()</code>:</p>
+<pre><code>settings_definition(slug, owner_plugin, scope: system|device|user|agent|node,
+                    schema: jsonschema-draft7, ui_hints: json, sensitivity: plain|secret, version)
+settings_value(slug, scope, scope_id, value | secret_ref, clock: crdt, updated_by, updated_at)
+</code></pre>
+<ul>
+<li>Writes validated against the JSON Schema; <code>secret</code> ⇒ keychain (mobile/desktop) or Vault ref (server).</li>
+<li>Settings UI: host generates A2UI forms from <code>schema</code> + <code>ui_hints</code> and interleaves plugin sections into the existing Settings screen — plugin settings are indistinguishable from core settings.</li>
+<li>A contributor/plugin reads its own namespace via <code>host-settings.get</code>; cross-namespace reads require an explicit permission and Cedar grant.</li>
+</ul></article><article id="S19-016" class="source-clause"><h4>S19-016 · 2.10 Security &amp; trust model</h4><p class="source-note">Governing revision: <a href="../index.html#security">SEC-01–06</a> · source requirement, not release evidence.</p><div class="source-note"><strong>Explicit amendments:</strong><ul><li>Key control does not establish reverse-DNS namespace ownership; separate registry proof is required.</li></ul></div><h2>2.10 Security &amp; trust model</h2>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Mechanism</th>
+<th>Existing anchor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Distribution</td>
+<td>IPFS CID + sha256 pinning; Ed25519 <code>did:key:</code> manifest signatures; cosign/SLSA for sidecar binaries</td>
+<td><code>WasmRef</code>, <code>ManifestSignature</code> in <code>knowme_plugin_host</code></td>
+</tr>
+<tr>
+<td>Trust tiers</td>
+<td><code>Verified</code> / <code>Unsigned(developer, consent-gated)</code> / <code>Invalid(refused)</code>; mapped to <code>McpServerTrust</code></td>
+<td><code>gen_ui_mcp</code> registry.rs:71</td>
+</tr>
+<tr>
+<td>Sandbox</td>
+<td>wasmtime component model; deny-by-default WASI; capability subset at instantiation; 64 MiB / 30 s defaults, per-plugin override</td>
+<td>librefang <code>sandbox_component.rs</code>; <code>SandboxLimits</code></td>
+</tr>
+<tr>
+<td>Network</td>
+<td>only via <code>host-net</code> (SSRF-guarded, domain allowlist in <code>permissions</code>) or Cedar-gated <code>uar-invoke</code></td>
+<td>librefang <code>net</code>; <code>PluginPermission</code></td>
+</tr>
+<tr>
+<td>Policy</td>
+<td>Cedar sole authority at tool-gate; plugin entitlements as VC-backed Cedar policies</td>
+<td><code>knowme_hands</code> <code>cedar_policy</code> pattern</td>
+</tr>
+<tr>
+<td>Audit</td>
+<td>lifecycle + policy decisions + hook overruns as Cedar-audited records</td>
+<td><code>CedarDecision</code> in <code>knowme_hands</code></td>
+</tr>
+<tr>
+<td>UI</td>
+<td>A2UI catalog-only rendering; no plugin HTML/JS execution in container</td>
+<td>A2UI strategy doc</td>
+</tr>
+</tbody>
+</table></article><article id="S19-017" class="source-clause"><h4>S19-017 · 2.11 Platform matrix</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>2.11 Platform matrix</h2>
+<table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Desktop (Tauri)</th>
+<th>Mobile (Flutter)</th>
+<th>Web</th>
+<th>BossFang node</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>WASM component host</td>
+<td>wasmtime 46</td>
+<td>wasmtime 46 (embedded, mobile world)</td>
+<td>via <code>gen_ui_wasm</code> shim (limited worlds)</td>
+<td>wasmtime 46</td>
+</tr>
+<tr>
+<td>Hook pipeline</td>
+<td>full</td>
+<td>full</td>
+<td>via UAR service</td>
+<td>full</td>
+</tr>
+<tr>
+<td>App-shell (A2UI)</td>
+<td><code>a2ui-react</code></td>
+<td><code>A2uiSurfaceView</code> (package:genui)</td>
+<td><code>a2ui-lit/react</code></td>
+<td>headless (no UI)</td>
+</tr>
+<tr>
+<td>Service sidecar</td>
+<td>yes</td>
+<td>Android: component-only; iOS: component-only</td>
+<td>remote services only</td>
+<td>yes (primary)</td>
+</tr>
+<tr>
+<td>Provider (image inference)</td>
+<td>yes</td>
+<td>yes</td>
+<td>via service</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>Workflow</td>
+<td>orchestrate via BossFang</td>
+<td>orchestrate via BossFang</td>
+<td>via UAR service</td>
+<td>executes</td>
+</tr>
+</tbody>
+</table>
+<hr/></article><article id="S19-018" class="source-clause"><h4>S19-018 · Part 3 — Functional Specification</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h1>Part 3 — Functional Specification</h1></article><article id="S19-019" class="source-clause"><h4>S19-019 · 3.1 Actors</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>3.1 Actors</h2>
+<table>
+<thead>
+<tr>
+<th>Actor</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>User</strong></td>
+<td>Installs, configures, uses plugins; cannot distinguish core from plugin features</td>
+</tr>
+<tr>
+<td><strong>Plugin author</strong></td>
+<td>Writes components in any WASM-targeting language; publishes signed <code>.pxt</code> bundles</td>
+</tr>
+<tr>
+<td><strong>Container</strong></td>
+<td>KnowMe core (this system) — provides substrate services</td>
+</tr>
+<tr>
+<td><strong>BossFang</strong></td>
+<td>Orchestration node executing workflows and hands</td>
+</tr>
+<tr>
+<td><strong>AI build agent</strong></td>
+<td>Implements this plan (primary consumer of Parts 3–4)</td>
+</tr>
+<tr>
+<td><strong>Reviewer</strong></td>
+<td>Human approving entitlements, trust-tier promotions, milestone gates</td>
+</tr>
+</tbody>
+</table></article><article id="S19-020" class="source-clause"><h4>S19-020 · 3.2 User stories (numbered US-x; acceptance criteria in 3.3)</h4><p class="source-note">Governing revision: <a href="../index.html#acceptance">G01–16</a> · source requirement, not release evidence.</p><h2>3.2 User stories (numbered US-x; acceptance criteria in 3.3)</h2>
+<ul>
+<li><strong>US-1</strong> As a user, I install a plugin from a <code>.pxt</code> bundle (or catalog URL) and see its features appear — navigation entries, settings sections, tools — without restarting the app.</li>
+<li><strong>US-2</strong> As a user, I open Settings and see the plugin's settings rendered with the same components and behavior as core settings; secrets never display values.</li>
+<li><strong>US-3</strong> As a user, I open a full plugin application (app-shell) and navigate its views; every view is native-feeling on mobile, desktop, and web.</li>
+<li><strong>US-4</strong> As a user, I chat with an agent whose context is enriched by contributor plugins (memory, RAG, system-prompt fragments); I can inspect provenance of what was injected.</li>
+<li><strong>US-5</strong> As a user, when the active model lacks image input, image messages are transparently routed to an installed image-inference provider plugin.</li>
+<li><strong>US-6</strong> As a user, I trigger a workflow plugin (e.g., via a Hand) and watch its progress as live events; I can cancel it.</li>
+<li><strong>US-7</strong> As a user, I install a service plugin; its capabilities appear as tools the agent can call, with clear trust labeling.</li>
+<li><strong>US-8</strong> As a user, I deactivate or remove a plugin; its surfaces disappear, its sidecars stop, and (on remove) I choose whether to delete its data.</li>
+<li><strong>US-9</strong> As a plugin author, I write a hook in Rust/TinyGo/Python/JS against the WIT, package it, and see it invoked only for the events I declared.</li>
+<li><strong>US-10</strong> As a plugin author, unsigned bundles install only after explicit developer-mode consent, and the UI shows the trust tier.</li>
+<li><strong>US-11</strong> As a reviewer, I can audit every lifecycle transition, policy decision, and budget overrun per plugin.</li>
+<li><strong>US-12</strong> As a user, core features (chat, settings) behave identically before and after the plugin system ships — because they are rebuilt as plugins on the same APIs (dogfood proof).</li>
+</ul></article><article id="S19-021" class="source-clause"><h4>S19-021 · 3.3 Feature catalog with acceptance criteria</h4><p class="source-note">Governing revision: <a href="../index.html#acceptance">G01–16</a> · source requirement, not release evidence.</p><div class="source-note"><strong>Explicit amendments:</strong><ul><li>Key control does not establish reverse-DNS namespace ownership; separate registry proof is required.</li></ul></div><h2>3.3 Feature catalog with acceptance criteria</h2>
+<p><strong>F1 — Plugin host core</strong> (<code>knowme_plugin_host</code>)
+- F1.1 Wasmtime-46 component sandbox, deny-by-default WASI, capability subset at instantiation. <em>AC: component importing an undeclared capability fails with <code>MissingCapability</code>; memory/fuel limits enforced (test: fork-bomb &amp; memory-bomb components are killed within limits).</em>
+- F1.2 Manifest v2 parse/validate (<code>parse_manifest</code> extended). <em>AC: invalid schema, unsupported world, or unknown capability kind → structured <code>PluginHostError</code>; golden-file tests per fixture.</em>
+- F1.3 Signature verification (Ed25519/did:key) + CID/sha256 pinning. <em>AC: tampered component → <code>Invalid</code>; unsigned → <code>developer</code> tier with consent record.</em>
+- F1.4 Lifecycle state machine with persistence and audit. <em>AC: crash mid-activate resumes deterministically; every transition audited.</em>
+- F1.5 <code>.cwasm</code> precompiled cache with version-mismatch invalidation. <em>AC: warm activation &lt; 50 ms on desktop reference hardware.</em></p>
+<p><strong>F2 — Capability registry</strong>
+- F2.1 Capability cards persisted; queryable by kind, platform, trust. <em>AC: registry survives restart; query latency &lt; 5 ms at 500 plugins.</em>
+- F2.2 Recognized set v1.0 = strategy-doc v0.1 set + <code>app-shell</code>, <code>service</code>, <code>workflow</code>. <em>AC: unknown kinds rejected at manifest validation with migration note.</em></p>
+<p><strong>F3 — Hook pipeline</strong> (<code>gen_ui_agent::pipeline</code>)
+- F3.1 Typed stage enum + contribution types integrated with <code>gen_ui_context</code>. <em>AC: contributions appear in assembled context with provenance tags; ordering deterministic.</em>
+- F3.2 Epoch budget enforcement (default 200 ms/stage). <em>AC: over-budget contributor dropped, <code>knowme.plugin.budget_exceeded</code> telemetry emitted, run continues.</em>
+- F3.3 Event-subscription hooks. <em>AC: hook fires only for declared patterns; wildcard beyond declaration rejected.</em></p>
+<p><strong>F4 — Settings substrate</strong>
+- F4.1 <code>settings_definition</code>/<code>settings_value</code> in SurrealDB + Postgres; scope model; secret refs. <em>AC: schema-invalid write rejected; secret value never leaves keychain/Vault; CRDT clock merges on OFP sync.</em>
+- F4.2 A2UI-generated settings forms in Flutter + React Settings screens. <em>AC: a plugin with settings renders a section indistinguishable from core; golden tests per platform.</em></p>
+<p><strong>F5 — A2UI app-shell</strong>
+- F5.1 Navigation mounting of app-shell plugins on all three UI targets. <em>AC: plugin root appears beside Chat; deep-link route works; no chrome mismatch (Flat 2.0 respected).</em>
+- F5.2 Catalog merge (base + contributed, fail-closed). <em>AC: component not in merged catalog → render error surface, never raw content.</em>
+- F5.3 Action round-trip (<code>A2uiAction</code> → plugin <code>on-action</code>). <em>AC: latency budget &lt; 100 ms local; full integration test on mobile.</em></p>
+<p><strong>F6 — Service broker</strong>
+- F6.1 Port lease + supervision + health. <em>AC: killed sidecar restarts ≤ N with backoff; deactivate frees the port (verified).</em>
+- F6.2 OpenAPI ingestion → MCP tools. <em>AC: a sample service's operations appear in <code>tools/list</code> within 2 s of activation; calls route through broker proxy; undeclared outbound hosts blocked.</em>
+- F6.3 WASM-native service world (<code>wasi:http</code>-aligned). <em>AC: same OpenAPI ingestion works for component services.</em></p>
+<p><strong>F7 — Provider plugins</strong>
+- F7.1 Modality registration + inference-router fallback. <em>AC: with primary engine lacking image input and provider installed, an image message succeeds; without provider, a clear capability error surfaces.</em>
+- F7.2 Streaming parity. <em>AC: provider streams through the same <code>InferenceEvent</code> path as built-in engines.</em></p>
+<p><strong>F8 — Workflow plugins</strong>
+- F8.1 Workflow document schema + BossFang execution binding. <em>AC: sample 3-node workflow executes on BossFang; progress emits AG-UI events; cancel propagates.</em>
+- F8.2 <code>knowme_hands::DeploymentTarget::BossFang</code> integration. <em>AC: a Hand referencing a workflow plugin deploys and runs end-to-end (replaces current <code>NotImplemented</code>).</em></p>
+<p><strong>F9 — Distribution &amp; catalog</strong>
+- F9.1 IPFS/OCI fetch with pinning. <em>AC: offline install from local bundle works; CID mismatch aborts.</em>
+- F9.2 In-app plugin catalog UI (browse/install/trust badges). <em>AC: catalog is itself an A2UI app-shell (dogfood).</em></p>
+<p><strong>F10 — Interop surfaces</strong>
+- F10.1 Plugin MCP server mounting. <em>AC: plugin tools listed via <code>gen_ui_mcp</code> with correct trust tier and annotations.</em>
+- F10.2 Plugin AgentCard + A2A reachability. <em>AC: external A2A client can <code>message/send</code> to a plugin agent via the container's dispatcher.</em>
+- F10.3 AG-UI emission for all plugin runs. <em>AC: emitted events validate against <code>uar/schemas/uar-agui-v1.schema.json</code> (conformance test).</em></p>
+<p><strong>F11 — Migration dogfood</strong>
+- F11.1 Settings feature re-implemented as first-party plugin. <em>AC: zero user-visible regression (golden UI suite).</em>
+- F11.2 Chat feature consumes hook pipeline for its context assembly. <em>AC: existing chat tests pass; provenance inspector shows core contributor.</em></p></article><article id="S19-022" class="source-clause"><h4>S19-022 · 3.4 Data contracts</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>3.4 Data contracts</h2>
+<ul>
+<li><strong>Manifest v2</strong>: JSON Schema <code>knowme/schemas/plugin-manifest-v2.schema.json</code> (new artifact; generated from Rust types via <code>schemars</code>).</li>
+<li><strong>Capability card</strong>: per <code>docs/strategies/plugins/README.md</code> §capability-cards, extended with <code>platforms: string[]</code> and <code>epoch-budget-ms</code>.</li>
+<li><strong>AG-UI profile</strong>: <code>uar.agui/1</code> — unchanged; plugin lifecycle events as <code>CUSTOM</code> with <code>knowme.plugin.*</code> names.</li>
+<li><strong>A2UI profile</strong>: <code>uar.a2ui/1</code> over Google A2UI v0.9.1; catalogs URN-namespaced per plugin (<code>urn:&lt;publisher&gt;:a2ui:catalog:&lt;n&gt;</code>).</li>
+<li><strong>Workflow document</strong>: new <code>knowme.workflow/1</code> JSON schema (nodes = capability invocations with Cedar policy refs; edges = data/signal flow; signals = pause/resume/cancel).</li>
+<li><strong>Settings</strong>: JSON Schema Draft 7 per definition; <code>ui_hints</code> maps to A2UI form components only (fail-closed).</li>
+</ul></article><article id="S19-023" class="source-clause"><h4>S19-023 · 3.5 Error handling &amp; edge cases</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>3.5 Error handling &amp; edge cases</h2>
+<table>
+<thead>
+<tr>
+<th>Case</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Plugin panics/traps</td>
+<td>Run fails with structured error event; plugin marked <code>degraded</code>; 3 traps ⇒ auto-deactivate with notification</td>
+</tr>
+<tr>
+<td>Over-budget hook</td>
+<td>Contribution dropped, telemetry, pipeline continues (never blocks the run)</td>
+</tr>
+<tr>
+<td>Sidecar port conflict</td>
+<td>Broker retries next free port in range; range exhausted ⇒ activation fails with actionable error</td>
+</tr>
+<tr>
+<td>Unsigned plugin</td>
+<td>Installs only to developer tier after explicit consent; tools from it run with <code>Untrusted</code> gating (confirmation per call)</td>
+</tr>
+<tr>
+<td>Settings schema upgrade</td>
+<td>Values migrated per declared <code>version</code> migrations; un-migratable values preserved read-only with banner</td>
+</tr>
+<tr>
+<td>Platform unsupported</td>
+<td>Capability card mismatch ⇒ install allowed, capability hidden with explanation (never a crash)</td>
+</tr>
+<tr>
+<td>Plugin requests undeclared import</td>
+<td>Instantiation-time <code>MissingCapability</code> (never runtime surprise)</td>
+</tr>
+<tr>
+<td>Network attempt without permission</td>
+<td><code>capability-denied</code>/<code>ssrf-denied</code>; audit record; no silent proxying</td>
+</tr>
+<tr>
+<td>App-shell emits unknown component</td>
+<td>Fail-closed error surface; incident logged with plugin id</td>
+</tr>
+<tr>
+<td>Core/plugin API drift</td>
+<td>WIT compatibility ranges resolved at load; incompatible ⇒ plugin <code>suspended</code> with upgrade prompt</td>
+</tr>
+</tbody>
+</table>
+<hr/></article><article id="S19-024" class="source-clause"><h4>S19-024 · Part 4 — Project Plan (AI-agent execution)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h1>Part 4 — Project Plan (AI-agent execution)</h1></article><article id="S19-025" class="source-clause"><h4>S19-025 · 4.0 Execution model for the AI build agent</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>4.0 Execution model for the AI build agent</h2>
+<ul>
+<li><strong>One phase = one openspec change</strong> (<code>openspec/changes/&lt;phase-name&gt;/</code> with proposal/design/tasks), matching repo convention.</li>
+<li><strong>Task granularity</strong>: each task ≤ 1 focused PR; every task lists <em>verification</em> (test command + expected result) in <code>tasks.md</code> — the agent may not check a box without running the verification.</li>
+<li><strong>Conformance-first</strong>: before building features, build the conformance harness (P0) so every later phase has executable acceptance.</li>
+<li><strong>Dogfood gate</strong>: no phase is "done" until its capability is consumed by a first-party plugin, not only by test fixtures.</li>
+<li><strong>Hard constraints</strong> (from AGENTS.md/base rules): layering UI→Hooks→Stores→Services; Flat 2.0; entity state via <code>prometheus-entity-management</code>; all networking/LLM/persistence stays in Rust core; audit script must pass.</li>
+</ul></article><article id="S19-026" class="source-clause"><h4>S19-026 · 4.1 Phases</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>4.1 Phases</h2></article><article id="S19-027" class="source-clause"><h4>S19-027 · P0 — Convergence &amp; conformance harness (foundation)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>P0 — Convergence &amp; conformance harness (foundation)</h3>
+<p><strong>Goal:</strong> one WIT family, one wasmtime, executable acceptance.
+- P0.1 Author <code>uar:plugin@0.2.0</code> WIT package (in the UAR repo per the amendment banner; this repo consumes it) (worlds: hook, contributor, agent, provider, app-shell, service, workflow) in <code>rust/crates/knowme_plugin_host/wit/</code>, absorbing <code>librefang:plugin</code> host interfaces and <code>uar-plugin</code> needs. <em>Verify: <code>wasm-tools component wit</code> validates; mapping doc from both legacy dialects.</em>
+- P0.2 Align workspace on wasmtime 46 (remove the commented 41 refs; unpin/liberate <code>knowme_plugin_host</code> deps). <em>Verify: <code>cargo tree | grep wasmtime</code> shows single major.</em>
+- P0.3 Extract/generalize librefang <code>sandbox_component.rs</code> into <code>knowme_plugin_host::sandbox</code> behind <code>PluginHost</code> trait (capability subset, <code>MissingCapability</code>, typed <code>host-error</code>, additive semver check). <em>Verify: vendored conformance corpus (<code>rust/vendor/librefang/conformance/</code>) passes against the new host.</em>
+- P0.4 Conformance harness: <code>plugins/conformance/</code> — fixture components per world (Rust + TinyGo minimum), golden manifests, negative fixtures (undeclared import, budget bomb, ssrf attempt). <em>Verify: CI job green.</em>
+<strong>Milestone M0:</strong> harness proves the sandbox contract before any product code depends on it.</p></article><article id="S19-028" class="source-clause"><h4>S19-028 · P1 — Host core &amp; lifecycle</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>P1 — Host core &amp; lifecycle</h3>
+<ul>
+<li>P1.1 Manifest v2 + JSON Schema + signature/CID verification. </li>
+<li>P1.2 Lifecycle state machine + persistence (<code>gen_ui_db</code>) + Cedar-audited transitions.</li>
+<li>P1.3 Capability registry (cards, platform/trust queries).</li>
+<li>P1.4 Local bundle install path (file picker / drag-drop) — no network distribution yet.</li>
+<li><strong>Dogfood:</strong> port <code>plugins/examples/hello-knowme</code> to manifest v2 + component world; install→activate→emit-event→deactivate end-to-end.
+<strong>Milestone M1:</strong> <code>hello-knowme</code> runs as a real component plugin on desktop. (Absorbs roadmap M3.)</li>
+</ul></article><article id="S19-029" class="source-clause"><h4>S19-029 · P2 — Settings substrate + hook pipeline (context-builder story)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>P2 — Settings substrate + hook pipeline (context-builder story)</h3>
+<ul>
+<li>P2.1 <code>settings_definition</code>/<code>settings_value</code> tables (SurrealDB + Postgres), scopes, secret refs, JSON-Schema validation; generalize UAR <code>SettingsManager.register_extension()</code> as the UAR-side adapter.</li>
+<li>P2.2 A2UI settings-form generator; render plugin sections in Flutter + React Settings.</li>
+<li>P2.3 <code>gen_ui_agent::pipeline</code> typed stages; contributor invocation with epoch budgets; <code>gen_ui_context</code> consumes typed contributions with provenance.</li>
+<li>P2.4 Reference contributor plugin: "memory-booster" — declares <code>context-assemble</code>, uses <code>host-memory.recall</code> + <code>host-net</code> (allowlisted domain) to enrich prompts; settings via substrate.</li>
+<li>P2.5 Provenance inspector (A2UI surface) showing injected contributions per run.
+<strong>Milestone M2:</strong> the portable context-builder pattern works identically on desktop and mobile embedded UAR.</li>
+</ul></article><article id="S19-030" class="source-clause"><h4>S19-030 · P3 — A2UI app-shell + core dogfood</h4><p class="source-note">Governing revision: <a href="../index.html#surfaces">UI-01–11</a> · source requirement, not release evidence.</p><h3>P3 — A2UI app-shell + core dogfood</h3>
+<ul>
+<li>P3.1 App-shell registration/navigation mounting (Flutter <code>A2uiSurfaceView</code> host page; React shell route; web lit renderer).</li>
+<li>P3.2 Catalog merge + fail-closed rendering; contributed-catalog persistence (SurrealDB <code>a2ui_schema</code> per A2UI strategy doc).</li>
+<li>P3.3 Action round-trip through FFI to <code>on-action</code>.</li>
+<li>P3.4 <strong>Settings feature re-implemented as a first-party app-shell plugin</strong> (F11.1) — the "user can't tell" proof.</li>
+<li>P3.5 Reference third-party-style app: "Notes+" full app plugin (list/detail/editor views from A2UI).
+<strong>Milestone M3:</strong> two apps (one core, one plugin) live side-by-side, indistinguishable.</li>
+</ul></article><article id="S19-031" class="source-clause"><h4>S19-031 · P4 — Service broker + provider plugins</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>P4 — Service broker + provider plugins</h3>
+<ul>
+<li>P4.1 ServiceBroker: port leases, supervision (sidecar protocol v1 reuse), health, broker proxy auth.</li>
+<li>P4.2 OpenAPI ingestion → <code>gen_ui_mcp</code> tool generation with trust tiers.</li>
+<li>P4.3 WASM-native service world.</li>
+<li>P4.4 Provider world + inference-router modality fallback; reference image-inference provider (wraps an existing engine; mobile included).</li>
+<li>P4.5 Reference service plugin: a small REST service (e.g., a notes search API) exposed on a broker port with OpenAPI.
+<strong>Milestone M4:</strong> scenarios 4 and 5 demonstrably work on desktop + mobile (component-only services on iOS/Android).</li>
+</ul></article><article id="S19-032" class="source-clause"><h4>S19-032 · P5 — Workflows + BossFang + distribution</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>P5 — Workflows + BossFang + distribution</h3>
+<ul>
+<li>P5.1 <code>knowme.workflow/1</code> schema + validation.</li>
+<li>P5.2 BossFang execution binding via hands-sidecar plan; <code>DeploymentTarget::BossFang</code> becomes real.</li>
+<li>P5.3 Workflow progress/cancel over AG-UI; A2UI run-detail surface.</li>
+<li>P5.4 IPFS/OCI distribution + cosign/SLSA verification for sidecar bundles.</li>
+<li>P5.5 Plugin catalog UI (itself an app-shell plugin).
+<strong>Milestone M5:</strong> full install→orchestrate→observe loop from the catalog.</li>
+</ul></article><article id="S19-033" class="source-clause"><h4>S19-033 · P6 — Mobile parity &amp; hardening</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>P6 — Mobile parity &amp; hardening</h3>
+<ul>
+<li>P6.1 Mobile world profile (reduced imports) + conformance on iOS/Android devices.</li>
+<li>P6.2 Offline certification rerun (extends <code>embed-uar-mobile-offline</code> §5 tasks) with plugins installed.</li>
+<li>P6.3 Performance budgets: activation &lt; 50 ms warm; hook p95 within epoch; app-shell first paint parity with core screens.</li>
+<li>P6.4 Security review pass: SSRF matrix, Cedar policy corpus, audit completeness.
+<strong>Milestone M6:</strong> release candidate.</li>
+</ul></article><article id="S19-034" class="source-clause"><h4>S19-034 · 4.2 Dependency graph (critical path)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>4.2 Dependency graph (critical path)</h2>
+<pre><code>P0 ──► P1 ──► P2 ──► P3 ──► P6
+        │      │      │
+        │      │      └────► P5 ──► P6
+        │      └───────────► P4 ──► P6
+        └──────────────────► P4 (broker needs lifecycle/registry)
+</code></pre>
+<p>P3 and P4 may run in parallel after P2; P5 depends on P3 (surfaces) and P4 (service tools in workflows). P6 gates release.</p></article><article id="S19-035" class="source-clause"><h4>S19-035 · 4.3 Risk register</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>4.3 Risk register</h2>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Likelihood</th>
+<th>Impact</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>WIT convergence breaks vendored UAR/librefang builds</td>
+<td>Med</td>
+<td>High</td>
+<td>P0 mapping doc + compatibility shims; vendored hosts keep legacy worlds behind features until P6</td>
+</tr>
+<tr>
+<td>wasmtime on iOS build friction</td>
+<td>Med</td>
+<td>High</td>
+<td>Reuse existing rust_builder/mobile toolchain; spike in P0 (compile trivial component for aarch64-apple-ios before P1)</td>
+</tr>
+<tr>
+<td>A2UI spec drift (v1.0 candidate changes)</td>
+<td>Med</td>
+<td>Med</td>
+<td>Pin v0.9.1 profile; isolate spec version in <code>gen_ui_protocol</code>; adopt v1.0 in a dedicated later change</td>
+</tr>
+<tr>
+<td>Hook epoch budgets too tight for real contributors</td>
+<td>Med</td>
+<td>Med</td>
+<td>Budgets configurable per capability card; telemetry from P2 reference plugin calibrates defaults</td>
+</tr>
+<tr>
+<td>Sidecar supply-chain verification complexity</td>
+<td>Med</td>
+<td>High</td>
+<td>Reuse BossFang sidecar plan verbatim (frozen protocol + cosign); no bespoke scheme</td>
+</tr>
+<tr>
+<td>Componentize-py/JS maturity gaps for "any language"</td>
+<td>High</td>
+<td>Med</td>
+<td>Guarantee Rust + TinyGo first-class at M1; Python/JS labeled beta with conformance fixtures in P0; documented matrix</td>
+</tr>
+<tr>
+<td>Scope creep: rebuilding core features as plugins balloons</td>
+<td>Med</td>
+<td>High</td>
+<td>Dogfood limited to Settings (P3) + chat context consumption (P2); chat-as-plugin full migration is post-M6</td>
+</tr>
+<tr>
+<td>Plugin settings sync conflicts (OFP/CRDT)</td>
+<td>Low</td>
+<td>Med</td>
+<td>CRDT clock in schema from day one; reuse <code>gen_ui_db::sync</code> seams</td>
+</tr>
+</tbody>
+</table></article><article id="S19-036" class="source-clause"><h4>S19-036 · 4.4 Effort &amp; sequencing estimate (AI-agent build, human review gates)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>4.4 Effort &amp; sequencing estimate (AI-agent build, human review gates)</h2>
+<p>Assuming one AI build agent with human review at milestones, calendar time dominated by build/test cycles rather than typing:</p>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Est. agent-effort</th>
+<th>Review gate</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>P0</td>
+<td>4–6 days</td>
+<td>M0 conformance green</td>
+</tr>
+<tr>
+<td>P1</td>
+<td>5–8 days</td>
+<td>M1 hello-knowme E2E</td>
+</tr>
+<tr>
+<td>P2</td>
+<td>6–9 days</td>
+<td>M2 context-builder demo</td>
+</tr>
+<tr>
+<td>P3</td>
+<td>6–9 days</td>
+<td>M3 core/plugin parity demo</td>
+</tr>
+<tr>
+<td>P4</td>
+<td>5–8 days</td>
+<td>M4 service + provider demos</td>
+</tr>
+<tr>
+<td>P5</td>
+<td>5–8 days</td>
+<td>M5 catalog→workflow loop</td>
+</tr>
+<tr>
+<td>P6</td>
+<td>4–7 days</td>
+<td>RC sign-off</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td><strong>~5–8 weeks</strong> with P3/P4 overlap</td>
+<td>7 human gates</td>
+</tr>
+</tbody>
+</table></article><article id="S19-037" class="source-clause"><h4>S19-037 · 4.5 Definition of done (applies to every phase)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>4.5 Definition of done (applies to every phase)</h2>
+<ol>
+<li>All <code>tasks.md</code> boxes checked <em>with</em> their verification commands run and logged.</li>
+<li>Conformance corpus green (including new fixtures added by the phase).</li>
+<li><code>scripts/audit.sh</code> passes; layering rules respected.</li>
+<li>Golden UI tests updated for any surface change; Flat 2.0 preserved.</li>
+<li>AG-UI events from new paths validate against the <code>uar.agui/1</code> schema.</li>
+<li>Docs updated: the relevant <code>docs/strategies/*/README.md</code> version bumped with change notes; this plan's phase table annotated with completion dates.</li>
+</ol>
+<hr/></article><article id="S19-038" class="source-clause"><h4>S19-038 · Appendix A — Scenario → capability checklist (traceability)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>Appendix A — Scenario → capability checklist (traceability)</h2>
+<table>
+<thead>
+<tr>
+<th>Requirement scenario</th>
+<th>Delivered by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>System component w/ settings, network, prompt-stage reactions (context builder)</td>
+<td>contributor world + settings substrate + hook pipeline (F3, F4)</td>
+</tr>
+<tr>
+<td>Full application shell composing A2UI views cross-platform</td>
+<td>app-shell world + catalog merge + navigation mounting (F5)</td>
+</tr>
+<tr>
+<td>Hooks-only plugins</td>
+<td>hook world + event subscription (F3.3)</td>
+</tr>
+<tr>
+<td>Web app/service with OpenAPI on unique port</td>
+<td>service broker + OpenAPI→MCP (F6)</td>
+</tr>
+<tr>
+<td>Image-inference provider</td>
+<td>provider world + router fallback (F7)</td>
+</tr>
+<tr>
+<td>Workflows for BossFang orchestration</td>
+<td>workflow world + BossFang binding (F8)</td>
+</tr>
+<tr>
+<td>Advertise capabilities/endpoints/A2UI registry/A2A/MCP</td>
+<td>capability cards + F10 interop surfaces</td>
+</tr>
+<tr>
+<td>Core vs plugin indistinguishable</td>
+<td>F11 dogfood + P3.4</td>
+</tr>
+</tbody>
+</table></article><article id="S19-039" class="source-clause"><h4>S19-039 · Appendix B — Research anchors (external)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>Appendix B — Research anchors (external)</h2>
+<ul>
+<li>AG-UI: open event-based agent↔UI protocol (~16 event types, transport-agnostic; SDKs in TS/Python/Kotlin/Java/Go) — docs.ag-ui.com; first-party support from Google, Microsoft, Amazon, Oracle ecosystem tooling.</li>
+<li>A2UI: Google-originated declarative generative-UI spec; v0.9.1 current (<code>application/a2ui+json</code>), v1.0 candidate adds <code>actionResponse</code> RPC; official renderers incl. Flutter GenUI SDK — a2ui.org.</li>
+<li>Protocol stack: MCP (agent→tool), A2A (agent→agent), AG-UI (agent→app transport), A2UI (rendering payload) — complementary layers; AG-UI explicitly carries A2UI payloads.</li>
+<li>WASM: wasmtime (Bytecode Alliance reference runtime) leads component-model/WASI-P2 support; capability-based deny-by-default security is the established plugin-sandbox pattern (Shopify Functions, Envoy filters); wasmCloud's provider/host-plugin model and <code>VersionReq</code> compatibility informed D3/WIT versioning; Extism's "host-controlled HTTP without WASI" informed the <code>host-net</code> design.</li>
+</ul></article></main></body></html>

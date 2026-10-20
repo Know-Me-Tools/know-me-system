@@ -1,0 +1,765 @@
+Contents
+01 · Overview
+02 · Philosophy
+03 · Users
+04 · Capabilities
+05 · Architecture
+06 · Hands System
+07 · BossFang Sync
+08 · Plugin System
+09 · Privacy & Trust
+10 · Tiers & Access
+11 · Roadmap
+// Personal Intelligence Platform · Functional Specification
+Personal intelligence,
+on your device.
+KnowMe is a sovereign personal AI platform that runs the same workflow on phone, tablet, and desktop. Eight tools for thinking with AI, fully on-device by default. Hands that work for you while you sleep. WASM plugins that extend the surface without compromising the core. Encrypted peer sync with your own BossFang instances when — and only when — you choose.
+Document
+FUNC-SPEC v1.0
+Date
+May 2026
+Owner
+KnowMe, LLC
+Stack
+Tauri 2 · Rust · React 19
+Site
+know-me.tools
+01 · Overview
+What KnowMe is.
+KnowMe is a single application that ships on macOS, Windows, Linux, iOS, and Android from one Rust + React 19 codebase. It runs language models on the user's own hardware — Gemma, Qwen, Phi, and Mistral families — using
+mistral.rs
+on desktop (Metal) and
+llama.cpp
+on mobile, both behind the
+InferenceProvider
+trait (see versions.toml [inference]). It bundles eight thinking tools the user reaches for daily, six autonomous-agent templates that work without supervision, and a content-addressed plugin system that lets third parties extend the surface without ever touching user data.
+Where most "AI assistants" are thin clients to someone else's server, KnowMe inverts the model. The local device is the primary runtime. The cloud is optional, opt-in, and exists only to sync with the user's own BossFang instances — which the user owns, runs, and shuts down at will. There is no central account that holds the user's conversations. There is no training pipeline that ingests their data. The conversation history, the agent memory, the encrypted skills registry — all of it lives in an embedded SurrealDB on the user's machine.
+The result is an AI tool with the convenience profile of a consumer app and the trust profile of a piece of physical paper. It works on the subway. It works on a flight. It works in a SCIF. It works for the user the same way regardless of whether the user is online or whether KnowMe LLC is still in business.
+◎
+Eight tools
+Chat · Hands · Ask Image · Audio Scribe · Prompt Lab · Skills · Models · Settings. One coherent surface.
+⌘
+Six form factors
+One codebase ships to desktop, tablet, and phone. The same workflow, fitted to the screen.
+⊘
+Sovereign by default
+On-device inference. Encrypted local memory. Air-gap-capable. Cloud is an opt-in, not a requirement.
+✦
+Hands
+Six autonomous-agent templates. They run on your schedule, on your device or your BossFang instance.
+⊞
+Plugin marketplace
+WASM Component Model + IPFS distribution + Ed25519 signing. Sandboxed by Wasmtime, governed by Cedar.
+⇆
+Peer sync
+OFP gossip protocol. Your devices talk to your BossFang instances directly. No hub, no broker, no leak.
+02 · Philosophy
+The four commitments.
+KnowMe is the consumer surface for a particular set of architectural beliefs. These are not slogans. They are constraints applied to every decision in the codebase, from the choice of inference engine down to how filenames are cased.
+Sovereignty is structural, not configurable.
+Most "private AI" products express privacy as a setting. The user toggles a checkbox; the vendor promises the data didn't go anywhere. KnowMe rejects that model.
+Sovereignty is enforced by where the code runs, not by a checkbox in a settings panel.
+Inference happens on-device because the model weights and the user's prompt never leave the device — there is no "private mode" because there is no other mode. Cloud calls require explicit Cedar policy approval at the runtime level. The architecture is the guarantee.
+Knowledge-Driven Development.
+The user's own context — their files, their writing voice, their schedule, their preferences — is the model's most important input. KnowMe encodes that context into a local SurrealDB knowledge graph that grows with use. When the user asks a Hand to triage their inbox, the Hand reads from a KB the user owns, not from a model fine-tuned on a million strangers' inboxes.
+Reasoning is compiled at the user's edge, not resolved at someone else's query time.
+Compile-time over query-time.
+The expensive parts of agent reasoning — skill selection, tool routing, policy evaluation — are precomputed when the user activates a Hand or installs a skill, not on every invocation. The Cedar policy that says "this Hand may read mail but not send it" is a typed predicate at compile time, not a string parsed each time the Hand runs. The skill registry is a checked manifest, not a discovered set. The result is fast, predictable, auditable behavior on hardware that does not have to be a datacenter.
+The user owns the substrate.
+Every artifact KnowMe produces — Hands, conversation histories, skill registrations, model files, plugin manifests — lives in formats the user can export, version, and migrate. The SurrealDB file is on disk. The GGUF models are on disk. The plugin manifests are content-addressed CIDs the user can re-fetch from any IPFS gateway.
+If KnowMe LLC disappeared tomorrow, the user's KnowMe installation would keep working indefinitely.
+That is what sovereignty means in practice.
+The contrast that matters
+Closed assistants log every query, train on aggregate data, and cease to function the moment their vendor's billing system goes down. KnowMe runs on the user's hardware, learns from the user's own context, and continues to function regardless of upstream conditions. The trade-off is real: the most powerful frontier models are still cloud-only. KnowMe handles that by letting the user route specific calls to specific cloud providers — under explicit Cedar policy — rather than making cloud the default.
+03 · Users
+Who KnowMe is for.
+KnowMe is designed for individuals who want AI leverage without surrendering their data. Four primary personas frame the product decisions. Each tab below describes who they are, why KnowMe matters to them specifically, and what their daily workflow looks like.
+The Knowledge Worker
+The Privacy-Conscious Pro
+The Builder
+The Cross-Device Power User
+KW
+The Knowledge Worker
+consultant · researcher · writer
+"I spend three hours a day on email triage and reading. I want a system that does the first pass for me — and I want to know exactly what it read."
+Why KnowMe
+Inbox Triage Hand
+reads mail on a 2-hour cadence and surfaces what needs attention.
+Researcher Hand
+watches three topics and writes a daily digest with sources.
+Reading List Hand
+captures URLs, summarizes them, files them by topic in local memory.
+Every artifact is auditable. The user can ask "what did you read to write this?" and get a citation list.
+Daily workflow
+9 AM
+— Open KnowMe. Review the Researcher digest from the morning's run.
+11 AM
+— Inbox Triage has surfaced four messages flagged "decision needed." Reply via Chat with Gemma-4-3B drafting against the user's known voice.
+3 PM
+— Drop a 40-page PDF into Ask Image. Get structured extraction in 90 seconds without the file leaving the laptop.
+PP
+The Privacy-Conscious Professional
+attorney · therapist · physician · journalist
+"My work is privileged. I cannot put client material into a SaaS chatbot. But I still want the productivity of an AI assistant. KnowMe is the only product I have found that solves this without compromise."
+Why KnowMe
+On-device-only mode
+blocks every cloud call at the Cedar policy layer. The lockdown is structural, not a setting.
+Encrypted SurrealDB at rest
+with AES-256-GCM. The conversation history is unreadable to anyone without the user's device key.
+Per-tool consent prompts
+. The first time any Hand wants to use any skill, the user must approve. No background drift.
+Air-gap capable
+. Works on a laptop with the WiFi turned off. Many professionals draft on flights for exactly this reason.
+Daily workflow
+Drafts case notes against a local Qwen model. The notes are encrypted to disk and never touch a network.
+Uses Audio Scribe to transcribe client sessions on-device. Whisper runs locally. The audio never uploads.
+Disables sync entirely. Each device has its own KnowMe install with its own keys. Cross-device handoff happens via signed export files.
+BD
+The Builder / Developer
+software engineer · indie hacker · researcher
+"I want a personal AI that is also a platform I can extend. The plugin system is what made me pay for it."
+Why KnowMe
+Code Watcher Hand
+watches a repo, summarizes diffs on every commit, and flags risky changes.
+WASM plugin SDK
+with strong typing via WIT. Build in Rust, TypeScript, Go, or any language that compiles to
+wasm32-wasip2
+.
+Skill Lab
+exposes the UAR runtime directly. Custom MCP servers register as skills the user's Hands can call.
+Models tab supports custom GGUF imports. The user can run their own fine-tuned weights with no platform gatekeeping.
+Daily workflow
+Develops a plugin against the
+knowme:plugin@0.1.0
+WIT contract. Tests locally, pins to IPFS, shares the CID with collaborators.
+Wires KnowMe Hands into a CI pipeline via the Code Watcher template. PR summaries arrive in their preferred channel.
+Uses Prompt Lab as a sandbox for prompt engineering — full parameter control, no rate limits, instant iteration.
+CP
+The Cross-Device Power User
+founder · executive · multi-device generalist
+"I move between three devices a day. I want my agents and my conversation history to follow me — but to my own infrastructure, not someone else's cloud."
+Why KnowMe
+Runs on phone, tablet, and desktop from the same codebase. The same Hand schedule, the same conversations.
+Personal BossFang instance
+on a home Mac Pro or rented VM. The user's devices sync through it, not through KnowMe LLC.
+OFP gossip protocol
+. Encrypted, peer-to-peer, no central broker. The user's home BossFang and their phone find each other directly.
+Model selection per device
+. The phone runs Gemma-3n-2B locally; the desktop offloads big-context work to a Qwen 35B running on the home server.
+Daily workflow
+Morning
+— Quick chat on the phone. Hand digests delivered overnight. Both synced from the home BossFang.
+Afternoon
+— At the desk, opens the desktop app. The same conversation continues. Switches to the larger Qwen model for a long-form document.
+Evening
+— Reviews the day's Hand activity log. All instances reconciled via OFP.
+04 · Capabilities
+The eight tiles.
+KnowMe organizes its surface around eight capability tiles. Each is a distinct workflow with its own runtime characteristics, but they share the same memory layer, the same skills registry, and the same Cedar governance. Click through each tile to see what it does, what it requires, and what it produces.
+◎ Chat
+✦ Hands
+⊡ Image
+◈ Audio
+◧ Prompt Lab
+◉ Skills
+▣ Models
+⊙ Settings
+◎
+AI Chat
+multi-turn · streaming · thinking mode
+The conversational surface. Multi-turn dialogue with streaming token output, optional reasoning visibility ("thinking" mode), tool-call rendering, and per-message skill activation. Conversations persist to the local SurrealDB and are searchable from any other tile.
+Key features
+Streaming output via Tauri channels — no polling
+Thinking-mode toggle (visible reasoning tokens)
+Tool calls render inline with input/output panels
+Per-conversation model override
+Encrypted at rest; full-text searchable
+Export to Markdown, JSON, or signed audit bundle
+Powered by
+candle-vllm (desktop) or llama.cpp (mobile)
+UAR for skill orchestration
+SurrealDB embedded for history
+Cedar policy for tool consent
+liter-llm for cloud routing (opt-in)
+✦
+Hands
+autonomous agents · scheduled execution · cedar-governed
+Autonomous agents that work for the user — distinct from chat agents the user works with. Six templates ship in v1.0: Researcher, Inbox Triage, Code Watcher, Market Pulse, Daily Journal, Reading List. Each runs on its own schedule, against the user's chosen model, and within a Cedar policy that limits which skills it may invoke.
+Key features
+Six built-in templates across six categories
+Three-step creation: Identity → Config → Deployment
+Schedule by cron, event, or manual trigger
+Run locally or on a connected BossFang instance
+Per-Hand audit log (every skill call recorded)
+Pause / resume / run-now from any device
+Powered by
+UAR scheduler for cadence
+Cedar policies (deny-by-default for new skills)
+SurrealDB for run history and state
+OFP sync for cross-device run delivery
+Tool-call consent for first-use prompts
+⊡
+Ask Image
+vision · multimodal · on-device
+Drop an image, document scan, screenshot, or PDF. Ask questions about its contents. Vision models run locally on supported hardware — no upload, no cloud round-trip. Output is structured: extracted text, identified objects, generated captions, and answers to free-form questions, all routable into Chat or saved to memory.
+Key features
+JPG, PNG, HEIC, PDF, screenshot capture
+OCR + structured extraction in one pass
+Free-form Q&A against the image
+Batch mode for multi-page PDFs
+Output saves to KnowMe memory automatically
+Zero upload — files stay on device
+Powered by
+Gemma-3n vision (desktop) · Phi-3.5-vision (mobile)
+Tauri filesystem plugin for sandboxed reads
+Native PDF reader via system frameworks
+UAR memory writer for extracted KB
+◈
+Audio Scribe
+whisper · transcription · translation · on-device
+Record a meeting, voice memo, or interview. Get transcription, speaker diarization, summary, and optional translation — all on-device via local Whisper. Recordings stay on the device. Transcripts route into Chat for follow-up questions or save directly to memory as searchable artifacts.
+Key features
+Live transcription with token streaming
+Multi-speaker diarization
+50+ language transcription
+Translation to user's preferred language
+Auto-summarize at end of recording
+Audio file is local-only by default
+Powered by
+whisper.cpp (Metal · Vulkan · CPU)
+Tauri audio capture (cross-platform)
+Local LLM for summary pass
+SurrealDB for transcript persistence
+◧
+Prompt Lab
+single-turn · parameter control · template library
+Single-turn workspace for prompt engineering and quick one-shots. Full control over temperature, top-p, max tokens, system prompt, and stop sequences. Save templates to a personal library. Compare outputs across two models side-by-side. The fast path for "I just need an answer" without polluting the chat history.
+Key features
+Full sampling parameter exposure
+Template library with variables
+Side-by-side model comparison
+Token-by-token output stream
+Export to clipboard, file, or Chat
+No history pollution — ephemeral by default
+Powered by
+Same inference layer as Chat
+Local template store (SurrealDB)
+Tauri streaming channels
+◉
+Agent Skills
+MCP registry · UAR runtime · cedar governance
+Skills are the verbs the agent runtime can invoke: web-fetch, wikipedia, filesystem, shell-exec, mail-imap, and any user-installed MCP server. Every skill registers with UAR, every invocation passes through Cedar policy, and every call is logged. The Skills tab is where the user audits, enables, disables, and inspects what their Hands and chats are allowed to do.
+Key features
+Built-in skills: web · filesystem · shell · email · memory
+MCP server installer (npm or local)
+Per-skill consent policy editor
+Invocation history with full input/output
+Per-Hand allowed-skills matrix
+Skill versioning and rollback
+Powered by
+Universal Agent Runtime (UAR)
+Cedar policy engine
+MCP protocol over stdio / HTTP
+SurrealDB skill registry
+▣
+Models
+gguf · download · benchmark · acceleration
+The on-device model library. Browse curated models, download GGUFs, benchmark them on the user's hardware, manage RAM allocation, and configure acceleration (CUDA · Metal · Vulkan · CPU). Custom GGUF imports are supported — drop a file, and KnowMe registers it. Remote models hosted on connected BossFang instances appear here too, marked clearly as off-device.
+Key features
+Curated model gallery (Gemma · Qwen · Phi · Mistral)
+Resumable parallel downloads
+On-device benchmark with tok/s output
+Per-model RAM and quantization stats
+Custom GGUF import (sideload)
+Remote BossFang model linking
+Powered by
+candle-vllm or llama.cpp (per platform)
+HuggingFace Hub fetcher
+Tauri filesystem plugin
+Platform-specific acceleration backends
+⊙
+Settings
+instances · sync · privacy · plugins · appearance
+Seven panels, one place. Connect and manage BossFang instances. Configure peer sync (which entities sync, when, with whom). Control privacy — on-device-only, encrypted history, telemetry off, tool consent. Install plugins by IPFS CID. Configure cloud LLM providers when used. Toggle theme. The settings tab is also the system audit surface: every consent, every skill grant, every sync event has an inspection point.
+Key features
+BossFang instance manager (4 default types)
+Per-entity sync toggles (Hands · history · memory · models)
+On-device-only mode (Cedar lockdown)
+Plugin installer by IPFS CID
+Provider keys (Anthropic · OpenAI · Groq via UAR)
+Theme: light · dark · system
+Powered by
+SurrealDB settings repository
+Tauri secure storage (keychain · keystore)
+OFP gossip configuration
+Cedar policy editor
+05 · Architecture
+How KnowMe is built.
+KnowMe is a Tauri 2 application. The frontend is React 19 with a strict layering discipline: components depend only on hooks, hooks subscribe only to stores, stores own all API calls. The backend is Rust, with platform-specific inference engines selected at compile time via Cargo cfg gates. State change propagates upward through subscription, never through callback drilling.
+LAYER 01 · UI
+React 19 + Vite 8
+Components
+presentation only
+Hooks
+selectors
+Stores
+zustand + entity-mgmt
+APIs
+invoke wrappers
+Tauri IPC
+LAYER 02 · CORE
+Rust · Tauri commands → AppState
+UAR
+agent runtime
+cedar policies
+PMPO loop
+embedded
+Inference
+candle-vllm
+llama.cpp
+whisper.cpp
+cfg-gated
+Data
+SurrealDB 3.0.5
+RocksDB engine
+repositories
+embedded
+Plugins
+Wasmtime 41
+Component Model
+WIT contracts
+sandboxed
+OFP
+peer gossip
+QUIC transport
+AES-256-GCM
+peer-to-peer
+EXTERNAL
+WASM Plugins
+isolated UI iframe
++ wasm sandbox
+EXTERNAL
+BossFang
+user's instances
+via OFP gossip
+FIG. 5.1 — KnowMe layer architecture · UI → IPC → Rust core → optional external surfaces
+The seven layers in detail
+01
+Presentation — components
+Pure JSX. Receives props and hook returns. Never imports stores or APIs directly. Mobile and desktop differ only in layout components; the data flow is identical.
+react 19
+tailwind 4
+02
+Selection — hooks
+Subscribe to store slices via Zustand selectors and to the entity graph via
+useEntityView
+. Compose feature-specific transforms. Never call the network.
+zustand 5
+entity-mgmt
+03
+State ownership — stores
+The only layer that calls APIs. Zustand + Immer for client state;
+@prometheus-ags/prometheus-entity-management
+for normalized server state with relations.
+immer
+graph store
+04
+IPC — Tauri commands
+Thin
+invoke()
+wrappers in
+src/api/
+. The only place Tauri's IPC surface appears in the frontend. Strongly typed against Rust handler signatures.
+tauri 2.10
+05
+Agent runtime — UAR
+The Universal Agent Runtime, embedded as a Rust library. Owns the skill registry, Cedar policy enforcement, the PMPO orchestration loop, and the Hand scheduler.
+cedar 4
+policy-first
+06
+Inference engine — platform-split
+candle-vllm on desktop (CUDA · Metal · Vulkan). llama.cpp via
+llama-cpp-2
+on mobile (Metal on iOS, Vulkan on Android). Both implement
+InferenceProvider
+.
+cfg-gated
+trait-abstracted
+07
+Persistence — embedded SurrealDB
+SurrealDB 3.0.5 with the RocksDB engine. Database file lives in the platform's app-data directory. Schema migrations run at startup. Encrypted at rest with AES-256-GCM.
+surrealdb 3.0.5
+encrypted
+06 · Hands System
+Autonomous agents that work for you.
+The distinction between Hands and Chat is the distinction between an agent the user works
+with
+and an agent that works
+for
+the user. A chat agent is reactive. A Hand is proactive — it runs on a schedule, executes within a Cedar policy, and writes its outputs to the user's memory regardless of whether the user is watching.
+Six templates ship in v1.0. Each has been chosen because it represents a high-leverage, recurring task that benefits from continuous attention rather than session-bound interaction. The templates are the starting point — users customize the name, schedule, model, and skills, and KnowMe registers the result as a deployed Hand.
+The six built-in templates
+Template
+Category
+What it does
+Default cadence
+Skills required
+Researcher
+Productivity
+Watches a topic. Writes a daily digest with sources.
+daily 9am
+web-fetch · wikipedia
+Inbox Triage
+Communication
+Triages messages. Surfaces what needs attention.
+every 2h
+email-imap
+Code Watcher
+Development
+Watches a repo. Summarizes diffs, flags risky changes.
+on commit
+filesystem · shell-exec
+Market Pulse
+Finance
+Tracks tickers. Daily delta summary with context.
+daily 5pm
+web-fetch
+Daily Journal
+Productivity
+Asks a check-in question. Builds private memory.
+daily 8pm
+surreal-memory
+Reading List
+Content
+Captures URLs, summarizes, files them by topic.
+on capture
+web-fetch · memory
+The three-step creation flow
+Every Hand is created through a deterministic three-step modal. The constraint is intentional — predictability is what makes autonomous agents trustworthy.
+①
+Identity
+Name, description, category. The Hand's "what it is and what it's for." Defaults seeded from the template.
+②
+Configuration
+Model selection, schedule, skill grants. Per-skill consent — the Hand cannot use a skill not listed here.
+③
+Deployment
+Run locally or on a connected BossFang instance. Cedar policy reviewed and accepted before activation.
+Cedar policy enforcement
+Every skill invocation by a Hand passes through Cedar at runtime. The policy is not a runtime instruction the model can be tricked into ignoring — it is a typed predicate evaluated by the Rust core
+after
+the model decides to call a tool but
+before
+the tool actually executes. A Hand whose policy says "may read mail but not send mail" cannot send mail even if a malicious email instructs it to. This is the structural defense against prompt injection that no LLM-layer mitigation can match.
+First-use consent prompt
+The first time a Hand attempts to invoke any skill, the user receives a consent prompt. The prompt shows the skill, the input, and the expected behavior. The user grants or denies. The grant is per-Hand, per-skill, and revocable from the Skills tab. Background drift is impossible — every new capability acquisition is a deliberate user action.
+07 · BossFang Sync
+Your devices talk to your servers.
+KnowMe runs on the user's devices. BossFang (the production name for the librefang server) runs on the user's other infrastructure — a home Mac Pro, a rented VM, an enterprise cluster. The two communicate via OFP, the Open Fang Protocol, which is a peer-to-peer gossip layer over QUIC with encrypted application payloads. There is no central broker. There is no KnowMe LLC server in the path.
+The four instance types
+Instance
+Form factor
+Role
+Sync surface
+This device
+in-process
+Primary. The local KnowMe install.
+—
+Home Mac Pro
+https://bossfang.local:8443
+Personal peer. Larger models, always-on Hands.
+Hands · history · memory
+Personal Cloud
+https://bossfang.<you>.cloud
+Rented VM you own. Off-device runtime when you're mobile.
+Hands · history · memory · models
+Team Instance
+https://team.<org>.com
+Multi-user shared. Org-controlled, member-scoped data.
+Skills · selected memory
+What syncs, by default
+Every entity in KnowMe has a default sync policy that the user can override. Conservative defaults; the user opts in to anything that would create asymmetric exposure.
+✦
+Hands
+Default
+on
+. Definitions and schedules sync to all peers. Run history is per-instance.
+◎
+Conversation history
+Default
+on
+. AES-256-GCM encrypted at rest; encrypted in transit over OFP.
+⊞
+SurrealDB memory
+Default
+on
+. The personal knowledge graph. CRDT merge resolves cross-device conflicts.
+◉
+Skill registrations
+Default
+on
+. MCP servers and Cedar policies. Lets a Hand created on phone run on home Mac.
+▣
+Models (GGUF)
+Default
+off
+. Model files are large (1–20 GB). Sync only on Wi-Fi when explicitly enabled.
+⊙
+Settings
+Default
+per-device
+. The user usually wants different theme / breakpoint defaults per form factor.
+The OFP gossip protocol
+OFP is what makes "your devices talk to your servers" not require a third party. Each instance maintains a peer list. State changes propagate through the peer graph using a Lamport-clock-based gossip with CRDT-friendly conflict resolution. Application payloads are encrypted with the user's identity key (a
+did:key:
+the user controls) and authenticated by mutual TLS. Without the user's key material, KnowMe LLC could not read sync traffic even if it sat on the wire.
+No hub, no broker, no leak
+OFP's design rule is that all four instance types are peers. The "Personal Cloud" instance is not privileged over the phone. The phone can be the source of truth for one entity and the home Mac Pro the source of truth for another. Conflict resolution is structural (CRDTs and Lamport clocks), not authoritative (server says so). This is what makes the architecture sovereign in the strict sense — there is no oracle.
+08 · Plugin System
+Extensibility without compromise.
+Third-party developers extend KnowMe through WASM components built against the
+knowme:plugin@0.1.0
+WIT contract. Plugins are content-addressed and distributed via IPFS. The host runtime is Wasmtime 41 with the Component Model enabled. Every plugin runs in a sandbox; every host capability is governed by Cedar; every UI surface is rendered in an isolated webview.
+The WIT contract
+The interface between host and plugin is defined in WebAssembly Interface Types — a typed IDL that produces Rust trait stubs at compile time via
+wasmtime::component::bindgen!()
+. The contract has two interfaces:
+host
+— capabilities the runtime exposes to plugins in
+v0.1
+:
+log
+,
+storage-{get,set,delete}
+,
+uar-invoke
+,
+emit-event
+. Deliberately few, typed, and boring — the only successful consumer-app precedent for Rust→WASM extensions (Zed, Wasmtime + WIT in production since 2024) shipped a similarly restricted surface and expanded only with ecosystem pull.
+plugin
+— lifecycle hooks the plugin must implement:
+init
+,
+handle-event
+,
+shutdown
+.
+v0.2 candidates (not in the v0.1 contract)
+Deferred until real plugins demonstrate the need, each with its own threat-model review (2026-07-16 assessment, rec #9):
+librefang-call
+(direct library surface),
+register-navigation
+(app-shell navigation injection), and the sandboxed-iframe plugin UI surface (
+window.knowme.invoke()
+/
+subscribe()
+bridge). Until then, plugins are headless capabilities reached through UAR skills and events.
+The contract is versioned. Plugins compiled against
+@0.1.0
+work against any host running
+0.1.x
+for any
+x ≥ 0
+. Backwards-compatible additions bump patch. Because the contract is pre-1.0, a
+minor
+bump (
+0.2.0
+) signals a breaking change, per standard 0.x semver.
+The plugin manifest
+A plugin lives in IPFS as a directory:
+manifest.json
+,
+plugin.wasm
+, and (v0.2, once the iframe UI surface lands)
+ui-bundle.tar.gz
+. The manifest declares everything the host needs to install, sandbox, and govern the plugin.
+Field
+Purpose
+id
+Globally unique. Reverse-DNS recommended.
+wasm.cid + sha256
+Content address of the WASM blob. SHA-256 verified after fetch.
+ui.cid + entry
+v0.2 candidate
+— reserved; ignored by v0.1 hosts. Content address of the UI bundle (HTML / CSS / JS) and entry file.
+navigation
+v0.2 candidate
+— reserved; ignored by v0.1 hosts. (Up to 10 entries the host would inject into the app shell; plugins never control top-level routing.)
+permissions
+v0.1: storage · uar_skills (network is reached only via
+uar-invoke("web-fetch", …)
+, governed by Cedar).
+v0.2 candidates:
+librefang. The user reviews these at install time.
+signature
+Optional Ed25519 signature over the canonical JSON. Unsigned plugins install with a warning.
+Distribution and trust
+Distribution uses IPFS for content addressing, with an HTTP gateway fallback for mobile (where running a local IPFS daemon is impractical). The fetcher tries the local daemon first, falls back to
+ipfs.io
+/
+cloudflare-ipfs.com
+/
+pinata.cloud
+, and verifies SHA-256 against the manifest after every fetch. Even a malicious gateway cannot serve a tampered binary — the hash check rejects it.
+Trust is structural. Publishers sign their manifests with Ed25519 keys bound to a
+did:key:
+in the publisher record. Verified signatures display as a green pill in the plugin install sheet; unsigned plugins display as amber and require an explicit "trust unverified" toggle. The user always sees and approves the permission set before any code runs.
+The sandbox
+A plugin running in Wasmtime
+can
+call host functions for which it holds permission, allocate up to 64 MiB of linear memory, and run for up to 30 seconds per
+handle-event
+invocation (epoch interruption). It
+cannot
+open files outside its scoped storage, open network sockets directly, spawn threads, access the host's React tree, or call other plugins. Network access goes through
+uar-invoke("web-fetch", …)
+with a manifest-declared allow-list. Inter-plugin communication goes through the host event bus.
+(v0.2 candidate — the plugin UI surface is not in the v0.1 contract.)
+When it lands, the plugin's UI bundle renders in an
+<iframe sandbox="allow-scripts allow-same-origin">
+. The host injects a small
+plugin-bridge.js
+that exposes
+window.knowme.invoke()
+and
+window.knowme.subscribe()
+, both of which translate to
+postMessage
+events routed to the plugin's WASM
+handle-event
+export. The plugin UI never touches the host's React state directly.
+Why WASM Component Model and not Extism
+Extism is the easier onboarding path — bytes in, bytes out, multi-language SDKs. KnowMe chose Wasmtime + Component Model because the surface includes UAR skill calls and BossFang HTTP — both involve structured data where loose typing would produce real bugs. The WIT file becomes a versioned contract enforced at compile time. The cost is steeper plugin-author onboarding; the benefit is a plugin ecosystem that does not silently rot as the host evolves.
+09 · Privacy & Trust
+What "sovereign" actually means.
+"Privacy-first" appears in nearly every consumer AI product's marketing. KnowMe's claim is more specific and more verifiable:
+the application's privacy properties are structural consequences of where the code runs, not policy promises about what the vendor will do.
+If KnowMe LLC went bankrupt tomorrow, every user's installed copy would continue to function indefinitely with the same privacy properties.
+The seven structural guarantees
+Guarantee
+How it's enforced
+Failure mode
+Inference is on-device
+Model weights and prompts never leave the device. candle-vllm and llama.cpp run in-process.
+None — there is no network code path for local inference.
+Conversation history is local
+Embedded SurrealDB. AES-256-GCM at rest. Device-key-derived.
+Disk forensics on an unlocked device. Mitigated by OS-level disk encryption.
+No telemetry by default
+Telemetry disabled in default config. No event firing path absent the toggle.
+Crash reports remain disabled until explicitly enabled.
+Cloud calls require Cedar approval
+Every outbound LLM call hits a Cedar policy check before request build.
+User explicitly authorizes cloud routing per provider.
+Tool consent at first use
+UAR prompts the user for explicit grant on a Hand's first call to any new skill.
+User can pre-grant a skill's broad use in Settings.
+Sync traffic is end-to-end encrypted
+OFP payloads encrypted with the user's
+did:key:
+. Mutual TLS authenticates peers.
+Compromised peer key. Mitigated by per-device key rotation.
+Plugins are sandboxed
+Wasmtime memory + epoch limits. Cedar governs every host call. UI in isolated iframe.
+Bug in Wasmtime itself. Mitigated by version-pinning and security advisories.
+On-device-only mode
+The most aggressive privacy setting is "on-device-only mode." Toggling it rewrites the active Cedar policy to deny every cloud call, every outbound HTTP, every plugin network grant, and every BossFang sync. In this mode KnowMe is provably air-gapped — the user can verify by disconnecting the device's network and confirming nothing breaks. Some users (privacy-conscious professionals, regulated industries) live in this mode permanently.
+What KnowMe does not do
+No central account.
+KnowMe LLC has no database of users. The product works without registration.
+No training on user data.
+User conversations and Hand outputs never reach any training pipeline. There is no pipeline.
+No silent updates of permissions.
+A plugin's permission grant is immutable from install. Updating a plugin requires re-consent if the permission set changed.
+No cross-tenant data flow.
+Each user's KnowMe install is an island. Sync goes only to peers the user has explicitly added.
+No third-party analytics.
+No Segment, no Mixpanel, no Sentry-by-default. The user can opt in to crash reports if they choose.
+The audit surface
+Every consent decision, every skill invocation, every sync event, every plugin install is logged to a local audit trail the user can inspect from the Skills tab. The log is append-only and cryptographically chained — tampering is detectable. For users who need to demonstrate compliance to a third party (legal, medical, regulated industries), the audit trail is exportable as a signed bundle.
+10 · Tiers & Access
+Three tiers, one product.
+KnowMe ships under a freemium model with two paid tiers above it. The free tier is genuinely useful, not a trial. The $20 tier is the consumer default. The $200 tier is the load-bearing tier — it is built around a powerful local model (Qwen-class) running on user hardware, which is what justifies the price without cloud API costs dominating the unit economics.
+Tier
+Price
+What you get
+Best for
+Free
+$0
+All eight tiles. On-device inference (Gemma-3n-2B, Phi-3.5-mini). One Hand. Local-only — no sync.
+Anyone who wants a private AI assistant. The product is fully usable indefinitely at this tier.
+KnowMe
+$20 / month
+Free tier features plus: cloud LLM access (Claude · GPT · Groq · 142+ providers via UAR's liter-llm). Up to 10 Hands. BossFang sync to one personal instance. Plugin marketplace access.
+The mainstream user. Mixes local for routine tasks with cloud frontier models for hard problems.
+KnowMe Pro
+$200 / month
+Everything in KnowMe plus: licensed local Qwen-class model (35B-A3B) with TurboQuant 3-bit KV compression. Unlimited Hands. Multi-instance BossFang sync. Priority plugin signing. Air-gap deployment guide and support.
+Professionals and power users who need frontier-class reasoning without surrendering data to a cloud provider.
+Why the $200 tier is load-bearing
+Most "AI subscription" products at the $200 price point are reselling cloud API capacity at a markup. The unit economics are dominated by per-token API costs to Anthropic, OpenAI, or similar. KnowMe Pro inverts this:
+the value at $200 is a licensed local model running on the user's hardware
+, not a cloud reselling spread. The user pays for the licensing and packaging of the local Qwen build, the TurboQuant compression that makes it run on prosumer hardware, the air-gap support, and the priority plugin signing — none of which scale linearly with usage. This is what makes the tier sustainable at scale and explains why converting a $20 user to $200 is a higher-leverage activity than acquiring a new free user.
+No tier ever takes away local sovereignty
+The free tier and the $200 tier have the same privacy properties. Privacy is not a paywall feature — it is structural to the product. What scales with tier is access to bigger models, more Hands, more devices, and white-glove support. The architectural guarantees apply to every user.
+11 · Roadmap
+Where this is going.
+KnowMe v1.0 is the consumer surface. The roadmap below charts the eighteen months following launch — milestones, not promises, each tied to a measurable user-facing outcome.
+Phase
+Window
+Defining shipment
+Unlocks
+Foundation
+Month 1–2
+Public launch. Eight tiles ship. Six Hand templates. Free + $20 tier active. Cherry Studio (The Boss) integration complete.
+The consumer thesis is in market. First $20 cohort.
+Pro Tier
+Month 3–4
+$200 tier launches with licensed local Qwen-35B-A3B. TurboQuant KV compression integrated. Air-gap deployment guide published.
+The load-bearing tier. Pro user cohort begins building.
+Plugin Marketplace
+Month 5–7
+plugins.know-me.tools
+opens. Curated index of signed plugin CIDs. Update notifications. Publisher onboarding.
+Third-party ecosystem. Plugin authors can build sustainable businesses on the platform.
+Multi-instance Sync
+Month 6–8
+OFP gossip protocol stable. Four-instance topology supported. Conflict resolution via CRDTs proven across phone+desktop+home+cloud.
+The cross-device persona finds the product complete.
+Mobile Inference
+Month 8–10
+iOS and Android shipping. llama.cpp via
+llama-cpp-2
+in production. Gemma-3n-2B-Q4 (~1.5 GB) as default mobile model.
+Phone becomes a first-class device, not a chat client.
+Skills 2.0
+Month 10–12
+Skill marketplace. Cedar policy editor with visual diff. Per-skill audit dashboards. MCP server installer with verification.
+The user's Skill repertoire becomes the leverage. Pro users have rich custom toolchains.
+Hybrid SSM Models
+Month 12–15
+Jamba, Falcon-H1, RWKV-7 supported in candle-vllm fork. Multi-session agent infrastructure on prosumer hardware.
+The $200 tier becomes a clear "I run this locally" advantage over cloud-only competitors.
+Enterprise Edition
+Month 15–18
+Team-tier BossFang. Group-controlled Cedar policies. SSO via Ory Kratos. Audit-bundle export for compliance.
+Small businesses and regulated teams adopt the same architecture as individuals.
+What is intentionally missing from this roadmap
+Notably absent: a "KnowMe Cloud" tier where KnowMe LLC hosts inference on the user's behalf. This is missing on purpose. Once the vendor holds the user's queries on its own hardware, every privacy guarantee becomes a policy promise instead of an architectural fact. The roadmap is constrained to milestones that preserve the structural sovereignty thesis.
+Know
+Me
+, LLC
+FUNCTIONAL SPECIFICATION v1.0 · MAY 2026 · know-me.tools
+
+Source link and image-reference ledger
+Reference: 01 · Overview — #overview
+Reference: 02 · Philosophy — #philosophy
+Reference: 03 · Users — #users
+Reference: 04 · Capabilities — #capabilities
+Reference: 05 · Architecture — #architecture
+Reference: 06 · Hands System — #hands
+Reference: 07 · BossFang Sync — #bossfang
+Reference: 08 · Plugin System — #plugins
+Reference: 09 · Privacy & Trust — #privacy
+Reference: 10 · Tiers & Access — #tiers
+Reference: 11 · Roadmap — #roadmap

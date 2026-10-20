@@ -1,0 +1,499 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>S20 · uar-plugin-system-research-2026-08-04.md</title><link rel="stylesheet" href="../records.css"><body><main><a href="../index.html">KnowMe Praxis</a><h1>S20 · uar-plugin-system-research-2026-08-04.md</h1><p>Complete technical source record. Historical names and requirements remain visible for audit. Revised clauses and explicit corrections govern their application.</p><p><a href="S20.txt">Download complete technical text</a></p><article id="S20-001" class="source-clause"><h4>S20-001 · Next-Generation Plugin System for the Universal Agent Runtime (UAR): Research, Architecture, Specification &amp; Implementation Plan</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h1>Next-Generation Plugin System for the Universal Agent Runtime (UAR): Research, Architecture, Specification &amp; Implementation Plan</h1>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Doc ID</td>
+<td>PAGS-RESEARCH-UAR-PLUGIN-001</td>
+</tr>
+<tr>
+<td>Date</td>
+<td>2026-08-04</td>
+</tr>
+<tr>
+<td>Author</td>
+<td>Travis James, Prometheus AGS (research compiled via PMPO deep-research run)</td>
+</tr>
+<tr>
+<td>Status</td>
+<td>Accepted as design input for the next UAR development cycle</td>
+</tr>
+<tr>
+<td>Ownership</td>
+<td>Contract layer: <strong>UAR</strong> (<code>uar:plugin</code>). Product layer: <strong>KnowMe</strong> (<code>knowme:*</code> capabilities, marketplace, entitlements, trust UX). Per ADR-pending ownership split.</td>
+</tr>
+<tr>
+<td>Canonical copies</td>
+<td><code>universal-agent-runtime/docs/plugins/</code> (authoritative) · <code>know-me-system/docs/strategies/plugins/</code> (reference copy)</td>
+</tr>
+<tr>
+<td>Supersedes/amends</td>
+<td><code>universal-plugin-system-plan.md</code> D1 target naming (<code>knowme:plugin@1.0.0</code> → <code>uar:plugin@0.2.0</code>), performance claims, and the 12 review holes' remediations</td>
+</tr>
+</tbody>
+</table>
+<hr/></article><article id="S20-002" class="source-clause"><h4>S20-002 · TL;DR</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>TL;DR</h2>
+<ul>
+<li><strong>The librefang-seeded, WIT-native, capability-card design is sound and industry-validated</strong> — VS Code's contribution-points + activation-events, Shopify/Stripe's host-rendered UI, wasmCloud's WIT capability wiring, and proxy-wasm's lifecycle contract each independently prove a piece of it. Stay WIT-native (not Extism), keep A2UI-only (validated by Shopify remote-ui, Stripe UI toolkit, and MCP Apps), and adopt capability-cards as a superset of VS Code contribution points — but bound your capability-wiring ambition against OSGi's complexity collapse and your sandboxing cleverness against Figma's Realms failure.</li>
+<li><strong>The "abstraction costs nothing" claim is false and must be reframed honestly.</strong> Per the PLDI 2017 WebAssembly paper, only a minority of benchmarks (7 of the PolyBench-C suite) run within 10% of native and "nearly all within 2× of native"; the USENIX ATC 2019 "Not So Fast" study measured real applications at 45% (Firefox) to 55% (Chrome) slower on average, peaking at 2.08×–2.5×. Pulley (mandatory on iOS) is roughly an order of magnitude slower than Cranelift by Wasmtime's own characterization. The correct claim is "one portable contract, three honestly-budgeted execution tiers" — not "costs nothing."</li>
+<li><strong>The 12 known holes are real and each maps to a proven industry fix</strong>; the highest-priority gaps are revocation/kill-switch (Chrome/Firefox blocklist ops), permission-combination review (Chrome Web Store), and rollback (content-addressed generations). Version the contract as <strong>0.2.0 now, 1.0.0 only after real plugins shake out the surface</strong> — librefang's own humility rule, corroborated by wasmCloud's and MCP's staged extension approach.</li>
+</ul>
+<hr/></article><article id="S20-003" class="source-clause"><h4>S20-003 · PART 1 — THEORY &amp; ANALYSIS</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>PART 1 — THEORY &amp; ANALYSIS</h2></article><article id="S20-004" class="source-clause"><h4>S20-004 · Requirement 1: Visual AND non-visual plugins of any type (mini-app → single-job trigger component)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>Requirement 1: Visual AND non-visual plugins of any type (mini-app → single-job trigger component)</h3>
+<p><strong>Systems that prove it viable.</strong> Fermyon Spin proves a single manifest (<code>spin.toml</code>) can drive many trigger types — HTTP, command (run-to-completion, exports <code>wasi:cli</code> <code>run</code>), MQTT, cron — where each component is dispatched by a declared trigger, and the same runtime spans a full HTTP app down to a one-shot job. This is exactly UAR's span from <code>app-shell</code> to event-fired <code>workflow</code> component. VS Code proves the same span in a UI-rich host: a single <code>package.json</code> declares everything from a full webview app to a single command. Shopify's model proves the non-visual/visual split explicitly — Shopify <strong>Functions</strong> (WASM, non-visual commerce logic with instruction limits) versus <strong>UI extensions</strong> (declarative components) share one extension/app envelope.</p>
+<p><strong>Failure modes observed.</strong> Spin's weakness is that trigger types are host-defined and adding a new trigger (e.g., the command trigger) required a Spin plugin and a manifest-version bump (v2→v3 was gated on a manifest change). Lesson: UAR's "worlds per plugin kind" must be an <strong>open, additive set</strong> anchored in the capability card, not a closed host enum, so a new kind doesn't force a contract-breaking manifest revision.</p>
+<p><strong>Design lesson imported.</strong> Keep the librefang <code>run() -&gt; result</code> world as the atomic unit (proven, has implementations), and treat every richer kind (<code>hook</code>, <code>contributor</code>, <code>agent</code>, <code>provider</code>, <code>app-shell</code>, <code>service</code>, <code>workflow</code>) as a WIT world that is a <strong>superset</strong> of the base host imports. The capability card — not a hard-coded host switch — declares which world a plugin implements. This is the Spin lesson (manifest declares the trigger) fused with the VS Code lesson (manifest declares contributions) and hardened against Spin's closed-enum weakness.</p></article><article id="S20-005" class="source-clause"><h4>S20-005 · Requirement 2: librefang spec + open-ended capability determination (capability-card open vocabulary)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>Requirement 2: librefang spec + open-ended capability determination (capability-card open vocabulary)</h3>
+<p><strong>VS Code contribution-points vs. capability-cards — validate/refine.</strong> VS Code's <code>contributes</code> block plus <code>activationEvents</code> is <em>the</em> success story of declarative capability advertisement: the host reads the manifest at startup and "prepares its UI accordingly," activating extension code lazily only when an activation event fires (<code>onCommand</code>, <code>onLanguage</code>, <code>onCustomEditor</code>, etc.). The refinement UAR must make: VS Code contribution points are a <strong>closed vocabulary</strong> owned by Microsoft — third parties cannot invent new contribution categories that other extensions can discover. UAR's capability card's <strong>open vocabulary</strong> (unrecognized capabilities carried, sandboxed, semantically discoverable; recognized ones get structured pipeline stages and first-class surfaces) is strictly more powerful and is the correct generalization. <strong>Verdict: copy contribution-points' declarative-manifest + lazy-activation discipline; refine by making the vocabulary open and self-describing (embedded name/description/tags for semantic routing), which VS Code cannot do.</strong></p>
+<p><strong>The caution: OSGi's complexity collapse.</strong> OSGi is the deepest prior art for a capability model (<code>Require-Capability</code>/<code>Provide-Capability</code>, versioned service registry, full bundle lifecycle). It technically worked and most enterprise Java middleware was rebuilt on it — yet it failed to "cross the chasm" for application developers. The consensus post-mortem (InfoQ interviews with practitioners): it was built for middleware vendors (its roots are remote set-top-box updates — "OSGi was never built for application developer consumption"), its learning curve was steep, and its <code>requires/provides</code> resolution created brittle, hard-to-debug runtime failures; it was ultimately incompatible with the mainstream Spring Boot stack. <strong>Design lesson: UAR's <code>requires</code>/<code>enhances</code> composition fields are valuable but must stay declarative-and-simple. Do not build an OSGi-style transitive constraint solver. Resolve composition at install/activation with a flat, explain-able "will this run here" check (the host-profile mechanism), and fail loudly with a named error — never a silent version-resolution cascade.</strong> OSGi is the cautionary upper bound on capability-wiring ambition.</p></article><article id="S20-006" class="source-clause"><h4>S20-006 · Requirement 3: Lifecycle with hooks (install→verify→register→activate→deactivate→upgrade→remove + runtime activation events)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>Requirement 3: Lifecycle with hooks (install→verify→register→activate→deactivate→upgrade→remove + runtime activation events)</h3>
+<p><strong>proxy-wasm lifecycle contract vs. the UAR lifecycle.</strong> The proxy-wasm ABI (v0.2.1, the de-facto standard across Envoy, Kong/ngx_wasm, and others) is the cleanest proven lifecycle contract for WASM plugins: a <strong>root context</strong> (<code>on_vm_start</code>, <code>on_configure</code>, <code>on_tick</code>) separated from <strong>per-request/per-stream contexts</strong> (<code>on_request_headers</code>, <code>on_response_body</code>, <code>on_done</code>, <code>on_delete</code>), where returning <code>false</code> from a configuration callback cleanly signals "this instance shouldn't be used." This root-vs-transient split is exactly the discipline UAR needs: a plugin-lifetime context (install/verify/register/activate/deactivate) distinct from per-invocation contexts (activation events, hook firings). <strong>Verdict: adopt proxy-wasm's root/per-event context separation and its "return false to reject configuration" pattern for the <code>verify</code>→<code>activate</code> gates. UAR's advantage over proxy-wasm is that the Component Model gives typed WIT interfaces instead of proxy-wasm's raw <code>i32</code>/pointer ABI with manual buffer management.</strong></p>
+<p><strong>VS Code activation as the model for runtime activation events.</strong> VS Code's evolution is instructive: newer versions (1.74+) <em>removed</em> the need to declare <code>onCommand</code>/<code>onLanguage</code>/<code>onCustomEditor</code> activation events explicitly — the host infers them from the contribution declarations. <strong>Design lesson: derive activation triggers from the capability card's <code>events.consumes</code> and <code>actions</code> declarations wherever possible, so authors don't double-declare.</strong> Keep an explicit escape hatch for <code>onStartup</code>-style eager activation, but default to lazy. (VS Code's disposable extension-host process, with a ~3-second unresponsiveness watchdog that can kill and restart the host without losing work, is also the proof pattern for crash-loop containment below.)</p></article><article id="S20-007" class="source-clause"><h4>S20-007 · Requirement 4: Rich event model integrating with Flint Realtime Fabric (FRF)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>Requirement 4: Rich event model integrating with Flint Realtime Fabric (FRF)</h3>
+<p><strong>WordPress hooks vs. the typed contributor pipeline.</strong> WordPress's action/filter system is the most successful hook system ever built — an informal community count puts core hooks at ~2,744 (WordPress.org itself says "over 2,000"), and they underpin a 60,000+ plugin ecosystem — and it succeeded precisely because it is <strong>dead simple and untyped</strong>: <code>add_action</code>/<code>add_filter</code> with a priority integer (default 10, lower runs first). But its untypedness has a documented, real cost: the WordPress Plugin Handbook requires that every filter callback <em>return a value</em>, and the single most-cited failure mode is "forgetting to return the value — which makes content disappear entirely"; callbacks must also defensively type-check the value they receive. <strong>This is the single strongest evidence in the entire research for UAR's typed-contributor-pipeline decision.</strong> UAR's contributor stages (ingress→…→egress) get WIT-typed input/output schemas, provenance tags, and budget caps — capturing WordPress's compositional power (many independent contributors at declared priority) while eliminating its class of silent type/return bugs. <strong>Verdict: copy WordPress's ordered-multiple-contributors-at-a-hook model and its priority-integer ordering; reject its untypedness. UAR's "declared priority + stable tiebreak, per-stage aggregate budget, first-party-system-content-first" rule is the correct typed evolution.</strong></p>
+<p><strong>Event forgery and provenance.</strong> WordPress hooks run in-process with full mutual trust — any plugin can <code>do_action</code> any hook name. UAR must not inherit this. The host-stamped provenance + emit-to-own-namespace allowlist + rate caps is the correct fix and has no WordPress precedent; the closest analog is Chrome MV3's move to <code>declarativeNetRequest</code> (declared, host-mediated rules) precisely because giving extensions imperative interception power was unauditable.</p>
+<p><strong>FRF seam design.</strong> The event model should present a single in-process bus abstraction to plugins (AG-UI vocabulary as the event schema), with the host — never the plugin — deciding whether an event stays local or is marshalled onto an FRF transport (WebRTC data channel / OFP mesh / Matrix-bridge). This mirrors wasmCloud's <strong>lattice</strong>: components emit/consume over WIT interfaces and are entirely unaware whether the peer is in-process or across a NATS-connected mesh — wasmCloud's docs state "application code can be written without regard to the underlying infrastructure," and its wRPC protocol composes distributed components at runtime over the lattice. <strong>Design lesson: model the FRF seam as a wasmCloud-lattice-style transport adapter behind the event bus port, with <code>WatchEntityType</code>/entity-watch RPC as adjacent machinery. Plugins see topics; the host sees transports.</strong> Do not expose transport selection to plugins.</p></article><article id="S20-008" class="source-clause"><h4>S20-008 · Requirement 5: Runs on all platforms via WASM, native perf via Cranelift, Pulley where JIT forbidden — quantify honestly</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>Requirement 5: Runs on all platforms via WASM, native perf via Cranelift, Pulley where JIT forbidden — quantify honestly</h3>
+<p>This requirement's framing — "the abstraction costs nothing" — is <strong>not supported by the evidence and must be amended.</strong> The honest performance story, sourced:</p>
+<ul>
+<li><strong>Cranelift codegen quality.</strong> The oft-cited "~2% slower than V8 TurboFan, ~14% slower than LLVM/WAVM" figure (from the Cranelift README) traces to the PLDI 2017 paper <em>Bringing the Web Up to Speed with WebAssembly</em> (Haas, Rossberg, et al.) — but that paper's actual headline is narrower: on the PolyBench-C suite, only <strong>7 benchmarks run within 10% of native and "nearly all within 2× of native."</strong> On the larger, realistic <strong>SPEC CPU</strong> suite, the USENIX ATC 2019 paper <em>Not So Fast</em> (Jangda, Powers, Berger, Guha) measured applications "slower by an average of 45% (Firefox) to 55% (Chrome), with peak slowdowns of 2.08× (Firefox) and 2.5× (Chrome)" — i.e., mean ~1.45×–1.55× native. A 2025 arXiv study (WAMI) found Wasmtime AOT ~4.1% slower than LLVM on its benchmarks. <strong>Honest claim: Cranelift is near-native for tight compute kernels and typically ~1.45×–1.6× native for real application workloads — not "costs nothing."</strong></li>
+<li><strong>Pulley (mandatory on iOS/iPadOS/tvOS).</strong> Wasmtime's docs state Pulley "is likely not suitable for compute-intensive tasks that must run in as little time as possible" and characterize it as roughly an order-of-magnitude slower than native/Cranelift. (No Wasmtime document states a fixed "10×" multiplier verbatim — treat it as an order-of-magnitude planning estimate, not a quoted constant.) Pulley is not naïve — it reuses Cranelift's optimizing mid-end and emits macro-op super-instructions — but per the Pulley Performance Tracking issue (#10102) it "fundamentally uses two opcodes per memory access: one for the bounds check and one for the actual load/store" (no signal-handler traps), and doesn't hoist memory bounds out of loops. <strong>Honest claim: dynamically-installed plugins on iOS run roughly an order of magnitude slower than desktop Cranelift; budget accordingly and keep hot paths off-device or in bundled AOT native code.</strong></li>
+<li><strong>Instantiation latency.</strong> Wasmtime's design puts compilation off the critical path via AOT <code>.cwasm</code> (<code>Component::deserialize</code>), leaving only instantiation, further accelerated by the <strong>pooling allocator</strong> (pre-allocated memory/table pool; deallocation is "a single <code>madvise</code> to reset linear memory") and <strong>copy-on-write memory init</strong>. Fermyon CEO Matt Butcher states production "cold starts under half a millisecond" (vendor claim, GlobeNewswire, Apr 9 2025; The New Stack notes traditional Lambda/Azure cold starts are 200–500 ms for contrast) — not independently benchmarked. No official Bytecode Alliance table of absolute µs figures for cold-JIT vs <code>.cwasm</code> vs Pulley exists — the docs describe mechanisms, not constants. <strong>Honest claim: with AOT + pooling, instantiation is sub-millisecond on desktop; treat Fermyon's ~0.5 ms as an achievable target, not a guarantee.</strong></li>
+<li><strong>Mobile footprint.</strong> A JS plugin via ComponentizeJS/StarlingMonkey embeds a SpiderMonkey engine of <strong>~8 MB per component</strong> (confirmed by both the Bytecode Alliance ComponentizeJS README and wasmCloud docs as a fixed cost that "does not grow with the size of your application code," but currently <strong>duplicated per JS component</strong> — the Bytecode Alliance plans to share embeddings in future). <strong>Design lesson: on mobile, prefer Rust/TinyGo plugins (no engine embedding); treat JS/Python plugins as a desktop-first convenience and warn on mobile install-size impact.</strong></li>
+</ul>
+<p><strong>Verdict: reframe the requirement. UAR delivers one portable WIT contract across three honestly-budgeted tiers — Cranelift AOT (desktop, Android where W^X permits), Pulley interpreter (iOS/iPadOS, ~order-of-magnitude penalty), and jco-transpiled core-wasm+JS (browser). The abstraction does not cost nothing; it costs a known, tier-specific, documented amount.</strong></p></article><article id="S20-009" class="source-clause"><h4>S20-009 · Requirement 6: Multi-language authoring (Rust, Go/TinyGo, Python, JS/TS, others)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>Requirement 6: Multi-language authoring (Rust, Go/TinyGo, Python, JS/TS, others)</h3>
+<p><strong>Extism vs. raw Component Model — why UAR should stay WIT-native.</strong> Extism is the most mature universal WASM plugin framework (host SDKs in 15+ languages, PDKs, a "bytes-in/bytes-out, bring-your-own-serialization" ABI). Its own maintainers state they have "no concrete plans to make use of the Component Model yet" because their generic ABI already supports every language. Helm's HIP-0026 chose Extism explicitly because the Component Model wasn't yet supported by their Go runtime (Wazero), calling Extism "the most mature and well-supported Wasm plugin system today." <strong>So why should UAR <em>not</em> use Extism?</strong> Because Extism's advantage — a low-level untyped byte-pipe — is exactly what UAR does not want. UAR's entire design (typed contributor pipeline, typed action I/O schemas, capability cards, cross-language type safety) depends on <strong>WIT interface types</strong> as the contract. Extism would force UAR to reinvent typing on top of a byte-pipe, exactly the mistake WordPress's untyped hooks demonstrate. The Component Model already gives UAR what it needs across languages: <strong>componentize-py</strong> (Python→component), <strong>ComponentizeJS/StarlingMonkey</strong> (JS/TS→component), native Rust via <code>wit-bindgen</code>, TinyGo, and the Bytecode Alliance's new <strong>Endive</strong> (Java Wasm runtime with a Cranelift backend, though it does not yet support WASI P2 or the component model as of May 2026). <strong>Verdict: stay WIT-native. Extism validates the market demand for universal plugins but chose the opposite design axis; UAR's typed-contract requirements make the Component Model the correct base. Cite Extism as the "what we'd build if we didn't need types" baseline.</strong></p>
+<p><strong>Practical multi-language caveats to fold in:</strong> componentize-py resolves all imports at build time (no runtime dynamic import — imports used at runtime must be resolved at the module top level); JS/Python components carry the ~8 MB engine; jco does not yet support async guest functions cleanly (browser builds use synchronous <code>XMLHttpRequest</code> wrappers as workarounds).</p></article><article id="S20-010" class="source-clause"><h4>S20-010 · Requirement 7: Web, mobile, desktop targets — the browser-host problem handled honestly</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>Requirement 7: Web, mobile, desktop targets — the browser-host problem handled honestly</h3>
+<p><strong>The hard fact: wasmtime does not run in browsers.</strong> Browsers execute core WASM modules, not Component Model components. The proven path is <strong>jco transpile</strong>, which converts any component into equivalent core-wasm + JS glue that runs in Node or the browser. This is real and in production (jco 1.20 passed all 46 upstream Wasmtime WASI P3 tests as of the May 27 2026 wasmCloud community call), but it means the <strong>browser host is not wasmtime</strong> — it's a different execution engine (V8's WASM + generated glue) with different characteristics (async support incomplete, WASI shims explicitly experimental in the browser). <strong>Design lesson: treat host-parity as a first-class conformance concern.</strong> The same plugin must pass the conformance kit under both the wasmtime host (desktop/mobile) and the jco-transpiled host (browser). Divergences (async support, WASI subsystem coverage) must be enumerated in the host matrix, not discovered at runtime. Notably, jco's transpile output is also the mechanism the Bytecode Alliance is using to build the telemetry case for eventual <em>native</em> browser Component Model support ("The Road to Component Model 1.0").</p></article><article id="S20-011" class="source-clause"><h4>S20-011 · Discovered additions (things the requirements forgot)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>Discovered additions (things the requirements forgot)</h3>
+<ol>
+<li><strong>Hot-reload dev loop.</strong> Zed's model is the proof point: extensions compile to <code>wasm32-wasip2</code>, run in a Wasmtime sandbox, and a module can be reloaded without restarting the editor with failures staying contained. Spin's <code>spin watch</code> (manifest <code>watch</code> globs) is the file-watch pattern. UAR needs both: a <code>uar plugin watch</code> rebuild loop and host-side hot-swap of a plugin generation without full runtime restart.</li>
+<li><strong>Conformance/test kit.</strong> Stripe ships Jest matchers + a remote-render test harness for UI extensions (testing "a remote engine that renders your app, not the DOM directly"); UAR needs the analogous conformance kit (the librefang zero-source-change conformance test is the seed).</li>
+<li><strong>Monetization reality.</strong> VS Code deliberately never shipped paid extensions; JetBrains Marketplace and Setapp prove curated paid-extension markets work. <strong>Design lesson: KnowMe's W3C Verifiable Credential entitlements (enforced at activation, not runtime) are the correct monetization primitive — decouple licensing from the runtime, as VS Code's absence and JetBrains' presence jointly show.</strong></li>
+<li><strong>Accessibility &amp; i18n of declarative UI.</strong> Because A2UI is host-rendered, accessibility and localization are the <em>host's</em> obligation and opportunity — Shopify explicitly states its host-rendered checkout components are "performant, accessible, and work in all of checkout's supported browsers" precisely because the host renders them natively. This is a hidden benefit of the A2UI-only decision — bake WCAG/i18n into the shared renderers once.</li>
+<li><strong>Resource metering/billing.</strong> Shopify Functions enforce hard instruction limits; UAR's <code>epoch-budget-ms</code> per capability is the analog. Extend it: per-stage aggregate wall budgets and epoch-based interruption via wasmtime's epoch mechanism.</li>
+<li><strong>Sandbox cleverness bound — Figma.</strong> Figma's plugin sandbox journey is the definitive cautionary tale. They first shipped a <strong>Realms shim</strong> sandbox; in October 2019 "several independent vulnerabilities were recently discovered with the Realms shim that could have allowed code inside the sandbox to escape" (disclosed as GitHub Advisory GHSA-7cg8-pq9v-x98q, Critical, fixed in realms-shim v1.2.1). They then switched to <strong>QuickJS/SpiderMonkey compiled to WASM</strong>, because — in Figma's words — "now that we're using a JavaScript VM compiled to WebAssembly, it's not possible to confuse objects from outside with objects from inside because the object representations are too different." A "swappable architecture" let them switch in days. The cost: notoriously "impenetrable" debugging and performance overhead. <strong>Design lesson: UAR's WASM-component sandbox is already the <em>correct</em> end state Figma converged on the hard way — do not add clever JS-realm-style tricks on top. The Component Model's shared-nothing isolation is the security boundary; keep it and invest the saved effort in debuggability (source maps, structured traces), which is where Figma's approach hurt.</strong></li>
+</ol></article><article id="S20-012" class="source-clause"><h4>S20-012 · Comparison Matrix</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>Comparison Matrix</h3>
+<p>Verdict line convention: <strong>COPY</strong> = adopt directly; <strong>REFINE</strong> = adopt with modification; <strong>AVOID</strong> = cautionary, do not replicate.</p>
+<table>
+<thead>
+<tr>
+<th>Ecosystem</th>
+<th>Capability advertisement</th>
+<th>Lazy activation</th>
+<th>Lifecycle</th>
+<th>Events</th>
+<th>Permissions</th>
+<th>UI model</th>
+<th>Multi-lang</th>
+<th>Versioning</th>
+<th>Revocation</th>
+<th>DX</th>
+<th>Verdict for UAR</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>VS Code</strong></td>
+<td><code>contributes</code> manifest (closed vocab)</td>
+<td>activation events (strong)</td>
+<td>activate/deactivate</td>
+<td>commands/webview RPC</td>
+<td><strong>none — full user authority</strong></td>
+<td>webview HTML + native</td>
+<td>any (via subprocess)</td>
+<td><code>engines</code> field</td>
+<td>store takedown only</td>
+<td>excellent</td>
+<td><strong>COPY</strong> manifest+lazy activation; <strong>REFINE</strong> to open vocab; <strong>AVOID</strong> its no-permission model</td>
+</tr>
+<tr>
+<td><strong>Extism</strong></td>
+<td>host-defined</td>
+<td>host-controlled</td>
+<td>host-driven</td>
+<td>host functions</td>
+<td>host-gated imports</td>
+<td>none</td>
+<td>15+ langs (strong)</td>
+<td>ABI-generic</td>
+<td>none</td>
+<td>good</td>
+<td><strong>AVOID as base</strong> (untyped byte-pipe); cite as demand proof</td>
+</tr>
+<tr>
+<td><strong>wasmCloud</strong></td>
+<td>WIT imports/exports</td>
+<td>link-at-runtime</td>
+<td>provider lifecycle</td>
+<td>lattice pub/sub (wRPC)</td>
+<td>WIT-typed capability</td>
+<td>none (backend)</td>
+<td>Rust/Go/TS</td>
+<td>WIT + wRPC</td>
+<td>host-controlled</td>
+<td>wash CLI, wit2wadm</td>
+<td><strong>COPY</strong> WIT capability wiring + lattice-as-transport-seam</td>
+</tr>
+<tr>
+<td><strong>Fermyon Spin</strong></td>
+<td><code>spin.toml</code> triggers</td>
+<td>trigger-driven</td>
+<td>run-to-completion</td>
+<td>trigger types</td>
+<td><code>allowed_outbound_hosts</code></td>
+<td>none</td>
+<td>any→component</td>
+<td>manifest version gate</td>
+<td>OCI registry</td>
+<td><code>spin new/watch</code> (strong)</td>
+<td><strong>COPY</strong> manifest triggers + watch loop; <strong>REFINE</strong> closed-trigger-enum → open worlds</td>
+</tr>
+<tr>
+<td><strong>Shopify Functions/UI ext</strong></td>
+<td><code>shopify.extension.toml</code> targets</td>
+<td>target-driven</td>
+<td>host-injected</td>
+<td>shopify global API</td>
+<td>no payment/DOM access</td>
+<td><strong>remote-ui, host-rendered (near-A2UI)</strong></td>
+<td>JS/WASM</td>
+<td>API version</td>
+<td>app review</td>
+<td>strong</td>
+<td><strong>COPY</strong> — closest analog to A2UI-only; validates it</td>
+</tr>
+<tr>
+<td><strong>Stripe Apps</strong></td>
+<td><code>stripe-app.json</code> + viewports</td>
+<td>view-driven</td>
+<td>install/permission</td>
+<td>proxied async events</td>
+<td>manifest permissions</td>
+<td><strong>UI toolkit, no HTML/CSS (near-A2UI)</strong></td>
+<td>TS/React</td>
+<td>SDK versioned</td>
+<td>app review</td>
+<td>Jest test kit</td>
+<td><strong>COPY</strong> typed-component UI + test kit; validates A2UI-only</td>
+</tr>
+<tr>
+<td><strong>MCP Apps (SEP-1865)</strong></td>
+<td><code>ui://</code> resource + <code>_meta.ui</code></td>
+<td>tool-declared</td>
+<td>prefetch/cache/review</td>
+<td>JSON-RPC</td>
+<td>sandboxed iframe</td>
+<td>HTML in sandboxed iframe</td>
+<td>any</td>
+<td>extension framework + deprecation policy</td>
+<td>host review</td>
+<td>maturing</td>
+<td><strong>INTEROP</strong> — support both directions; mirror prefetch-then-review lifecycle</td>
+</tr>
+<tr>
+<td><strong>proxy-wasm</strong></td>
+<td>ABI markers</td>
+<td>context creation</td>
+<td><strong>root vs per-event (strong)</strong></td>
+<td>on_* callbacks</td>
+<td>host functions</td>
+<td>none</td>
+<td>C++/Rust/AS</td>
+<td>ABI version (0.2.1)</td>
+<td>host</td>
+<td>moderate</td>
+<td><strong>COPY</strong> root/per-event lifecycle; upgrade raw ABI→typed WIT</td>
+</tr>
+<tr>
+<td><strong>WordPress hooks</strong></td>
+<td>none (runtime <code>add_action</code>)</td>
+<td>always loaded</td>
+<td>plugin activate/deactivate</td>
+<td><strong>actions/filters (strongest ecosystem)</strong></td>
+<td><strong>none — full trust</strong></td>
+<td>PHP/server</td>
+<td>PHP only</td>
+<td>none (breakage common)</td>
+<td>.org delisting</td>
+<td>huge ecosystem</td>
+<td><strong>COPY</strong> ordered-multi-contributor model; <strong>AVOID</strong> untyped + full-trust</td>
+</tr>
+<tr>
+<td><strong>Chrome MV3</strong></td>
+<td>manifest permissions</td>
+<td>event service workers</td>
+<td>install/enable</td>
+<td>declarativeNetRequest</td>
+<td><strong>permission combinations reviewed</strong></td>
+<td>HTML</td>
+<td>JS</td>
+<td>manifest version</td>
+<td><strong>blocklist/remote kill (strong)</strong></td>
+<td>good</td>
+<td><strong>COPY</strong> permission-combination review + blocklist ops</td>
+</tr>
+<tr>
+<td><strong>OSGi</strong></td>
+<td>Provide/Require-Capability</td>
+<td>lazy bundle activation</td>
+<td>full bundle lifecycle</td>
+<td>service registry events</td>
+<td>Java security mgr</td>
+<td>none</td>
+<td>JVM langs</td>
+<td>semantic version ranges</td>
+<td>none</td>
+<td><strong>poor (complexity collapse)</strong></td>
+<td><strong>AVOID</strong> transitive resolver; cautionary bound on wiring ambition</td>
+</tr>
+<tr>
+<td><strong>Zed</strong></td>
+<td><code>extension.toml</code> + <code>[[capabilities]]</code></td>
+<td>on-demand load</td>
+<td>download/unpack/instantiate/reload</td>
+<td>LSP/host API</td>
+<td><strong>capability-scoped (process:exec, download_file, npm)</strong></td>
+<td>none yet</td>
+<td>Rust→wasm32-wasip2</td>
+<td><strong><code>zed_extension_api</code> versioned WIT (strong)</strong></td>
+<td>git/store</td>
+<td>hot-reload, wit-bindgen</td>
+<td><strong>COPY</strong> versioned-WIT-API discipline + capability scoping + hot-reload</td>
+</tr>
+<tr>
+<td><strong>Figma</strong></td>
+<td>manifest</td>
+<td>on-run</td>
+<td>run/close</td>
+<td>postMessage</td>
+<td>networkAccess allowlist</td>
+<td>iframe + QuickJS-in-WASM</td>
+<td>JS</td>
+<td>API versioned</td>
+<td>store</td>
+<td><strong>poor debuggability</strong></td>
+<td><strong>AVOID</strong> clever JS-realm sandboxing; UAR's WASM sandbox is the right end state</td>
+</tr>
+</tbody>
+</table>
+<hr/></article><article id="S20-013" class="source-clause"><h4>S20-013 · PART 2 — ARCHITECTURE</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>PART 2 — ARCHITECTURE</h2></article><article id="S20-014" class="source-clause"><h4>S20-014 · 2.1 Crate / package topology</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>2.1 Crate / package topology</h3>
+<p>Per the D3 decision (all hosts share one implementation):</p>
+<ul>
+<li><strong><code>uar-plugin-contract</code></strong> (crate) — pure types generated from the WIT family; no host logic. The single source of truth. Published to crates.io and mirrored as WIT packages to an OCI/wkg registry (<code>ghcr.io/prometheus-ags/wit/uar/plugin</code>).</li>
+<li><strong><code>uar-plugin-host</code></strong> (crate) — the shared dispatch trait + sandbox host: capability wiring at instantiation (undeclared imports → <code>MissingCapability</code> at load, never trap-at-first-use, inheriting librefang), the fs/net/kv/agent/env/time host implementations with SSRF and path-traversal guards, epoch budgets, event bus, provenance stamping, lifecycle state machine, generation manager. <strong>One implementation, shared by every host</strong> — this is the architectural keystone.</li>
+<li><strong>Per-host adapter crates:</strong> <code>uar-host-librefang</code> (headless: skill-task + hook), <code>uar-host-knowme</code> (full-UI: + events/a2ui/settings/app-shell/provider), <code>uar-host-server</code> (axum 0.8 service host). Adapters wire profile-specific imports and the trusted host layer (device keys, entitlement VC wallet, approval gate — never in plugin/runtime space); they contain <strong>no sandbox logic</strong>.</li>
+<li><strong><code>uar-plugin-cli</code></strong> — scaffold/build/watch/test/publish tooling.</li>
+<li><strong>Browser host:</strong> a jco-transpilation build target of the contract + a JS re-implementation of the host imports (the sandbox host cannot be shared verbatim here — this is the honest host-parity seam).</li>
+</ul></article><article id="S20-015" class="source-clause"><h4>S20-015 · 2.2 WIT family layout (`uar:plugin`)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>2.2 WIT family layout (<code>uar:plugin</code>)</h3>
+<pre><code>package uar:plugin@0.2.0;
+
+// --- host imports (near-verbatim librefang, additive extensions) ---
+interface fs   { /* read/write/list-entries, path-traversal guarded */ }
+interface net  { /* fetch, SSRF-guarded: block loopback/link-local/RFC1918/metadata */ }
+interface kv   { /* get/set */ }
+interface agent{ /* send/spawn */ }
+interface env  { /* allowlisted read */ }
+interface time { /* ungated now() */ }
+// additive (new):
+interface events   { /* emit (host-stamped provenance), subscribe; namespaced topics, rate-capped */ }
+interface infer    { /* LLM/embedding calls — REDUCED/absent inside contributor stages (reentrancy guard) */ }
+interface memory   { /* read/write scoped store */ }
+interface a2ui     { /* emit validated A2UI data (uar.a2ui/1, catalog urn:uar:a2ui:catalog:1) */ }
+interface settings { /* read validated settings (JSON Schema 2020-12) */ }
+
+// --- error taxonomy (librefang, extended) ---
+variant plugin-error {
+  capability-denied, path-denied, ssrf-denied, io(string),
+  invalid-argument(string), timeout, internal(string),
+  // additive:
+  missing-capability(string), budget-exceeded, quarantined, revoked
+}
+
+// --- worlds per plugin kind (superset of base) ---
+world skill-task  { import ...base...; export run: func() -&gt; result&lt;_, plugin-error&gt;; }
+world hook        { import ...base, events; export on-event: func(ev: event) -&gt; result&lt;_, plugin-error&gt;; }
+world contributor { import ...base-minus-infer, events; export contribute: func(stage-input) -&gt; result&lt;contribution, plugin-error&gt;; }
+world agent       { /* A2A-shaped task lifecycle */ }
+world provider    { /* LLM/embedding/modality with fallback */ }
+world app-shell   { import ...base, a2ui, settings, events; /* full mini-app */ }
+world service     { /* wasi:http or supervised sidecar; OpenAPI-&gt;MCP */ }
+world workflow    { /* declarative graph, BossFang-orchestrated */ }
+</code></pre>
+<p><strong>Profiles as worlds-composition:</strong>
+- <strong>headless profile</strong> = base host + <code>skill-task</code> + <code>hook</code> (librefang/BossFang gateway nodes).
+- <strong>full-UI profile</strong> = headless + <code>events</code> + <code>a2ui</code> + <code>settings</code> + <code>app-shell</code> + <code>provider</code> (KnowMe).</p>
+<p><strong>Skill-task convergence (the ADR):</strong> <code>librefang:plugin@0.1.0</code> <code>run()</code>, <code>uar-skill.wit</code>, and <code>prometheus:component</code> skill interfaces converge into <code>uar:plugin/skill-task</code>. <strong>Conformance requirement: an existing <code>librefang:plugin@0.1.0</code> plugin must load and run unchanged</strong> — the base <code>run()</code> world is byte-compatible; additive interfaces are opt-in.</p></article><article id="S20-016" class="source-clause"><h4>S20-016 · 2.3 Capability card schema v2</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>2.3 Capability card schema v2</h3>
+<p>One card shape for every capability (recognized or invented):</p>
+<pre><code>id            : namespaced (uar:* runtime | knowme:* product | reverse-DNS third-party)
+version       : semver
+name/desc/tags: embedded locally (semantic discovery/routing; registry ships TEXT never vectors)
+settings_schema: JSON Schema 2020-12
+actions       : A2A-style {input_schema, output_schema, streaming: bool}  — validated UNIVERSALLY
+events        : {emits[], consumes[]} namespaced topics
+chunks        : stream-chunk types incl. a2ui-patch
+ui            : optional a2ui_components
+requires/enhances: composition (flat, non-transitive — OSGi caution)
+platforms     : [desktop, ios, android, web] with execution backend hints
+profile_required: headless | full-ui         (NEW — installer answers "will this run here" mechanically)
+epoch_budget_ms: int
+combination_risk: [NEW — declared risky combos, e.g. {memory:read + net:egress = exfiltration}]
+namespace_proof: [NEW — did:web/DNS-TXT or transparency-log receipt]
+</code></pre></article><article id="S20-017" class="source-clause"><h4>S20-017 · 2.4 Event fabric</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>2.4 Event fabric</h3>
+<ul>
+<li><strong>In-process bus</strong> with AG-UI (<code>uar.agui/1</code>) as the event vocabulary; topics namespaced.</li>
+<li><strong>Host-stamped provenance</strong>: the host — not the plugin — records emitter identity and generation; plugins may emit only to their own namespace (allowlist) under per-topic rate caps.</li>
+<li><strong>FRF transport adapter</strong> (wasmCloud-lattice-style): behind the bus port, the host routes an event locally or onto an FRF transport (str0m SFU / LiveKit / OFP mesh / Matrix inbound / ATProto outbound). Plugins are transport-unaware. <strong>Entity-watch RPC (<code>WatchEntityType</code>)</strong> is adjacent machinery on the same port for cross-device state.</li>
+<li><strong>Contributor reentrancy guard</strong>: the <code>contributor</code> world imports a host set <em>without</em> <code>infer</code> (no host-inference inside the prompt pipeline); if inference is genuinely needed, a depth-1 non-reentrant lane is granted explicitly and metered.</li>
+</ul></article><article id="S20-018" class="source-clause"><h4>S20-018 · 2.5 Lifecycle state machine + generations/rollback</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>2.5 Lifecycle state machine + generations/rollback</h3>
+<p>States: <code>installed → verified → registered → active ⇄ inactive → (upgrading) → removed</code>, with <code>quarantined</code> as a terminal-until-cleared state reachable from any active state.</p>
+<ul>
+<li><strong>Content-addressed immutable generations</strong>: each install/upgrade is an immutable generation addressed by content hash, with <code>current</code>/<code>previous</code> pointers. <strong>Atomic swap</strong> of payload + registry entry + catalog + settings together; rollback = repoint <code>current</code>→<code>previous</code>. (Mirrors Figma's "swappable architecture" that let them switch sandboxes in days, and NixOS-style generations.)</li>
+<li><strong>Crash-loop containment</strong>: a circuit breaker per plugin; N failures in window → <strong>auto-quarantine with user notice</strong>. VS Code's disposable extension-host + ~3-second unresponsiveness watchdog (kill and restart without losing work) is the proof pattern.</li>
+<li><strong>proxy-wasm root/per-event contexts</strong> map onto verify/activate (root) vs. hook/action firings (per-event); <code>verify</code> returning an error rejects the generation before it can activate.</li>
+</ul></article><article id="S20-019" class="source-clause"><h4>S20-019 · 2.6 Registry + advisory/revocation</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>2.6 Registry + advisory/revocation</h3>
+<ul>
+<li><strong>Distribution:</strong> components as <strong>OCI artifacts</strong> (proven by Spin, wasmCloud, SpinKube) via <strong>wkg</strong>/<code>wasm-pkg</code>; optional <strong>warg</strong> transparency log for federated namespacing and "package transparency" (Certificate-Transparency-inspired). A <strong>first-come transparency log</strong> is the pragmatic namespace-squatting defense when <code>did:web</code>/DNS-TXT proof is absent. (As of 2026 the ecosystem's registry story is OCI-first with warg still in-development — start OCI, keep warg optional.)</li>
+<li><strong>Signing:</strong> artifacts signed; verify at install. Sigstore/cosign + TUF are the industry standard for keyless signing + transparency; adopt cosign-style signatures with a TUF-style root of trust for the advisory feed.</li>
+<li><strong>Advisory / revocation (highest-priority gap):</strong> a <strong>signed advisory/blocklist published beside the registry</strong>, checked at <strong>activation + periodically</strong>, triggering <strong>auto-quarantine</strong>. This is modeled directly on Chrome Web Store and Firefox AMO <strong>blocklist operations</strong> — the proven mechanism for remotely killing malicious extensions already installed on user devices (in early 2026 Google removed credential-stealing extensions with 10,000+ installs via exactly this machinery). Without this, UAR has no answer to a compromised popular plugin.</li>
+<li><strong>Permission-combination surfacing:</strong> the install UI must render <em>combinations</em>, not just individual permissions (Chrome Web Store program policy requires the narrowest permissions and reviews combinations, because <code>memory:read + net:egress</code> = exfiltration even when each alone is benign). The card's <code>combination_risk</code> field drives this.</li>
+</ul></article><article id="S20-020" class="source-clause"><h4>S20-020 · 2.7 Discovery / semantic routing</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>2.7 Discovery / semantic routing</h3>
+<p>Registry ships <strong>text</strong> (name/description/tags), never vectors; the host embeds locally for semantic discovery and routing. Unrecognized capabilities remain discoverable (open vocabulary) while sandboxed. Recognized capabilities additionally get first-class pipeline surfaces.</p></article><article id="S20-021" class="source-clause"><h4>S20-021 · 2.8 Host matrix with execution backends &amp; honest budgets</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>2.8 Host matrix with execution backends &amp; honest budgets</h3>
+<table>
+<thead>
+<tr>
+<th>Target</th>
+<th>Backend</th>
+<th>Perf vs native</th>
+<th>Distribution</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Desktop (x86_64/aarch64)</strong></td>
+<td>Cranelift AOT <code>.cwasm</code> + pooling allocator</td>
+<td>~1.45–1.6× real workloads; near-native on kernels</td>
+<td>synced, content-addressed</td>
+<td>full profile (KnowMe)</td>
+</tr>
+<tr>
+<td><strong>Android (aarch64)</strong></td>
+<td>Cranelift where W^X permits; else Pulley</td>
+<td>Cranelift near-desktop; Pulley ~order-of-magnitude</td>
+<td>synced</td>
+<td>opportunistic Cranelift</td>
+</tr>
+<tr>
+<td><strong>iOS/iPadOS</strong></td>
+<td><strong>Pulley interpreter (mandatory — no JIT)</strong></td>
+<td><strong>~order-of-magnitude slower than Cranelift</strong></td>
+<td><strong>bundled (App Store 3.3.2) vs synced split</strong></td>
+<td><code>.cwasm</code> AOT native code forbidden; keep hot paths off-device</td>
+</tr>
+<tr>
+<td><strong>Browser</strong></td>
+<td><strong>jco transpile → core-wasm + JS glue (NOT wasmtime)</strong></td>
+<td>V8 WASM; async limited</td>
+<td>served</td>
+<td>host-parity seam; WASI shims experimental</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Distribution split for iOS (App Store guideline 3.3.2):</strong> bundled plugins ship inside the app binary and pass review as first-party code; dynamically-synced plugins run interpreted (Pulley) as <em>data</em>, the same legal basis JavaScriptCore/Hermes/QuickJS rely on (UTM SE's TCTI interpreter precedent, approved on the App Store). Both paths must be explicit in the card's <code>platforms</code>/distribution metadata. Third-party iOS apps "cannot create writable-executable memory (outside narrow carve-outs like the EU's BrowserEngineKit entitlements)," so a JIT has nothing to compile into — interpretation is the only path.</p></article><article id="S20-022" class="source-clause"><h4>S20-022 · 2.9 Multi-language toolchain support</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>2.9 Multi-language toolchain support</h3>
+<p>Rust (<code>wit-bindgen</code>, first-class), TinyGo, <strong>componentize-py</strong> (build-time import resolution caveat), <strong>ComponentizeJS/StarlingMonkey</strong> (~8 MB engine/component — desktop-first). WASI <strong>0.2 today</strong>; <strong>WASI 0.3</strong> (released June 11, 2026; Wasmtime 43+, jco) brings native async (<code>stream&lt;T&gt;</code>/<code>future&lt;T&gt;</code>, <code>wasi:io</code> absorbed into the Canonical ABI) — <strong>do not block the contract on 0.3</strong>; ship on 0.2 and virtualize/polyfill, adopting 0.3 async in a minor contract bump once toolchains settle. WASI 1.0 is targeted late-2026/early-2027 — the versioning-humility rule applies.</p></article><article id="S20-023" class="source-clause"><h4>S20-023 · 2.10 Developer experience</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>2.10 Developer experience</h3>
+<ul>
+<li><strong>Scaffold CLI:</strong> <code>uar plugin new -k skill-task|hook|contributor|...</code> (Spin <code>spin new</code>/Zed template pattern).</li>
+<li><strong>Hot reload:</strong> <code>uar plugin watch</code> (Spin <code>watch</code> globs + Zed hot-swap) — rebuild + host-side generation swap without runtime restart.</li>
+<li><strong>Playground:</strong> local host harness that renders A2UI in the shared renderers (Flutter <code>A2uiSurfaceView</code>, React <code>a2ui-*</code>).</li>
+<li><strong>Conformance kit:</strong> the librefang zero-source-change test as seed; Stripe-style typed test matchers for A2UI; host-parity suite (same plugin under wasmtime and jco hosts).</li>
+<li><strong>Debuggability investment</strong> (the Figma lesson): source maps, structured plugin-error traces, epoch-timeout diagnostics — because the WASM sandbox's weakness is debugging, not security.</li>
+</ul>
+<hr/></article><article id="S20-024" class="source-clause"><h4>S20-024 · PART 3 — FUNCTIONAL SPECIFICATION</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>PART 3 — FUNCTIONAL SPECIFICATION</h2>
+<p><strong>Error envelope (all fallible exports):</strong> <code>result&lt;T, plugin-error&gt;</code> with the extended variant taxonomy (§2.2). Hosts must map every internal failure to a named variant; traps are a bug, not an error path.</p></article><article id="S20-025" class="source-clause"><h4>S20-025 · Functional Requirements</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>Functional Requirements</h3>
+<ul>
+<li><strong>FR-1 (kinds).</strong> The system SHALL support all eight worlds (skill-task, hook, contributor, agent, provider, app-shell, service, workflow) via a superset-of-base WIT world per kind. <em>Acceptance:</em> a skill-task and an app-shell plugin both load under the same host crate; kind is derived from the capability card.</li>
+<li><strong>FR-2 (open vocabulary).</strong> Unrecognized capabilities SHALL be carried, sandboxed, and semantically discoverable; recognized ones SHALL receive structured pipeline surfaces. <em>Acceptance:</em> a third-party reverse-DNS capability installs, is discoverable by tag search, and executes sandboxed with no host code changes.</li>
+<li><strong>FR-3 (librefang conformance).</strong> An unmodified <code>librefang:plugin@0.1.0</code> plugin SHALL load and run. <em>Acceptance:</em> the librefang conformance suite passes with zero source changes.</li>
+<li><strong>FR-4 (lifecycle).</strong> The full lifecycle (install→verify→register→activate→deactivate→upgrade→remove) plus runtime activation events SHALL be implemented as the §2.5 state machine. <em>Acceptance:</em> each transition emits a host-stamped lifecycle event; <code>verify</code> failure blocks activation.</li>
+<li><strong>FR-5 (lazy activation).</strong> Plugins SHALL activate lazily from card-derived triggers (events.consumes/actions), with an explicit eager-activation opt-in. <em>Acceptance:</em> an idle installed plugin consumes no instance memory until its trigger fires.</li>
+<li><strong>FR-6 (events + FRF).</strong> Events SHALL use AG-UI vocabulary over an in-process bus with a transport-transparent FRF adapter. <em>Acceptance:</em> the same plugin's events flow locally in one host and over a WebRTC data channel in another with no plugin change.</li>
+<li><strong>FR-7 (multi-language).</strong> Rust, TinyGo, Python (componentize-py), JS/TS (ComponentizeJS) plugins SHALL all satisfy the contract. <em>Acceptance:</em> one conformance plugin authored in each language passes the kit.</li>
+<li><strong>FR-8 (host matrix).</strong> Desktop (Cranelift AOT), iOS (Pulley), Android (Cranelift/Pulley), browser (jco) SHALL all run a conformant plugin. <em>Acceptance:</em> the host-parity suite passes on all four with documented behavioral deltas.</li>
+<li><strong>FR-9 (generations/rollback).</strong> Installs/upgrades SHALL be content-addressed immutable generations with atomic multi-artifact swap and current/previous rollback. <em>Acceptance:</em> an upgrade then rollback restores byte-identical prior behavior.</li>
+<li><strong>FR-10 (universal I/O validation).</strong> Action input/output schemas SHALL be validated for ALL capabilities including unrecognized ones. <em>Acceptance:</em> a malformed action payload to a third-party capability is rejected with <code>invalid-argument</code> before guest entry.</li>
+<li><strong>FR-11 (contributor pipeline).</strong> Contributions SHALL carry provenance, declared priority + stable tiebreak, per-stage aggregate wall budgets, and third-party fragments SHALL never precede first-party system content. <em>Acceptance:</em> ordering is deterministic; a budget-exceeding stage is truncated with <code>budget-exceeded</code>, not dropped silently.</li>
+<li><strong>FR-12 (MCP interop).</strong> The host SHALL expose plugin tools to MCP and allow plugins to mount MCP servers, with trust tiers; app-shell UI SHALL interoperate with MCP Apps (<code>ui://</code> + <code>_meta.ui</code>). <em>Acceptance:</em> a plugin tool appears in an MCP client; an MCP-App UI resource renders via the A2UI seam.</li>
+</ul></article><article id="S20-026" class="source-clause"><h4>S20-026 · Non-Functional Requirements</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>Non-Functional Requirements</h3>
+<ul>
+<li><strong>NFR-1 (perf honesty).</strong> Published budgets SHALL state per-tier costs: Cranelift ~1.45–1.6× native (real workloads, USENIX ATC 2019), Pulley ~order-of-magnitude slower than Cranelift, JS component +~8 MB. <em>Acceptance:</em> the host matrix doc carries these figures with sources; no "zero-cost" claim ships.</li>
+<li><strong>NFR-2 (instantiation).</strong> Desktop cold instantiation via AOT + pooling SHALL target sub-millisecond. <em>Acceptance:</em> measured p50 &lt; 1 ms for a base skill-task on reference hardware (target, not guarantee; Fermyon's production ~0.5 ms is the benchmark to beat).</li>
+<li><strong>NFR-3 (isolation).</strong> The Component Model shared-nothing boundary SHALL be the sole security boundary; no JS-realm-style tricks. <em>Acceptance:</em> a hostile plugin cannot access another plugin's memory or host state beyond declared capabilities.</li>
+</ul></article><article id="S20-027" class="source-clause"><h4>S20-027 · Security Requirements (mapping the 12 review holes)</h4><p class="source-note">Governing revision: <a href="../index.html#security">SEC-01–06</a> · source requirement, not release evidence.</p><h3>Security Requirements (mapping the 12 review holes)</h3>
+<ul>
+<li><strong>SR-1 (namespace).</strong> Reverse-DNS ids SHALL carry <code>namespace_proof</code> via did:web/DNS-TXT verification OR a first-come transparency-log receipt (warg-style). <em>Acceptance:</em> an unproven squatted namespace is flagged at install.</li>
+<li><strong>SR-2 (revocation).</strong> A signed advisory/blocklist SHALL be checked at activation + periodically, auto-quarantining revoked plugins. <em>Acceptance:</em> publishing a revocation quarantines an already-installed plugin within one poll interval, with user notice.</li>
+<li><strong>SR-3 (combinations).</strong> Install UI SHALL surface risky permission combinations from <code>combination_risk</code>. <em>Acceptance:</em> <code>memory:read + net:egress</code> shows an exfiltration warning at install.</li>
+<li><strong>SR-4 (event forgery).</strong> Host SHALL stamp provenance and enforce emit-to-own-namespace + rate caps. <em>Acceptance:</em> a plugin emitting to a foreign namespace is denied <code>capability-denied</code>.</li>
+<li><strong>SR-5 (reentrancy).</strong> Contributor stages SHALL receive reduced imports (no <code>infer</code>) or a depth-1 non-reentrant metered lane. <em>Acceptance:</em> an attempted host-inference call inside a contributor stage fails <code>capability-denied</code>.</li>
+<li><strong>SR-6 (sidecar).</strong> Service sidecars SHALL reuse OS sandbox fences (Seatbelt/bwrap) and broker over UDS, not loopback TCP. <em>Acceptance:</em> a sidecar cannot open an unfenced network socket; broker traffic is UDS-only.</li>
+<li><strong>SR-7 (rollback).</strong> Per FR-9.</li>
+<li><strong>SR-8 (crash-loop).</strong> Circuit breaker SHALL auto-quarantine after N failures/window with user notice. <em>Acceptance:</em> a panic-looping plugin is quarantined without degrading the host.</li>
+<li><strong>SR-9 (ordering/budgets).</strong> Per FR-11.</li>
+<li><strong>SR-10 (universal validation).</strong> Per FR-10.</li>
+<li><strong>SR-11 (mobile).</strong> iOS SHALL run dynamically-installed plugins under Pulley; <code>.cwasm</code> AOT native code SHALL NOT be loaded on iOS; bundled-vs-synced split SHALL satisfy App Store 3.3.2. <em>Acceptance:</em> a synced plugin runs interpreted on a physical iPhone and passes review.</li>
+<li><strong>SR-12 (versioning).</strong> The contract SHALL ship as <strong>0.2.0</strong>; <strong>1.0.0 SHALL NOT be declared until real-world plugins across ≥3 kinds and ≥2 hosts have exercised the surface.</strong> <em>Acceptance:</em> the ADR records the 1.0 trigger criteria.</li>
+</ul></article><article id="S20-028" class="source-clause"><h4>S20-028 · Profile Conformance Requirements</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>Profile Conformance Requirements</h3>
+<ul>
+<li><strong>PCR-1.</strong> A plugin declaring <code>profile_required = headless</code> SHALL run on both headless and full-UI hosts; a <code>full-ui</code> plugin SHALL be mechanically rejected at install on a headless host with a clear message. <em>Acceptance:</em> the librefang gateway rejects an app-shell plugin at install, not at runtime.</li>
+<li><strong>PCR-2.</strong> The conformance kit SHALL verify each profile's host-import set matches the WIT world composition in §2.2.</li>
+</ul>
+<hr/></article><article id="S20-029" class="source-clause"><h4>S20-029 · PART 4 — IMPLEMENTATION PLAN</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>PART 4 — IMPLEMENTATION PLAN</h2>
+<p>Estimation convention: <strong>agent-build time in agent-days</strong> using the validated <strong>11.3× PMPO velocity compression</strong> (implementation only); <strong>elapsed calendar time stated separately</strong>; <strong>human gates named explicitly</strong> as the critical path. Agent-days below are implementation-only and already compressed.</p></article><article id="S20-030" class="source-clause"><h4>S20-030 · Phase 0 — Contract + ADRs (foundation)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>Phase 0 — Contract + ADRs (foundation)</h3>
+<p>PRs: (a) <code>uar-plugin-contract</code> WIT family @0.2.0; (b) ADR-001 skill-task convergence (librefang <code>run()</code> + uar-skill.wit + prometheus:component); (c) ADR-002 version-numbering (0.2.0 now, 1.0.0 trigger criteria — SR-12); (d) ADR-003 error taxonomy extension; (e) capability-card schema v2.
+- <strong>Agent-build:</strong> ~4 agent-days. <strong>Elapsed:</strong> dominated by <strong>human gate: ADR + adversarial review</strong> (multi-day, serial).</p></article><article id="S20-031" class="source-clause"><h4>S20-031 · Phase 1 — Shared host crate</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>Phase 1 — Shared host crate</h3>
+<p>PRs: <code>uar-plugin-host</code> — capability wiring (MissingCapability-at-load), fs/net/kv/agent/env/time with SSRF+path guards, epoch budgets, lifecycle state machine, generation manager, event bus + provenance/rate-caps, minimal signed-blocklist check stub.
+- <strong>Agent-build:</strong> ~9 agent-days. <strong>Elapsed:</strong> <strong>human gate: security/adversarial review of sandbox host</strong> (this is the crown-jewel review; do not compress it).</p></article><article id="S20-032" class="source-clause"><h4>S20-032 · Phase 2 — Worlds in evidence order</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>Phase 2 — Worlds in evidence order</h3>
+<ol>
+<li><strong>skill-task + hook</strong> first (have implementations: librefang/BossFang). Includes FR-3 librefang conformance suite.</li>
+<li><strong>contributor</strong> next, built against the <strong>KnowMe pipeline</strong> (reentrancy guard, ordering/budgets).</li>
+<li><strong>app-shell / service / workflow</strong> versioned separately at <strong>0.x until proven</strong> (do not stabilize speculatively).
+- <strong>Agent-build:</strong> ~12 agent-days total. <strong>Elapsed:</strong> gated by <strong>conformance sign-offs</strong> and the <strong>KnowMe pipeline dependency</strong> (contributor cannot finalize until the KnowMe ingress→egress pipeline stages are frozen — external critical-path dependency).</li>
+</ol></article><article id="S20-033" class="source-clause"><h4>S20-033 · Phase 3 — FRF event transport</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>Phase 3 — FRF event transport</h3>
+<p>PRs: lattice-style transport adapter behind the bus port; <code>WatchEntityType</code> entity-watch; local↔WebRTC/OFP/Matrix/ATProto routing.
+- <strong>Agent-build:</strong> ~6 agent-days. <strong>Elapsed:</strong> gated by <strong>FRF interface stability</strong> (str0m/LiveKit adapter maturity).</p></article><article id="S20-034" class="source-clause"><h4>S20-034 · Phase 4 — Registry + advisory/revocation</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>Phase 4 — Registry + advisory/revocation</h3>
+<p>PRs: OCI/wkg distribution; cosign-style signing + TUF-style advisory root; <strong>signed blocklist checked at activation+periodic → auto-quarantine</strong> (SR-2); permission-combination install UI (SR-3); namespace-proof/transparency-log (SR-1).
+- <strong>Agent-build:</strong> ~8 agent-days. <strong>Elapsed:</strong> <strong>human gate: revocation-ops runbook + trust-root ceremony</strong> (operational, not just code).</p></article><article id="S20-035" class="source-clause"><h4>S20-035 · Phase 5 — Mobile / web hosts</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>Phase 5 — Mobile / web hosts</h3>
+<p>PRs: iOS Pulley host + bundled/synced split (SR-11); Android Cranelift/Pulley; browser jco-transpile host + JS host-import re-implementation; host-parity conformance suite (FR-8).
+- <strong>Agent-build:</strong> ~10 agent-days. <strong>Elapsed:</strong> <strong>human gate: physical-device validation + App Store review</strong> (serial, unavoidable, multi-week wall-clock; the swift-wasmtime iOS Pulley path is validated in principle but has no App Store gate yet — UAR must be the one to prove it).</p></article><article id="S20-036" class="source-clause"><h4>S20-036 · Phase 6 — DX tooling</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>Phase 6 — DX tooling</h3>
+<p>PRs: <code>uar plugin new/build/watch/test/publish</code>; playground with A2UI renderers; conformance kit packaging; debuggability (source maps, structured traces).
+- <strong>Agent-build:</strong> ~7 agent-days. <strong>Elapsed:</strong> parallelizable with Phases 3–5.</p>
+<p><strong>Total agent-build ≈ 56 agent-days (implementation-only, compressed).</strong> <strong>Calendar elapsed is dominated by human gates, not build:</strong> ADR/adversarial reviews (Phases 0–1), conformance sign-offs + KnowMe pipeline freeze (Phase 2), trust-root ceremony (Phase 4), and physical-device + App Store review (Phase 5). These gates are serial and human-bound; they, not agent throughput, set the release date.</p></article><article id="S20-037" class="source-clause"><h4>S20-037 · Risks — named failure scenarios (&quot;the scenario that hurts Prometheus&quot;)</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>Risks — named failure scenarios ("the scenario that hurts Prometheus")</h3>
+<ul>
+<li><strong>R-1 (revocation absence exploited).</strong> A popular third-party plugin is compromised post-install; without SR-2 shipped, every KnowMe device runs the malicious generation until manual uninstall — precisely the Chrome-extension credential-theft pattern seen with 10,000+-install extensions in early 2026. <em>This is the highest-severity scenario — Phase 4 revocation must not slip behind Phase 5.</em> Mitigation: ship a minimal signed-blocklist check in Phase 1 as a stub, fully in Phase 4.</li>
+<li><strong>R-2 (iOS review rejection).</strong> App Store rejects synced-plugin execution as "downloaded executable code." Mitigation: lean on the interpreted-as-data precedent (JavaScriptCore/Hermes/QuickJS, UTM SE's approved TCTI interpreter), keep synced plugins Pulley-interpreted, and keep a bundled-only fallback distribution ready.</li>
+<li><strong>R-3 (contributor reentrancy DoS).</strong> A contributor triggers host inference that re-enters the pipeline, causing unbounded recursion / cost blowup. Mitigation: SR-5 reduced-imports is non-negotiable in Phase 2.</li>
+<li><strong>R-4 (OSGi-style wiring creep).</strong> <code>requires/enhances</code> grows into a transitive resolver, reproducing OSGi's complexity collapse and killing DX. Mitigation: ADR bans transitive resolution; composition stays flat + install-time explain-able.</li>
+<li><strong>R-5 (perf over-promise).</strong> Marketing repeats "abstraction costs nothing"; a customer benchmarks a real workload on iOS and finds a ~10× slowdown. Mitigation: NFR-1 honest budgets published up front.</li>
+</ul></article><article id="S20-038" class="source-clause"><h4>S20-038 · Open decisions with triggers</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>Open decisions with triggers</h3>
+<ul>
+<li><strong>OD-1: WASI 0.2 vs 0.3.</strong> Ship on 0.2; <strong>trigger to adopt 0.3 async:</strong> when jco async support lands cleanly AND componentize-py/ComponentizeJS 0.3 support is polished.</li>
+<li><strong>OD-2: warg vs OCI-only.</strong> Start OCI + wkg; <strong>trigger for warg transparency log:</strong> first namespace-squatting incident OR &gt;100 third-party publishers.</li>
+<li><strong>OD-3: 1.0.0 contract.</strong> <strong>Trigger:</strong> real plugins across ≥3 kinds on ≥2 hosts, per SR-12/librefang humility rule.</li>
+<li><strong>OD-4: shared SpiderMonkey embedding on mobile.</strong> <strong>Trigger:</strong> &gt;1 JS plugin common on mobile AND Bytecode Alliance ships shared-embedding support.</li>
+</ul></article><article id="S20-039" class="source-clause"><h4>S20-039 · Explicit non-goals</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h3>Explicit non-goals</h3>
+<ul>
+<li>Not building an OSGi-style transitive dependency resolver (R-4).</li>
+<li>Not shipping React/Flutter code across the sandbox (A2UI-only, validated by Shopify/Stripe/MCP Apps).</li>
+<li>Not using Extism or a byte-pipe ABI (stay WIT-native).</li>
+<li>Not claiming native/zero-cost performance (NFR-1).</li>
+<li>Not stabilizing app-shell/service/workflow worlds before real usage (Phase 2).</li>
+<li>Not adding JS-realm-style sandbox cleverness on top of the WASM boundary (Figma lesson).</li>
+</ul>
+<hr/></article><article id="S20-040" class="source-clause"><h4>S20-040 · CAVEATS</h4><p class="source-note">Governing revision: <a href="../index.html#plugins">PL-01–11</a> · source requirement, not release evidence.</p><h2>CAVEATS</h2>
+<ul>
+<li><strong>Performance figures blend primary and vendor sources.</strong> The Pulley "order-of-magnitude" slowdown is Wasmtime's own qualitative characterization, not a quoted fixed multiplier; Fermyon's "cold starts under half a millisecond" is a CEO/press-release claim, not independently benchmarked. The Cranelift "~2%/~14%" figure is from small PolyBench-C kernels (PLDI 2017, where only 7 benchmarks reach within 10% of native) and is contradicted for real workloads by the USENIX ATC 2019 "Not So Fast" study (45–55% average slowdown, up to 2.08×–2.5×). No official absolute-µs instantiation table exists — the docs describe mechanisms only. Treat all perf numbers as order-of-magnitude planning inputs, not contractual SLAs.</li>
+<li><strong>MCP Apps / SEP-1865 is fast-moving.</strong> MCP Apps went Final Jan 26, 2026 (nine launch partners incl. Figma, Slack, Canva); the broader MCP 2026-07-28 spec (stateless core, Extensions framework, Tasks) only just finalized. The interop seam (FR-12) targets a moving standard — expect a follow-up contract bump.</li>
+<li><strong>iOS App Store path is validated in principle, not in production for UAR.</strong> The swift-wasmtime Pulley path and interpreted-code precedent are real, but no App Store review gate has yet approved UAR's specific synced-plugin model — R-2 remains live until a physical-device + review pass completes.</li>
+<li><strong>A few Part-1 ecosystems (Home Assistant, Kubernetes operators/admission webhooks, Raycast, Stream Deck, Salesforce Lightning/AppExchange, Sigstore/TUF specifics, Obsidian curation) were analyzed from general engineering knowledge rather than fresh primary sources</strong>; their lessons (declared-not-discovered participation, admission-webhook gating, keyless signing + transparency logs, community curation) reinforce but do not change the conclusions drawn from the more deeply-sourced analogs. The Zed extension analysis was deepened via a dedicated research pass (versioned <code>zed_extension_api</code> WIT contract, <code>[[capabilities]]</code> scoping incl. <code>process:exec</code>/<code>download_file</code>/<code>npm:install</code>, Tree-sitter-in-WASM, <code>wasm32-wasip2</code> target, and CVE-2026-27976 demonstrating that the host-side unpack path is a separate attack surface from the Wasm guest sandbox).</li>
+<li><strong>The estimation model assumes the 11.3× PMPO compression holds for this domain.</strong> Sandbox-security and cross-platform host work are review-heavy; if adversarial reviews surface architectural rework, agent-build compression will not shorten the human-gated critical path — which dominates the calendar regardless.</li>
+</ul></article></main></body></html>
