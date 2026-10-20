@@ -1,3 +1,8 @@
 dist/
 __pycache__/
 *.pyc
+
+# Local expanded audit output and duplicate screenshot views.
+checks-1.2/accessibility.json
+checks-1.2/screenshots/
+checks-1.2/release-screenshots/

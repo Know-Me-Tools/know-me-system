@@ -131,5 +131,15 @@
   "research/webmcp-2026-10-20.md",
   "verification/revision-1.1.json",
   "screenshots/revision-1.1-webmcp-desktop.png",
-  "screenshots/revision-1.1-webmcp-mobile.png"
+  "screenshots/revision-1.1-webmcp-mobile.png",
+  "screenshots/revision-1.2-og.png",
+  "screenshots/revision-1.2-desktop-light.png",
+  "screenshots/revision-1.2-retained-desktop-light.png",
+  "screenshots/revision-1.2-retained-mobile-dark.png",
+  "screenshots/revision-1.2-retained-mobile-light.png",
+  "screenshots/revision-1.2-desktop-dark.png",
+  "screenshots/revision-1.2-mobile-light.png",
+  "screenshots/revision-1.2-retained-desktop-dark.png",
+  "screenshots/revision-1.2-mobile-dark.png",
+  "verification/revision-1.2.json"
 ]

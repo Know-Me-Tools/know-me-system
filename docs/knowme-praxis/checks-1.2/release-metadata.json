@@ -1,0 +1,56 @@
+{
+  "canonical": "https://ipfs.prometheusags.ai/ipns/k51qzi5uqu5dl4048r1wozopco1c2b0vzfx0kj3rbs0g9rhadfjs8msvi4ll3t/index.html",
+  "canonical_status": "public key created by parent; pointer not yet published",
+  "image_url": "https://ipfs.prometheusags.ai/ipfs/bafkreify5f2332n33x6s4suxxteqhw6lj6zgqanvh4ji4cqtb5qgoqr3lu",
+  "image_cid_prediction": "bafkreify5f2332n33x6s4suxxteqhw6lj6zgqanvh4ji4cqtb5qgoqr3lu",
+  "image_cid_status": "locally calculated; parent must compare RPC returned CID before document upload",
+  "image_bytes": 272805,
+  "image_sha256": "b8e975bde9bbddfd2e4a97bcc903dbcb4fb26801b53f128e0a130f6067423b5d",
+  "image_library_id": "libfile_c2a6898cb2148191ac294fe6df11ee82",
+  "image_importer_query": "cid-version=1&hash=sha2-256&raw-leaves=true&chunker=size-1048576&wrap-with-directory=false&trickle=false&inline=false&preserve-mode=false&preserve-mtime=false&pin=true",
+  "image_upload_form": "One multipart file, filename=og-1.2.png, no directory entry, mode or mtime. Use exact PNG bytes.",
+  "image_prediction_method": "Single raw leaf: base32lower(0x01 CIDv1 || 0x55 raw codec || 0x12 sha2-256 || 0x20 length || SHA256(PNG)); 272805 < chunk size1048576.",
+  "documentation": "https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-add",
+  "document_importer_query": "cid-version=1&hash=sha2-256&raw-leaves=true&chunker=size-262144&wrap-with-directory=true&trickle=false&inline=false&preserve-mode=false&preserve-mtime=false&pin=true",
+  "document_upload_form": "One multipart part per manifest file with filename equal to exact relative path; do not include outer ZIP directory or ZIP file itself. Parent records actual returned root CID.",
+  "changed_files_vs_tested_draft": [
+    "index.html"
+  ],
+  "body_exactly_unchanged": true,
+  "all_other_157_files_unchanged": true,
+  "metadata_tests": 4,
+  "static_metadata_checks": "passed; no duplicate tags; canonical/og:url/twitter:url match exact verified key ID",
+  "index_sha256": "e5e051482624ad71423d1dc0015161032f224fcba901f57850e91183b7ba9a0f",
+  "public_verification": "pending parent; child performed zero authenticated RPC operations",
+  "release_rendered_views": [
+    {
+      "view": "desktop-light",
+      "metadata_correct": true,
+      "screenshot_byte_identical_to_tested_draft": true,
+      "page_errors": [],
+      "overflow": false
+    },
+    {
+      "view": "desktop-dark",
+      "metadata_correct": true,
+      "screenshot_byte_identical_to_tested_draft": true,
+      "page_errors": [],
+      "overflow": false
+    },
+    {
+      "view": "mobile-light",
+      "metadata_correct": true,
+      "screenshot_byte_identical_to_tested_draft": true,
+      "page_errors": [],
+      "overflow": false
+    },
+    {
+      "view": "mobile-dark",
+      "metadata_correct": true,
+      "screenshot_byte_identical_to_tested_draft": true,
+      "page_errors": [],
+      "overflow": false
+    }
+  ],
+  "release_render_status": "passed"
+}

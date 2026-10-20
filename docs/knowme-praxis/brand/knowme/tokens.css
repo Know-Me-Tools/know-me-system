@@ -1,9 +1,9 @@
 :root{
   --bg:#F7F7F8; --surface:#FFFFFF; --surface-warm:#EEEEF1; --border:#D8DEE6; --border-soft:#E8ECF0;
-  --fg:#0B0F14; --fg-2:#4B5563; --muted:#6F7C89; --meta:var(--muted);
+  --fg:#0B0F14; --fg-2:#4B5563; --muted:#566372; --meta:var(--muted);
   --accent:#C8431F; --accent-on:#FFFFFF; --accent-hover:#A83617; --accent-active:#8A2E14;
   --ember:#E04E28; --ember-soft:#F2D6CF; --charcoal:#0B0F14; --heading:#0B0F14;
-  --success:#2F6F4E; --warn:#B7791F; --danger:#C53030;
+  --success:#2F6F4E; --warn:#805211; --danger:#C53030;
   --font-display:"Space Grotesk","Helvetica Neue",Arial,sans-serif;
   --font-body:"Roboto","Helvetica Neue",Arial,sans-serif;
   --font-mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;

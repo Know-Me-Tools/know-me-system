@@ -1,1 +1,9 @@
 *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#f7f8fb;color:#151923;font:17px/1.65 system-ui,sans-serif}main{max-width:1000px;margin:auto;padding:40px 24px}h1,h2,h3,h4{line-height:1.25;color:#15025d}a{color:#9b361c;overflow-wrap:anywhere}pre{background:#eef0f4;padding:20px;border-radius:8px;white-space:pre-wrap;overflow-wrap:anywhere;font:14px/1.65 ui-monospace,monospace}table{border-collapse:collapse;width:100%;display:block;overflow:auto}td,th{text-align:left;padding:10px;border-bottom:1px solid #cbd0d8}article{padding-block:20px;border-bottom:1px solid #ced2dc}.source-note{font-size:13px;color:#58616f}input{font:inherit;padding:10px;width:100%}@media(prefers-color-scheme:dark){body{background:#0b0f14;color:#e8edf3}h1,h2,h3,h4{color:#e8dcff}a{color:#ffab91}pre{background:#141c26}}
+:focus-visible{outline:2px solid #9b361c;outline-offset:2px}
+.keyboard-scroll:focus-visible{outline-offset:-3px}
+@media(prefers-color-scheme:dark){.source-note{color:#A7B0BC}:focus-visible{outline-color:#ffab91}}
+@media(forced-colors:active){:focus-visible{outline-color:Highlight}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+
+/* 1.2: long technical identifiers wrap; wide tables retain their own scroll region. */
+main,article{min-width:0}p,li,code,h1,h2,h3,h4{overflow-wrap:anywhere}table{max-width:100%}pre code{white-space:pre-wrap}
