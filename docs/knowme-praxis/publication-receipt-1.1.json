@@ -47,9 +47,12 @@
     "index_sha256": "47d8f144ffd4edbf75ee585cd3c10ae206be2edcd26517e13597365240bd30ef",
     "public_index_hash_matches_candidate_verified_by_root": true,
     "og_twitter_image_matches_published_image_verified_by_root": true,
-    "full_public_file_verification": "pending independent root verification at time of receipt creation",
+    "full_public_file_verification": "blocked by network policy mid-check; not all 147 public files verified; no retry authorized",
     "manifest": "candidate-manifest.json",
-    "manifest_sha256": "ba22c09691b349dc29176c56db60cd8b28aac8fa6dcd2df7ff3e754bb38e7af9"
+    "manifest_sha256": "ba22c09691b349dc29176c56db60cd8b28aac8fa6dcd2df7ff3e754bb38e7af9",
+    "all_147_local_manifest_hashes_verified_before_upload": true,
+    "public_index_and_image_checks": "Successful unauthenticated GETs verified exact hashes; image MIME and dimensions verified",
+    "bulk_public_verification_retry_performed": false
   },
   "canonical": {
     "strategy": "Immutable edition URL recorded externally; published HTML intentionally omits canonical, og:url and twitter:url. No self-reference claimed.",

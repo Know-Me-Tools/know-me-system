@@ -17,7 +17,7 @@ The earlier unauthenticated HTTP 401 on this Mac is historical. Root obtained ac
 
 Root verified the published preview's public bytes, `image/png` MIME, 2400×1260 decoded dimensions and SHA256 `049f8af0b4cb8d6aa48472ded99a8a818dd8b0110ae18e2d1c8cd6acba7f6a57`. The returned image CID matched the predicted CID embedded in `source/social.json`. Root also verified that the public index hash matches the tested candidate and its OG/Twitter image URLs resolve to this preview.
 
-Both authenticated add calls used `pin=true`. No separate authenticated pin/list call was made, and remote pin state was not independently inspected. Full verification of all 147 public file hashes is being performed independently by root and is pending in this receipt; it must not be inferred from the index check alone.
+Both authenticated add calls used `pin=true`. No separate authenticated pin/list call was made, and remote pin state was not independently inspected. The pre-upload local manifest check covered all 147 files. Optional verification of all 147 public file hashes was blocked by network policy mid-check; not all public files were verified. That denied bulk operation was not retried through another route. Successful unauthenticated GETs verified the exact public index/image hashes and image MIME/dimensions; they do not establish all-file gateway verification.
 
 The screenshot is available in ChatGPT Library as `libfile_2cbed1e4ec50819193ba34efb5fdf89c` (`knowme-praxis-1.1-og.png`). No Library URL is substituted for the required public IPFS image.
 
