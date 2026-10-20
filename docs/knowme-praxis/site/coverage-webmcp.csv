@@ -1,0 +1,15 @@
+id,title,owner,revised,api,acceptance,source,status
+WEB-01,First-class capability source,workspace,index.html#workspace,index.html#api,index.html#acceptance,research/webmcp-2026-10-20.md,proposed; not runtime-certified
+WEB-02,Browser-session binding,workspace,index.html#workspace,index.html#api,index.html#acceptance,research/webmcp-2026-10-20.md,proposed; not runtime-certified
+WEB-03,Actual capabilities,workspace,index.html#workspace,index.html#api,index.html#acceptance,research/webmcp-2026-10-20.md,proposed; not runtime-certified
+WEB-04,Bounded discovery,workspace,index.html#workspace,index.html#api,index.html#acceptance,research/webmcp-2026-10-20.md,proposed; not runtime-certified
+WEB-05,Navigation and lifecycle,workspace,index.html#workspace,index.html#api,index.html#acceptance,research/webmcp-2026-10-20.md,proposed; not runtime-certified
+WEB-06,Origin and frame policy,workspace,index.html#workspace,index.html#api,index.html#acceptance,research/webmcp-2026-10-20.md,proposed; not runtime-certified
+WEB-07,Existing authority path,workspace,index.html#workspace,index.html#api,index.html#acceptance,research/webmcp-2026-10-20.md,proposed; not runtime-certified
+WEB-08,Meaning and registration races,workspace,index.html#workspace,index.html#api,index.html#acceptance,research/webmcp-2026-10-20.md,proposed; not runtime-certified
+WEB-09,Typed inputs and honest outputs,workspace,index.html#workspace,index.html#api,index.html#acceptance,research/webmcp-2026-10-20.md,proposed; not runtime-certified
+WEB-10,Human interaction and takeover,workspace,index.html#workspace,index.html#api,index.html#acceptance,research/webmcp-2026-10-20.md,proposed; not runtime-certified
+WEB-11,Credentials and egress,workspace,index.html#workspace,index.html#api,index.html#acceptance,research/webmcp-2026-10-20.md,proposed; not runtime-certified
+WEB-12,Injection containment,workspace,index.html#workspace,index.html#api,index.html#acceptance,research/webmcp-2026-10-20.md,proposed; not runtime-certified
+WEB-13,Durable evidence and safe reconciliation,workspace,index.html#workspace,index.html#api,index.html#acceptance,research/webmcp-2026-10-20.md,proposed; not runtime-certified
+WEB-14,Explicit fallbacks,workspace,index.html#workspace,index.html#api,index.html#acceptance,research/webmcp-2026-10-20.md,proposed; not runtime-certified

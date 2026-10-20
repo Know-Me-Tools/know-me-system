@@ -13208,5 +13208,147 @@
       "change": "Contradictory legacy requirements retained with explicit precedence",
       "rationale": "EV-01 and migration clauses govern; no silent removal."
     }
-  ]
+  ],
+  "supplemental_requirements": [
+  {
+    "id": "WEB-01",
+    "title": "First-class capability source",
+    "owner": "workspace",
+    "revised": "index.html#workspace",
+    "api": "index.html#api",
+    "acceptance": "index.html#acceptance",
+    "source": "research/webmcp-2026-10-20.md",
+    "status": "proposed; not runtime-certified"
+  },
+  {
+    "id": "WEB-02",
+    "title": "Browser-session binding",
+    "owner": "workspace",
+    "revised": "index.html#workspace",
+    "api": "index.html#api",
+    "acceptance": "index.html#acceptance",
+    "source": "research/webmcp-2026-10-20.md",
+    "status": "proposed; not runtime-certified"
+  },
+  {
+    "id": "WEB-03",
+    "title": "Actual capabilities",
+    "owner": "workspace",
+    "revised": "index.html#workspace",
+    "api": "index.html#api",
+    "acceptance": "index.html#acceptance",
+    "source": "research/webmcp-2026-10-20.md",
+    "status": "proposed; not runtime-certified"
+  },
+  {
+    "id": "WEB-04",
+    "title": "Bounded discovery",
+    "owner": "workspace",
+    "revised": "index.html#workspace",
+    "api": "index.html#api",
+    "acceptance": "index.html#acceptance",
+    "source": "research/webmcp-2026-10-20.md",
+    "status": "proposed; not runtime-certified"
+  },
+  {
+    "id": "WEB-05",
+    "title": "Navigation and lifecycle",
+    "owner": "workspace",
+    "revised": "index.html#workspace",
+    "api": "index.html#api",
+    "acceptance": "index.html#acceptance",
+    "source": "research/webmcp-2026-10-20.md",
+    "status": "proposed; not runtime-certified"
+  },
+  {
+    "id": "WEB-06",
+    "title": "Origin and frame policy",
+    "owner": "workspace",
+    "revised": "index.html#workspace",
+    "api": "index.html#api",
+    "acceptance": "index.html#acceptance",
+    "source": "research/webmcp-2026-10-20.md",
+    "status": "proposed; not runtime-certified"
+  },
+  {
+    "id": "WEB-07",
+    "title": "Existing authority path",
+    "owner": "workspace",
+    "revised": "index.html#workspace",
+    "api": "index.html#api",
+    "acceptance": "index.html#acceptance",
+    "source": "research/webmcp-2026-10-20.md",
+    "status": "proposed; not runtime-certified"
+  },
+  {
+    "id": "WEB-08",
+    "title": "Meaning and registration races",
+    "owner": "workspace",
+    "revised": "index.html#workspace",
+    "api": "index.html#api",
+    "acceptance": "index.html#acceptance",
+    "source": "research/webmcp-2026-10-20.md",
+    "status": "proposed; not runtime-certified"
+  },
+  {
+    "id": "WEB-09",
+    "title": "Typed inputs and honest outputs",
+    "owner": "workspace",
+    "revised": "index.html#workspace",
+    "api": "index.html#api",
+    "acceptance": "index.html#acceptance",
+    "source": "research/webmcp-2026-10-20.md",
+    "status": "proposed; not runtime-certified"
+  },
+  {
+    "id": "WEB-10",
+    "title": "Human interaction and takeover",
+    "owner": "workspace",
+    "revised": "index.html#workspace",
+    "api": "index.html#api",
+    "acceptance": "index.html#acceptance",
+    "source": "research/webmcp-2026-10-20.md",
+    "status": "proposed; not runtime-certified"
+  },
+  {
+    "id": "WEB-11",
+    "title": "Credentials and egress",
+    "owner": "workspace",
+    "revised": "index.html#workspace",
+    "api": "index.html#api",
+    "acceptance": "index.html#acceptance",
+    "source": "research/webmcp-2026-10-20.md",
+    "status": "proposed; not runtime-certified"
+  },
+  {
+    "id": "WEB-12",
+    "title": "Injection containment",
+    "owner": "workspace",
+    "revised": "index.html#workspace",
+    "api": "index.html#api",
+    "acceptance": "index.html#acceptance",
+    "source": "research/webmcp-2026-10-20.md",
+    "status": "proposed; not runtime-certified"
+  },
+  {
+    "id": "WEB-13",
+    "title": "Durable evidence and safe reconciliation",
+    "owner": "workspace",
+    "revised": "index.html#workspace",
+    "api": "index.html#api",
+    "acceptance": "index.html#acceptance",
+    "source": "research/webmcp-2026-10-20.md",
+    "status": "proposed; not runtime-certified"
+  },
+  {
+    "id": "WEB-14",
+    "title": "Explicit fallbacks",
+    "owner": "workspace",
+    "revised": "index.html#workspace",
+    "api": "index.html#api",
+    "acceptance": "index.html#acceptance",
+    "source": "research/webmcp-2026-10-20.md",
+    "status": "proposed; not runtime-certified"
+  }
+]
 }

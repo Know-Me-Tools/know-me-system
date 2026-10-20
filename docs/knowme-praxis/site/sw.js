@@ -7,7 +7,7 @@
 //    intercepted, so they never touch the cache;
 //  - activation deletes only this scope's own older caches, never another report's on the same origin;
 //  - nothing here, or in the page, writes to web storage, IndexedDB or cookies.
-const CFG = {"version": "a808c8fc3bb9", "local": ["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png", "assets/vendor/htmx.min.js", "assets/vendor/htmx-ext-sse.min.js", "assets/vendor/htmx-ext-json-enc.min.js", "assets/vendor/htmx-ext-response-targets.min.js", "assets/vendor/htmx-ext-class-tools.min.js", "assets/vendor/alpinejs-intersect.min.js", "assets/vendor/alpinejs.min.js"], "feedbackOrigins": []};
+const CFG = {"version": "b6da6181c765", "local": ["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png", "assets/vendor/htmx.min.js", "assets/vendor/htmx-ext-sse.min.js", "assets/vendor/htmx-ext-json-enc.min.js", "assets/vendor/htmx-ext-response-targets.min.js", "assets/vendor/htmx-ext-class-tools.min.js", "assets/vendor/alpinejs-intersect.min.js", "assets/vendor/alpinejs.min.js"], "feedbackOrigins": []};
 const SCOPE = self.registration.scope;
 const PREFIX = 'forge:';
 const CACHE = PREFIX + CFG.version + ':' + SCOPE;

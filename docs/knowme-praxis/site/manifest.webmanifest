@@ -1,7 +1,7 @@
 {
   "name": "KnowMe Praxis",
   "short_name": "Praxis",
-  "description": "The Sovereign Agentic Workspace: complete architecture, functional requirements, native Flutter, Rust, portable plugins, private dots and LiveKit realtime.",
+  "description": "The Sovereign Agentic Workspace: complete architecture, functional requirements, native Flutter, Rust, portable plugins, browser WebMCP canvas/site integration, private dots and LiveKit realtime.",
   "id": "./",
   "start_url": "./",
   "scope": "./",

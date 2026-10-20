@@ -1,0 +1,413 @@
+{
+  "views": [
+    {
+      "chapters": 17,
+      "retained": 811,
+      "overflow": false,
+      "webmcp": true,
+      "integration": {
+        "workspace": true,
+        "api": true,
+        "plugins": true,
+        "runtimes": true,
+        "surfaces": true,
+        "security": true,
+        "acceptance": true,
+        "implementation": true,
+        "decisions": true,
+        "provenance": true
+      },
+      "canonical": null,
+      "metadata": [
+        {
+          "key": "og:type",
+          "value": "article"
+        },
+        {
+          "key": "og:site_name",
+          "value": "KnowMe"
+        },
+        {
+          "key": "og:title",
+          "value": "KnowMe Praxis"
+        },
+        {
+          "key": "og:description",
+          "value": "The Sovereign Agentic Workspace: complete architecture, functional requirements, native Flutter, Rust, portable plugins, browser WebMCP canvas/site integration, private dots and LiveKit realtime."
+        },
+        {
+          "key": "og:image",
+          "value": "https://ipfs.prometheusags.ai/ipfs/bafybeic6mr557ji36o53xo5bc6uw7jpxckzcdqo4kjzis3zimwjchem6bq"
+        },
+        {
+          "key": "og:image:secure_url",
+          "value": "https://ipfs.prometheusags.ai/ipfs/bafybeic6mr557ji36o53xo5bc6uw7jpxckzcdqo4kjzis3zimwjchem6bq"
+        },
+        {
+          "key": "og:image:type",
+          "value": "image/png"
+        },
+        {
+          "key": "og:image:width",
+          "value": "2400"
+        },
+        {
+          "key": "og:image:height",
+          "value": "1260"
+        },
+        {
+          "key": "og:image:alt",
+          "value": "KnowMe Praxis 1.1 architecture specification, showing title, source coverage and chapter navigation."
+        },
+        {
+          "key": "og:locale",
+          "value": "en_US"
+        },
+        {
+          "key": "article:published_time",
+          "value": "2026-10-20T10:00:00Z"
+        },
+        {
+          "key": "article:author",
+          "value": "AI-generated with Codex, OpenAI"
+        },
+        {
+          "key": "twitter:card",
+          "value": "summary_large_image"
+        },
+        {
+          "key": "twitter:title",
+          "value": "KnowMe Praxis"
+        },
+        {
+          "key": "twitter:description",
+          "value": "The Sovereign Agentic Workspace: complete architecture, functional requirements, native Flutter, Rust, portable plugins, browser WebMCP canvas/site integration, private dots and LiveKit realtime."
+        },
+        {
+          "key": "twitter:image",
+          "value": "https://ipfs.prometheusags.ai/ipfs/bafybeic6mr557ji36o53xo5bc6uw7jpxckzcdqo4kjzis3zimwjchem6bq"
+        },
+        {
+          "key": "twitter:image:alt",
+          "value": "KnowMe Praxis 1.1 architecture specification, showing title, source coverage and chapter navigation."
+        },
+        {
+          "key": "article:modified_time",
+          "value": "2026-10-20T11:00:00Z"
+        }
+      ],
+      "name": "desktop",
+      "page_errors": [],
+      "metadata_ok": true
+    },
+    {
+      "chapters": 17,
+      "retained": 811,
+      "overflow": false,
+      "webmcp": true,
+      "integration": {
+        "workspace": true,
+        "api": true,
+        "plugins": true,
+        "runtimes": true,
+        "surfaces": true,
+        "security": true,
+        "acceptance": true,
+        "implementation": true,
+        "decisions": true,
+        "provenance": true
+      },
+      "canonical": null,
+      "metadata": [
+        {
+          "key": "og:type",
+          "value": "article"
+        },
+        {
+          "key": "og:site_name",
+          "value": "KnowMe"
+        },
+        {
+          "key": "og:title",
+          "value": "KnowMe Praxis"
+        },
+        {
+          "key": "og:description",
+          "value": "The Sovereign Agentic Workspace: complete architecture, functional requirements, native Flutter, Rust, portable plugins, browser WebMCP canvas/site integration, private dots and LiveKit realtime."
+        },
+        {
+          "key": "og:image",
+          "value": "https://ipfs.prometheusags.ai/ipfs/bafybeic6mr557ji36o53xo5bc6uw7jpxckzcdqo4kjzis3zimwjchem6bq"
+        },
+        {
+          "key": "og:image:secure_url",
+          "value": "https://ipfs.prometheusags.ai/ipfs/bafybeic6mr557ji36o53xo5bc6uw7jpxckzcdqo4kjzis3zimwjchem6bq"
+        },
+        {
+          "key": "og:image:type",
+          "value": "image/png"
+        },
+        {
+          "key": "og:image:width",
+          "value": "2400"
+        },
+        {
+          "key": "og:image:height",
+          "value": "1260"
+        },
+        {
+          "key": "og:image:alt",
+          "value": "KnowMe Praxis 1.1 architecture specification, showing title, source coverage and chapter navigation."
+        },
+        {
+          "key": "og:locale",
+          "value": "en_US"
+        },
+        {
+          "key": "article:published_time",
+          "value": "2026-10-20T10:00:00Z"
+        },
+        {
+          "key": "article:author",
+          "value": "AI-generated with Codex, OpenAI"
+        },
+        {
+          "key": "twitter:card",
+          "value": "summary_large_image"
+        },
+        {
+          "key": "twitter:title",
+          "value": "KnowMe Praxis"
+        },
+        {
+          "key": "twitter:description",
+          "value": "The Sovereign Agentic Workspace: complete architecture, functional requirements, native Flutter, Rust, portable plugins, browser WebMCP canvas/site integration, private dots and LiveKit realtime."
+        },
+        {
+          "key": "twitter:image",
+          "value": "https://ipfs.prometheusags.ai/ipfs/bafybeic6mr557ji36o53xo5bc6uw7jpxckzcdqo4kjzis3zimwjchem6bq"
+        },
+        {
+          "key": "twitter:image:alt",
+          "value": "KnowMe Praxis 1.1 architecture specification, showing title, source coverage and chapter navigation."
+        },
+        {
+          "key": "article:modified_time",
+          "value": "2026-10-20T11:00:00Z"
+        }
+      ],
+      "name": "desktop-dark",
+      "page_errors": [],
+      "metadata_ok": true
+    },
+    {
+      "chapters": 17,
+      "retained": 811,
+      "overflow": false,
+      "webmcp": true,
+      "integration": {
+        "workspace": true,
+        "api": true,
+        "plugins": true,
+        "runtimes": true,
+        "surfaces": true,
+        "security": true,
+        "acceptance": true,
+        "implementation": true,
+        "decisions": true,
+        "provenance": true
+      },
+      "canonical": null,
+      "metadata": [
+        {
+          "key": "og:type",
+          "value": "article"
+        },
+        {
+          "key": "og:site_name",
+          "value": "KnowMe"
+        },
+        {
+          "key": "og:title",
+          "value": "KnowMe Praxis"
+        },
+        {
+          "key": "og:description",
+          "value": "The Sovereign Agentic Workspace: complete architecture, functional requirements, native Flutter, Rust, portable plugins, browser WebMCP canvas/site integration, private dots and LiveKit realtime."
+        },
+        {
+          "key": "og:image",
+          "value": "https://ipfs.prometheusags.ai/ipfs/bafybeic6mr557ji36o53xo5bc6uw7jpxckzcdqo4kjzis3zimwjchem6bq"
+        },
+        {
+          "key": "og:image:secure_url",
+          "value": "https://ipfs.prometheusags.ai/ipfs/bafybeic6mr557ji36o53xo5bc6uw7jpxckzcdqo4kjzis3zimwjchem6bq"
+        },
+        {
+          "key": "og:image:type",
+          "value": "image/png"
+        },
+        {
+          "key": "og:image:width",
+          "value": "2400"
+        },
+        {
+          "key": "og:image:height",
+          "value": "1260"
+        },
+        {
+          "key": "og:image:alt",
+          "value": "KnowMe Praxis 1.1 architecture specification, showing title, source coverage and chapter navigation."
+        },
+        {
+          "key": "og:locale",
+          "value": "en_US"
+        },
+        {
+          "key": "article:published_time",
+          "value": "2026-10-20T10:00:00Z"
+        },
+        {
+          "key": "article:author",
+          "value": "AI-generated with Codex, OpenAI"
+        },
+        {
+          "key": "twitter:card",
+          "value": "summary_large_image"
+        },
+        {
+          "key": "twitter:title",
+          "value": "KnowMe Praxis"
+        },
+        {
+          "key": "twitter:description",
+          "value": "The Sovereign Agentic Workspace: complete architecture, functional requirements, native Flutter, Rust, portable plugins, browser WebMCP canvas/site integration, private dots and LiveKit realtime."
+        },
+        {
+          "key": "twitter:image",
+          "value": "https://ipfs.prometheusags.ai/ipfs/bafybeic6mr557ji36o53xo5bc6uw7jpxckzcdqo4kjzis3zimwjchem6bq"
+        },
+        {
+          "key": "twitter:image:alt",
+          "value": "KnowMe Praxis 1.1 architecture specification, showing title, source coverage and chapter navigation."
+        },
+        {
+          "key": "article:modified_time",
+          "value": "2026-10-20T11:00:00Z"
+        }
+      ],
+      "name": "mobile",
+      "page_errors": [],
+      "metadata_ok": true
+    },
+    {
+      "chapters": 17,
+      "retained": 811,
+      "overflow": false,
+      "webmcp": true,
+      "integration": {
+        "workspace": true,
+        "api": true,
+        "plugins": true,
+        "runtimes": true,
+        "surfaces": true,
+        "security": true,
+        "acceptance": true,
+        "implementation": true,
+        "decisions": true,
+        "provenance": true
+      },
+      "canonical": null,
+      "metadata": [
+        {
+          "key": "og:type",
+          "value": "article"
+        },
+        {
+          "key": "og:site_name",
+          "value": "KnowMe"
+        },
+        {
+          "key": "og:title",
+          "value": "KnowMe Praxis"
+        },
+        {
+          "key": "og:description",
+          "value": "The Sovereign Agentic Workspace: complete architecture, functional requirements, native Flutter, Rust, portable plugins, browser WebMCP canvas/site integration, private dots and LiveKit realtime."
+        },
+        {
+          "key": "og:image",
+          "value": "https://ipfs.prometheusags.ai/ipfs/bafybeic6mr557ji36o53xo5bc6uw7jpxckzcdqo4kjzis3zimwjchem6bq"
+        },
+        {
+          "key": "og:image:secure_url",
+          "value": "https://ipfs.prometheusags.ai/ipfs/bafybeic6mr557ji36o53xo5bc6uw7jpxckzcdqo4kjzis3zimwjchem6bq"
+        },
+        {
+          "key": "og:image:type",
+          "value": "image/png"
+        },
+        {
+          "key": "og:image:width",
+          "value": "2400"
+        },
+        {
+          "key": "og:image:height",
+          "value": "1260"
+        },
+        {
+          "key": "og:image:alt",
+          "value": "KnowMe Praxis 1.1 architecture specification, showing title, source coverage and chapter navigation."
+        },
+        {
+          "key": "og:locale",
+          "value": "en_US"
+        },
+        {
+          "key": "article:published_time",
+          "value": "2026-10-20T10:00:00Z"
+        },
+        {
+          "key": "article:author",
+          "value": "AI-generated with Codex, OpenAI"
+        },
+        {
+          "key": "twitter:card",
+          "value": "summary_large_image"
+        },
+        {
+          "key": "twitter:title",
+          "value": "KnowMe Praxis"
+        },
+        {
+          "key": "twitter:description",
+          "value": "The Sovereign Agentic Workspace: complete architecture, functional requirements, native Flutter, Rust, portable plugins, browser WebMCP canvas/site integration, private dots and LiveKit realtime."
+        },
+        {
+          "key": "twitter:image",
+          "value": "https://ipfs.prometheusags.ai/ipfs/bafybeic6mr557ji36o53xo5bc6uw7jpxckzcdqo4kjzis3zimwjchem6bq"
+        },
+        {
+          "key": "twitter:image:alt",
+          "value": "KnowMe Praxis 1.1 architecture specification, showing title, source coverage and chapter navigation."
+        },
+        {
+          "key": "article:modified_time",
+          "value": "2026-10-20T11:00:00Z"
+        }
+      ],
+      "name": "mobile-dark",
+      "page_errors": [],
+      "metadata_ok": true
+    }
+  ],
+  "image": {
+    "signature_valid": true,
+    "dimensions": [
+      2400,
+      1260
+    ],
+    "public_response": "not verified: authenticated IPFS upload blocked"
+  },
+  "ok": true
+}
